@@ -17,3 +17,10 @@ Verification:
 
 Concerns:
 - None.
+
+Fix update:
+- Added a regression test for V1-style configs with no `profiles:` section in `internal/config/profile_test.go`.
+- `ResolveScan` now injects built-in `slow/normal/fast` defaults only when `cfg.Profiles` is empty, so legacy configs resolve while explicitly unknown profile names still fail.
+
+Additional verification:
+- `rtk proxy go test ./internal/config -run TestResolveScanDefaultsV1ConfigWithoutProfilesSection -count=1`
