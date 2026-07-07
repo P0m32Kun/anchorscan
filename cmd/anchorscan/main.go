@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
+	"github.com/P0m32Kun/anchorscan/internal/web"
 )
 
 type cliDeps struct {
@@ -60,6 +62,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 		return runScan(args[1:], stdout, stderr, deps)
 	case "doctor":
 		return runDoctor(args[1:], stdout)
+	case "web":
+		return runWeb(args[1:], stdout, stderr, deps)
 	case "report":
 		return runReport(args[1:], stdout, deps)
 	case "tools":
@@ -309,6 +313,33 @@ func runDoctor(args []string, stdout io.Writer) error {
 	return nil
 }
 
+func runWeb(args []string, stdout io.Writer, _ io.Writer, deps cliDeps) error {
+	fs := flag.NewFlagSet("web", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	configPath := fs.String("config", filepath.Join("config", "default.yaml"), "path to config file")
+	dbPath := fs.String("db", filepath.Join("data", "scans.sqlite"), "path to sqlite database")
+	listen := fs.String("listen", "127.0.0.1:8088", "listen address")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printWebHelp(stdout)
+			return nil
+		}
+		return err
+	}
+	handler, err := web.NewServer(web.ServerOptions{
+		ConfigPath: *configPath,
+		DBPath:     *dbPath,
+		Listen:     *listen,
+		Runner:     deps.newRunner(),
+		Now:        deps.now,
+	})
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "listening on http://%s\n", *listen)
+	return http.ListenAndServe(*listen, handler)
+}
+
 func runTools(args []string, stdout io.Writer) error {
 	if len(args) == 0 || isHelpRequest(args[0]) {
 		printToolsHelp(stdout)
@@ -419,6 +450,7 @@ func printRootHelp(w io.Writer) {
 Commands:
   scan        Run discovery, fingerprinting, and reporting
   doctor      Validate config, tools, and paths
+  web         Start the local Web Console
   report      Rebuild reports from stored results
   tools check Verify configured external tools
 
@@ -462,6 +494,15 @@ Flags:
   --config <path>   Config file path
   --db <path>       SQLite database path
   --reports <path>  Report output directory`)
+}
+
+func printWebHelp(w io.Writer) {
+	_, _ = fmt.Fprintln(w, `Usage: anchorscan web [flags]
+
+Flags:
+  --config <path>   Config file path
+  --db <path>       SQLite database path
+  --listen <addr>   Listen address`)
 }
 
 func printToolsHelp(w io.Writer) {

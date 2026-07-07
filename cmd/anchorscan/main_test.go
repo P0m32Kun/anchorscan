@@ -70,6 +70,17 @@ func TestExecuteRootHelpShowsCommands(t *testing.T) {
 	}
 }
 
+func TestExecuteWebHelpShowsListen(t *testing.T) {
+	var stdout bytes.Buffer
+	err := run([]string{"web", "--help"}, &stdout, &bytes.Buffer{}, cliDeps{})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "--listen") {
+		t.Fatalf("expected --listen in %q", stdout.String())
+	}
+}
+
 func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	var stdout bytes.Buffer
 	err := run([]string{"scan", "--help"}, &stdout, &bytes.Buffer{}, cliDeps{})

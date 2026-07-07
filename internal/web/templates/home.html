@@ -1,0 +1,11 @@
+{{define "content"}}
+<h2>Home</h2>
+<section>
+  <h3>Projects</h3>
+  <ul>{{range .Projects}}<li>{{.Name}}</li>{{else}}<li>No projects yet.</li>{{end}}</ul>
+</section>
+<section>
+  <h3>Recent Runs</h3>
+  <ul>{{range .Runs}}<li>{{.RunID}} - {{.Status}}</li>{{else}}<li>No runs yet.</li>{{end}}</ul>
+</section>
+{{end}}
