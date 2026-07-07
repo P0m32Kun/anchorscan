@@ -120,15 +120,26 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		go func() {
 			defer close(targets)
 			for _, target := range opts.Targets {
-				targets <- target
+				select {
+				case <-ctx.Done():
+					return
+				case targets <- target:
+				}
 			}
 		}()
 
+		var canceledErr error
 		var failed int
 		var failedTargets []targetResult
 		var firstErr error
 		for result := range results {
 			if result.err != nil {
+				if errors.Is(result.err, context.Canceled) {
+					if canceledErr == nil {
+						canceledErr = result.err
+					}
+					continue
+				}
 				failed++
 				if firstErr == nil {
 					firstErr = result.err
@@ -141,6 +152,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 		for _, result := range failedTargets {
 			emit(opts, scanStore, "error", "target", "target %s failed: %v", result.target, result.err)
+		}
+		if canceledErr != nil {
+			return canceledErr
 		}
 		if failed == len(opts.Targets) {
 			return fmt.Errorf("all targets failed: %w", firstErr)

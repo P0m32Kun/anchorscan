@@ -60,3 +60,53 @@
 ## Concerns
 - The new tests cover the required worker-bound behavior and partial-failure continuation path.
 - I did not add a separate explicit regression test for the "all targets fail" branch because the task-required RED/GREEN coverage already exercised the new worker/isolation behaviors and the implementation for the all-failed branch is a small conditional on the collected results.
+
+---
+
+## Fix pass for reviewer findings (after commit 027b2ab)
+
+### What I fixed
+1. Restored the worker-limit regression test to the brief's intended shape.
+   - `TestRunScanRespectsHostWorkers` now uses `HostWorkers: 1` with two targets.
+   - It fails if `maxActive > 1`.
+2. Fixed multi-target cancellation semantics in `/Users/kun/DEV/new-Anchor/internal/app/scan.go`.
+   - The target feeder now stops on `ctx.Done()` instead of enqueueing the rest of the run.
+   - `context.Canceled` from any worker is now treated as a run-level cancellation, not an ordinary target-local failure.
+3. Added direct regression coverage for the all-targets-failed rule.
+   - `TestRunScanReturnsErrorWhenAllTargetsFail` now asserts a run-level error is returned.
+
+### Root cause
+- The worker feeder goroutine always pushed every target into the queue, even after the run context was canceled.
+- The result collector counted `context.Canceled` the same way as a normal target error, so a partial success could incorrectly let a canceled multi-target run finish as success.
+- The original Task 6 worker test had drifted from the review requirement and no longer proved the concurrency bound itself.
+
+### TDD evidence for the fix pass
+- RED:
+  - Ran `go test ./internal/app -run 'TestRunScanRespectsHostWorkers|TestRunScanContinuesAfterTargetFailure|TestRunScanMarksCanceledWhenContextCanceled|TestRunScanReturnsErrorWhenAllTargetsFail' -count=1`
+  - First run failed to compile because the new cancellation assertion needed the `errors` import.
+  - After fixing the test compile issue, the focused run failed for the intended product reason:
+    - `TestRunScanMarksCanceledWhenContextCanceled`: `expected only one target start before cancellation, got 2 calls`
+- GREEN:
+  - Updated the feeder to `select` on `ctx.Done()` while sending targets.
+  - Short-circuited `context.Canceled` as a run-level return path.
+  - Re-ran the focused test command and it passed.
+
+### Fix-pass verification
+- `go test ./internal/app -run 'TestRunScanRespectsHostWorkers|TestRunScanContinuesAfterTargetFailure|TestRunScanMarksCanceledWhenContextCanceled|TestRunScanReturnsErrorWhenAllTargetsFail' -count=1`
+  - PASS
+- `go test ./internal/app -count=1`
+  - PASS
+- `go test ./...`
+  - PASS
+
+### Files changed in the fix pass
+- `/Users/kun/DEV/new-Anchor/internal/app/scan.go`
+- `/Users/kun/DEV/new-Anchor/internal/app/scan_test.go`
+
+### Self-review
+- Stayed inside Task 6 scope and only touched the two owned app files plus this append-only report.
+- Preserved the existing per-target execution order; the fix only changes queue feeding and result classification for cancellation.
+- The cancellation regression test now covers both required behaviors in one path: no post-cancel target dispatch and run-level canceled return.
+
+### Remaining concerns
+- None specific to Task 6 scope.

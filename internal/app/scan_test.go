@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -160,27 +161,27 @@ func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 }
 
 func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
-	runner := &cancelRunner{}
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := &cancelAfterFirstTargetRunner{cancel: cancel}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
 	reportPath := filepath.Join(t.TempDir(), "report.json")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
 
 	opts := ScanOptions{
 		RunID:          "run-1",
 		ProfileName:    "normal",
-		Targets:        []string{"192.168.1.10"},
+		HostWorkers:    1,
+		Targets:        []string{"192.168.1.10", "192.168.1.11"},
 		Ports:          "22",
 		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 	}
 	err = RunScan(ctx, runner, scanStore, opts)
-	if err == nil {
-		t.Fatal("expected error")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled, got %v", err)
 	}
 	run, getErr := scanStore.GetScanRun("run-1")
 	if getErr != nil {
@@ -188,6 +189,9 @@ func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
 	}
 	if run.Status != "canceled" {
 		t.Fatalf("status mismatch: %#v", run)
+	}
+	if runner.calls != 1 {
+		t.Fatalf("expected only one target start before cancellation, got %d calls", runner.calls)
 	}
 }
 
@@ -314,8 +318,8 @@ func TestRunScanRespectsHostWorkers(t *testing.T) {
 	opts := ScanOptions{
 		RunID:          "run-1",
 		ProfileName:    "slow",
-		HostWorkers:    2,
-		Targets:        []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"},
+		HostWorkers:    1,
+		Targets:        []string{"10.0.0.1", "10.0.0.2"},
 		Ports:          "22",
 		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
@@ -324,8 +328,8 @@ func TestRunScanRespectsHostWorkers(t *testing.T) {
 	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
-	if runner.maxActive != 2 {
-		t.Fatalf("expected max active 2, got %d", runner.maxActive)
+	if runner.maxActive > 1 {
+		t.Fatalf("expected max active 1, got %d", runner.maxActive)
 	}
 }
 
@@ -371,6 +375,34 @@ func TestRunScanContinuesAfterTargetFailure(t *testing.T) {
 	}
 }
 
+func TestRunScanReturnsErrorWhenAllTargetsFail(t *testing.T) {
+	runner := failRunner{err: fmt.Errorf("boom")}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	opts := ScanOptions{
+		RunID:          "run-1",
+		ProfileName:    "normal",
+		HostWorkers:    2,
+		Targets:        []string{"192.168.1.10", "192.168.1.11"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: reportPath,
+	}
+
+	err = RunScan(context.Background(), runner, scanStore, opts)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "all targets failed") {
+		t.Fatalf("expected all-targets-failed error, got %v", err)
+	}
+}
+
 type sequenceRunner struct {
 	outputs [][]byte
 	sleeps  []time.Duration
@@ -389,6 +421,20 @@ func (s *sequenceRunner) Run(_ context.Context, _ string, _ []string) ([]byte, e
 type cancelRunner struct{}
 
 func (cancelRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {
+	return nil, ctx.Err()
+}
+
+type cancelAfterFirstTargetRunner struct {
+	cancel func()
+	calls  int
+}
+
+func (r *cancelAfterFirstTargetRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {
+	r.calls++
+	if r.calls == 1 {
+		r.cancel()
+		<-ctx.Done()
+	}
 	return nil, ctx.Err()
 }
 
@@ -494,6 +540,14 @@ func (r *failFirstRunner) Run(_ context.Context, _ string, _ []string) ([]byte, 
 	out := r.outputs[r.index-1]
 	r.index++
 	return out, nil
+}
+
+type failRunner struct {
+	err error
+}
+
+func (r failRunner) Run(_ context.Context, _ string, _ []string) ([]byte, error) {
+	return nil, r.err
 }
 
 func containsEvent(events []store.ScanEvent, level string, stage string, target string) bool {
