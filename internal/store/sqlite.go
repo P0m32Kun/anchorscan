@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"time"
 
 	_ "modernc.org/sqlite"
 
@@ -40,6 +41,36 @@ CREATE TABLE IF NOT EXISTS findings (
   summary TEXT NOT NULL,
   target TEXT NOT NULL,
   output TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  default_targets TEXT NOT NULL,
+  default_ports TEXT NOT NULL,
+  default_profile TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS scan_runs (
+  run_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  target TEXT NOT NULL,
+  ports TEXT NOT NULL,
+  profile TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT NOT NULL,
+  error TEXT NOT NULL,
+  config_snapshot TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS scan_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  time TEXT NOT NULL,
+  level TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  message TEXT NOT NULL
 );`
 	if _, err := db.Exec(schema); err != nil {
 		_ = db.Close()
@@ -122,4 +153,18 @@ func boolToInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+func formatTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339Nano)
+}
+
+func parseTime(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	return time.Parse(time.RFC3339Nano, value)
 }
