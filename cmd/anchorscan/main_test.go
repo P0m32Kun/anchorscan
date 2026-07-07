@@ -126,7 +126,13 @@ profiles:
 		t.Fatalf("run returned error: %v", err)
 	}
 
-	if !runner.hasArg("/opt/nmap", "--max-retries") {
+	if !runner.hasArgs("/opt/rustscan", "--batch-size", "100") {
+		t.Fatalf("expected slow profile rustscan args in %#v", runner.commands)
+	}
+	if !runner.hasArgs("/opt/httpx", "-rate-limit", "20") {
+		t.Fatalf("expected slow profile httpx args in %#v", runner.commands)
+	}
+	if !runner.hasArgs("/opt/nmap", "-T2", "--max-retries", "5") {
 		t.Fatalf("expected nmap override args in %#v", runner.commands)
 	}
 }
@@ -261,6 +267,27 @@ func (r *recordingRunner) hasArg(binary string, arg string) bool {
 		}
 		for _, item := range cmd[1:] {
 			if item == arg {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *recordingRunner) hasArgs(binary string, args ...string) bool {
+	for _, cmd := range r.commands {
+		if len(cmd) == 0 || cmd[0] != binary {
+			continue
+		}
+		for i := 1; i+len(args) <= len(cmd); i++ {
+			match := true
+			for j := range args {
+				if cmd[i+j] != args[j] {
+					match = false
+					break
+				}
+			}
+			if match {
 				return true
 			}
 		}

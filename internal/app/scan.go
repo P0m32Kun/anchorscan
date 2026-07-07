@@ -31,12 +31,14 @@ type TagRule = vuln.TagRule
 
 type ScanOptions struct {
 	RunID          string
+	ProjectID      string
 	Targets        []string
 	Ports          string
 	Tools          ToolPaths
 	ProfileName    string
 	HostWorkers    int
 	ExtraArgs      ToolExtraArgs
+	ConfigSnapshot string
 	JSONReportPath string
 	NSERules       map[string][]string
 	TagRules       []TagRule

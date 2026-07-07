@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -14,6 +15,29 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
+
+func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
+	type fieldCheck struct {
+		name string
+		typ  reflect.Type
+	}
+
+	for _, check := range []fieldCheck{
+		{name: "ProfileName", typ: reflect.TypeOf("")},
+		{name: "HostWorkers", typ: reflect.TypeOf(0)},
+		{name: "ExtraArgs", typ: reflect.TypeOf(ToolExtraArgs{})},
+		{name: "ProjectID", typ: reflect.TypeOf("")},
+		{name: "ConfigSnapshot", typ: reflect.TypeOf("")},
+	} {
+		field, ok := reflect.TypeOf(ScanOptions{}).FieldByName(check.name)
+		if !ok {
+			t.Fatalf("expected ScanOptions.%s", check.name)
+		}
+		if field.Type != check.typ {
+			t.Fatalf("expected ScanOptions.%s type %v, got %v", check.name, check.typ, field.Type)
+		}
+	}
+}
 
 func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	runner := &sequenceRunner{
