@@ -44,6 +44,37 @@ go run ./cmd/anchorscan report \
 go run ./cmd/anchorscan tools check --config config/default.yaml
 ```
 
+## V1.1 Web Console
+
+Start local Web Console:
+
+```bash
+go run ./cmd/anchorscan web \
+  --config config/default.yaml \
+  --db data/scans.sqlite \
+  --listen 127.0.0.1:8088
+```
+
+Open http://127.0.0.1:8088.
+
+## Scan Profiles
+
+- `slow`: fragile networks and old devices
+- `normal`: default
+- `fast`: healthy networks and many targets
+
+CLI:
+
+```bash
+go run ./cmd/anchorscan scan --config config/default.yaml --target 127.0.0.1 --profile slow
+```
+
+## Doctor
+
+```bash
+go run ./cmd/anchorscan doctor --config config/default.yaml --db data/scans.sqlite --reports reports
+```
+
 ## Port Selection
 
 Use one of these with `--ports`:

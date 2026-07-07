@@ -255,3 +255,14 @@ V1 lab pass is good enough when:
 - JSON and HTML agree on results
 - multi-service reports do not mix findings across ports
 - unknown services do not break the run
+
+## V1.1 Web Lab
+
+1. Start Web Console.
+2. Run doctor from Home.
+3. Create Local Lab project.
+4. Start scan with `normal` profile and ports `8080,6379`.
+5. Confirm progress events update.
+6. Confirm report page shows Redis and Tomcat assets.
+7. Start a long full-port scan and cancel it.
+8. Confirm canceled status and event log.

@@ -65,7 +65,7 @@ func TestExecuteRootHelpShowsCommands(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"Usage:", "scan", "report", "tools check"} {
+	for _, want := range []string{"Usage:", "scan", "report", "tools check", "doctor", "web", "cancel"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in help output %q", want, output)
 		}

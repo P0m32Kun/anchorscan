@@ -159,3 +159,15 @@ When a lab case fails, answer these in order:
 6. Did JSON/HTML render those findings?
 
 Do not debug all layers at once. Start at the first wrong answer.
+
+## Web Console does not start
+
+Check listen address, DB path, and config path.
+
+## Scan cannot start from Web
+
+Check if another scan is running. v1.1 allows one active scan.
+
+## Cancel does not work
+
+Cancel only affects scans started by the running Web Console process. Confirm `anchorscan cancel --server` points to the active Web Console.

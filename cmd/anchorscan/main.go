@@ -476,8 +476,14 @@ Commands:
   scan        Run discovery, fingerprinting, and reporting
   doctor      Validate config, tools, and paths
   web         Start the local Web Console
+  cancel      Cancel a Web-managed scan
   report      Rebuild reports from stored results
   tools check Verify configured external tools
+
+Examples:
+  anchorscan doctor --config config/default.yaml
+  anchorscan web --config config/default.yaml --db data/scans.sqlite
+  anchorscan cancel --run-id 20260707-120000
 
 Global flags:
   -h, --help  Show help`)
