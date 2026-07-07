@@ -117,6 +117,80 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	}
 }
 
+func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
+	runner := &sequenceRunner{outputs: [][]byte{
+		[]byte("192.168.1.10 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+	}}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	opts := ScanOptions{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		ProfileName:    "normal",
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: reportPath,
+		ConfigSnapshot: "profile: normal",
+	}
+	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	run, err := scanStore.GetScanRun("run-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if run.Status != "completed" || run.Profile != "normal" {
+		t.Fatalf("unexpected run: %#v", run)
+	}
+	events, err := scanStore.ListScanEvents("run-1", 20)
+	if err != nil {
+		t.Fatalf("ListScanEvents returned error: %v", err)
+	}
+	if len(events) == 0 || events[0].Message == "" {
+		t.Fatalf("expected scan events, got %#v", events)
+	}
+}
+
+func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
+	runner := &cancelRunner{}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	opts := ScanOptions{
+		RunID:          "run-1",
+		ProfileName:    "normal",
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: reportPath,
+	}
+	err = RunScan(ctx, runner, scanStore, opts)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	run, getErr := scanStore.GetScanRun("run-1")
+	if getErr != nil {
+		t.Fatalf("GetScanRun returned error: %v", getErr)
+	}
+	if run.Status != "canceled" {
+		t.Fatalf("status mismatch: %#v", run)
+	}
+}
+
 func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 	oldHeartbeat := nmapHeartbeatEvery
 	nmapHeartbeatEvery = time.Millisecond
@@ -241,6 +315,12 @@ func (s *sequenceRunner) Run(_ context.Context, _ string, _ []string) ([]byte, e
 	out := s.outputs[s.index]
 	s.index++
 	return out, nil
+}
+
+type cancelRunner struct{}
+
+func (cancelRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {
+	return nil, ctx.Err()
 }
 
 type recordingSequenceRunner struct {

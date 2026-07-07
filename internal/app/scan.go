@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
@@ -45,20 +48,51 @@ type ScanOptions struct {
 	Logf           func(format string, args ...any)
 }
 
-func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) error {
+func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
 
+	if opts.ProfileName == "" {
+		opts.ProfileName = "normal"
+	}
+	if opts.RunID != "" && scanStore != nil {
+		_ = scanStore.SaveScanRun(store.ScanRun{
+			RunID:          opts.RunID,
+			ProjectID:      opts.ProjectID,
+			Target:         strings.Join(opts.Targets, ","),
+			Ports:          opts.Ports,
+			Profile:        opts.ProfileName,
+			Status:         "running",
+			StartedAt:      time.Now(),
+			ConfigSnapshot: opts.ConfigSnapshot,
+		})
+	}
+	defer func() {
+		if opts.RunID == "" || scanStore == nil {
+			return
+		}
+		status := "completed"
+		message := ""
+		if runErr != nil {
+			status = "failed"
+			message = runErr.Error()
+			if errors.Is(runErr, context.Canceled) {
+				status = "canceled"
+			}
+		}
+		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
+	}()
+
 	for _, target := range opts.Targets {
 		logf(opts, "target %s", target)
-		logf(opts, "rustscan %s ports=%s", target, opts.Ports)
+		emit(opts, scanStore, "info", "rustscan", "rustscan %s ports=%s", target, opts.Ports)
 		ports, err := tools.DiscoverPorts(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
 		if err != nil {
 			return err
 		}
-		logf(opts, "rustscan %s open=%v", target, ports)
+		emit(opts, scanStore, "info", "rustscan", "rustscan %s open=%v", target, ports)
 
-		logf(opts, "nmap %s ports=%v (service detection may be slow)", target, ports)
+		emit(opts, scanStore, "info", "nmap", "nmap %s ports=%v (service detection may be slow)", target, ports)
 		started := time.Now()
 		done := make(chan struct{})
 		go func() {
@@ -78,12 +112,12 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		if err != nil {
 			return err
 		}
-		logf(opts, "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
+		emit(opts, scanStore, "info", "nmap", "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
 
 		for _, fp := range fingerprints {
 			httpResult := tools.HTTPResult{}
 			if fp.IsWeb && opts.Tools.Httpx != "" {
-				logf(opts, "httpx %s", fp.URL)
+				emit(opts, scanStore, "info", "httpx", "httpx %s", fp.URL)
 				httpResult, err = tools.EnrichWeb(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
 				if err != nil {
 					return err
@@ -100,7 +134,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 			scripts := vuln.MatchNSE(fp, opts.NSERules)
 			if len(scripts) > 0 {
-				logf(opts, "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
+				emit(opts, scanStore, "info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
 				nseResults, err := tools.RunNSE(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 				if err != nil {
 					return err
@@ -125,7 +159,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 			match := vuln.MatchNucleiTags(fp, vuln.HTTPResult{URL: fp.URL, Tech: httpResult.Tech}, opts.TagRules)
 			if len(match.Tags) > 0 && opts.Tools.Nuclei != "" {
-				logf(opts, "nuclei %s tags=%v", match.Address, match.Tags)
+				emit(opts, scanStore, "info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 				out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, opts.ExtraArgs.Nuclei)
 				if err != nil {
 					return err
@@ -154,7 +188,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 	}
 
-	logf(opts, "report json %s", opts.JSONReportPath)
+	emit(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
 	return report.WriteJSON(opts.JSONReportPath, report.Build(allFingerprints, allFindings))
 }
 
@@ -162,4 +196,19 @@ func logf(opts ScanOptions, format string, args ...any) {
 	if opts.Logf != nil {
 		opts.Logf(format, args...)
 	}
+}
+
+func emit(opts ScanOptions, scanStore *store.Store, level string, stage string, format string, args ...any) {
+	message := fmt.Sprintf(format, args...)
+	logf(opts, "%s", message)
+	if opts.RunID == "" || scanStore == nil {
+		return
+	}
+	_ = scanStore.AppendScanEvent(store.ScanEvent{
+		RunID:   opts.RunID,
+		Time:    time.Now(),
+		Level:   level,
+		Stage:   stage,
+		Message: message,
+	})
 }
