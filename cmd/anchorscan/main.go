@@ -76,6 +76,12 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	jsonPath := fs.String("json", "", "path to JSON report output")
 	htmlPath := fs.String("html", "", "path to HTML report output")
 	portsSpec := fs.String("ports", "", "ports preset or csv")
+	profileFlag := fs.String("profile", "", "scan profile: slow, normal, or fast")
+	hostWorkersFlag := fs.Int("host-workers", 0, "host-level worker count override")
+	rustscanArgsFlag := fs.String("rustscan-args", "", "extra rustscan args")
+	nmapArgsFlag := fs.String("nmap-args", "", "extra nmap args")
+	httpxArgsFlag := fs.String("httpx-args", "", "extra httpx args")
+	nucleiArgsFlag := fs.String("nuclei-args", "", "extra nuclei args")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printScanHelp(stdout)
@@ -118,6 +124,18 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		}
 	}
 
+	effective, err := config.ResolveScan(cfg, config.Overrides{
+		ProfileName:  *profileFlag,
+		HostWorkers:  *hostWorkersFlag,
+		RustscanArgs: *rustscanArgsFlag,
+		NmapArgs:     *nmapArgsFlag,
+		HttpxArgs:    *httpxArgsFlag,
+		NucleiArgs:   *nucleiArgsFlag,
+	})
+	if err != nil {
+		return err
+	}
+
 	if *jsonPath == "" {
 		*jsonPath = filepath.Join("reports", "scan-"+deps.now().Format("20060102-150405")+".json")
 	}
@@ -150,6 +168,14 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 			Nmap:     cfg.Tools.Nmap,
 			Httpx:    cfg.Tools.Httpx,
 			Nuclei:   cfg.Tools.Nuclei,
+		},
+		ProfileName: effective.ProfileName,
+		HostWorkers: effective.HostWorkers,
+		ExtraArgs: app.ToolExtraArgs{
+			Rustscan: effective.Rustscan,
+			Nmap:     effective.Nmap,
+			Httpx:    effective.Httpx,
+			Nuclei:   effective.Nuclei,
 		},
 		JSONReportPath: *jsonPath,
 		NSERules:       nseRules,
@@ -371,6 +397,12 @@ Flags:
   --config <path>   Config file path
   --target <value>  Target IP, CIDR, or comma-separated list
   --ports <value>   Comma list, top100, top1000, or full
+  --profile slow|normal|fast
+  --host-workers N
+  --rustscan-args "..."
+  --nmap-args "..."
+  --httpx-args "..."
+  --nuclei-args "..."
   --db <path>       SQLite database path
   --json <path>     JSON report output path
   --html <path>     HTML report output path`)

@@ -20,6 +20,13 @@ type ToolPaths struct {
 	Nuclei   string
 }
 
+type ToolExtraArgs struct {
+	Rustscan []string
+	Nmap     []string
+	Httpx    []string
+	Nuclei   []string
+}
+
 type TagRule = vuln.TagRule
 
 type ScanOptions struct {
@@ -27,6 +34,9 @@ type ScanOptions struct {
 	Targets        []string
 	Ports          string
 	Tools          ToolPaths
+	ProfileName    string
+	HostWorkers    int
+	ExtraArgs      ToolExtraArgs
 	JSONReportPath string
 	NSERules       map[string][]string
 	TagRules       []TagRule
@@ -40,7 +50,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	for _, target := range opts.Targets {
 		logf(opts, "target %s", target)
 		logf(opts, "rustscan %s ports=%s", target, opts.Ports)
-		ports, err := tools.DiscoverPorts(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, nil)
+		ports, err := tools.DiscoverPorts(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
 		if err != nil {
 			return err
 		}
@@ -61,7 +71,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 				}
 			}
 		}()
-		fingerprints, err := tools.Fingerprint(ctx, runner, opts.Tools.Nmap, target, ports, nil)
+		fingerprints, err := tools.Fingerprint(ctx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
 		close(done)
 		if err != nil {
 			return err
@@ -72,7 +82,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			httpResult := tools.HTTPResult{}
 			if fp.IsWeb && opts.Tools.Httpx != "" {
 				logf(opts, "httpx %s", fp.URL)
-				httpResult, err = tools.EnrichWeb(ctx, runner, opts.Tools.Httpx, fp, nil)
+				httpResult, err = tools.EnrichWeb(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
 				if err != nil {
 					return err
 				}
@@ -89,7 +99,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			scripts := vuln.MatchNSE(fp, opts.NSERules)
 			if len(scripts) > 0 {
 				logf(opts, "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
-				nseResults, err := tools.RunNSE(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, nil)
+				nseResults, err := tools.RunNSE(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 				if err != nil {
 					return err
 				}
@@ -114,7 +124,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			match := vuln.MatchNucleiTags(fp, vuln.HTTPResult{URL: fp.URL, Tech: httpResult.Tech}, opts.TagRules)
 			if len(match.Tags) > 0 && opts.Tools.Nuclei != "" {
 				logf(opts, "nuclei %s tags=%v", match.Address, match.Tags)
-				out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, nil)
+				out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, opts.ExtraArgs.Nuclei)
 				if err != nil {
 					return err
 				}

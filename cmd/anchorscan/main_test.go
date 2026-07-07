@@ -59,10 +59,75 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"Usage: anchorscan scan", "--target", "--ports", "--json", "--html"} {
+	for _, want := range []string{
+		"Usage: anchorscan scan",
+		"--target",
+		"--ports",
+		"--profile",
+		"--host-workers",
+		"--rustscan-args",
+		"--nmap-args",
+		"--httpx-args",
+		"--nuclei-args",
+		"--json",
+		"--html",
+	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in help output %q", want, output)
 		}
+	}
+}
+
+func TestExecuteScanPassesProfileAndToolArgs(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	dbPath := filepath.Join(dir, "scan.db")
+	jsonPath := filepath.Join(dir, "report.json")
+	writeFile(t, configPath, `tools:
+  rustscan: /opt/rustscan
+  nmap: /opt/nmap
+  httpx: /opt/httpx
+  nuclei: /opt/nuclei
+scan:
+  ports: 8080
+  profile: normal
+profiles:
+  normal:
+    host_workers: 3
+    rustscan_args: ["--batch-size", "500"]
+    nmap_args: ["-T3"]
+    httpx_args: ["-rate-limit", "100"]
+    nuclei_args: ["-rate-limit", "50"]
+  slow:
+    host_workers: 1
+    rustscan_args: ["--batch-size", "100"]
+    nmap_args: ["-T2"]
+    httpx_args: ["-rate-limit", "20"]
+    nuclei_args: ["-rate-limit", "10"]
+`)
+
+	runner := &recordingRunner{outputs: [][]byte{
+		[]byte("Open 8080\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
+	}}
+
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "192.168.1.10",
+		"--db", dbPath,
+		"--json", jsonPath,
+		"--profile", "slow",
+		"--host-workers", "2",
+		"--nmap-args", "-T2 --max-retries 5",
+	}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{newRunner: func() tools.Runner { return runner }})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	if !runner.hasArg("/opt/nmap", "--max-retries") {
+		t.Fatalf("expected nmap override args in %#v", runner.commands)
 	}
 }
 
@@ -170,6 +235,37 @@ func (f *fakeRunner) Run(_ context.Context, _ string, _ []string) ([]byte, error
 	out := f.outputs[f.index]
 	f.index++
 	return out, nil
+}
+
+type recordingRunner struct {
+	outputs  [][]byte
+	commands [][]string
+	index    int
+}
+
+func (r *recordingRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	cmd := append([]string{binary}, args...)
+	r.commands = append(r.commands, cmd)
+	if r.index >= len(r.outputs) {
+		return nil, errors.New("unexpected command")
+	}
+	out := r.outputs[r.index]
+	r.index++
+	return out, nil
+}
+
+func (r *recordingRunner) hasArg(binary string, arg string) bool {
+	for _, cmd := range r.commands {
+		if len(cmd) == 0 || cmd[0] != binary {
+			continue
+		}
+		for _, item := range cmd[1:] {
+			if item == arg {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func writeFile(t *testing.T, path string, content string) {
