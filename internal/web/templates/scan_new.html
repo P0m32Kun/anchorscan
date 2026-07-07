@@ -1,0 +1,16 @@
+{{define "content"}}
+<h2>Start Scan</h2>
+<form method="post" action="/scan">
+  <label>Project <select name="project_id">{{range .Projects}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label><br>
+  <label>Target <input name="target" value="127.0.0.1" required></label><br>
+  <label>Ports <input name="ports" value="8080,6379"></label><br>
+  <label>Profile <select name="profile"><option>slow</option><option selected>normal</option><option>fast</option></select></label><br>
+  <details><summary>Advanced args</summary>
+    <label>Rustscan args <input name="rustscan_args"></label><br>
+    <label>Nmap args <input name="nmap_args"></label><br>
+    <label>Httpx args <input name="httpx_args"></label><br>
+    <label>Nuclei args <input name="nuclei_args"></label><br>
+  </details>
+  <button type="submit">Start Scan</button>
+</form>
+{{end}}

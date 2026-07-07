@@ -67,3 +67,24 @@ func TestCreateProjectFromWeb(t *testing.T) {
 		t.Fatalf("unexpected projects: %#v", projects)
 	}
 }
+
+func TestNewScanPageRenders(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", DefaultTargets: "127.0.0.1", DefaultPorts: "8080", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/scan/new", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "Start Scan") {
+		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
+	}
+}
