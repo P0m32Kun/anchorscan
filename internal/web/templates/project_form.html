@@ -1,0 +1,12 @@
+{{define "content"}}
+<h2>{{.Title}}</h2>
+<form method="post" action="{{.Action}}">
+  <label>Name <input name="name" value="{{.Project.Name}}" required></label><br>
+  <label>Description <input name="description" value="{{.Project.Description}}"></label><br>
+  <label>Default Targets <input name="default_targets" value="{{.Project.DefaultTargets}}"></label><br>
+  <label>Default Ports <input name="default_ports" value="{{.Project.DefaultPorts}}"></label><br>
+  <label>Default Profile <select name="default_profile"><option>slow</option><option selected>normal</option><option>fast</option></select></label><br>
+  <button type="submit">Save</button>
+</form>
+{{if .Project.ID}}<form method="post" action="/projects/{{.Project.ID}}"><input type="hidden" name="_method" value="delete"><button type="submit">Delete</button></form>{{end}}
+{{end}}

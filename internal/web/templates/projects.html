@@ -1,0 +1,9 @@
+{{define "content"}}
+<h2>Projects</h2>
+<p><a href="/projects/new">New Project</a></p>
+<table><tr><th>Name</th><th>Targets</th><th>Ports</th><th>Profile</th><th>Actions</th></tr>
+{{range .Projects}}
+<tr><td><a href="/projects/{{.ID}}">{{.Name}}</a></td><td>{{.DefaultTargets}}</td><td>{{.DefaultPorts}}</td><td>{{.DefaultProfile}}</td><td><a href="/projects/{{.ID}}/edit">Edit</a></td></tr>
+{{else}}<tr><td colspan="5">No projects.</td></tr>{{end}}
+</table>
+{{end}}

@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -25,6 +27,9 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	if opts.Listen == "" {
 		opts.Listen = "127.0.0.1:8088"
 	}
+	if opts.Now == nil {
+		opts.Now = time.Now
+	}
 	scanStore, err := store.Open(opts.DBPath)
 	if err != nil {
 		return nil, err
@@ -33,6 +38,9 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	s := &server{opts: opts, store: scanStore}
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServerFS(assets))
+	mux.HandleFunc("/projects", s.projects)
+	mux.HandleFunc("/projects/new", s.projectNew)
+	mux.HandleFunc("/projects/", s.projectDetail)
 	mux.HandleFunc("/", s.home)
 	return mux, nil
 }
@@ -54,4 +62,125 @@ func (s *server) home(w http.ResponseWriter, r *http.Request) {
 		"Projects": projects,
 		"Runs":     runs,
 	})
+}
+
+func (s *server) projects(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		projects, err := s.store.ListProjects()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		render(w, "templates/projects.html", map[string]any{"Projects": projects})
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		now := s.opts.Now()
+		project := store.Project{
+			ID:             newID("project", now),
+			Name:           r.FormValue("name"),
+			Description:    r.FormValue("description"),
+			DefaultTargets: r.FormValue("default_targets"),
+			DefaultPorts:   r.FormValue("default_ports"),
+			DefaultProfile: r.FormValue("default_profile"),
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		if err := s.store.SaveProject(project); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/projects", http.StatusSeeOther)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *server) projectNew(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	render(w, "templates/project_form.html", map[string]any{
+		"Title":   "New Project",
+		"Action":  "/projects",
+		"Project": store.Project{DefaultProfile: "normal"},
+	})
+}
+
+func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/projects/")
+	id := strings.TrimSuffix(path, "/edit")
+
+	switch {
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/edit"):
+		project, err := s.store.GetProject(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		render(w, "templates/project_form.html", map[string]any{
+			"Title":   "Edit Project",
+			"Action":  "/projects/" + id,
+			"Project": project,
+		})
+	case r.Method == http.MethodGet:
+		project, err := s.store.GetProject(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		render(w, "templates/project_form.html", map[string]any{
+			"Title":   project.Name,
+			"Action":  "/projects/" + id,
+			"Project": project,
+		})
+	case r.Method == http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if r.FormValue("_method") == "delete" {
+			if err := s.store.DeleteProject(id); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			http.Redirect(w, r, "/projects", http.StatusSeeOther)
+			return
+		}
+		project, err := s.store.GetProject(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		project.Name = r.FormValue("name")
+		project.Description = r.FormValue("description")
+		project.DefaultTargets = r.FormValue("default_targets")
+		project.DefaultPorts = r.FormValue("default_ports")
+		project.DefaultProfile = r.FormValue("default_profile")
+		project.UpdatedAt = s.opts.Now()
+		if err := s.store.SaveProject(project); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/projects", http.StatusSeeOther)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func render(w http.ResponseWriter, file string, data any) {
+	tmpl, err := parseTemplates(file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = tmpl.ExecuteTemplate(w, "base", data)
+}
+
+func newID(prefix string, now time.Time) string {
+	return fmt.Sprintf("%s-%s", prefix, now.Format("20060102-150405.000000000"))
 }
