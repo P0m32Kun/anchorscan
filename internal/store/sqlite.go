@@ -155,11 +155,13 @@ func boolToInt(value bool) int {
 	return 0
 }
 
+const sortableTimestampLayout = "2006-01-02T15:04:05.000000000Z07:00"
+
 func formatTime(value time.Time) string {
 	if value.IsZero() {
 		return ""
 	}
-	return value.UTC().Format(time.RFC3339Nano)
+	return value.UTC().Format(sortableTimestampLayout)
 }
 
 func parseTime(value string) (time.Time, error) {

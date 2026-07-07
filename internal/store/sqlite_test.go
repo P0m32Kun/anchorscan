@@ -185,3 +185,61 @@ func TestStoreScanRunsAndEvents(t *testing.T) {
 		t.Fatalf("unexpected events: %#v", events)
 	}
 }
+
+func TestStoreListsScanRunsByChronologicalStartedAtWithMixedPrecision(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	projectID := "p1"
+	earlier := ScanRun{
+		RunID:          "run-whole-second",
+		ProjectID:      projectID,
+		Target:         "127.0.0.1",
+		Ports:          "80",
+		Profile:        "normal",
+		Status:         "queued",
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	later := ScanRun{
+		RunID:          "run-fractional",
+		ProjectID:      projectID,
+		Target:         "127.0.0.2",
+		Ports:          "443",
+		Profile:        "normal",
+		Status:         "queued",
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      time.Date(2026, 1, 1, 0, 0, 0, 100000000, time.UTC),
+	}
+
+	if err := store.SaveScanRun(earlier); err != nil {
+		t.Fatalf("SaveScanRun earlier returned error: %v", err)
+	}
+	if err := store.SaveScanRun(later); err != nil {
+		t.Fatalf("SaveScanRun later returned error: %v", err)
+	}
+
+	runs, err := store.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Fatalf("expected 2 runs, got %#v", runs)
+	}
+	if runs[0].RunID != later.RunID || runs[1].RunID != earlier.RunID {
+		t.Fatalf("unexpected global run order: %#v", runs)
+	}
+
+	projectRuns, err := store.ListProjectScanRuns(projectID, 10)
+	if err != nil {
+		t.Fatalf("ListProjectScanRuns returned error: %v", err)
+	}
+	if len(projectRuns) != 2 {
+		t.Fatalf("expected 2 project runs, got %#v", projectRuns)
+	}
+	if projectRuns[0].RunID != later.RunID || projectRuns[1].RunID != earlier.RunID {
+		t.Fatalf("unexpected project run order: %#v", projectRuns)
+	}
+}

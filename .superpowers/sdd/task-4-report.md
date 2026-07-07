@@ -92,3 +92,44 @@ Go test: 2 passed in 1 packages
 
 ## Concerns
 - None at the store layer. The only notable choice is representing unset `finished_at` values as empty strings because the brief requires `TEXT NOT NULL`; this keeps the schema exact and the code simple.
+
+## Reviewer follow-up fix: mixed-precision run ordering
+- Verified the review finding against the current implementation: `started_at` was stored with `time.RFC3339Nano`, which omits trailing fractional zeros, so lexicographic `ORDER BY started_at DESC` could misorder runs within the same second.
+- Fixed this by changing persisted timestamp formatting to a fixed-width UTC layout: `2006-01-02T15:04:05.000000000Z07:00`.
+- Kept the brief's schema shape intact: `started_at` and `finished_at` remain `TEXT NOT NULL`, and the list queries still order by `started_at DESC`.
+- Added a focused regression test covering one whole-second timestamp and one fractional-second timestamp, asserting correct order in both `ListScanRuns` and `ListProjectScanRuns`.
+
+### Reviewer fix TDD evidence
+#### RED
+Command:
+```bash
+rtk go test ./internal/store -run TestStoreListsScanRunsByChronologicalStartedAtWithMixedPrecision -count=1
+```
+Output:
+```text
+Go test: 0 passed, 1 failed in 1 packages
+
+store (0 passed, 1 failed)
+  [FAIL] TestStoreListsScanRunsByChronologicalStartedAtWithMixedPrecision
+     sqlite_test.go:232: unexpected global run order: []store.ScanRun{store.ScanRun{RunID:"run-whole-second", ...}}
+```
+
+#### GREEN
+Command:
+```bash
+rtk go test ./internal/store -run TestStoreListsScanRunsByChronologicalStartedAtWithMixedPrecision -count=1
+```
+Output:
+```text
+Go test: 1 passed in 1 packages
+```
+
+### Reviewer fix verification
+Command:
+```bash
+rtk go test ./internal/store -count=1
+rtk go test ./... -count=1
+```
+Result:
+- PASS (`Go test: 5 passed in 1 packages`)
+- PASS (`Go test: 43 passed in 10 packages`)
