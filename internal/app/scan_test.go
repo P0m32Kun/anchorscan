@@ -220,6 +220,9 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 			t.Fatalf("expected %s arg %s in %#v", check.binary, check.arg, runner.commands)
 		}
 	}
+	if !runner.hasArgs("/opt/nmap", "-sV", "--version-intensity", "7", "-T3") {
+		t.Fatalf("expected nmap fingerprint args in %#v", runner.commands)
+	}
 	if !runner.hasArgs("/opt/nmap", "--script", "http-tomcat-manager", "-T3") {
 		t.Fatalf("expected nmap NSE args in %#v", runner.commands)
 	}
