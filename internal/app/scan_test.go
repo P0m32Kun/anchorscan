@@ -302,6 +302,75 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	}
 }
 
+func TestRunScanRespectsHostWorkers(t *testing.T) {
+	runner := &blockingRunner{}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	opts := ScanOptions{
+		RunID:          "run-1",
+		ProfileName:    "slow",
+		HostWorkers:    2,
+		Targets:        []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: reportPath,
+	}
+
+	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.maxActive != 2 {
+		t.Fatalf("expected max active 2, got %d", runner.maxActive)
+	}
+}
+
+func TestRunScanContinuesAfterTargetFailure(t *testing.T) {
+	runner := &failFirstRunner{outputs: [][]byte{
+		[]byte("192.168.1.11 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+	}}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	opts := ScanOptions{
+		RunID:          "run-1",
+		ProfileName:    "normal",
+		HostWorkers:    1,
+		Targets:        []string{"192.168.1.10", "192.168.1.11"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: reportPath,
+	}
+
+	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	fps, err := scanStore.ListFingerprints("run-1")
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(fps) != 1 || fps[0].IP != "192.168.1.11" {
+		t.Fatalf("unexpected fingerprints: %#v", fps)
+	}
+
+	events, err := scanStore.ListScanEvents("run-1", 20)
+	if err != nil {
+		t.Fatalf("ListScanEvents returned error: %v", err)
+	}
+	if !containsEvent(events, "error", "target", "192.168.1.10") {
+		t.Fatalf("expected target error event, got %#v", events)
+	}
+}
+
 type sequenceRunner struct {
 	outputs [][]byte
 	sleeps  []time.Duration
@@ -376,6 +445,60 @@ func (r *recordingSequenceRunner) hasArgs(binary string, args ...string) bool {
 func containsLogSubstring(items []string, want string) bool {
 	for _, item := range items {
 		if strings.Contains(item, want) {
+			return true
+		}
+	}
+	return false
+}
+
+type blockingRunner struct {
+	mu        sync.Mutex
+	active    int
+	maxActive int
+}
+
+func (r *blockingRunner) Run(_ context.Context, binary string, _ []string) ([]byte, error) {
+	r.mu.Lock()
+	r.active++
+	if r.active > r.maxActive {
+		r.maxActive = r.active
+	}
+	r.mu.Unlock()
+	time.Sleep(5 * time.Millisecond)
+	r.mu.Lock()
+	r.active--
+	r.mu.Unlock()
+	switch binary {
+	case "/opt/rustscan":
+		return []byte("127.0.0.1 -> [22]\n"), nil
+	case "/opt/nmap":
+		return []byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+	default:
+		return nil, fmt.Errorf("unexpected binary %s", binary)
+	}
+}
+
+type failFirstRunner struct {
+	mu      sync.Mutex
+	outputs [][]byte
+	index   int
+}
+
+func (r *failFirstRunner) Run(_ context.Context, _ string, _ []string) ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.index == 0 {
+		r.index++
+		return nil, fmt.Errorf("boom")
+	}
+	out := r.outputs[r.index-1]
+	r.index++
+	return out, nil
+}
+
+func containsEvent(events []store.ScanEvent, level string, stage string, target string) bool {
+	for _, event := range events {
+		if event.Level == level && event.Stage == stage && strings.Contains(event.Message, target) {
 			return true
 		}
 	}
