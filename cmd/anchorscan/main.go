@@ -13,6 +13,7 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/doctor"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 	"github.com/P0m32Kun/anchorscan/internal/report"
@@ -57,6 +58,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 	switch args[0] {
 	case "scan":
 		return runScan(args[1:], stdout, stderr, deps)
+	case "doctor":
+		return runDoctor(args[1:], stdout)
 	case "report":
 		return runReport(args[1:], stdout, deps)
 	case "tools":
@@ -274,6 +277,38 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	return nil
 }
 
+func runDoctor(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	configPath := fs.String("config", filepath.Join("config", "default.yaml"), "path to config file")
+	dbPath := fs.String("db", filepath.Join("data", "scans.sqlite"), "path to sqlite database")
+	reportsDir := fs.String("reports", "reports", "report output directory")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printDoctorHelp(stdout)
+			return nil
+		}
+		return err
+	}
+
+	checks := doctor.Run(doctor.Options{
+		ConfigPath: *configPath,
+		DBPath:     *dbPath,
+		ReportDir:  *reportsDir,
+	})
+	for _, check := range checks {
+		status := "fail"
+		if check.OK {
+			status = "ok"
+		}
+		_, _ = fmt.Fprintf(stdout, "%s: %s %s\n", check.Name, status, check.Message)
+	}
+	if doctor.HasFailures(checks) {
+		return errors.New("doctor found issues")
+	}
+	return nil
+}
+
 func runTools(args []string, stdout io.Writer) error {
 	if len(args) == 0 || isHelpRequest(args[0]) {
 		printToolsHelp(stdout)
@@ -383,6 +418,7 @@ func printRootHelp(w io.Writer) {
 
 Commands:
   scan        Run discovery, fingerprinting, and reporting
+  doctor      Validate config, tools, and paths
   report      Rebuild reports from stored results
   tools check Verify configured external tools
 
@@ -417,6 +453,15 @@ Flags:
   --run-id <id>     Scan run id
   --json <path>     JSON report output path
   --html <path>     HTML report output path`)
+}
+
+func printDoctorHelp(w io.Writer) {
+	_, _ = fmt.Fprintln(w, `Usage: anchorscan doctor [flags]
+
+Flags:
+  --config <path>   Config file path
+  --db <path>       SQLite database path
+  --reports <path>  Report output directory`)
 }
 
 func printToolsHelp(w io.Writer) {

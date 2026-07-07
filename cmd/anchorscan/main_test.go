@@ -36,6 +36,25 @@ func TestExecuteToolsCheckReportsConfiguredTools(t *testing.T) {
 	}
 }
 
+func TestExecuteDoctorPrintsChecks(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := filepath.Join(dir, "tool")
+	writeFile(t, toolPath, "")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+
+	var stdout bytes.Buffer
+	err := run([]string{"doctor", "--config", configPath, "--db", filepath.Join(dir, "scan.db"), "--reports", dir}, &stdout, &bytes.Buffer{}, cliDeps{})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	for _, want := range []string{"config: ok", "rustscan: ok", "nmap: ok", "database: ok", "reports: ok"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected %q in %q", want, stdout.String())
+		}
+	}
+}
+
 func TestExecuteRootHelpShowsCommands(t *testing.T) {
 	var stdout bytes.Buffer
 	err := run([]string{"--help"}, &stdout, &bytes.Buffer{}, cliDeps{})
