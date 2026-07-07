@@ -64,6 +64,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 		return runDoctor(args[1:], stdout)
 	case "web":
 		return runWeb(args[1:], stdout, stderr, deps)
+	case "cancel":
+		return runCancel(args[1:], stdout)
 	case "report":
 		return runReport(args[1:], stdout, deps)
 	case "tools":
@@ -338,6 +340,29 @@ func runWeb(args []string, stdout io.Writer, _ io.Writer, deps cliDeps) error {
 	}
 	_, _ = fmt.Fprintf(stdout, "listening on http://%s\n", *listen)
 	return http.ListenAndServe(*listen, handler)
+}
+
+func runCancel(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("cancel", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	runID := fs.String("run-id", "", "scan run id")
+	serverURL := fs.String("server", "http://127.0.0.1:8088", "local web console URL")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *runID == "" {
+		return errors.New("cancel requires --run-id")
+	}
+	resp, err := http.Post(strings.TrimRight(*serverURL, "/")+"/runs/"+*runID+"/cancel", "application/x-www-form-urlencoded", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("cancel failed: %s", resp.Status)
+	}
+	_, _ = fmt.Fprintf(stdout, "canceled %s\n", *runID)
+	return nil
 }
 
 func runTools(args []string, stdout io.Writer) error {

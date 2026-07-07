@@ -88,3 +88,27 @@ func TestNewScanPageRenders(t *testing.T) {
 		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
 	}
 }
+
+func TestRunEventsAPI(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "8080", Profile: "normal", Status: "running", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.AppendScanEvent(store.ScanEvent{RunID: "run-1", Time: time.Unix(2, 0), Level: "info", Stage: "nmap", Message: "still running"}); err != nil {
+		t.Fatalf("AppendScanEvent returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/events", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "still running") {
+		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
+	}
+}

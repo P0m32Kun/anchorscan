@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -55,6 +56,8 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/projects/", s.projectDetail)
 	mux.HandleFunc("/scan/new", s.scanNew)
 	mux.HandleFunc("/scan", s.scanCreate)
+	mux.HandleFunc("/runs/", s.runDetail)
+	mux.HandleFunc("/api/runs/", s.runAPI)
 	mux.HandleFunc("/", s.home)
 	return mux, nil
 }
@@ -284,6 +287,50 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
+}
+
+func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/runs/")
+	if strings.HasSuffix(path, "/cancel") {
+		id := strings.TrimSuffix(path, "/cancel")
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := s.manager.Cancel(id); err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		_ = s.store.AppendScanEvent(store.ScanEvent{RunID: id, Time: s.opts.Now(), Level: "info", Stage: "cancel", Message: "cancel requested"})
+		http.Redirect(w, r, "/runs/"+id, http.StatusSeeOther)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	run, err := s.store.GetScanRun(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	render(w, "templates/run.html", map[string]any{"Run": run})
+}
+
+func (s *server) runAPI(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/runs/")
+	id := strings.TrimSuffix(path, "/events")
+	if r.Method != http.MethodGet || !strings.HasSuffix(path, "/events") {
+		http.NotFound(w, r)
+		return
+	}
+	events, err := s.store.ListScanEvents(id, 1000)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(events)
 }
 
 func render(w http.ResponseWriter, file string, data any) {

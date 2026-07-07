@@ -1,0 +1,9 @@
+{{define "content"}}
+<h2>Run {{.Run.RunID}}</h2>
+<p>Status: <strong id="run-status">{{.Run.Status}}</strong></p>
+<p>Target: {{.Run.Target}} | Ports: {{.Run.Ports}} | Profile: {{.Run.Profile}}</p>
+<form method="post" action="/runs/{{.Run.RunID}}/cancel"><button type="submit">Cancel Scan</button></form>
+<section><h3>Events</h3><pre id="events">Loading...</pre></section>
+<script src="/static/app.js"></script>
+<script>window.anchorRunID = "{{.Run.RunID}}";</script>
+{{end}}

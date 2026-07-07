@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,6 +80,27 @@ func TestExecuteWebHelpShowsListen(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "--listen") {
 		t.Fatalf("expected --listen in %q", stdout.String())
+	}
+}
+
+func TestExecuteCancelPostsToServer(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/runs/run-1/cancel" {
+			called = true
+			w.WriteHeader(http.StatusSeeOther)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	err := run([]string{"cancel", "--run-id", "run-1", "--server", server.URL}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !called {
+		t.Fatal("expected cancel request")
 	}
 }
 
