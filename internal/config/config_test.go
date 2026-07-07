@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -59,5 +60,63 @@ func TestLoadTagRulesParsesSnakeCaseFields(t *testing.T) {
 	}
 	if got := rules[0].NucleiTags; len(got) != 2 || got[0] != "tomcat" || rules[0].Target != "url" {
 		t.Fatalf("unexpected parsed rule: %#v", rules[0])
+	}
+}
+
+func TestLoadParsesProfiles(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	content := []byte(`
+tools:
+  rustscan: /opt/rustscan
+  nmap: /opt/nmap
+  httpx: /opt/httpx
+  nuclei: /opt/nuclei
+scan:
+  ports: top100
+  profile: slow
+profiles:
+  slow:
+    host_workers: 1
+    rustscan_args: ["--batch-size", "100"]
+    nmap_args: ["-T2", "--max-retries", "3"]
+    httpx_args: ["-rate-limit", "20"]
+    nuclei_args: ["-rate-limit", "10"]
+`)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	if cfg.Scan.Profile != "slow" {
+		t.Fatalf("profile mismatch: got %q", cfg.Scan.Profile)
+	}
+	profile := cfg.Profiles["slow"]
+	if profile.HostWorkers != 1 {
+		t.Fatalf("host workers mismatch: got %d", profile.HostWorkers)
+	}
+	if !reflect.DeepEqual(profile.Nmap, []string{"-T2", "--max-retries", "3"}) {
+		t.Fatalf("nmap args mismatch: %#v", profile.Nmap)
+	}
+}
+
+func TestLoadDefaultsProfileToNormal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	content := []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\nscan:\n  ports: top100\n")
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Scan.Profile != "normal" {
+		t.Fatalf("profile mismatch: got %q want normal", cfg.Scan.Profile)
 	}
 }

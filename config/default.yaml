@@ -6,3 +6,24 @@ tools:
 
 scan:
   ports: top100
+  profile: normal
+
+profiles:
+  slow:
+    host_workers: 1
+    rustscan_args: ["--batch-size", "100", "--timeout", "3000"]
+    nmap_args: ["-T2", "--max-retries", "3", "--scan-delay", "100ms"]
+    httpx_args: ["-rate-limit", "20", "-threads", "5"]
+    nuclei_args: ["-rate-limit", "10", "-c", "5", "-retries", "2"]
+  normal:
+    host_workers: 3
+    rustscan_args: ["--batch-size", "500"]
+    nmap_args: ["-T3", "--max-retries", "2"]
+    httpx_args: ["-rate-limit", "100", "-threads", "20"]
+    nuclei_args: ["-rate-limit", "50", "-c", "20"]
+  fast:
+    host_workers: 8
+    rustscan_args: ["--batch-size", "1000"]
+    nmap_args: ["-T4", "--max-retries", "1"]
+    httpx_args: ["-rate-limit", "300", "-threads", "50"]
+    nuclei_args: ["-rate-limit", "150", "-c", "50"]
