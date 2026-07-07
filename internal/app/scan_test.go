@@ -173,6 +173,52 @@ func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 	}
 }
 
+func TestRunScanPassesExtraArgsToTools(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte("192.168.1.10 -> [8080]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
+		[]byte("{" + `"template-id":"tomcat-default-login","info":{"name":"Tomcat Default Login","severity":"high"},"matched-at":"http://192.168.1.10:8080"` + "}\n"),
+	}}
+
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	opts := ScanOptions{
+		RunID:          "run-1",
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "8080",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
+		JSONReportPath: reportPath,
+		ExtraArgs: ToolExtraArgs{
+			Rustscan: []string{"--batch-size", "500"},
+			Nmap:     []string{"-T3"},
+			Httpx:    []string{"-rate-limit", "100"},
+			Nuclei:   []string{"-rate-limit", "50"},
+		},
+		TagRules: []TagRule{{Name: "tomcat", Service: []string{"http"}, Product: []string{"tomcat"}, NucleiTags: []string{"tomcat"}, Target: "url"}},
+	}
+
+	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	for _, check := range []struct{ binary, arg string }{
+		{"/opt/rustscan", "--batch-size"},
+		{"/opt/nmap", "-T3"},
+		{"/opt/httpx", "-rate-limit"},
+		{"/opt/nuclei", "-rate-limit"},
+	} {
+		if !runner.hasArg(check.binary, check.arg) {
+			t.Fatalf("expected %s arg %s in %#v", check.binary, check.arg, runner.commands)
+		}
+	}
+}
+
 type sequenceRunner struct {
 	outputs [][]byte
 	sleeps  []time.Duration
@@ -186,6 +232,33 @@ func (s *sequenceRunner) Run(_ context.Context, _ string, _ []string) ([]byte, e
 	out := s.outputs[s.index]
 	s.index++
 	return out, nil
+}
+
+type recordingSequenceRunner struct {
+	outputs  [][]byte
+	commands [][]string
+	index    int
+}
+
+func (r *recordingSequenceRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	r.commands = append(r.commands, append([]string{binary}, args...))
+	out := r.outputs[r.index]
+	r.index++
+	return out, nil
+}
+
+func (r *recordingSequenceRunner) hasArg(binary string, arg string) bool {
+	for _, cmd := range r.commands {
+		if len(cmd) == 0 || cmd[0] != binary {
+			continue
+		}
+		for _, got := range cmd[1:] {
+			if got == arg {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func containsLogSubstring(items []string, want string) bool {
