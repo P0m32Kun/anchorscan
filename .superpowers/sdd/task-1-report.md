@@ -24,3 +24,10 @@ Fix update:
 
 Additional verification:
 - `rtk proxy go test ./internal/config -run TestResolveScanDefaultsV1ConfigWithoutProfilesSection -count=1`
+
+Fix update 2:
+- Added `TestSplitArgsPreservesEmptyQuotedToken` for `--header "" --flag`.
+- `SplitArgs` now tracks token start separately from token length, so empty quoted arguments are preserved while normal tokens and unclosed-quote handling stay unchanged.
+
+Additional verification:
+- `rtk proxy go test ./internal/config -run TestSplitArgsPreservesEmptyQuotedToken -count=1`

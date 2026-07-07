@@ -22,3 +22,14 @@ func TestSplitArgsRejectsUnclosedQuote(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestSplitArgsPreservesEmptyQuotedToken(t *testing.T) {
+	got, err := SplitArgs(`--header "" --flag`)
+	if err != nil {
+		t.Fatalf("SplitArgs returned error: %v", err)
+	}
+	want := []string{"--header", "", "--flag"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args mismatch: got %#v want %#v", got, want)
+	}
+}
