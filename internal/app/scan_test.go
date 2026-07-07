@@ -178,6 +178,7 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 		[]byte("192.168.1.10 -> [8080]\n"),
 		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
+		[]byte(`<nmaprun><host><ports><port protocol="tcp" portid="8080"><script id="http-tomcat-manager" output="manager exposed"/></port></ports></host></nmaprun>`),
 		[]byte("{" + `"template-id":"tomcat-default-login","info":{"name":"Tomcat Default Login","severity":"high"},"matched-at":"http://192.168.1.10:8080"` + "}\n"),
 	}}
 
@@ -200,6 +201,9 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 			Httpx:    []string{"-rate-limit", "100"},
 			Nuclei:   []string{"-rate-limit", "50"},
 		},
+		NSERules: map[string][]string{
+			"http": {"http-tomcat-manager"},
+		},
 		TagRules: []TagRule{{Name: "tomcat", Service: []string{"http"}, Product: []string{"tomcat"}, NucleiTags: []string{"tomcat"}, Target: "url"}},
 	}
 
@@ -209,13 +213,15 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 
 	for _, check := range []struct{ binary, arg string }{
 		{"/opt/rustscan", "--batch-size"},
-		{"/opt/nmap", "-T3"},
 		{"/opt/httpx", "-rate-limit"},
 		{"/opt/nuclei", "-rate-limit"},
 	} {
 		if !runner.hasArg(check.binary, check.arg) {
 			t.Fatalf("expected %s arg %s in %#v", check.binary, check.arg, runner.commands)
 		}
+	}
+	if !runner.hasArgs("/opt/nmap", "--script", "http-tomcat-manager", "-T3") {
+		t.Fatalf("expected nmap NSE args in %#v", runner.commands)
 	}
 }
 
@@ -257,6 +263,29 @@ func (r *recordingSequenceRunner) hasArg(binary string, arg string) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+func (r *recordingSequenceRunner) hasArgs(binary string, args ...string) bool {
+	for _, cmd := range r.commands {
+		if len(cmd) == 0 || cmd[0] != binary {
+			continue
+		}
+		for _, arg := range args {
+			found := false
+			for _, got := range cmd[1:] {
+				if got == arg {
+					found = true
+					break
+				}
+			}
+			if !found {
+				goto next
+			}
+		}
+		return true
+	next:
 	}
 	return false
 }
