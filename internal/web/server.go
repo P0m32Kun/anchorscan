@@ -61,6 +61,7 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/runs/", s.runDetail)
 	mux.HandleFunc("/api/runs/", s.runAPI)
 	mux.HandleFunc("/reports/", s.reportDetail)
+	mux.HandleFunc("/config", s.configPage)
 	mux.HandleFunc("/", s.home)
 	return mux, nil
 }
@@ -404,6 +405,36 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"Fingerprints": filterFingerprints(fps, filters),
 			"Findings":     filterFindings(findings, filters),
 		})
+	}
+}
+
+func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
+	cfg, err := config.Load(s.opts.ConfigPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		render(w, "templates/config.html", cfg)
+	case http.MethodPost:
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		cfg.Tools.Rustscan = r.FormValue("rustscan")
+		cfg.Tools.Nmap = r.FormValue("nmap")
+		cfg.Tools.Httpx = r.FormValue("httpx")
+		cfg.Tools.Nuclei = r.FormValue("nuclei")
+		cfg.Scan.Ports = r.FormValue("ports")
+		cfg.Scan.Profile = r.FormValue("profile")
+		if _, err := config.SaveWithBackup(s.opts.ConfigPath, cfg, s.opts.Now()); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/config", http.StatusSeeOther)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 

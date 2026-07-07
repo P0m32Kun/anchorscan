@@ -3,11 +3,13 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -139,5 +141,32 @@ func TestReportPageRendersFindings(t *testing.T) {
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1", nil))
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "redis-default-logins") {
 		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestConfigPageUpdatesToolPath(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /old/rustscan\n  nmap: /old/nmap\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), Now: func() time.Time { return time.Date(2026, 7, 7, 21, 30, 0, 0, time.UTC) }})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	form := strings.NewReader("rustscan=/new/rustscan&nmap=/new/nmap&httpx=&nuclei=&ports=8080&profile=normal")
+	req := httptest.NewRequest(http.MethodPost, "/config", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d", res.Code)
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.Tools.Rustscan != "/new/rustscan" || cfg.Scan.Ports != "8080" {
+		t.Fatalf("unexpected config: %#v", cfg)
 	}
 }

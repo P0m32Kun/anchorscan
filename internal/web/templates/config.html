@@ -1,0 +1,14 @@
+{{define "content"}}
+<h2>Config</h2>
+<form method="post" action="/config">
+  <h3>Tools</h3>
+  <label>Rustscan <input name="rustscan" value="{{.Tools.Rustscan}}"></label><br>
+  <label>Nmap <input name="nmap" value="{{.Tools.Nmap}}"></label><br>
+  <label>Httpx <input name="httpx" value="{{.Tools.Httpx}}"></label><br>
+  <label>Nuclei <input name="nuclei" value="{{.Tools.Nuclei}}"></label><br>
+  <h3>Scan</h3>
+  <label>Ports <input name="ports" value="{{.Scan.Ports}}"></label><br>
+  <label>Profile <select name="profile"><option>slow</option><option selected>normal</option><option>fast</option></select></label><br>
+  <button type="submit">Save Config</button>
+</form>
+{{end}}
