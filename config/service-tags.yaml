@@ -1,0 +1,30 @@
+- name: redis
+  service: ["redis"]
+  product: ["redis"]
+  tech: []
+  nuclei_tags: ["redis"]
+  target: "hostport"
+- name: tomcat
+  service: ["http"]
+  product: ["tomcat", "apache tomcat"]
+  tech: ["tomcat"]
+  nuclei_tags: ["tomcat", "apache-tomcat"]
+  target: "url"
+- name: nginx
+  service: ["http"]
+  product: ["nginx"]
+  tech: ["nginx"]
+  nuclei_tags: ["nginx"]
+  target: "url"
+- name: mysql
+  service: ["mysql"]
+  product: ["mysql", "mariadb"]
+  tech: []
+  nuclei_tags: ["mysql", "mariadb"]
+  target: "hostport"
+- name: smb
+  service: ["smb"]
+  product: ["samba", "microsoft-ds"]
+  tech: []
+  nuclei_tags: ["smb"]
+  target: "hostport"

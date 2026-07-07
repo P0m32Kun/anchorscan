@@ -1,0 +1,16 @@
+redis:
+  - redis-info
+mysql:
+  - mysql-info
+  - mysql-empty-password
+smb:
+  - smb-protocols
+  - smb-security-mode
+ssh:
+  - ssh2-enum-algos
+  - ssh-hostkey
+http:
+  - http-title
+  - http-server-header
+tomcat:
+  - http-tomcat-manager

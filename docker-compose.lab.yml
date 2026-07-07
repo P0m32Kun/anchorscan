@@ -1,0 +1,13 @@
+services:
+  tomcat:
+    image: anchor-tomcat:latest
+    container_name: anchorscan-lab-tomcat
+    pull_policy: never
+    ports:
+      - "8080:8080"
+
+  redis:
+    image: redis:7-alpine
+    container_name: anchorscan-lab-redis
+    ports:
+      - "6379:6379"

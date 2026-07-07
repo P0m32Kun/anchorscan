@@ -1,0 +1,8 @@
+tools:
+  rustscan: /opt/homebrew/bin/rustscan
+  nmap: /opt/homebrew/bin/nmap
+  httpx: /Users/kun/.pdtm/go/bin/httpx
+  nuclei: /Users/kun/.pdtm/go/bin/nuclei
+
+scan:
+  ports: top100
