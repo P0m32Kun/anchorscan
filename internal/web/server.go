@@ -14,6 +14,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
+	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
@@ -56,8 +57,10 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/projects/", s.projectDetail)
 	mux.HandleFunc("/scan/new", s.scanNew)
 	mux.HandleFunc("/scan", s.scanCreate)
+	mux.HandleFunc("/runs", s.runs)
 	mux.HandleFunc("/runs/", s.runDetail)
 	mux.HandleFunc("/api/runs/", s.runAPI)
+	mux.HandleFunc("/reports/", s.reportDetail)
 	mux.HandleFunc("/", s.home)
 	return mux, nil
 }
@@ -331,6 +334,77 @@ func (s *server) runAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(events)
+}
+
+func (s *server) runs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	runs, err := s.store.ListScanRuns(100)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	render(w, "templates/runs.html", map[string]any{"Runs": runs})
+}
+
+func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/reports/")
+	format := ""
+	runID := path
+	if strings.HasSuffix(path, ".json") {
+		format = "json"
+		runID = strings.TrimSuffix(path, ".json")
+	}
+	if strings.HasSuffix(path, ".html") {
+		format = "html"
+		runID = strings.TrimSuffix(path, ".html")
+	}
+
+	run, err := s.store.GetScanRun(runID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	fps, err := s.store.ListFingerprints(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	findings, err := s.store.ListFindings(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	built := report.Build(fps, findings)
+	switch format {
+	case "json":
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(built)
+	case "html":
+		tmp := filepath.Join(os.TempDir(), "anchorscan-report-"+runID+".html")
+		if err := report.WriteHTML(tmp, built); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer os.Remove(tmp)
+		http.ServeFile(w, r, tmp)
+	default:
+		filters := reportFilters{
+			IP:       r.URL.Query().Get("ip"),
+			Port:     r.URL.Query().Get("port"),
+			Service:  r.URL.Query().Get("service"),
+			Severity: r.URL.Query().Get("severity"),
+			Source:   r.URL.Query().Get("source"),
+		}
+		render(w, "templates/report.html", map[string]any{
+			"Run":          run,
+			"Filters":      filters,
+			"Fingerprints": filterFingerprints(fps, filters),
+			"Findings":     filterFindings(findings, filters),
+		})
+	}
 }
 
 func render(w http.ResponseWriter, file string, data any) {

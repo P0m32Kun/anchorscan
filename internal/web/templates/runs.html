@@ -1,0 +1,6 @@
+{{define "content"}}
+<h2>Runs</h2>
+<table><tr><th>Run</th><th>Status</th><th>Target</th><th>Profile</th><th>Report</th></tr>
+{{range .Runs}}<tr><td><a href="/runs/{{.RunID}}">{{.RunID}}</a></td><td>{{.Status}}</td><td>{{.Target}}</td><td>{{.Profile}}</td><td><a href="/reports/{{.RunID}}">Report</a></td></tr>{{else}}<tr><td colspan="5">No runs.</td></tr>{{end}}
+</table>
+{{end}}

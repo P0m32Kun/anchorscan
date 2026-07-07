@@ -1,0 +1,10 @@
+{{define "content"}}
+<h2>Report {{.Run.RunID}}</h2>
+<p>Status: {{.Run.Status}} | Target: {{.Run.Target}} | Ports: {{.Run.Ports}} | Profile: {{.Run.Profile}}</p>
+<p><a href="/reports/{{.Run.RunID}}.json">Download JSON</a> <a href="/reports/{{.Run.RunID}}.html">Download HTML</a></p>
+<form method="get"><input name="ip" placeholder="IP" value="{{.Filters.IP}}"><input name="port" placeholder="Port" value="{{.Filters.Port}}"><input name="severity" placeholder="Severity" value="{{.Filters.Severity}}"><input name="source" placeholder="Source" value="{{.Filters.Source}}"><button>Filter</button></form>
+<h3>Assets</h3>
+<table><tr><th>IP</th><th>Port</th><th>Service</th><th>Product</th><th>Web</th><th>URL</th></tr>{{range .Fingerprints}}<tr><td>{{.IP}}</td><td>{{.Port}}</td><td>{{.Service}}</td><td>{{.Product}}</td><td>{{.IsWeb}}</td><td>{{.URL}}</td></tr>{{end}}</table>
+<h3>Findings</h3>
+<table><tr><th>Severity</th><th>Source</th><th>ID</th><th>Target</th><th>Summary</th></tr>{{range .Findings}}<tr><td>{{.Severity}}</td><td>{{.Source}}</td><td>{{.ID}}</td><td>{{.Target}}</td><td>{{.Summary}}</td></tr>{{else}}<tr><td colspan="5">No findings.</td></tr>{{end}}</table>
+{{end}}
