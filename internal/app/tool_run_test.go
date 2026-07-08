@@ -72,6 +72,27 @@ func TestRunToolNmapServiceSavesFingerprints(t *testing.T) {
 	}
 }
 
+func TestRunToolNmapServiceSavesManualReviewFindings(t *testing.T) {
+	st := newToolRunStore(t)
+	xml := `<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port></ports></host></nmaprun>`
+	runner := toolRunnerFunc(func(_ string, _ []string) ([]byte, error) { return []byte(xml), nil })
+
+	err := RunTool(context.Background(), runner, st, ToolRunOptions{
+		RunID: "run-nmap-bluekeep", Tool: "nmap", Mode: "service", Target: "192.0.2.10", Ports: "3389", Tools: ToolPaths{Nmap: "nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	findings, err := st.ListFindings("run-nmap-bluekeep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || findings[0].Source != "manual-review" || findings[0].ID != "manual-review:CVE-2019-0708" {
+		t.Fatalf("findings = %#v", findings)
+	}
+}
+
 func TestRunToolNmapAliveSavesInfoFinding(t *testing.T) {
 	st := newToolRunStore(t)
 	runner := toolRunnerFunc(func(_ string, _ []string) ([]byte, error) {

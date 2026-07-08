@@ -168,6 +168,34 @@ func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 	}
 }
 
+func TestRunScanAddsManualReviewForRDP(t *testing.T) {
+	runner := &sequenceRunner{outputs: [][]byte{
+		[]byte("192.0.2.10 -> [3389]\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port></ports></host></nmaprun>`),
+	}}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-bluekeep", Targets: []string{"192.0.2.10"}, Ports: "3389", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	findings, err := scanStore.ListFindings("run-bluekeep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || findings[0].ID != "manual-review:CVE-2019-0708" {
+		t.Fatalf("findings = %#v", findings)
+	}
+}
+
 func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := &cancelAfterFirstTargetRunner{cancel: cancel}

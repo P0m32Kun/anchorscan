@@ -224,6 +224,13 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		}
 		allFingerprints = append(allFingerprints, fp)
 
+		for _, finding := range ManualReviewFindings(fp) {
+			if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
+				return nil, nil, err
+			}
+			allFindings = append(allFindings, finding)
+		}
+
 		scripts := vuln.MatchNSE(fp, opts.NSERules)
 		if len(scripts) > 0 {
 			emit(opts, scanStore, "info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)

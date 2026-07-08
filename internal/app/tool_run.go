@@ -153,12 +153,19 @@ func runNmapTool(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 	if err != nil {
 		return nil, nil, normalizeToolError(ctx, err)
 	}
+	var findings []report.Finding
 	for _, fp := range fps {
 		if err := scanStore.SaveFingerprint(opts.RunID, fp); err != nil {
 			return nil, nil, err
 		}
+		for _, finding := range ManualReviewFindings(fp) {
+			if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
+				return nil, nil, err
+			}
+			findings = append(findings, finding)
+		}
 	}
-	return fps, nil, nil
+	return fps, findings, nil
 }
 
 func runHTTPXTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]fingerprint.ServiceFingerprint, []report.Finding, error) {
