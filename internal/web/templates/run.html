@@ -2,16 +2,16 @@
 <section class="page-header">
   <div>
     <p class="eyebrow">任务控制台</p>
-    <h2 style="font-family: var(--mono); font-size: 1.6rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.75rem;">
+    <h2 class="mono-heading" style="display: flex; align-items: center; gap: 0.75rem;">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 1.5rem; height: 1.5rem; color: var(--primary);">
         <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
       </svg>
       <span>{{.Run.RunID}}</span>
     </h2>
     <p class="meta-line">
-      目标: <span style="font-family: var(--mono); color: var(--text);">{{.Run.Target}}</span> | 
-      端口: <span style="font-family: var(--mono); color: var(--text);">{{.Run.Ports}}</span> | 
-      档位: <span style="font-family: var(--mono); color: var(--text);">{{.Run.Profile}}</span>
+      目标: <span class="mono-value">{{.Run.Target}}</span> |
+      端口: <span class="mono-value">{{.Run.Ports}}</span> |
+      档位: <span class="mono-value">{{.Run.Profile}}</span>
     </p>
   </div>
   
