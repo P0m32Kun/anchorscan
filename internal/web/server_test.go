@@ -38,6 +38,7 @@ func TestHomePageRenders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	res := httptest.NewRecorder()
@@ -63,6 +64,7 @@ func TestCreateProjectFromWeb(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -128,6 +130,7 @@ func TestNewScanPageRenders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/scan/new", nil))
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "开始扫描") {
@@ -142,11 +145,45 @@ func TestNewScanPageRenders(t *testing.T) {
 	}
 }
 
+func TestScanCreateRendersPreflightErrors(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     filepath.Join(dir, "scan.db"),
+		Runner:     &serverSequenceRunner{},
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	body := strings.NewReader("target=127.0.0.1&ports=top100&profile=normal")
+	req := httptest.NewRequest(http.MethodPost, "/scan", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "预检失败") || !strings.Contains(rec.Body.String(), "rustscan") {
+		t.Fatalf("expected preflight errors in body, got %q", rec.Body.String())
+	}
+}
+
 func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	rustscanPath := writeExecutable(t, dir, "rustscan")
+	nmapPath := writeExecutable(t, dir, "nmap")
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -183,6 +220,7 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 
 	form := strings.NewReader("project_id=p1")
 	req := httptest.NewRequest(http.MethodPost, "/scan", form)
@@ -211,10 +249,10 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if run.Target != "127.0.0.1" || run.Ports != "80,8080" || run.Profile != "slow" {
 		t.Fatalf("unexpected run: %#v", run)
 	}
-	if !runner.hasArgs("/opt/rustscan", "-a", "127.0.0.1", "--ports", "80,8080") {
+	if !runner.hasArgs(rustscanPath, "-a", "127.0.0.1", "--ports", "80,8080") {
 		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
 	}
-	if runner.callCount("/opt/rustscan") != 1 {
+	if runner.callCount(rustscanPath) != 1 {
 		t.Fatalf("expected single rustscan target after exclusions, got %#v", runner.commands)
 	}
 }
@@ -236,6 +274,7 @@ func TestRunEventsAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/events", nil))
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "still running") {
@@ -270,6 +309,7 @@ func TestReportPageRendersFindings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1", nil))
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "redis-default-logins") {
@@ -307,6 +347,7 @@ func TestReportPagePaginatesAssetsAndFindings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1", nil))
@@ -365,6 +406,7 @@ func TestReportPageFiltersFindingsByService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1?service=redis", nil))
 	if res.Code != http.StatusOK {
@@ -400,6 +442,7 @@ func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1?view=hosts&q=redis", nil))
 	if res.Code != http.StatusOK {
@@ -440,6 +483,7 @@ func TestReportAssetExportSupportsFilteredTXTAndCSV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/assets.txt?q=redis&kind=ip_port", nil))
@@ -481,6 +525,7 @@ func TestConfigPageUpdatesToolPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	form := strings.NewReader("rustscan=/new/rustscan&nmap=/new/nmap&httpx=&nuclei=&ports=8080&profile=normal")
 	req := httptest.NewRequest(http.MethodPost, "/config", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -508,6 +553,7 @@ func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/config", nil))
 	if res.Code != http.StatusOK {
@@ -529,6 +575,7 @@ func TestConfigPageRawEditorUpdatesConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	form := strings.NewReader("mode=raw&raw_config=tools%3A%0A++rustscan%3A+%2Fcustom%2Frustscan%0Ascan%3A%0A++ports%3A+8080%2C6379%0A++profile%3A+slow%0Aprofiles%3A%0A++slow%3A%0A++++host_workers%3A+1%0A")
 	req := httptest.NewRequest(http.MethodPost, "/config", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -598,6 +645,35 @@ func (r *serverSequenceRunner) callCount(binary string) int {
 	return count
 }
 
+func writeFile(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
+	}
+}
+
+func writeExecutable(t *testing.T, dir string, name string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
+	}
+	return path
+}
+
+func closeServer(t *testing.T, handler http.Handler) {
+	t.Helper()
+	closer, ok := handler.(interface{ Close() error })
+	if !ok {
+		return
+	}
+	t.Cleanup(func() {
+		if err := closer.Close(); err != nil {
+			t.Fatalf("Close returned error: %v", err)
+		}
+	})
+}
+
 func TestConfigPageRawEditorRejectsInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
@@ -609,6 +685,7 @@ func TestConfigPageRawEditorRejectsInvalidYAML(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
+	closeServer(t, handler)
 	form := strings.NewReader("mode=raw&raw_config=tools%3A+%5Bbroken")
 	req := httptest.NewRequest(http.MethodPost, "/config", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

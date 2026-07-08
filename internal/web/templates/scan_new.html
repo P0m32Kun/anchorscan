@@ -8,6 +8,22 @@
 </section>
 
 <section class="panel">
+  {{if .Preflight.Errors}}
+  <p class="alert alert-error">
+    <strong>预检失败</strong><br>
+    {{range .Preflight.Errors}}
+    <span>{{.Field}}: {{.Message}}</span><br>
+    {{end}}
+  </p>
+  {{end}}
+  {{if .Preflight.Warnings}}
+  <div class="alert" style="background: var(--warning-soft); border-color: rgba(245, 158, 11, 0.3); color: #fcd34d;">
+    <strong>预检提醒</strong><br>
+    {{range .Preflight.Warnings}}
+    <span>{{.Field}}: {{.Message}}</span><br>
+    {{end}}
+  </div>
+  {{end}}
   <form class="form-grid" method="post" action="/scan">
     <label>
       <span>选择项目模板</span>

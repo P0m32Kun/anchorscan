@@ -15,6 +15,7 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -34,6 +35,7 @@ type server struct {
 	opts    ServerOptions
 	store   *store.Store
 	manager *app.Manager
+	mux     *http.ServeMux
 }
 
 type configPageData struct {
@@ -73,7 +75,16 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/reports/", s.reportDetail)
 	mux.HandleFunc("/config", s.configPage)
 	mux.HandleFunc("/", s.home)
-	return mux, nil
+	s.mux = mux
+	return s, nil
+}
+
+func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mux.ServeHTTP(w, r)
+}
+
+func (s *server) Close() error {
+	return s.store.Close()
 }
 
 func (s *server) home(w http.ResponseWriter, r *http.Request) {
@@ -222,12 +233,7 @@ func (s *server) scanNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	projects, err := s.store.ListProjects()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	render(w, "templates/scan_new.html", map[string]any{"Projects": projects})
+	s.renderScanForm(w, preflight.Result{})
 }
 
 func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
@@ -307,6 +313,35 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 
 	runID := newID("run", s.opts.Now())
 	jsonPath := filepath.Join("reports", "scan-"+runID+".json")
+	preflightResult := preflight.Run(preflight.Options{
+		ConfigDir: filepath.Dir(s.opts.ConfigPath),
+		DBPath:    s.opts.DBPath,
+		JSONPath:  jsonPath,
+		ReportDir: filepath.Dir(jsonPath),
+		Targets:   targets,
+		PortSpec:  portValue,
+		Tools: app.ToolPaths{
+			Rustscan: cfg.Tools.Rustscan,
+			Nmap:     cfg.Tools.Nmap,
+			Httpx:    cfg.Tools.Httpx,
+			Nuclei:   cfg.Tools.Nuclei,
+		},
+		Profile: effective.ProfileName,
+		Workers: effective.HostWorkers,
+		ExtraArgs: app.ToolExtraArgs{
+			Rustscan: effective.Rustscan,
+			Nmap:     effective.Nmap,
+			Httpx:    effective.Httpx,
+			Nuclei:   effective.Nuclei,
+		},
+		NSERuleCount: len(nseRules),
+		TagRuleCount: len(tagRules),
+	})
+	if preflightResult.HasErrors() {
+		w.WriteHeader(http.StatusBadRequest)
+		s.renderScanForm(w, preflightResult)
+		return
+	}
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -339,6 +374,18 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
+}
+
+func (s *server) renderScanForm(w http.ResponseWriter, preflightResult preflight.Result) {
+	projects, err := s.store.ListProjects()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	render(w, "templates/scan_new.html", map[string]any{
+		"Projects":  projects,
+		"Preflight": preflightResult,
+	})
 }
 
 func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
