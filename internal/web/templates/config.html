@@ -1,14 +1,92 @@
 {{define "content"}}
-<h2>Config</h2>
-<form method="post" action="/config">
-  <h3>Tools</h3>
-  <label>Rustscan <input name="rustscan" value="{{.Tools.Rustscan}}"></label><br>
-  <label>Nmap <input name="nmap" value="{{.Tools.Nmap}}"></label><br>
-  <label>Httpx <input name="httpx" value="{{.Tools.Httpx}}"></label><br>
-  <label>Nuclei <input name="nuclei" value="{{.Tools.Nuclei}}"></label><br>
-  <h3>Scan</h3>
-  <label>Ports <input name="ports" value="{{.Scan.Ports}}"></label><br>
-  <label>Profile <select name="profile"><option>slow</option><option selected>normal</option><option>fast</option></select></label><br>
-  <button type="submit">Save Config</button>
-</form>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">配置管理</p>
+    <h2>全局扫描器配置</h2>
+  </div>
+  <a class="button button-secondary" href="/">返回面板</a>
+</section>
+
+{{if .Error}}
+<p class="alert alert-error">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem; display: inline; vertical-align: middle; margin-right: 0.5rem;">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+  </svg>
+  <span>配置应用失败: {{.Error}}</span>
+</p>
+{{end}}
+
+<section class="config-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">基础设置</p>
+        <h3>安全引擎工具路径</h3>
+      </div>
+    </div>
+    <form class="form-grid" method="post" action="/config">
+      <label class="full-width">
+        <span>Rustscan 路径</span>
+        <input name="rustscan" value="{{.Config.Tools.Rustscan}}" placeholder="例如: /usr/local/bin/rustscan">
+      </label>
+      <label class="full-width">
+        <span>Nmap 路径</span>
+        <input name="nmap" value="{{.Config.Tools.Nmap}}" placeholder="例如: /usr/local/bin/nmap">
+      </label>
+      <label class="full-width">
+        <span>Httpx 路径</span>
+        <input name="httpx" value="{{.Config.Tools.Httpx}}" placeholder="例如: /usr/local/bin/httpx">
+      </label>
+      <label class="full-width">
+        <span>Nuclei 路径</span>
+        <input name="nuclei" value="{{.Config.Tools.Nuclei}}" placeholder="例如: /usr/local/bin/nuclei">
+      </label>
+      
+      <label>
+        <span>全局默认端口</span>
+        <input name="ports" value="{{.Config.Scan.Ports}}" placeholder="例如: top1000">
+      </label>
+      <label>
+        <span>全局默认档位</span>
+        <select name="profile">
+          <option value="slow" {{if eq .Config.Scan.Profile "slow"}}selected{{end}}>slow</option>
+          <option value="normal" {{if eq .Config.Scan.Profile "normal"}}selected{{end}}>normal</option>
+          <option value="fast" {{if eq .Config.Scan.Profile "fast"}}selected{{end}}>fast</option>
+        </select>
+      </label>
+      
+      <div class="form-actions full-width" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+        <button class="button button-primary" type="submit" style="width: 100%;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
+          </svg>
+          <span>保存配置基础选项</span>
+        </button>
+      </div>
+    </form>
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">高级 YAML 编排</p>
+        <h3>编辑原始配置文件</h3>
+        <p class="meta-line">可直接在此修改高级网络策略、速率限制、核引擎配置等 YAML 参数。</p>
+      </div>
+    </div>
+    <form method="post" action="/config" style="display: flex; flex-direction: column; gap: 1.25rem; height: calc(100% - 3.5rem);">
+      <input type="hidden" name="mode" value="raw">
+      <textarea class="code-editor" name="raw_config" spellcheck="false" style="flex-grow: 1; min-height: 23rem;">{{.RawConfig}}</textarea>
+      
+      <div class="form-actions" style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border);">
+        <button class="button button-primary" type="submit" style="width: 100%;">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286.627zM12 13.013l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>应用高级 YAML 配置</span>
+        </button>
+      </div>
+    </form>
+  </article>
+</section>
 {{end}}

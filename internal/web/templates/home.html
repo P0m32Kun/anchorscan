@@ -1,11 +1,90 @@
 {{define "content"}}
-<h2>Home</h2>
-<section>
-  <h3>Projects</h3>
-  <ul>{{range .Projects}}<li>{{.Name}}</li>{{else}}<li>No projects yet.</li>{{end}}</ul>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">总览</p>
+    <h2>仪表盘</h2>
+  </div>
+  <a class="button button-primary" href="/scan/new">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+    </svg>
+    <span>开启新扫描</span>
+  </a>
 </section>
-<section>
-  <h3>Recent Runs</h3>
-  <ul>{{range .Runs}}<li>{{.RunID}} - {{.Status}}</li>{{else}}<li>No runs yet.</li>{{end}}</ul>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <span class="eyebrow">项目库</span>
+    <span class="stat-value">{{len .Projects}}</span>
+    <span class="meta-line">已保存的扫描范围与配置</span>
+  </div>
+  <div class="stat-card">
+    <span class="eyebrow">历史任务</span>
+    <span class="stat-value">{{len .Runs}}</span>
+    <span class="meta-line">已执行的扫描记录</span>
+  </div>
+  <div class="stat-card">
+    <span class="eyebrow">内置探针引擎</span>
+    <span class="stat-value" style="font-size: 1.5rem; line-height: 2.25rem; font-weight: 700; color: #60a5fa;">Rust/Nmap/Nuclei</span>
+    <span class="meta-line">全自动级联指纹探测</span>
+  </div>
+  <div class="stat-card">
+    <span class="eyebrow">系统状态</span>
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+      <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite;"></span>
+      <span class="stat-value" style="font-size: 1.5rem; line-height: 1.5rem; font-weight: 700; margin: 0;">运行中</span>
+    </div>
+    <span class="meta-line">Web 控制台已准备就绪</span>
+  </div>
+</div>
+
+<section class="dashboard-grid">
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">资产范围</p>
+        <h3>项目列表</h3>
+      </div>
+      <a class="button button-secondary" href="/projects/new">新建项目</a>
+    </div>
+    <ul class="link-list">
+      {{range .Projects}}
+      <li>
+        <a href="/projects/{{.ID}}">{{.Name}}</a>
+        <span class="meta-line" style="font-size: 0.8rem;">{{.DefaultProfile}}</span>
+      </li>
+      {{else}}
+      <li class="muted">暂无项目。</li>
+      {{end}}
+    </ul>
+  </article>
+  
+  <article class="panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">执行队列</p>
+        <h3>最近扫描任务</h3>
+      </div>
+      <a class="button button-secondary" href="/runs">查看全部</a>
+    </div>
+    <ul class="run-list">
+      {{range .Runs}}
+      <li>
+        <a href="/runs/{{.RunID}}" style="font-family: var(--mono); font-size: 0.9rem;">{{.RunID}}</a>
+        <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+      </li>
+      {{else}}
+      <li class="muted">暂无扫描记录。</li>
+      {{end}}
+    </ul>
+  </article>
 </section>
+
+<style>
+@keyframes pulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+</style>
 {{end}}

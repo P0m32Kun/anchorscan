@@ -8,6 +8,8 @@ type Project struct {
 	Description    string
 	DefaultTargets string
 	DefaultPorts   string
+	ExcludeTargets string
+	ExcludePorts   string
 	DefaultProfile string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -27,10 +29,10 @@ type ScanRun struct {
 }
 
 type ScanEvent struct {
-	ID      int64
-	RunID   string
-	Time    time.Time
-	Level   string
-	Stage   string
-	Message string
+	ID      int64     `json:"id"`
+	RunID   string    `json:"run_id"`
+	Time    time.Time `json:"time"`
+	Level   string    `json:"level"`
+	Stage   string    `json:"stage"`
+	Message string    `json:"message"`
 }

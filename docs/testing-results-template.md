@@ -91,7 +91,7 @@ Copy this file per lab round, for example:
 ### Fingerprints
 
 ```sql
-select run_id, ip, port, service, product, normalized, is_web, url
+select run_id, ip, port, service, product, version, normalized, is_web, url
 from fingerprints
 order by ip, port;
 ```
@@ -112,6 +112,19 @@ Notes:
 
 - 
 
+## Web Report Workbench
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Keyword filter `redis` | | |
+| Host aggregation view | | |
+| Finding detail expansion | | |
+| Copy `IP` | | |
+| Copy `IP:PORT` | | |
+| Copy `URL` | | |
+| TXT export | | |
+| CSV export | | |
+
 ## Final Verdict
 
 | Area | Status | Notes |
@@ -125,6 +138,8 @@ Notes:
 | SQLite persistence | | |
 | JSON report | | |
 | HTML report | | |
+| Web Console | | |
+| Report workbench | | |
 | Stability | | |
 
 ## Bugs / Follow-Ups

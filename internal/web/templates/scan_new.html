@@ -1,16 +1,74 @@
 {{define "content"}}
-<h2>Start Scan</h2>
-<form method="post" action="/scan">
-  <label>Project <select name="project_id">{{range .Projects}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></label><br>
-  <label>Target <input name="target" value="127.0.0.1" required></label><br>
-  <label>Ports <input name="ports" value="8080,6379"></label><br>
-  <label>Profile <select name="profile"><option>slow</option><option selected>normal</option><option>fast</option></select></label><br>
-  <details><summary>Advanced args</summary>
-    <label>Rustscan args <input name="rustscan_args"></label><br>
-    <label>Nmap args <input name="nmap_args"></label><br>
-    <label>Httpx args <input name="httpx_args"></label><br>
-    <label>Nuclei args <input name="nuclei_args"></label><br>
-  </details>
-  <button type="submit">Start Scan</button>
-</form>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">发起扫描</p>
+    <h2>开始扫描</h2>
+  </div>
+  <a class="button button-secondary" href="/">返回面板</a>
+</section>
+
+<section class="panel">
+  <form class="form-grid" method="post" action="/scan">
+    <label>
+      <span>选择项目模板</span>
+      <select name="project_id" id="project_select">
+        <option value="">不使用项目（完全自定义）</option>
+        {{range .Projects}}
+        <option value="{{.ID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+    
+    <label>
+      <span>扫描档位 (Profile)</span>
+      <select name="profile">
+        <option value="">使用项目/全局默认值</option>
+        <option value="slow">slow (轻载/低速率)</option>
+        <option value="normal">normal (均衡/默认值)</option>
+        <option value="fast">fast (极速/多路并发)</option>
+      </select>
+    </label>
+
+    <label class="full-width">
+      <span>自定义扫描目标 (Target)</span>
+      <textarea name="target" rows="4" placeholder="可留空使用项目的默认目标。支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔"></textarea>
+    </label>
+    
+    <label class="full-width">
+      <span>自定义端口 (Ports)</span>
+      <input name="ports" placeholder="可留空使用项目的默认端口。支持: top100, top1000, full, 80,443,8080 等">
+    </label>
+    
+    <details class="details-block full-width" style="margin-top: 1rem;">
+      <summary style="font-size: 0.95rem; font-weight: 600; padding: 0.5rem 0;">高级自定义参数 (自定义引擎命令行参数)</summary>
+      <div class="form-grid" style="padding-top: 1rem; border-top: 1px dashed rgba(59, 130, 246, 0.1); margin-top: 0.5rem;">
+        <label>
+          <span>Rustscan 参数</span>
+          <input name="rustscan_args" placeholder="例如: --ulimit 5000">
+        </label>
+        <label>
+          <span>Nmap 参数</span>
+          <input name="nmap_args" placeholder="例如: --min-rate 300 -sV">
+        </label>
+        <label>
+          <span>Httpx 参数</span>
+          <input name="httpx_args" placeholder="例如: -title -content-length">
+        </label>
+        <label>
+          <span>Nuclei 参数</span>
+          <input name="nuclei_args" placeholder="例如: -tags cve,vuln">
+        </label>
+      </div>
+    </details>
+    
+    <div class="form-actions full-width" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+      <button class="button button-primary" type="submit" style="width: 100%; max-width: 250px;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699-2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+        </svg>
+        <span>立即启动引擎扫描</span>
+      </button>
+    </div>
+  </form>
+</section>
 {{end}}

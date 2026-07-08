@@ -26,3 +26,17 @@ func TestParseNucleiJSONLIgnoresBannerLines(t *testing.T) {
 		t.Fatalf("unexpected results: %#v", got)
 	}
 }
+
+func TestParseNucleiJSONLParsesEvidenceFields(t *testing.T) {
+	input := []byte("{\"template-id\":\"tomcat-default-login\",\"matcher-name\":\"basic-auth\",\"extractor-results\":[\"admin:admin\"],\"curl-command\":\"curl -u admin:admin http://127.0.0.1:8080/manager/html\",\"info\":{\"name\":\"Tomcat Default Login\",\"severity\":\"high\"},\"matched-at\":\"http://127.0.0.1:8080/manager/html\"}\n")
+	got, err := ParseNucleiJSONL(input)
+	if err != nil {
+		t.Fatalf("ParseNucleiJSONL returned error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 finding, got %#v", got)
+	}
+	if got[0].MatcherName != "basic-auth" || got[0].CurlCommand == "" || len(got[0].ExtractedResults) != 1 || got[0].Raw == "" {
+		t.Fatalf("unexpected evidence fields: %#v", got[0])
+	}
+}

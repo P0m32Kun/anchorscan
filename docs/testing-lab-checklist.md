@@ -13,6 +13,7 @@ Verify these paths only:
 - SQLite persistence
 - JSON / HTML report generation
 - terminal progress logs, including nmap heartbeat during slow service detection
+- Web report filtering, host aggregation, copy/export actions
 
 ## Recommended Lab Targets
 
@@ -210,7 +211,7 @@ sqlite3 data/scans.sqlite
 Fingerprints:
 
 ```sql
-select run_id, ip, port, service, product, normalized, is_web, url
+select run_id, ip, port, service, product, version, normalized, is_web, url
 from fingerprints
 order by ip, port;
 ```
@@ -264,5 +265,21 @@ V1 lab pass is good enough when:
 4. Start scan with `normal` profile and ports `8080,6379`.
 5. Confirm progress events update.
 6. Confirm report page shows Redis and Tomcat assets.
-7. Start a long full-port scan and cancel it.
-8. Confirm canceled status and event log.
+7. Use keyword `redis`, confirm only Redis-related assets/findings remain.
+8. Switch asset view to `按主机聚合`, confirm one row per host and port list is correct.
+9. Use `复制 IP:PORT`, confirm clipboard content is usable as `host:port` lines.
+10. Open TXT/CSV export, confirm the exported rows match the current filter.
+11. Start a long full-port scan and cancel it.
+12. Confirm canceled status and event log.
+
+## Report Workbench Checks
+
+| Check | Expected |
+| --- | --- |
+| Keyword search `redis` | Redis assets/findings remain, unrelated Tomcat rows are hidden |
+| Host aggregation view | Assets are grouped by IP and show the expected port list |
+| Copy `IP` | Clipboard contains one IP per line |
+| Copy `IP:PORT` | Clipboard contains one `host:port` per line |
+| Copy `URL` | Clipboard contains only web assets with saved URLs |
+| TXT export | Output follows the selected kind and current filters |
+| CSV export | Header includes `ip,port,service,product,version,url` and rows match current filters |

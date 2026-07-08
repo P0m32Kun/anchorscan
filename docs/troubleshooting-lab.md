@@ -68,7 +68,7 @@ Check:
 Quick DB check:
 
 ```sql
-select ip, port, service, normalized from fingerprints order by ip, port;
+select ip, port, service, product, version, normalized from fingerprints order by ip, port;
 ```
 
 If `normalized` is not what you expected, fix the mapping or the lab assumption first.
@@ -116,7 +116,26 @@ Check:
 - the same run id is being used for both outputs
 - HTML file was regenerated after the latest run
 
-## 8. Multi-service host mixes findings across ports
+## 8. Report filter/export looks empty
+
+Check:
+
+- `q` is a keyword search across asset and finding text
+- `service` is an exact normalized service filter
+- export endpoints use the same query string as the report page
+- URL export only includes web assets with a saved URL
+- CSV export should include `ip,port,service,product,version,url`
+
+Quick checks:
+
+```bash
+curl 'http://127.0.0.1:8088/reports/<run_id>/assets.txt?kind=ip_port&q=redis'
+curl 'http://127.0.0.1:8088/reports/<run_id>/assets.csv?q=redis'
+```
+
+If the report page shows data but export is empty, keep the exact URL and query string. That is likely a report endpoint bug, not a scanner bug.
+
+## 9. Multi-service host mixes findings across ports
 
 Check:
 
@@ -130,7 +149,7 @@ Quick check:
 jq '.hosts[] | {ip, ports}' reports/<mixed>.json
 ```
 
-## 9. Unknown service crashes the run
+## 10. Unknown service crashes the run
 
 That is a real bug. Unknown should degrade to:
 
@@ -147,7 +166,7 @@ Capture:
 - saved JSON
 - saved SQLite rows for the run
 
-## 10. Minimal triage flow
+## 11. Minimal triage flow
 
 When a lab case fails, answer these in order:
 

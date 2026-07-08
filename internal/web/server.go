@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -33,6 +35,14 @@ type server struct {
 	store   *store.Store
 	manager *app.Manager
 }
+
+type configPageData struct {
+	Config    config.Config
+	RawConfig string
+	Error     string
+}
+
+const reportPageSize = 50
 
 func NewServer(opts ServerOptions) (http.Handler, error) {
 	if opts.Listen == "" {
@@ -95,7 +105,12 @@ func (s *server) projects(w http.ResponseWriter, r *http.Request) {
 		}
 		render(w, "templates/projects.html", map[string]any{"Projects": projects})
 	case http.MethodPost:
-		if err := r.ParseForm(); err != nil {
+		if err := parseProjectRequest(r); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defaultTargets, err := mergedTargetsInput(r)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -104,8 +119,10 @@ func (s *server) projects(w http.ResponseWriter, r *http.Request) {
 			ID:             newID("project", now),
 			Name:           r.FormValue("name"),
 			Description:    r.FormValue("description"),
-			DefaultTargets: r.FormValue("default_targets"),
+			DefaultTargets: defaultTargets,
 			DefaultPorts:   r.FormValue("default_ports"),
+			ExcludeTargets: r.FormValue("exclude_targets"),
+			ExcludePorts:   r.FormValue("exclude_ports"),
 			DefaultProfile: r.FormValue("default_profile"),
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -126,7 +143,7 @@ func (s *server) projectNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, "templates/project_form.html", map[string]any{
-		"Title":   "New Project",
+		"Title":   "新建项目",
 		"Action":  "/projects",
 		"Project": store.Project{DefaultProfile: "normal"},
 	})
@@ -144,7 +161,7 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		render(w, "templates/project_form.html", map[string]any{
-			"Title":   "Edit Project",
+			"Title":   "编辑项目",
 			"Action":  "/projects/" + id,
 			"Project": project,
 		})
@@ -160,7 +177,7 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			"Project": project,
 		})
 	case r.Method == http.MethodPost:
-		if err := r.ParseForm(); err != nil {
+		if err := parseProjectRequest(r); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -177,10 +194,17 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		defaultTargets, err := mergedTargetsInput(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		project.Name = r.FormValue("name")
 		project.Description = r.FormValue("description")
-		project.DefaultTargets = r.FormValue("default_targets")
+		project.DefaultTargets = defaultTargets
 		project.DefaultPorts = r.FormValue("default_ports")
+		project.ExcludeTargets = r.FormValue("exclude_targets")
+		project.ExcludePorts = r.FormValue("exclude_ports")
 		project.DefaultProfile = r.FormValue("default_profile")
 		project.UpdatedAt = s.opts.Now()
 		if err := s.store.SaveProject(project); err != nil {
@@ -221,14 +245,38 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	targets, err := target.Parse(r.FormValue("target"))
+	project, err := s.loadProjectForScan(r.FormValue("project_id"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	targetValue := strings.TrimSpace(r.FormValue("target"))
+	if targetValue == "" && project != nil {
+		targetValue = project.DefaultTargets
+	}
+	targets, err := target.Parse(targetValue)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	portValue := r.FormValue("ports")
+	if portValue == "" && project != nil {
+		portValue = project.DefaultPorts
+	}
 	if portValue == "" {
 		portValue = cfg.Scan.Ports
+	}
+	if project != nil {
+		targets, err = excludeTargets(targets, project.ExcludeTargets)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		portValue, err = excludePorts(portValue, project.ExcludePorts)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	resolvedPorts, err := resolvePorts(portValue, s.opts.ConfigPath)
 	if err != nil {
@@ -236,7 +284,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	effective, err := config.ResolveScan(cfg, config.Overrides{
-		ProfileName:  r.FormValue("profile"),
+		ProfileName:  coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
 		RustscanArgs: r.FormValue("rustscan_args"),
 		NmapArgs:     r.FormValue("nmap_args"),
 		HttpxArgs:    r.FormValue("httpx_args"),
@@ -353,12 +401,21 @@ func (s *server) runs(w http.ResponseWriter, r *http.Request) {
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
 	format := ""
+	assetExport := ""
 	runID := path
-	if strings.HasSuffix(path, ".json") {
+	if strings.HasSuffix(path, "/assets.txt") {
+		assetExport = "txt"
+		runID = strings.TrimSuffix(path, "/assets.txt")
+	}
+	if strings.HasSuffix(path, "/assets.csv") {
+		assetExport = "csv"
+		runID = strings.TrimSuffix(path, "/assets.csv")
+	}
+	if assetExport == "" && strings.HasSuffix(path, ".json") {
 		format = "json"
 		runID = strings.TrimSuffix(path, ".json")
 	}
-	if strings.HasSuffix(path, ".html") {
+	if assetExport == "" && strings.HasSuffix(path, ".html") {
 		format = "html"
 		runID = strings.TrimSuffix(path, ".html")
 	}
@@ -379,6 +436,16 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	built := report.Build(fps, findings)
+	filters := reportFilters{
+		IP:       r.URL.Query().Get("ip"),
+		Port:     r.URL.Query().Get("port"),
+		Service:  r.URL.Query().Get("service"),
+		Keyword:  r.URL.Query().Get("q"),
+		Severity: r.URL.Query().Get("severity"),
+		Source:   r.URL.Query().Get("source"),
+	}
+	filteredFingerprints := filterFingerprints(fps, filters)
+	filteredFindings := filterFindings(findings, fps, filters)
 	switch format {
 	case "json":
 		w.Header().Set("Content-Type", "application/json")
@@ -392,18 +459,45 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		defer os.Remove(tmp)
 		http.ServeFile(w, r, tmp)
 	default:
-		filters := reportFilters{
-			IP:       r.URL.Query().Get("ip"),
-			Port:     r.URL.Query().Get("port"),
-			Service:  r.URL.Query().Get("service"),
-			Severity: r.URL.Query().Get("severity"),
-			Source:   r.URL.Query().Get("source"),
+		if assetExport == "txt" {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = io.WriteString(w, exportAssetsTXT(filteredFingerprints, r.URL.Query().Get("kind")))
+			return
 		}
+		if assetExport == "csv" {
+			data, err := exportAssetsCSV(filteredFingerprints)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+			_, _ = io.WriteString(w, data)
+			return
+		}
+		query := r.URL.Query()
+		view := query.Get("view")
+		if view == "" {
+			view = "ports"
+		}
+		assetPage := paginateFingerprints(filteredFingerprints, parsePage(query.Get("assets_page")), query, "assets_page", reportPageSize)
+		findingPage := paginateFindings(filteredFindings, parsePage(query.Get("findings_page")), query, "findings_page", reportPageSize)
+		hostPage := paginateHostAssets(groupFingerprintsByHost(filteredFingerprints), parsePage(query.Get("assets_page")), query, "assets_page", reportPageSize)
+		copyBase := cloneValues(query)
+		copyBase.Del("assets_page")
+		copyBase.Del("findings_page")
 		render(w, "templates/report.html", map[string]any{
-			"Run":          run,
-			"Filters":      filters,
-			"Fingerprints": filterFingerprints(fps, filters),
-			"Findings":     filterFindings(findings, filters),
+			"Run":            run,
+			"Filters":        filters,
+			"Fingerprints":   assetPage.Items,
+			"Findings":       findingPage.Items,
+			"AssetPage":      assetPage,
+			"FindingPage":    findingPage,
+			"HostPage":       hostPage,
+			"AssetView":      view,
+			"AssetTXTIP":     "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
+			"AssetTXTIPPort": "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
+			"AssetTXTURL":    "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
+			"AssetCSV":       "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
 		})
 	}
 }
@@ -414,12 +508,31 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	raw, err := os.ReadFile(s.opts.ConfigPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
-		render(w, "templates/config.html", cfg)
+		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw)})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if r.FormValue("mode") == "raw" {
+			rawConfig := r.FormValue("raw_config")
+			if _, err := config.SaveRawWithBackup(s.opts.ConfigPath, rawConfig, s.opts.Now()); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				render(w, "templates/config.html", configPageData{
+					Config:    cfg,
+					RawConfig: rawConfig,
+					Error:     "invalid YAML: " + err.Error(),
+				})
+				return
+			}
+			http.Redirect(w, r, "/config", http.StatusSeeOther)
 			return
 		}
 		cfg.Tools.Rustscan = r.FormValue("rustscan")
@@ -436,6 +549,191 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func parseProjectRequest(r *http.Request) error {
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		return r.ParseMultipartForm(8 << 20)
+	}
+	return r.ParseForm()
+}
+
+func mergedTargetsInput(r *http.Request) (string, error) {
+	values := []string{strings.TrimSpace(r.FormValue("default_targets"))}
+	file, _, err := r.FormFile("targets_file")
+	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) {
+			return joinNonEmpty(values...), nil
+		}
+		return "", err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+	values = append(values, strings.TrimSpace(string(data)))
+	return joinNonEmpty(values...), nil
+}
+
+func joinNonEmpty(values ...string) string {
+	var out []string
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func (s *server) loadProjectForScan(id string) (*store.Project, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, nil
+	}
+	project, err := s.store.GetProject(id)
+	if err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+func defaultProjectProfile(project *store.Project) string {
+	if project == nil {
+		return ""
+	}
+	return strings.TrimSpace(project.DefaultProfile)
+}
+
+func excludeTargets(targets []string, excludeValue string) ([]string, error) {
+	excluded, err := target.Parse(excludeValue)
+	if err != nil {
+		return nil, err
+	}
+	if len(excluded) == 0 {
+		return targets, nil
+	}
+	blocked := map[string]struct{}{}
+	for _, item := range excluded {
+		blocked[item] = struct{}{}
+	}
+	var out []string
+	for _, item := range targets {
+		if _, ok := blocked[item]; ok {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func excludePorts(portValue string, excludeValue string) (string, error) {
+	portValue = strings.TrimSpace(portValue)
+	excludeValue = strings.TrimSpace(excludeValue)
+	if portValue == "" || excludeValue == "" {
+		return portValue, nil
+	}
+	portsToUse, err := expandPortSpec(portValue)
+	if err != nil {
+		return "", err
+	}
+	portsToDrop, err := expandPortSpec(excludeValue)
+	if err != nil {
+		return "", err
+	}
+	blocked := map[int]struct{}{}
+	for _, port := range portsToDrop {
+		blocked[port] = struct{}{}
+	}
+	var filtered []int
+	for _, port := range portsToUse {
+		if _, ok := blocked[port]; ok {
+			continue
+		}
+		filtered = append(filtered, port)
+	}
+	return compressPorts(filtered), nil
+}
+
+func expandPortSpec(spec string) ([]int, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return nil, nil
+	}
+	var out []int
+	seen := map[int]struct{}{}
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if strings.Contains(part, "-") {
+			bounds := strings.SplitN(part, "-", 2)
+			if len(bounds) != 2 {
+				return nil, fmt.Errorf("invalid port range: %s", part)
+			}
+			start, err := parsePortNumber(bounds[0])
+			if err != nil {
+				return nil, err
+			}
+			end, err := parsePortNumber(bounds[1])
+			if err != nil {
+				return nil, err
+			}
+			if end < start {
+				start, end = end, start
+			}
+			for port := start; port <= end; port++ {
+				if _, ok := seen[port]; ok {
+					continue
+				}
+				seen[port] = struct{}{}
+				out = append(out, port)
+			}
+			continue
+		}
+		port, err := parsePortNumber(part)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[port]; ok {
+			continue
+		}
+		seen[port] = struct{}{}
+		out = append(out, port)
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+func parsePortNumber(value string) (int, error) {
+	var port int
+	_, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &port)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid port: %s", value)
+	}
+	return port, nil
+}
+
+func compressPorts(ports []int) string {
+	if len(ports) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(ports))
+	for _, port := range ports {
+		parts = append(parts, fmt.Sprintf("%d", port))
+	}
+	return strings.Join(parts, ",")
+}
+
+func coalesce(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func render(w http.ResponseWriter, file string, data any) {

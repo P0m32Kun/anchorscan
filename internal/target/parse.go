@@ -6,7 +6,11 @@ func Parse(input string) ([]string, error) {
 	seen := map[string]struct{}{}
 	var out []string
 
-	for _, part := range strings.Split(input, ",") {
+	input = strings.ReplaceAll(input, "\r\n", "\n")
+	input = strings.ReplaceAll(input, "\r", "\n")
+	for _, part := range strings.FieldsFunc(input, func(r rune) bool {
+		return r == ',' || r == '\n'
+	}) {
 		value := strings.TrimSpace(part)
 		if value == "" {
 			continue

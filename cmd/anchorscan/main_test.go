@@ -115,7 +115,9 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	for _, want := range []string{
 		"Usage: anchorscan scan",
 		"--target",
+		"IP range",
 		"--ports",
+		"100-1000",
 		"--profile",
 		"--host-workers",
 		"--rustscan-args",

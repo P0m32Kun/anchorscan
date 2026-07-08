@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,10 +11,14 @@ import (
 )
 
 type NucleiFinding struct {
-	TemplateID string
-	Name       string
-	Severity   string
-	MatchedAt  string
+	TemplateID       string
+	Name             string
+	Severity         string
+	MatchedAt        string
+	MatcherName      string
+	ExtractedResults []string
+	CurlCommand      string
+	Raw              string
 }
 
 func RunNuclei(ctx context.Context, runner Runner, binaryPath string, target string, tags []string, extraArgs []string) ([]byte, error) {
@@ -35,8 +40,12 @@ func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 		}
 
 		var row struct {
-			TemplateID string `json:"template-id"`
-			Info       struct {
+			TemplateID       string   `json:"template-id"`
+			MatcherName      string   `json:"matcher-name"`
+			ExtractedResults []string `json:"extracted-results"`
+			ExtractorResults []string `json:"extractor-results"`
+			CurlCommand      string   `json:"curl-command"`
+			Info             struct {
 				Name     string `json:"name"`
 				Severity string `json:"severity"`
 			} `json:"info"`
@@ -45,11 +54,24 @@ func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 		if err := json.Unmarshal([]byte(line), &row); err != nil {
 			return nil, err
 		}
+		extracted := row.ExtractedResults
+		if len(extracted) == 0 {
+			extracted = row.ExtractorResults
+		}
+		raw := line
+		var pretty bytes.Buffer
+		if err := json.Indent(&pretty, []byte(line), "", "  "); err == nil {
+			raw = pretty.String()
+		}
 		findings = append(findings, NucleiFinding{
-			TemplateID: row.TemplateID,
-			Name:       row.Info.Name,
-			Severity:   row.Info.Severity,
-			MatchedAt:  row.MatchedAt,
+			TemplateID:       row.TemplateID,
+			Name:             row.Info.Name,
+			Severity:         row.Info.Severity,
+			MatchedAt:        row.MatchedAt,
+			MatcherName:      row.MatcherName,
+			ExtractedResults: extracted,
+			CurlCommand:      row.CurlCommand,
+			Raw:              raw,
 		})
 	}
 	if err := scanner.Err(); err != nil && !errors.Is(err, io.EOF) {

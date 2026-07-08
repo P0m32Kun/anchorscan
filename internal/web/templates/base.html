@@ -1,14 +1,75 @@
 {{define "base"}}
 <!doctype html>
-<html>
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <title>AnchorScan</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AnchorScan - 内网安全扫描控制台</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-  <header><h1>AnchorScan</h1><nav><a href="/">Home</a> <a href="/projects">Projects</a> <a href="/runs">Runs</a> <a href="/config">Config</a></nav></header>
-  <main>{{template "content" .}}</main>
+<body class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 1.25rem; height: 1.25rem;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+        </svg>
+      </div>
+      <h1>AnchorScan</h1>
+    </div>
+    
+    <nav class="sidebar-nav">
+      <a href="/" class="nav-item" id="nav-home">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+        </svg>
+        <span>控制面板</span>
+      </a>
+      <a href="/projects" class="nav-item" id="nav-projects">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-19.5 0A2.25 2.25 0 002.25 15v4.5a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V15a2.25 2.25 0 00-2.25-2.25m-19.5 0h19.5" />
+        </svg>
+        <span>项目管理</span>
+      </a>
+      <a href="/runs" class="nav-item" id="nav-runs">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+        </svg>
+        <span>扫描历史</span>
+      </a>
+      <a href="/config" class="nav-item" id="nav-config">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span>全局配置</span>
+      </a>
+    </nav>
+    
+    <div style="border-top: 1px solid var(--border); padding-top: 1rem; font-size: 0.75rem; color: var(--muted); text-align: center;">
+      AnchorScan Console v1.1
+    </div>
+  </aside>
+  
+  <main class="page-shell">
+    {{template "content" .}}
+  </main>
+  
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const path = window.location.pathname;
+      document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
+      if (path === "/" || path === "") {
+        document.getElementById("nav-home").classList.add("active");
+      } else if (path.startsWith("/projects")) {
+        document.getElementById("nav-projects").classList.add("active");
+      } else if (path.startsWith("/runs") || path.startsWith("/scan") || path.startsWith("/reports")) {
+        document.getElementById("nav-runs").classList.add("active");
+      } else if (path.startsWith("/config")) {
+        document.getElementById("nav-config").classList.add("active");
+      }
+    });
+  </script>
 </body>
 </html>
 {{end}}

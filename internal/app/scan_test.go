@@ -47,7 +47,7 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 			[]byte(`<nmaprun><host><ports><port protocol="tcp" portid="8080"><script id="http-tomcat-manager" output="manager exposed"/></port></ports></host></nmaprun>`),
-			[]byte("{\"template-id\":\"tomcat-default-login\",\"info\":{\"name\":\"Tomcat Default Login\",\"severity\":\"high\"},\"matched-at\":\"http://192.168.1.10:8080\"}\n"),
+			[]byte("{\"template-id\":\"tomcat-default-login\",\"matcher-name\":\"basic-auth\",\"extractor-results\":[\"admin:admin\"],\"curl-command\":\"curl -u admin:admin http://192.168.1.10:8080/manager/html\",\"info\":{\"name\":\"Tomcat Default Login\",\"severity\":\"high\"},\"matched-at\":\"http://192.168.1.10:8080\"}\n"),
 		},
 	}
 
@@ -101,6 +101,14 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	}
 	if len(findings) != 2 {
 		t.Fatalf("unexpected findings: %#v", findings)
+	}
+	for _, finding := range findings {
+		if finding.Source != "nuclei" {
+			continue
+		}
+		if !strings.Contains(finding.Output, "curl-command") || !strings.Contains(finding.Output, "admin:admin") {
+			t.Fatalf("expected rich nuclei evidence output, got %#v", finding)
+		}
 	}
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("report not written: %v", err)
@@ -192,6 +200,38 @@ func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
 	}
 	if runner.calls != 1 {
 		t.Fatalf("expected only one target start before cancellation, got %d calls", runner.calls)
+	}
+}
+
+func TestRunScanMarksCanceledWhenToolIsKilledAfterCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	runner := &killedAfterCancelRunner{cancel: cancel}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	opts := ScanOptions{
+		RunID:          "run-1",
+		ProfileName:    "slow",
+		HostWorkers:    1,
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: reportPath,
+	}
+	err = RunScan(ctx, runner, scanStore, opts)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context canceled, got %v", err)
+	}
+	run, getErr := scanStore.GetScanRun("run-1")
+	if getErr != nil {
+		t.Fatalf("GetScanRun returned error: %v", getErr)
+	}
+	if run.Status != "canceled" {
+		t.Fatalf("status mismatch: %#v", run)
 	}
 }
 
@@ -436,6 +476,25 @@ func (r *cancelAfterFirstTargetRunner) Run(ctx context.Context, _ string, _ []st
 		<-ctx.Done()
 	}
 	return nil, ctx.Err()
+}
+
+type killedAfterCancelRunner struct {
+	cancel func()
+	calls  int
+}
+
+func (r *killedAfterCancelRunner) Run(ctx context.Context, binary string, _ []string) ([]byte, error) {
+	r.calls++
+	switch {
+	case binary == "/opt/rustscan":
+		return []byte("192.168.1.10 -> [22]\n"), nil
+	case binary == "/opt/nmap":
+		r.cancel()
+		<-ctx.Done()
+		return nil, fmt.Errorf("signal: killed")
+	default:
+		return nil, fmt.Errorf("unexpected binary %s", binary)
+	}
 }
 
 type recordingSequenceRunner struct {

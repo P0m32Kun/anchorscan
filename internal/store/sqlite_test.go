@@ -21,6 +21,7 @@ func TestSQLiteStoreSavesAndListsFingerprints(t *testing.T) {
 		Port:       6379,
 		Service:    "redis",
 		Product:    "redis",
+		Version:    "7.2.0",
 		Normalized: "redis",
 	}
 	if err := store.SaveFingerprint("run-1", fp); err != nil {
@@ -31,7 +32,7 @@ func TestSQLiteStoreSavesAndListsFingerprints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListFingerprints returned error: %v", err)
 	}
-	if len(got) != 1 || got[0].Port != 6379 {
+	if len(got) != 1 || got[0].Port != 6379 || got[0].Version != "7.2.0" {
 		t.Fatalf("unexpected rows: %#v", got)
 	}
 }
@@ -78,6 +79,8 @@ func TestStoreProjectCRUD(t *testing.T) {
 		Description:    "Tomcat Redis",
 		DefaultTargets: "127.0.0.1",
 		DefaultPorts:   "8080,6379",
+		ExcludeTargets: "127.0.0.2",
+		ExcludePorts:   "22,3306",
 		DefaultProfile: "normal",
 		CreatedAt:      time.Unix(1, 0),
 		UpdatedAt:      time.Unix(1, 0),
@@ -106,6 +109,9 @@ func TestStoreProjectCRUD(t *testing.T) {
 	}
 	if got.Name != "Updated Lab" {
 		t.Fatalf("project name mismatch: %#v", got)
+	}
+	if got.ExcludeTargets != "127.0.0.2" || got.ExcludePorts != "22,3306" {
+		t.Fatalf("project exclude fields mismatch: %#v", got)
 	}
 
 	if err := store.DeleteProject("p1"); err != nil {

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS fingerprints (
   port INTEGER NOT NULL,
   service TEXT NOT NULL,
   product TEXT NOT NULL,
+  version TEXT NOT NULL,
   normalized TEXT NOT NULL,
   is_web INTEGER NOT NULL,
   url TEXT NOT NULL
@@ -48,6 +50,8 @@ CREATE TABLE IF NOT EXISTS projects (
   description TEXT NOT NULL,
   default_targets TEXT NOT NULL,
   default_ports TEXT NOT NULL,
+  exclude_targets TEXT NOT NULL,
+  exclude_ports TEXT NOT NULL,
   default_profile TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -76,22 +80,32 @@ CREATE TABLE IF NOT EXISTS scan_events (
 		_ = db.Close()
 		return nil, err
 	}
+	for _, stmt := range []string{
+		`ALTER TABLE projects ADD COLUMN exclude_targets TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE projects ADD COLUMN exclude_ports TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE fingerprints ADD COLUMN version TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+			_ = db.Close()
+			return nil, err
+		}
+	}
 
 	return &Store{db: db}, nil
 }
 
 func (s *Store) SaveFingerprint(runID string, fp fingerprint.ServiceFingerprint) error {
 	_, err := s.db.Exec(
-		`INSERT INTO fingerprints (run_id, ip, port, service, product, normalized, is_web, url)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		runID, fp.IP, fp.Port, fp.Service, fp.Product, fp.Normalized, boolToInt(fp.IsWeb), fp.URL,
+		`INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		runID, fp.IP, fp.Port, fp.Service, fp.Product, fp.Version, fp.Normalized, boolToInt(fp.IsWeb), fp.URL,
 	)
 	return err
 }
 
 func (s *Store) ListFingerprints(runID string) ([]fingerprint.ServiceFingerprint, error) {
 	rows, err := s.db.Query(
-		`SELECT ip, port, service, product, normalized, is_web, url
+		`SELECT ip, port, service, product, version, normalized, is_web, url
 		 FROM fingerprints
 		 WHERE run_id = ?
 		 ORDER BY ip, port`,
@@ -106,7 +120,7 @@ func (s *Store) ListFingerprints(runID string) ([]fingerprint.ServiceFingerprint
 	for rows.Next() {
 		var fp fingerprint.ServiceFingerprint
 		var isWeb int
-		if err := rows.Scan(&fp.IP, &fp.Port, &fp.Service, &fp.Product, &fp.Normalized, &isWeb, &fp.URL); err != nil {
+		if err := rows.Scan(&fp.IP, &fp.Port, &fp.Service, &fp.Product, &fp.Version, &fp.Normalized, &isWeb, &fp.URL); err != nil {
 			return nil, err
 		}
 		fp.IsWeb = isWeb == 1

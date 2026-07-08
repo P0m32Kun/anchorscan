@@ -180,7 +180,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 	emit(opts, scanStore, "info", "rustscan", "rustscan %s ports=%s", target, opts.Ports)
 	ports, err := tools.DiscoverPorts(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, normalizeToolError(ctx, err)
 	}
 	emit(opts, scanStore, "info", "rustscan", "rustscan %s open=%v", target, ports)
 
@@ -202,7 +202,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 	fingerprints, err := tools.Fingerprint(ctx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
 	close(done)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, normalizeToolError(ctx, err)
 	}
 	emit(opts, scanStore, "info", "nmap", "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
 
@@ -212,7 +212,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 			emit(opts, scanStore, "info", "httpx", "httpx %s", fp.URL)
 			httpResult, err = tools.EnrichWeb(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, normalizeToolError(ctx, err)
 			}
 			if httpResult.URL != "" {
 				fp.URL = httpResult.URL
@@ -229,7 +229,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 			emit(opts, scanStore, "info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
 			nseResults, err := tools.RunNSE(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, normalizeToolError(ctx, err)
 			}
 			for _, result := range nseResults {
 				finding := report.Finding{
@@ -254,7 +254,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 			emit(opts, scanStore, "info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, opts.ExtraArgs.Nuclei)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, normalizeToolError(ctx, err)
 			}
 			nucleiFindings, err := tools.ParseNucleiJSONL(out)
 			if err != nil {
@@ -269,7 +269,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 					Severity: result.Severity,
 					Summary:  result.Name,
 					Target:   result.MatchedAt,
-					Output:   result.MatchedAt,
+					Output:   formatNucleiEvidence(result),
 				}
 				if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
 					return nil, nil, err
@@ -301,4 +301,34 @@ func emit(opts ScanOptions, scanStore *store.Store, level string, stage string, 
 		Stage:   stage,
 		Message: message,
 	})
+}
+
+func normalizeToolError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return context.Canceled
+	}
+	return err
+}
+
+func formatNucleiEvidence(result tools.NucleiFinding) string {
+	var lines []string
+	if result.MatchedAt != "" {
+		lines = append(lines, "matched-at: "+result.MatchedAt)
+	}
+	if result.MatcherName != "" {
+		lines = append(lines, "matcher-name: "+result.MatcherName)
+	}
+	if len(result.ExtractedResults) > 0 {
+		lines = append(lines, "extracted-results: "+strings.Join(result.ExtractedResults, ", "))
+	}
+	if result.CurlCommand != "" {
+		lines = append(lines, "curl-command: "+result.CurlCommand)
+	}
+	if result.Raw != "" {
+		lines = append(lines, "", result.Raw)
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }

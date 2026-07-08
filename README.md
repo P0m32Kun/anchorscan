@@ -1,17 +1,32 @@
-# anchorscan
+# AnchorScan
 
 `anchorscan` is a portable internal network scanner for authorized environments. It chains `rustscan` for port discovery, `nmap -sV` for service fingerprinting, `httpx` for web enrichment, and fingerprint-driven `nuclei`/NSE checks, then stores results in SQLite and renders JSON/HTML reports.
 
-## V1 MVP Status
+## Current Status
 
-V1 MVP is feature-complete for local lab testing:
+AnchorScan is currently at a V1.1 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review.
+
+Implemented:
 
 - configurable external tool paths
 - fixed pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
-- custom ports, `top100`, `top1000`, and `full`
-- SQLite persistence
-- JSON and HTML reports
-- terminal progress logs, including nmap heartbeat while `-sV` is still running
+- custom ports, ranges like `100-1000`, `top100`, `top1000`, and `full`
+- slow / normal / fast scan profiles with per-tool extra args
+- CLI commands: `scan`, `report`, `doctor`, `tools check`, `web`, `cancel`
+- SQLite persistence for runs, events, fingerprints, findings, projects, and config snapshots
+- JSON / HTML report generation
+- local Chinese Web Console for single-user operation
+- project defaults, target file import, excluded targets, and excluded ports
+- live run event logs, cancel support, and nmap heartbeat during slow `-sV`
+- report filtering, finding evidence details, pagination, host aggregation, and copy/export for `IP`, `IP:PORT`, and `URL` lists
+
+Not in scope for this baseline:
+
+- login, roles, or multi-user permissions
+- distributed scanning
+- public SaaS deployment
+- bundled external tool binaries
+- knowledge base or vulnerability encyclopedia
 
 ## Quick Start
 
@@ -57,6 +72,41 @@ go run ./cmd/anchorscan web \
 
 Open http://127.0.0.1:8088.
 
+Web Console 当前特性：
+
+- 中文界面，适合本机单兵使用
+- 项目管理：保存默认目标、默认端口、默认档位
+- 项目目标支持：
+  - 支持英文逗号或换行分隔多个目标
+  - `IP`
+  - `CIDR`
+  - 简单范围文本
+  - 文件导入并追加到目标列表
+- 项目端口支持：
+  - `top100`
+  - `top1000`
+  - `full`
+  - `100-1000`
+  - `80,443,8080,3389`
+- 可选排除项：
+  - 排除目标
+  - 排除端口
+- 运行页面可查看实时事件日志
+- 报告页面支持筛选、证据详情展开、资产/漏洞分页
+- 报告页面支持按主机聚合视图，以及按当前筛选结果复制/导出 `IP`、`IP:PORT`、`URL` 清单
+
+报告导出接口也可以直接访问，适合复制给其他验证工具继续使用：
+
+- `http://127.0.0.1:8088/reports/<run_id>/assets.txt?kind=ip_port&q=redis`
+- `http://127.0.0.1:8088/reports/<run_id>/assets.txt?kind=url&q=tomcat`
+- `http://127.0.0.1:8088/reports/<run_id>/assets.csv?q=redis`
+
+说明：
+
+- 如果在“开始扫描”页面只选择项目，不手工填写目标/端口，则会自动使用项目默认值。
+- 终端传多个目标时，使用英文逗号分隔，例如：`--target 172.22.0.2,172.22.0.3`
+- 如果项目配置了排除目标或排除端口，发起扫描时会自动生效。
+
 ## Scan Profiles
 
 - `slow`: fragile networks and old devices
@@ -80,6 +130,7 @@ go run ./cmd/anchorscan doctor --config config/default.yaml --db data/scans.sqli
 Use one of these with `--ports`:
 
 - `22,80,443,8080` for a custom list
+- `100-1000` for a custom range
 - `top100`
 - `top1000`
 - `full`
@@ -115,6 +166,7 @@ go run ./cmd/anchorscan scan \
 
 ## Lab docs
 
+- `/Users/kun/DEV/new-Anchor/docs/project-status.md`
 - `/Users/kun/DEV/new-Anchor/docs/testing-lab-checklist.md`
 - `/Users/kun/DEV/new-Anchor/docs/testing-results-template.md`
 - `/Users/kun/DEV/new-Anchor/docs/troubleshooting-lab.md`

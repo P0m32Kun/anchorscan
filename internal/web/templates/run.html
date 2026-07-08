@@ -1,9 +1,96 @@
 {{define "content"}}
-<h2>Run {{.Run.RunID}}</h2>
-<p>Status: <strong id="run-status">{{.Run.Status}}</strong></p>
-<p>Target: {{.Run.Target}} | Ports: {{.Run.Ports}} | Profile: {{.Run.Profile}}</p>
-<form method="post" action="/runs/{{.Run.RunID}}/cancel"><button type="submit">Cancel Scan</button></form>
-<section><h3>Events</h3><pre id="events">Loading...</pre></section>
+<section class="page-header">
+  <div>
+    <p class="eyebrow">任务控制台</p>
+    <h2 style="font-family: var(--mono); font-size: 1.6rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.75rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 1.5rem; height: 1.5rem; color: var(--primary);">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+      </svg>
+      <span>{{.Run.RunID}}</span>
+    </h2>
+    <p class="meta-line">
+      目标: <span style="font-family: var(--mono); color: var(--text);">{{.Run.Target}}</span> | 
+      端口: <span style="font-family: var(--mono); color: var(--text);">{{.Run.Ports}}</span> | 
+      档位: <span style="font-family: var(--mono); color: var(--text);">{{.Run.Profile}}</span>
+    </p>
+  </div>
+  
+  <div class="header-actions">
+    <span class="status-badge status-{{.Run.Status}}" id="run-status" style="margin-right: 0.5rem;">{{.Run.Status}}</span>
+    {{if eq .Run.Status "running"}}
+    <form method="post" action="/runs/{{.Run.RunID}}/cancel" style="margin: 0;">
+      <button class="button button-danger" type="submit">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>中止扫描</span>
+      </button>
+    </form>
+    {{else}}
+    <a class="button button-primary" href="/reports/{{.Run.RunID}}">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+      <span>查看扫描报告</span>
+    </a>
+    {{end}}
+  </div>
+</section>
+
+<section class="panel" style="padding: 1.25rem;">
+  <div class="panel-heading" style="margin-bottom: 0.75rem;">
+    <div>
+      <p class="eyebrow">进程输出</p>
+      <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+        <span>引擎级联流水线实时监控</span>
+      </h3>
+    </div>
+  </div>
+  
+  <div class="terminal-window">
+    <div class="terminal-header">
+      <div class="terminal-dots">
+        <span class="terminal-dot dot-red"></span>
+        <span class="terminal-dot dot-yellow"></span>
+        <span class="terminal-dot dot-green"></span>
+      </div>
+      <div class="terminal-title">anchorscan@engine: ~</div>
+    </div>
+    <pre class="event-log" id="events">Initializing scanner events channel...</pre>
+  </div>
+</section>
+
 <script src="/static/app.js"></script>
-<script>window.anchorRunID = "{{.Run.RunID}}";</script>
+<script>
+  window.anchorRunID = "{{.Run.RunID}}";
+  
+  // Custom status checking loop to reload button if scan finishes
+  let prevStatus = "{{.Run.Status}}";
+  async function checkStatus() {
+    if (prevStatus !== 'running') return;
+    try {
+      const res = await fetch('/api/runs/' + window.anchorRunID + '/events');
+      if (res.ok) {
+        // If we can get active status or if the events contain finished tags, we reload
+        // A simple reload is extremely robust for SSR transitions
+      }
+    } catch(e) {}
+  }
+  // Let's reload the page if we notice the status badge text changes to completed or failed
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === "childList") {
+        const text = mutation.target.textContent.trim().toLowerCase();
+        if (text === "completed" || text === "failed" || text === "canceled") {
+          setTimeout(() => location.reload(), 1500);
+        }
+      }
+    });
+  });
+  
+  const badge = document.getElementById("run-status");
+  if (badge) {
+    observer.observe(badge, { childList: true });
+  }
+</script>
 {{end}}
