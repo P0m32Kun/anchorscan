@@ -23,6 +23,8 @@ type ToolRunOptions struct {
 	Mode           string
 	Target         string
 	Ports          string
+	UseNativeArgs  bool
+	NativeArgs     []string
 	URL            string
 	Tags           []string
 	Template       string
@@ -60,6 +62,15 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
 	}()
 
+	if opts.UseNativeArgs {
+		findings, runErr := runNativeTool(ctx, runner, scanStore, opts)
+		if runErr != nil {
+			return runErr
+		}
+		emitTool(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
+		return report.WriteJSON(opts.JSONReportPath, report.Build(nil, findings))
+	}
+
 	var fingerprints []fingerprint.ServiceFingerprint
 	var findings []report.Finding
 	switch opts.Tool {
@@ -84,24 +95,80 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 func saveToolRun(scanStore *store.Store, opts ToolRunOptions) {
 	snapshot, _ := json.Marshal(map[string]any{
-		"tool":     opts.Tool,
-		"mode":     opts.Mode,
-		"target":   opts.Target,
-		"url":      opts.URL,
-		"ports":    opts.Ports,
-		"tags":     opts.Tags,
-		"template": opts.Template,
+		"tool":        opts.Tool,
+		"mode":        opts.Mode,
+		"target":      opts.Target,
+		"url":         opts.URL,
+		"ports":       opts.Ports,
+		"tags":        opts.Tags,
+		"template":    opts.Template,
+		"use_native":  opts.UseNativeArgs,
+		"native_args": opts.NativeArgs,
 	})
 	_ = scanStore.SaveScanRun(store.ScanRun{
 		RunID:          opts.RunID,
 		ProjectID:      opts.ProjectID,
-		Target:         firstNonEmpty(opts.Target, opts.URL),
+		Target:         firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),
 		Ports:          opts.Ports,
 		Profile:        "tool:" + opts.Tool,
 		Status:         "running",
 		StartedAt:      time.Now(),
 		ConfigSnapshot: string(snapshot),
 	})
+}
+
+func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]report.Finding, error) {
+	binary, err := nativeToolBinary(opts)
+	if err != nil {
+		return nil, err
+	}
+	emitTool(opts, scanStore, "info", opts.Tool, "%s", displayCommand(binary, opts.NativeArgs))
+	out, err := runner.Run(ctx, binary, opts.NativeArgs)
+	output := string(out)
+	if strings.TrimSpace(output) != "" {
+		emitTool(opts, scanStore, "info", opts.Tool, "%s", strings.TrimRight(output, "\n"))
+	}
+	if err != nil {
+		return nil, normalizeToolError(ctx, err)
+	}
+	finding := report.Finding{
+		Source:   opts.Tool,
+		ID:       "native-output",
+		Severity: "info",
+		Summary:  opts.Tool + " native output",
+		Target:   strings.Join(opts.NativeArgs, " "),
+		Output:   output,
+	}
+	if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
+		return nil, err
+	}
+	return []report.Finding{finding}, nil
+}
+
+func displayCommand(binary string, args []string) string {
+	parts := []string{binary}
+	for _, arg := range args {
+		if strings.ContainsAny(arg, " \t\n\"'\\") {
+			arg = strconv.Quote(arg)
+		}
+		parts = append(parts, arg)
+	}
+	return strings.Join(parts, " ")
+}
+
+func nativeToolBinary(opts ToolRunOptions) (string, error) {
+	switch opts.Tool {
+	case "rustscan":
+		return opts.Tools.Rustscan, nil
+	case "nmap":
+		return opts.Tools.Nmap, nil
+	case "httpx":
+		return opts.Tools.Httpx, nil
+	case "nuclei":
+		return opts.Tools.Nuclei, nil
+	default:
+		return "", fmt.Errorf("unknown tool: %s", opts.Tool)
+	}
 }
 
 func runRustscanTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]fingerprint.ServiceFingerprint, error) {
