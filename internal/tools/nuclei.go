@@ -27,6 +27,12 @@ func RunNuclei(ctx context.Context, runner Runner, binaryPath string, target str
 	return runner.Run(ctx, binaryPath, args)
 }
 
+func RunNucleiTemplate(ctx context.Context, runner Runner, binaryPath string, target string, template string, extraArgs []string) ([]byte, error) {
+	args := []string{"-target", target, "-t", template, "-jsonl"}
+	args = append(args, extraArgs...)
+	return runner.Run(ctx, binaryPath, args)
+}
+
 func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(input)))
 	var findings []NucleiFinding

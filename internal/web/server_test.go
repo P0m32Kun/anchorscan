@@ -142,6 +142,95 @@ func TestNewScanPageRenders(t *testing.T) {
 	}
 }
 
+func TestToolNewPageRenders(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", DefaultTargets: "127.0.0.1", DefaultPorts: "8080", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/tools/new", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, want := range []string{"单独运行工具", "rustscan", "nmap", "httpx", "nuclei", "Local Lab"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body: %s", want, body)
+		}
+	}
+}
+
+func TestToolCreateStartsRun(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	runner := &serverSequenceRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+	}}
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     dbPath,
+		Listen:     "127.0.0.1:8088",
+		Runner:     runner,
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("tool=nmap&mode=alive&target=192.0.2.10&extra_args=--min-rate+50")
+	req := httptest.NewRequest(http.MethodPost, "/tools", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	location := res.Header().Get("Location")
+	if !strings.HasPrefix(location, "/runs/tool-nmap-") {
+		t.Fatalf("unexpected redirect: %s", location)
+	}
+
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	var run store.ScanRun
+	for range 50 {
+		runs, err := scanStore.ListScanRuns(10)
+		if err != nil {
+			t.Fatalf("ListScanRuns returned error: %v", err)
+		}
+		if len(runs) == 1 && runs[0].Status == "completed" {
+			run = runs[0]
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if run.RunID == "" || run.Profile != "tool:nmap" || run.Target != "192.0.2.10" {
+		t.Fatalf("unexpected run: %#v", run)
+	}
+	if !runner.hasArgs("/opt/nmap", "-sn", "192.0.2.10", "--min-rate", "50") {
+		t.Fatalf("unexpected nmap args: %#v", runner.commands)
+	}
+	reportPath := filepath.Join(dir, "runs", run.RunID, "report.json")
+	if _, err := os.Stat(reportPath); err != nil {
+		t.Fatalf("expected managed report at %s: %v", reportPath, err)
+	}
+}
+
 func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
