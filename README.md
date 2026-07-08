@@ -217,6 +217,93 @@ go run ./cmd/anchorscan scan \
 
 `full` / `1-65535` can discover many local application ports. `nmap -sV --version-intensity 7` may then take a while during service detection; this is expected.
 
+## Local Lab Startup
+
+The bundled lab can now expose six service families for manual testing:
+
+| Service | Container | Real port | Published host port |
+| --- | --- | --- | --- |
+| Tomcat | `anchorscan-lab-tomcat` | `8080` | `8080` |
+| Redis | `anchorscan-lab-redis` | `6379` | `6379` |
+| Unknown TCP | `anchorscan-lab-unknown` | `9099` | `19099` |
+| SSH | `anchorscan-lab-ssh` | `2222` | `10022` |
+| SMB | `anchorscan-lab-samba` | `445` | `1445` |
+| MariaDB | `anchorscan-lab-mariadb` | `3306` | `13306` |
+
+Start the lab:
+
+```bash
+docker compose -f docker-compose.lab.yml up -d
+```
+
+If `mariadb:11` is slow to pull in your network, pre-pull it first:
+
+```bash
+docker pull mariadb:11
+```
+
+If you need a shell proxy for image pulls:
+
+```bash
+export http_proxy=http://127.0.0.1:7897
+export https_proxy=http://127.0.0.1:7897
+export all_proxy=http://127.0.0.1:7897
+docker pull mariadb:11
+```
+
+Check status:
+
+```bash
+docker compose -f docker-compose.lab.yml ps
+```
+
+Get the real container IPs that AnchorScan should scan:
+
+```bash
+for c in \
+  anchorscan-lab-tomcat \
+  anchorscan-lab-redis \
+  anchorscan-lab-mariadb \
+  anchorscan-lab-ssh \
+  anchorscan-lab-samba \
+  anchorscan-lab-unknown
+do
+  printf '%s ' "$c"
+  docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$c"
+done
+```
+
+On macOS, direct access from the host to container IPs usually needs `docker-mac-net-connect`. If that is not installed, host-port checks like `127.0.0.1:8080` are fine for quick service validation, but the recommended AnchorScan lab path is to scan the real container IPs.
+
+Example mixed-service run after resolving the real IPs:
+
+```bash
+go run ./cmd/anchorscan scan \
+  --config config/default.yaml \
+  --target "$TOMCAT_IP,$REDIS_IP,$UNKNOWN_IP,$SSH_IP,$SMB_IP" \
+  --ports 8080,6379,9099,2222,445 \
+  --db data/scans.sqlite \
+  --json reports/lab-mixed.json \
+  --html reports/lab-mixed.html
+```
+
+You can also run service-specific checks:
+
+```bash
+go run ./cmd/anchorscan scan --config config/default.yaml --target <TOMCAT_IP> --ports 8080 --db data/scans.sqlite --json reports/tomcat.json --html reports/tomcat.html
+go run ./cmd/anchorscan scan --config config/default.yaml --target <REDIS_IP> --ports 6379 --db data/scans.sqlite --json reports/redis.json --html reports/redis.html
+go run ./cmd/anchorscan scan --config config/default.yaml --target <MARIADB_IP> --ports 3306 --db data/scans.sqlite --json reports/mariadb.json --html reports/mariadb.html
+go run ./cmd/anchorscan scan --config config/default.yaml --target <SSH_IP> --ports 2222 --db data/scans.sqlite --json reports/ssh.json --html reports/ssh.html
+go run ./cmd/anchorscan scan --config config/default.yaml --target <SMB_IP> --ports 445 --db data/scans.sqlite --json reports/smb.json --html reports/smb.html
+go run ./cmd/anchorscan scan --config config/default.yaml --target <UNKNOWN_IP> --ports 9099 --db data/scans.sqlite --json reports/unknown.json --html reports/unknown.html
+```
+
+Stop and clean up the lab:
+
+```bash
+docker compose -f docker-compose.lab.yml down
+```
+
 ## Output
 
 - Progress logs go to stderr.
