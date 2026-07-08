@@ -1,10 +1,10 @@
 # AnchorScan
 
-`anchorscan` is a portable internal network scanner for authorized environments. It chains `rustscan` for port discovery, `nmap -sV` for service fingerprinting, `httpx` for web enrichment, and fingerprint-driven `nuclei`/NSE checks, then stores results in SQLite and renders JSON/HTML reports.
+`anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。它以“**指纹驱动、精准分类**”为核心，使用 `rustscan` 做端口发现，使用 `nmap -sV` 做服务指纹识别，再根据识别出的服务类型，进入 `httpx`、`nuclei`、NSE 等后续流程，并将结果统一落入 SQLite，最后导出 JSON / HTML 报告。
 
 ## Current Status
 
-AnchorScan is currently at a V1.1 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review.
+AnchorScan 当前处于 **V1.2 稳定性增强阶段**。CLI 扫描链路和本地 Web Console 已可用，当前重点是把**部署、自检、数据库迁移、扫描前预检**这几个基础能力打牢，方便后续继续迭代扫描控制与前端体验。
 
 Implemented:
 
@@ -12,6 +12,9 @@ Implemented:
 - fixed pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
 - custom ports, ranges like `100-1000`, `top100`, `top1000`, and `full`
 - slow / normal / fast scan profiles with per-tool extra args
+- shared preflight for CLI and Web scans; blocking errors stop before `rustscan`
+- SQLite schema migrations with legacy upgrade compatibility
+- stronger `doctor` checks for config, tools, ports, rule files, database, and reports path
 - CLI commands: `scan`, `report`, `doctor`, `tools check`, `web`, `cancel`
 - SQLite persistence for runs, events, fingerprints, findings, projects, and config snapshots
 - JSON / HTML report generation
@@ -31,7 +34,13 @@ Not in scope for this baseline:
 ## Quick Start
 
 1. Edit [config/default.yaml](./config/default.yaml) so the tool paths point at your local binaries.
-2. Run a scan:
+2. Run self-check first:
+
+```bash
+go run ./cmd/anchorscan doctor --config config/default.yaml --db data/scans.sqlite --reports reports
+```
+
+3. Run a scan:
 
 ```bash
 go run ./cmd/anchorscan scan \
@@ -42,7 +51,7 @@ go run ./cmd/anchorscan scan \
   --html reports/test.html
 ```
 
-3. Rebuild a report from stored data:
+4. Rebuild a report from stored data:
 
 ```bash
 go run ./cmd/anchorscan report \
@@ -53,11 +62,29 @@ go run ./cmd/anchorscan report \
   --html reports/rerender.html
 ```
 
-4. Check configured tools:
+5. Check configured tools:
 
 ```bash
 go run ./cmd/anchorscan tools check --config config/default.yaml
 ```
+
+## Build / Package
+
+常用命令：
+
+```bash
+make test
+make build
+make package
+```
+
+- `make test`: 运行全部测试
+- `make build`: 输出当前平台二进制到 `dist/anchorscan`
+- `make package`: 生成当前平台归档包到 `dist/`
+
+部署到新设备时，优先参考部署文档：
+
+- [docs/deploy.md](./docs/deploy.md)
 
 ## V1.1 Web Console
 
