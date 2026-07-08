@@ -11,6 +11,7 @@ AnchorScan is a local, single-user internal scanning tool for authorized environ
 - tool configuration
 - target/project management
 - stable scan execution
+- single-tool execution for targeted verification
 - fingerprint-driven vulnerability checks
 - readable reports and exportable asset lists
 
@@ -20,16 +21,17 @@ The current direction explicitly does not include:
 - distributed scanning
 - public SaaS deployment
 - a vulnerability knowledge base
-- bundled third-party binaries
+- bundled third-party binaries or large exploit frameworks such as Metasploit
 
 ## Current Baseline
 
-The project is at a V1.1 local-operator baseline.
+The project is at a V1.3 local-operator baseline.
 
 Implemented capabilities:
 
-- CLI commands: `scan`, `report`, `doctor`, `tools check`, `web`, `cancel`
+- CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
 - fixed scan pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
+- single-tool runs for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
 - port selection: custom lists, ranges like `100-1000`, `top100`, `top1000`, and `full`
 - scan profiles: `slow`, `normal`, `fast`
 - per-tool extra args through configuration
@@ -41,6 +43,7 @@ Implemented capabilities:
 - project-level excluded targets and excluded ports
 - live run event logs and nmap heartbeat messages during slow `-sV` runs
 - report filtering, finding evidence expansion, pagination, host aggregation, and copy/export for `IP`, `IP:PORT`, and `URL` lists
+- manual-review findings for vulnerabilities that require operator confirmation instead of bundled exploit frameworks, including BlueKeep / CVE-2019-0708 when RDP is fingerprinted on 3389
 
 ## Important Config Files
 
@@ -51,7 +54,7 @@ Implemented capabilities:
 | `config/nse.yaml` | fingerprint-driven NSE script mapping |
 | `config/service-aliases.yaml` | service normalization aliases |
 
-Third-party tools are configured by path. V1.1 does not package `rustscan`, `nmap`, `httpx`, or `nuclei` into the AnchorScan binary.
+Third-party tools are configured by path. V1.3 does not package `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the AnchorScan binary.
 
 ## Runtime Artifacts
 
@@ -64,9 +67,11 @@ These are generated locally and should not be treated as source:
 ## Known Operational Notes
 
 - Web Console is designed for local single-user use.
-- The current Web Console process supports one active scan at a time.
+- The current Web Console process supports one active pipeline scan or single-tool run at a time.
 - `nmap -sV --version-intensity 7` can be slow on full-port scans. This is expected; use narrow ports for lab checks.
 - nuclei execution is intentionally narrow and fingerprint-driven through tags such as `redis` or `tomcat`.
+- Manual nuclei runs can target explicit tags or one template path from the CLI/Web single-tool flow.
+- BlueKeep / CVE-2019-0708 is flagged for manual review from RDP fingerprint evidence; AnchorScan does not attempt exploit-based confirmation.
 - Unknown services should not be forced into the Web pipeline.
 - Findings are owned by IP and port. Similar findings on different IPs should remain separate.
 

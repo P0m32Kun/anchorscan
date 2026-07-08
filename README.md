@@ -4,7 +4,7 @@
 
 ## Current Status
 
-AnchorScan is currently at a V1.1 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review.
+AnchorScan is currently at a V1.3 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review.
 
 Implemented:
 
@@ -12,13 +12,15 @@ Implemented:
 - fixed pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
 - custom ports, ranges like `100-1000`, `top100`, `top1000`, and `full`
 - slow / normal / fast scan profiles with per-tool extra args
-- CLI commands: `scan`, `report`, `doctor`, `tools check`, `web`, `cancel`
+- CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
 - SQLite persistence for runs, events, fingerprints, findings, projects, and config snapshots
 - JSON / HTML report generation
 - local Chinese Web Console for single-user operation
+- single-tool runs for `rustscan`, `nmap`, `httpx`, and `nuclei`, with the same SQLite and report viewing flow
 - project defaults, target file import, excluded targets, and excluded ports
 - live run event logs, cancel support, and nmap heartbeat during slow `-sV`
 - report filtering, finding evidence details, pagination, host aggregation, and copy/export for `IP`, `IP:PORT`, and `URL` lists
+- manual-review findings for vulnerabilities that should not require bundling large exploit frameworks, including BlueKeep / CVE-2019-0708 when RDP is fingerprinted on 3389
 
 Not in scope for this baseline:
 
@@ -59,7 +61,66 @@ go run ./cmd/anchorscan report \
 go run ./cmd/anchorscan tools check --config config/default.yaml
 ```
 
-## V1.1 Web Console
+## Single Tool Runs
+
+Use `anchorscan tool` when you want to run one engine without the full rustscan -> nmap -> httpx/NSE/nuclei pipeline. Results are still written to SQLite and JSON reports, so they can be reviewed through the same `/runs/<run_id>` and `/reports/<run_id>` pages.
+
+Examples:
+
+```bash
+# Port discovery only
+go run ./cmd/anchorscan tool rustscan \
+  --config config/default.yaml \
+  --target 192.0.2.10 \
+  --ports 80,443,3389 \
+  --db data/scans.sqlite \
+  --json reports/rustscan-only.json
+
+# Nmap host alive check
+go run ./cmd/anchorscan tool nmap \
+  --config config/default.yaml \
+  --mode alive \
+  --target 192.0.2.10 \
+  --db data/scans.sqlite \
+  --json reports/nmap-alive.json
+
+# Nmap service fingerprinting for known ports
+go run ./cmd/anchorscan tool nmap \
+  --config config/default.yaml \
+  --mode service \
+  --target 192.0.2.10 \
+  --ports 22,80,3389 \
+  --db data/scans.sqlite \
+  --json reports/nmap-service.json
+
+# Web fingerprinting only
+go run ./cmd/anchorscan tool httpx \
+  --config config/default.yaml \
+  --url http://192.0.2.10:8080 \
+  --db data/scans.sqlite \
+  --json reports/httpx-only.json
+
+# Nuclei by tag or by a specific template
+go run ./cmd/anchorscan tool nuclei \
+  --config config/default.yaml \
+  --url http://192.0.2.10:8080 \
+  --tags tomcat,cve \
+  --db data/scans.sqlite \
+  --json reports/nuclei-tags.json
+
+go run ./cmd/anchorscan tool nuclei \
+  --config config/default.yaml \
+  --url http://192.0.2.10:8080 \
+  --template cves/2021/CVE-2021-41773.yaml \
+  --db data/scans.sqlite \
+  --json reports/nuclei-template.json
+```
+
+Use `--args` to pass extra arguments to the selected tool only, for example `--args "--min-rate 50"` for nmap or `--args "-rate-limit 5"` for nuclei.
+
+In the Web Console, open `http://127.0.0.1:8088/tools/new` or use the sidebar “单工具调用” entry.
+
+## V1.3 Web Console
 
 Start local Web Console:
 
@@ -92,6 +153,7 @@ Web Console 当前特性：
   - 排除目标
   - 排除端口
 - 运行页面可查看实时事件日志
+- 单工具调用页面可单独执行 rustscan / nmap / httpx / nuclei
 - 报告页面支持筛选、证据详情展开、资产/漏洞分页
 - 报告页面支持按主机聚合视图，以及按当前筛选结果复制/导出 `IP`、`IP:PORT`、`URL` 清单
 - Web Console 发起的扫描会把托管 JSON 报告写入 `data/` 目录：
