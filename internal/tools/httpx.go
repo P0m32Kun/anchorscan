@@ -21,7 +21,7 @@ func EnrichWeb(ctx context.Context, runner Runner, binaryPath string, fp fingerp
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return HTTPResult{}, err
+		return HTTPResult{}, withOutputError(err, out)
 	}
 
 	line := lastJSONLine(string(out))

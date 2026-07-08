@@ -29,7 +29,7 @@ func RunNSE(ctx context.Context, runner Runner, binaryPath string, ip string, po
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, err
+		return nil, withOutputError(err, out)
 	}
 
 	var parsed nseXML

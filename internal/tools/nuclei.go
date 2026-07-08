@@ -24,13 +24,21 @@ type NucleiFinding struct {
 func RunNuclei(ctx context.Context, runner Runner, binaryPath string, target string, tags []string, extraArgs []string) ([]byte, error) {
 	args := []string{"-target", target, "-tags", strings.Join(tags, ","), "-jsonl"}
 	args = append(args, extraArgs...)
-	return runner.Run(ctx, binaryPath, args)
+	out, err := runner.Run(ctx, binaryPath, args)
+	if err != nil {
+		return nil, withOutputError(err, out)
+	}
+	return out, nil
 }
 
 func RunNucleiTemplate(ctx context.Context, runner Runner, binaryPath string, target string, template string, extraArgs []string) ([]byte, error) {
 	args := []string{"-target", target, "-t", template, "-jsonl"}
 	args = append(args, extraArgs...)
-	return runner.Run(ctx, binaryPath, args)
+	out, err := runner.Run(ctx, binaryPath, args)
+	if err != nil {
+		return nil, withOutputError(err, out)
+	}
+	return out, nil
 }
 
 func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
