@@ -42,6 +42,27 @@ func (m *Manager) Start(ctx context.Context, opts ScanOptions) (string, error) {
 	return opts.RunID, nil
 }
 
+func (m *Manager) StartTool(ctx context.Context, opts ToolRunOptions) (string, error) {
+	m.mu.Lock()
+	if m.activeID != "" {
+		m.mu.Unlock()
+		return "", errors.New("scan already running")
+	}
+	runCtx, cancel := context.WithCancel(ctx)
+	m.activeID = opts.RunID
+	m.cancel = cancel
+	m.mu.Unlock()
+
+	go func() {
+		_ = RunTool(runCtx, m.runner, m.store, opts)
+		m.mu.Lock()
+		m.activeID = ""
+		m.cancel = nil
+		m.mu.Unlock()
+	}()
+	return opts.RunID, nil
+}
+
 func (m *Manager) Cancel(runID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

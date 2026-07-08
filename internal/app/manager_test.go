@@ -29,6 +29,28 @@ func TestManagerAllowsOnlyOneActiveScan(t *testing.T) {
 	waitForInactive(t, manager)
 }
 
+func TestManagerAllowsOnlyOneActiveToolRun(t *testing.T) {
+	scanStore, err := store.Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	manager := NewManager(sleepRunner{}, scanStore)
+	opts := ToolRunOptions{
+		RunID: "tool-1", Tool: "rustscan", Target: "127.0.0.1", Ports: "22",
+		Tools: ToolPaths{Rustscan: "/opt/rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if _, err := manager.StartTool(ctx, opts); err != nil {
+		t.Fatalf("StartTool returned error: %v", err)
+	}
+	if _, err := manager.StartTool(context.Background(), opts); err == nil {
+		t.Fatal("expected active tool run error")
+	}
+	cancel()
+	waitForInactive(t, manager)
+}
+
 type sleepRunner struct{}
 
 func (sleepRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {

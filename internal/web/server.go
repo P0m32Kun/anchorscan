@@ -83,6 +83,8 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/projects/", s.projectDetail)
 	mux.HandleFunc("/scan/new", s.scanNew)
 	mux.HandleFunc("/scan", s.scanCreate)
+	mux.HandleFunc("/tools/new", s.toolNew)
+	mux.HandleFunc("/tools", s.toolCreate)
 	mux.HandleFunc("/runs", s.runs)
 	mux.HandleFunc("/runs/", s.runDetail)
 	mux.HandleFunc("/api/runs/", s.runAPI)
@@ -257,6 +259,90 @@ func (s *server) scanNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, "templates/scan_new.html", map[string]any{"Projects": projects})
+}
+
+func (s *server) toolNew(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	projects, err := s.store.ListProjects()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	render(w, "templates/tool_new.html", map[string]any{"Projects": projects})
+}
+
+func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	cfg, err := config.Load(s.opts.ConfigPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	toolName := strings.TrimSpace(r.FormValue("tool"))
+	if !isManualTool(toolName) {
+		http.Error(w, "unknown tool", http.StatusBadRequest)
+		return
+	}
+	mode := coalesce(strings.TrimSpace(r.FormValue("mode")), "service")
+	portsValue := strings.TrimSpace(r.FormValue("ports"))
+	if toolName == "rustscan" || (toolName == "nmap" && mode != "alive") {
+		if portsValue == "" {
+			portsValue = cfg.Scan.Ports
+		}
+		portsValue, err = resolvePorts(portsValue, s.opts.ConfigPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	extraArgs, err := config.SplitArgs(r.FormValue("extra_args"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	runID := newID("tool-"+toolName, s.opts.Now())
+	projectID := strings.TrimSpace(r.FormValue("project_id"))
+	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
+	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	opts := app.ToolRunOptions{
+		RunID:     runID,
+		ProjectID: projectID,
+		Tool:      toolName,
+		Mode:      mode,
+		Target:    strings.TrimSpace(r.FormValue("target")),
+		Ports:     portsValue,
+		URL:       strings.TrimSpace(r.FormValue("url")),
+		Tags:      splitCSV(r.FormValue("tags")),
+		Template:  strings.TrimSpace(r.FormValue("template")),
+		Tools: app.ToolPaths{
+			Rustscan: cfg.Tools.Rustscan,
+			Nmap:     cfg.Tools.Nmap,
+			Httpx:    cfg.Tools.Httpx,
+			Nuclei:   cfg.Tools.Nuclei,
+		},
+		JSONReportPath: jsonPath,
+	}
+	applyToolExtraArgs(&opts, toolName, extraArgs)
+	if _, err := s.manager.StartTool(context.Background(), opts); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
 }
 
 func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
@@ -764,6 +850,38 @@ func coalesce(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func isManualTool(toolName string) bool {
+	switch toolName {
+	case "rustscan", "nmap", "httpx", "nuclei":
+		return true
+	default:
+		return false
+	}
+}
+
+func applyToolExtraArgs(opts *app.ToolRunOptions, toolName string, args []string) {
+	switch toolName {
+	case "rustscan":
+		opts.ExtraArgs.Rustscan = args
+	case "nmap":
+		opts.ExtraArgs.Nmap = args
+	case "httpx":
+		opts.ExtraArgs.Httpx = args
+	case "nuclei":
+		opts.ExtraArgs.Nuclei = args
+	}
+}
+
+func splitCSV(value string) []string {
+	var out []string
+	for _, part := range strings.Split(value, ",") {
+		if item := strings.TrimSpace(part); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 func render(w http.ResponseWriter, file string, data any) {
