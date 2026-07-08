@@ -21,6 +21,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
+	"github.com/P0m32Kun/anchorscan/internal/version"
 	"github.com/P0m32Kun/anchorscan/internal/web"
 )
 
@@ -44,6 +45,10 @@ func Execute() error {
 func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error {
 	if len(args) == 0 || isHelpRequest(args[0]) {
 		printRootHelp(stdout)
+		return nil
+	}
+	if args[0] == "--version" || args[0] == "-v" {
+		printVersion(stdout)
 		return nil
 	}
 
@@ -72,6 +77,9 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 		return runReport(args[1:], stdout, deps)
 	case "tools":
 		return runTools(args[1:], stdout)
+	case "version":
+		printVersion(stdout)
+		return nil
 	default:
 		_, _ = fmt.Fprintf(stderr, "unknown command: %s\n", args[0])
 		return errors.New("unknown command")
@@ -589,6 +597,10 @@ func isHelpRequest(arg string) bool {
 	return arg == "-h" || arg == "--help" || arg == "help"
 }
 
+func printVersion(w io.Writer) {
+	_, _ = fmt.Fprintf(w, "anchorscan version %s\n", version.Version)
+}
+
 func printRootHelp(w io.Writer) {
 	_, _ = fmt.Fprintln(w, `Usage: anchorscan <command> [flags]
 
@@ -600,6 +612,7 @@ Commands:
   cancel      Cancel a Web-managed scan
   report      Rebuild reports from stored results
   tools check Verify configured external tools
+  version     Print the AnchorScan version
 
 Examples:
   anchorscan doctor --config config/default.yaml

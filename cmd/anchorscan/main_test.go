@@ -224,6 +224,7 @@ profiles:
 `)
 
 	runner := &recordingRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		[]byte("Open 8080\n"),
 		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
@@ -265,6 +266,7 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
+			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 			[]byte("Open 8080\n"),
 			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
@@ -416,5 +418,18 @@ func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
+	}
+}
+
+func TestVersionCommandPrintsVersion(t *testing.T) {
+	cases := [][]string{{"version"}, {"--version"}, {"-v"}}
+	for _, args := range cases {
+		var stdout bytes.Buffer
+		if err := run(args, &stdout, &bytes.Buffer{}, cliDeps{}); err != nil {
+			t.Fatalf("run(%v) returned error: %v", args, err)
+		}
+		if !strings.Contains(stdout.String(), "anchorscan version 1.3") {
+			t.Fatalf("run(%v) output missing version: %q", args, stdout.String())
+		}
 	}
 }
