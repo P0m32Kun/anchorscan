@@ -20,6 +20,12 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	if _, err := db.Exec(`PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;`); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 
 	schema := `
 CREATE TABLE IF NOT EXISTS fingerprints (

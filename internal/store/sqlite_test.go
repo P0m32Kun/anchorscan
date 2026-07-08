@@ -2,12 +2,36 @@ package store
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
+
+func TestOpenConfiguresSQLiteForConcurrentScanWrites(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	var timeout int
+	if err := store.db.QueryRow(`PRAGMA busy_timeout`).Scan(&timeout); err != nil {
+		t.Fatalf("busy_timeout query returned error: %v", err)
+	}
+	if timeout < 5000 {
+		t.Fatalf("expected busy_timeout >= 5000, got %d", timeout)
+	}
+
+	var journalMode string
+	if err := store.db.QueryRow(`PRAGMA journal_mode`).Scan(&journalMode); err != nil {
+		t.Fatalf("journal_mode query returned error: %v", err)
+	}
+	if strings.ToLower(journalMode) != "wal" {
+		t.Fatalf("expected WAL journal mode, got %q", journalMode)
+	}
+}
 
 func TestSQLiteStoreSavesAndListsFingerprints(t *testing.T) {
 	db := t.TempDir() + "/scan.db"
