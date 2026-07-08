@@ -50,7 +50,16 @@ func TestExecuteDoctorPrintsChecks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
-	for _, want := range []string{"config: ok", "rustscan: ok", "nmap: ok", "database: ok", "reports: ok"} {
+	for _, want := range []string{
+		"config: ok",
+		"rustscan: ok",
+		"nmap: ok",
+		"ports: ok",
+		"nse rules: ok",
+		"tag rules: ok",
+		"database: ok",
+		"reports: ok",
+	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected %q in %q", want, stdout.String())
 		}
