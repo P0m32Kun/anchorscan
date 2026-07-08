@@ -2,7 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -20,78 +19,16 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	schema := `
-CREATE TABLE IF NOT EXISTS fingerprints (
-  run_id TEXT NOT NULL,
-  ip TEXT NOT NULL,
-  port INTEGER NOT NULL,
-  service TEXT NOT NULL,
-  product TEXT NOT NULL,
-  version TEXT NOT NULL,
-  normalized TEXT NOT NULL,
-  is_web INTEGER NOT NULL,
-  url TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS findings (
-  run_id TEXT NOT NULL,
-  ip TEXT NOT NULL,
-  port INTEGER NOT NULL,
-  source TEXT NOT NULL,
-  finding_id TEXT NOT NULL,
-  severity TEXT NOT NULL,
-  summary TEXT NOT NULL,
-  target TEXT NOT NULL,
-  output TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS projects (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  default_targets TEXT NOT NULL,
-  default_ports TEXT NOT NULL,
-  exclude_targets TEXT NOT NULL,
-  exclude_ports TEXT NOT NULL,
-  default_profile TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS scan_runs (
-  run_id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL,
-  target TEXT NOT NULL,
-  ports TEXT NOT NULL,
-  profile TEXT NOT NULL,
-  status TEXT NOT NULL,
-  started_at TEXT NOT NULL,
-  finished_at TEXT NOT NULL,
-  error TEXT NOT NULL,
-  config_snapshot TEXT NOT NULL
-);
-CREATE TABLE IF NOT EXISTS scan_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id TEXT NOT NULL,
-  time TEXT NOT NULL,
-  level TEXT NOT NULL,
-  stage TEXT NOT NULL,
-  message TEXT NOT NULL
-);`
-	if _, err := db.Exec(schema); err != nil {
+	if err := runMigrations(db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
-	for _, stmt := range []string{
-		`ALTER TABLE projects ADD COLUMN exclude_targets TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE projects ADD COLUMN exclude_ports TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE fingerprints ADD COLUMN version TEXT NOT NULL DEFAULT ''`,
-	} {
-		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
-			_ = db.Close()
-			return nil, err
-		}
-	}
 
 	return &Store{db: db}, nil
+}
+
+func (s *Store) Close() error {
+	return s.db.Close()
 }
 
 func (s *Store) SaveFingerprint(runID string, fp fingerprint.ServiceFingerprint) error {

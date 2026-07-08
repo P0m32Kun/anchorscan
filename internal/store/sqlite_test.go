@@ -1,13 +1,107 @@
 package store
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
+
+func TestOpenCreatesSchemaMigrations(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scan.db")
+	scanStore, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer scanStore.Close()
+
+	var count int
+	if err := scanStore.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
+		t.Fatalf("schema_migrations query returned error: %v", err)
+	}
+	if count == 0 {
+		t.Fatal("expected applied migrations")
+	}
+}
+
+func TestOpenMigratesLegacyDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open returned error: %v", err)
+	}
+	_, err = db.Exec(`
+CREATE TABLE fingerprints (
+  run_id TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  service TEXT NOT NULL,
+  product TEXT NOT NULL,
+  normalized TEXT NOT NULL,
+  is_web INTEGER NOT NULL,
+  url TEXT NOT NULL
+);
+CREATE TABLE projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  default_targets TEXT NOT NULL,
+  default_ports TEXT NOT NULL,
+  default_profile TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);`)
+	if err != nil {
+		t.Fatalf("legacy schema setup returned error: %v", err)
+	}
+	_ = db.Close()
+
+	scanStore, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer scanStore.Close()
+
+	for _, query := range []string{
+		`SELECT version FROM fingerprints LIMIT 0`,
+		`SELECT exclude_targets, exclude_ports FROM projects LIMIT 0`,
+	} {
+		if _, err := scanStore.db.Exec(query); err != nil {
+			t.Fatalf("expected migrated schema for %q: %v", query, err)
+		}
+	}
+}
+
+func TestOpenMigrationsAreIdempotent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scan.db")
+
+	first, err := Open(path)
+	if err != nil {
+		t.Fatalf("first Open returned error: %v", err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("first Close returned error: %v", err)
+	}
+
+	second, err := Open(path)
+	if err != nil {
+		t.Fatalf("second Open returned error: %v", err)
+	}
+	defer second.Close()
+
+	var count int
+	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
+		t.Fatalf("schema_migrations query returned error: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 applied migration, got %d", count)
+	}
+}
 
 func TestSQLiteStoreSavesAndListsFingerprints(t *testing.T) {
 	db := t.TempDir() + "/scan.db"
