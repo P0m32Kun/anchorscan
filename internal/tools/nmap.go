@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/xml"
 	"strconv"
 	"strings"
 
@@ -35,4 +36,33 @@ func joinPorts(ports []int) string {
 		items = append(items, strconv.Itoa(port))
 	}
 	return strings.Join(items, ",")
+}
+
+type aliveXML struct {
+	Hosts []struct {
+		Status struct {
+			State string `xml:"state,attr"`
+		} `xml:"status"`
+	} `xml:"host"`
+}
+
+func CheckAlive(ctx context.Context, runner Runner, binaryPath string, target string, extraArgs []string) (bool, error) {
+	args := []string{"-sn", target, "-oX", "-"}
+	args = append(args, extraArgs...)
+
+	out, err := runner.Run(ctx, binaryPath, args)
+	if err != nil {
+		return false, err
+	}
+
+	var parsed aliveXML
+	if err := xml.Unmarshal(out, &parsed); err != nil {
+		return false, err
+	}
+	for _, host := range parsed.Hosts {
+		if host.Status.State == "up" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
