@@ -3,11 +3,91 @@ services:
     image: anchor-tomcat:latest
     container_name: anchorscan-lab-tomcat
     pull_policy: never
+    networks:
+      default:
+        ipv4_address: 172.22.0.6
     ports:
       - "8080:8080"
 
   redis:
     image: redis:7-alpine
     container_name: anchorscan-lab-redis
+    networks:
+      default:
+        ipv4_address: 172.22.0.3
     ports:
       - "6379:6379"
+
+  mariadb:
+    image: mariadb:11
+    container_name: anchorscan-lab-mariadb
+    networks:
+      default:
+        ipv4_address: 172.22.0.5
+    environment:
+      MARIADB_ROOT_PASSWORD: anchorscan
+      MARIADB_DATABASE: anchorscan
+    ports:
+      - "13306:3306"
+
+  ssh:
+    image: lscr.io/linuxserver/openssh-server:latest
+    container_name: anchorscan-lab-ssh
+    networks:
+      default:
+        ipv4_address: 172.22.0.2
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: UTC
+      PASSWORD_ACCESS: "true"
+      USER_NAME: lab
+      USER_PASSWORD: anchorscan
+    ports:
+      - "10022:2222"
+
+  samba:
+    image: dperson/samba
+    container_name: anchorscan-lab-samba
+    networks:
+      default:
+        ipv4_address: 172.22.0.4
+    command:
+      - "-u"
+      - "lab;anchorscan"
+      - "-s"
+      - "public;/share;yes;no;no;lab"
+    ports:
+      - "1445:445"
+
+  unknown-tcp:
+    image: python:3.12-alpine
+    container_name: anchorscan-lab-unknown
+    networks:
+      default:
+        ipv4_address: 172.22.0.7
+    command:
+      - "python"
+      - "-c"
+      - |
+        import socket
+        s = socket.socket()
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(("0.0.0.0", 9099))
+        s.listen()
+        while True:
+            conn, _ = s.accept()
+            try:
+                conn.sendall(b"anchorscan-unknown\r\n")
+            except OSError:
+                pass
+            finally:
+                conn.close()
+    ports:
+      - "19099:9099"
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
