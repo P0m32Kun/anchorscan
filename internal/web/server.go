@@ -473,6 +473,27 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/runs/"+id, http.StatusSeeOther)
 		return
 	}
+	if r.Method == http.MethodPost && r.FormValue("_method") == "delete" {
+		run, err := s.store.GetScanRun(path)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if run.Status == "running" {
+			http.Error(w, "scan is running", http.StatusConflict)
+			return
+		}
+		if err := s.store.DeleteScanRunCascade(path); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := os.RemoveAll(filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, run.RunID))); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/runs", http.StatusSeeOther)
+		return
+	}
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return

@@ -20,7 +20,7 @@
         <th style="width: 15%;">任务状态</th>
         <th style="width: 30%;">目标资产</th>
         <th style="width: 15%;">扫描档位</th>
-        <th style="width: 15%; text-align: right;">扫描报告</th>
+        <th style="width: 15%; text-align: right;">操作</th>
       </tr>
     </thead>
     <tbody>
@@ -60,6 +60,12 @@
           </a>
           {{else}}
           <span style="font-size: 0.85rem; color: var(--muted); padding-right: 0.5rem;">—</span>
+          {{end}}
+          {{if ne .Status "running"}}
+          <form method="post" action="/runs/{{.RunID}}" style="display: inline;" onsubmit="return confirm('确认删除该扫描历史？');">
+            <input type="hidden" name="_method" value="delete">
+            <button class="button button-danger" type="submit" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">删除</button>
+          </form>
           {{end}}
         </td>
       </tr>

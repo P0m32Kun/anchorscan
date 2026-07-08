@@ -76,6 +76,31 @@ func (s *Store) ListProjectScanRuns(projectID string, limit int) ([]ScanRun, err
 	return scanRunsFromRows(rows)
 }
 
+func (s *Store) DeleteScanRunCascade(runID string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	for _, stmt := range []string{
+		`DELETE FROM findings WHERE run_id = ?`,
+		`DELETE FROM fingerprints WHERE run_id = ?`,
+		`DELETE FROM scan_events WHERE run_id = ?`,
+		`DELETE FROM scan_runs WHERE run_id = ?`,
+	} {
+		if _, err := tx.Exec(stmt, runID); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return nil
+}
+
 func (s *Store) UpdateScanRunStatus(runID string, status string, message string, finishedAt time.Time) error {
 	_, err := s.db.Exec(
 		`UPDATE scan_runs
