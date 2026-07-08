@@ -17,12 +17,16 @@ func TestManagerAllowsOnlyOneActiveScan(t *testing.T) {
 	}
 	manager := NewManager(sleepRunner{}, scanStore)
 	opts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json")}
-	if _, err := manager.Start(context.Background(), opts); err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if _, err := manager.Start(ctx, opts); err != nil {
 		t.Fatalf("Start returned error: %v", err)
 	}
 	if _, err := manager.Start(context.Background(), opts); err == nil {
 		t.Fatal("expected active scan error")
 	}
+	cancel()
+	waitForInactive(t, manager)
 }
 
 type sleepRunner struct{}
@@ -37,3 +41,20 @@ func (sleepRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error
 }
 
 var _ tools.Runner = sleepRunner{}
+
+func waitForInactive(t *testing.T, manager *Manager) {
+	t.Helper()
+	deadline := time.After(500 * time.Millisecond)
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if manager.ActiveRunID() == "" {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatal("manager stayed active after cancellation")
+		case <-ticker.C:
+		}
+	}
+}
