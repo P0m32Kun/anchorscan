@@ -1,5 +1,7 @@
 package store
 
+import "database/sql"
+
 func (s *Store) SaveProject(project Project) error {
 	_, err := s.db.Exec(
 		`INSERT INTO projects (
@@ -117,4 +119,42 @@ func (s *Store) ListProjects() ([]Project, error) {
 func (s *Store) DeleteProject(id string) error {
 	_, err := s.db.Exec(`DELETE FROM projects WHERE id = ?`, id)
 	return err
+}
+
+func (s *Store) DeleteProjectCascade(id string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	for _, stmt := range []string{
+		`DELETE FROM findings WHERE run_id IN (SELECT run_id FROM scan_runs WHERE project_id = ?)`,
+		`DELETE FROM fingerprints WHERE run_id IN (SELECT run_id FROM scan_runs WHERE project_id = ?)`,
+		`DELETE FROM scan_events WHERE run_id IN (SELECT run_id FROM scan_runs WHERE project_id = ?)`,
+		`DELETE FROM scan_runs WHERE project_id = ?`,
+		`DELETE FROM projects WHERE id = ?`,
+	} {
+		if _, err := tx.Exec(stmt, id); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return nil
+}
+
+func (s *Store) ProjectHasRunningRuns(id string) (bool, error) {
+	row := s.db.QueryRow(`SELECT COUNT(1) FROM scan_runs WHERE project_id = ? AND status = ?`, id, "running")
+	var count int
+	if err := row.Scan(&count); err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return count > 0, nil
 }

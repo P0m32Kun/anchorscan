@@ -127,6 +127,125 @@ func TestStoreProjectCRUD(t *testing.T) {
 	}
 }
 
+func TestDeleteProjectCascadeRemovesRunsAndArtifacts(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	project := Project{
+		ID:             "p1",
+		Name:           "Local Lab",
+		DefaultTargets: "127.0.0.1",
+		DefaultPorts:   "6379",
+		DefaultProfile: "normal",
+		CreatedAt:      time.Unix(1, 0),
+		UpdatedAt:      time.Unix(1, 0),
+	}
+	if err := store.SaveProject(project); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	run := ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "127.0.0.1",
+		Ports:          "6379",
+		Profile:        "normal",
+		Status:         "completed",
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      time.Unix(2, 0),
+		FinishedAt:     time.Unix(3, 0),
+	}
+	if err := store.SaveScanRun(run); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := store.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "127.0.0.1", Port: 6379, Service: "redis", Product: "Redis", Normalized: "redis"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+	if err := store.SaveFinding("run-1", report.Finding{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "redis-default-logins", Severity: "high", Summary: "Redis Default Login", Target: "127.0.0.1:6379"}); err != nil {
+		t.Fatalf("SaveFinding returned error: %v", err)
+	}
+	if err := store.AppendScanEvent(ScanEvent{RunID: "run-1", Time: time.Unix(4, 0), Level: "info", Stage: "nmap", Message: "done"}); err != nil {
+		t.Fatalf("AppendScanEvent returned error: %v", err)
+	}
+
+	if err := store.DeleteProjectCascade("p1"); err != nil {
+		t.Fatalf("DeleteProjectCascade returned error: %v", err)
+	}
+
+	projects, err := store.ListProjects()
+	if err != nil {
+		t.Fatalf("ListProjects returned error: %v", err)
+	}
+	if len(projects) != 0 {
+		t.Fatalf("expected no projects, got %#v", projects)
+	}
+	runs, err := store.ListProjectScanRuns("p1", 10)
+	if err != nil {
+		t.Fatalf("ListProjectScanRuns returned error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs, got %#v", runs)
+	}
+	fps, err := store.ListFingerprints("run-1")
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(fps) != 0 {
+		t.Fatalf("expected no fingerprints, got %#v", fps)
+	}
+	findings, err := store.ListFindings("run-1")
+	if err != nil {
+		t.Fatalf("ListFindings returned error: %v", err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings, got %#v", findings)
+	}
+	events, err := store.ListScanEvents("run-1", 10)
+	if err != nil {
+		t.Fatalf("ListScanEvents returned error: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("expected no events, got %#v", events)
+	}
+}
+
+func TestProjectHasRunningRuns(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	if err := store.SaveScanRun(ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "127.0.0.1",
+		Ports:          "80",
+		Profile:        "normal",
+		Status:         "running",
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      time.Unix(1, 0),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	hasRunning, err := store.ProjectHasRunningRuns("p1")
+	if err != nil {
+		t.Fatalf("ProjectHasRunningRuns returned error: %v", err)
+	}
+	if !hasRunning {
+		t.Fatalf("expected running run for project p1")
+	}
+
+	hasRunning, err = store.ProjectHasRunningRuns("p2")
+	if err != nil {
+		t.Fatalf("ProjectHasRunningRuns returned error: %v", err)
+	}
+	if hasRunning {
+		t.Fatalf("expected no running runs for project p2")
+	}
+}
+
 func TestStoreScanRunsAndEvents(t *testing.T) {
 	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
 	if err != nil {

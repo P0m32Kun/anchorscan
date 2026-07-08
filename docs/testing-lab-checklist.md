@@ -15,6 +15,30 @@ Verify these paths only:
 - terminal progress logs, including nmap heartbeat during slow service detection
 - Web report filtering, host aggregation, copy/export actions
 
+## Automated E2E Baseline
+
+Before manual walkthroughs, you can run the automated baseline:
+
+```bash
+go test -tags=e2e ./e2e -v
+```
+
+Current automated coverage:
+
+- CLI 多 IP 扫描
+- 终端英文逗号分隔目标
+- 指定端口列表扫描
+- Web 项目创建
+- 项目默认目标发起扫描
+- 排除目标
+- 排除端口
+- 项目删除时联动清理数据库与托管报告目录
+
+说明：
+
+- 自动化不会使用不存在的测试 IP，而是直接从 `docker-compose.lab.yml` 启动或复用容器，并通过 `docker inspect` 获取真实容器 IP。
+- 如果你在 macOS 上跑这套用例，并希望从宿主机直接访问容器 IP，请保持 `docker-mac-net-connect` 可用。
+
 ## Recommended Lab Targets
 
 Use at least one target for each service family:

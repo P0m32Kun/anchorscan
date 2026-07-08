@@ -94,6 +94,10 @@ Web Console 当前特性：
 - 运行页面可查看实时事件日志
 - 报告页面支持筛选、证据详情展开、资产/漏洞分页
 - 报告页面支持按主机聚合视图，以及按当前筛选结果复制/导出 `IP`、`IP:PORT`、`URL` 清单
+- Web Console 发起的扫描会把托管 JSON 报告写入 `data/` 目录：
+  - 项目扫描：`data/projects/<project_id>/runs/<run_id>/report.json`
+  - 非项目扫描：`data/runs/<run_id>/report.json`
+- 删除项目时会同时清理该项目关联的扫描历史、指纹、Finding、事件日志，以及 `data/projects/<project_id>/` 下的托管报告文件
 
 报告导出接口也可以直接访问，适合复制给其他验证工具继续使用：
 
@@ -156,6 +160,7 @@ go run ./cmd/anchorscan scan \
 - Progress logs go to stderr.
 - Result paths go to stdout.
 - JSON and HTML reports are written to the paths you choose.
+- CLI 手工指定的 `--json` / `--html` 输出路径不会被项目删除自动清理。
 - During nmap service detection, AnchorScan prints a heartbeat every 30 seconds so a slow `nmap -sV` run is visible:
 
 ```text
@@ -184,3 +189,27 @@ Stop it:
 ```bash
 docker compose -f docker-compose.lab.yml down
 ```
+
+### Automated E2E
+
+If you want to verify the local lab end to end, run:
+
+```bash
+go test -tags=e2e ./e2e -v
+```
+
+What this suite currently covers:
+
+- CLI scan with real Docker lab container IPs
+- comma-separated multi-target CLI input
+- custom port list scan (`8080,6379`)
+- Web project creation
+- project default target scan
+- excluded target / excluded port behavior
+- project deletion with managed file cleanup
+
+Notes:
+
+- The E2E suite does not use fake IPs. It starts or reuses `docker-compose.lab.yml`, then discovers the real container IPs with `docker inspect`.
+- On macOS, if you want to reach container IPs directly from the host, keep `docker-mac-net-connect` running.
+- The suite currently requires `rustscan` and `nmap` in your PATH, or set `ANCHORSCAN_RUSTSCAN` / `ANCHORSCAN_NMAP`.

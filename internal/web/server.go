@@ -44,6 +44,22 @@ type configPageData struct {
 
 const reportPageSize = 50
 
+func managedDataRoot(dbPath string) string {
+	return filepath.Dir(dbPath)
+}
+
+func managedReportPath(dbPath string, projectID string, runID string) string {
+	root := managedDataRoot(dbPath)
+	if strings.TrimSpace(projectID) == "" {
+		return filepath.Join(root, "runs", runID, "report.json")
+	}
+	return filepath.Join(root, "projects", projectID, "runs", runID, "report.json")
+}
+
+func managedProjectDir(dbPath string, projectID string) string {
+	return filepath.Join(managedDataRoot(dbPath), "projects", projectID)
+}
+
 func NewServer(opts ServerOptions) (http.Handler, error) {
 	if opts.Listen == "" {
 		opts.Listen = "127.0.0.1:8088"
@@ -182,7 +198,20 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if r.FormValue("_method") == "delete" {
-			if err := s.store.DeleteProject(id); err != nil {
+			hasRunning, err := s.store.ProjectHasRunningRuns(id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if hasRunning {
+				http.Error(w, "project has running scans", http.StatusConflict)
+				return
+			}
+			if err := s.store.DeleteProjectCascade(id); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if err := os.RemoveAll(managedProjectDir(s.opts.DBPath, id)); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -306,14 +335,15 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	runID := newID("run", s.opts.Now())
-	jsonPath := filepath.Join("reports", "scan-"+runID+".json")
+	projectID := r.FormValue("project_id")
+	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	_, err = s.manager.Start(context.Background(), app.ScanOptions{
 		RunID:     runID,
-		ProjectID: r.FormValue("project_id"),
+		ProjectID: projectID,
 		Targets:   targets,
 		Ports:     resolvedPorts,
 		Tools: app.ToolPaths{

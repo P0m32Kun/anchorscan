@@ -211,11 +211,172 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if run.Target != "127.0.0.1" || run.Ports != "80,8080" || run.Profile != "slow" {
 		t.Fatalf("unexpected run: %#v", run)
 	}
+	reportPath := filepath.Join(dir, "projects", "p1", "runs", run.RunID, "report.json")
+	if _, err := os.Stat(reportPath); err != nil {
+		t.Fatalf("expected managed report at %s: %v", reportPath, err)
+	}
 	if !runner.hasArgs("/opt/rustscan", "-a", "127.0.0.1", "--ports", "80,8080") {
 		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
 	}
 	if runner.callCount("/opt/rustscan") != 1 {
 		t.Fatalf("expected single rustscan target after exclusions, got %#v", runner.commands)
+	}
+}
+
+func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	now := time.Unix(1, 0)
+	if err := scanStore.SaveProject(store.Project{
+		ID:             "p1",
+		Name:           "Local Lab",
+		DefaultTargets: "127.0.0.1",
+		DefaultPorts:   "6379",
+		DefaultProfile: "normal",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "127.0.0.1",
+		Ports:          "6379",
+		Profile:        "normal",
+		Status:         "completed",
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      now,
+		FinishedAt:     now.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "127.0.0.1", Port: 6379, Service: "redis", Product: "Redis", Normalized: "redis"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+	if err := scanStore.SaveFinding("run-1", report.Finding{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "redis-default-logins", Severity: "high", Summary: "Redis Default Login", Target: "127.0.0.1:6379"}); err != nil {
+		t.Fatalf("SaveFinding returned error: %v", err)
+	}
+	if err := scanStore.AppendScanEvent(store.ScanEvent{RunID: "run-1", Time: now.Add(2 * time.Second), Level: "info", Stage: "nmap", Message: "done"}); err != nil {
+		t.Fatalf("AppendScanEvent returned error: %v", err)
+	}
+	reportPath := filepath.Join(dir, "projects", "p1", "runs", "run-1", "report.json")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("_method=delete")
+	req := httptest.NewRequest(http.MethodPost, "/projects/p1", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+
+	projects, err := scanStore.ListProjects()
+	if err != nil {
+		t.Fatalf("ListProjects returned error: %v", err)
+	}
+	if len(projects) != 0 {
+		t.Fatalf("expected no projects, got %#v", projects)
+	}
+	runs, err := scanStore.ListProjectScanRuns("p1", 10)
+	if err != nil {
+		t.Fatalf("ListProjectScanRuns returned error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs, got %#v", runs)
+	}
+	fps, err := scanStore.ListFingerprints("run-1")
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(fps) != 0 {
+		t.Fatalf("expected no fingerprints, got %#v", fps)
+	}
+	findings, err := scanStore.ListFindings("run-1")
+	if err != nil {
+		t.Fatalf("ListFindings returned error: %v", err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings, got %#v", findings)
+	}
+	events, err := scanStore.ListScanEvents("run-1", 10)
+	if err != nil {
+		t.Fatalf("ListScanEvents returned error: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("expected no events, got %#v", events)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "p1")); !os.IsNotExist(err) {
+		t.Fatalf("expected project dir to be removed, got err=%v", err)
+	}
+}
+
+func TestDeleteProjectRejectsRunningRuns(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	now := time.Unix(1, 0)
+	if err := scanStore.SaveProject(store.Project{
+		ID:             "p1",
+		Name:           "Local Lab",
+		DefaultTargets: "127.0.0.1",
+		DefaultPorts:   "6379",
+		DefaultProfile: "normal",
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "127.0.0.1",
+		Ports:          "6379",
+		Profile:        "normal",
+		Status:         "running",
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      now,
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("_method=delete")
+	req := httptest.NewRequest(http.MethodPost, "/projects/p1", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusConflict {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	projects, err := scanStore.ListProjects()
+	if err != nil {
+		t.Fatalf("ListProjects returned error: %v", err)
+	}
+	if len(projects) != 1 {
+		t.Fatalf("expected project to remain, got %#v", projects)
 	}
 }
 
