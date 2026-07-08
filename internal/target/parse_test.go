@@ -40,3 +40,15 @@ func TestParseSupportsCommaAndNewlineSeparatedTargets(t *testing.T) {
 		t.Fatalf("Parse mismatch: got %#v want %#v", got, want)
 	}
 }
+
+func TestParseKeepsCIDRTargetsIntact(t *testing.T) {
+	got, err := Parse("192.168.1.0/30")
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	want := []string{"192.168.1.0/30"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Parse mismatch: got %#v want %#v", got, want)
+	}
+}

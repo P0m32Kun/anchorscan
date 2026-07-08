@@ -3,80 +3,29 @@
   <div>
     <p class="eyebrow">单工具调用</p>
     <h2>单独运行工具</h2>
+    <p class="meta-line">每个工具有独立页面、中文 Help 和常用参数组合。结果仍进入任务控制台查看。</p>
   </div>
   <a class="button button-secondary" href="/runs">查看历史</a>
 </section>
 
-<section class="panel">
-  <form class="form-grid" method="post" action="/tools">
-    <label>
-      <span>选择项目</span>
-      <select name="project_id">
-        <option value="">不绑定项目</option>
-        {{range .Projects}}
-        <option value="{{.ID}}">{{.Name}}</option>
-        {{end}}
-      </select>
-    </label>
+<section class="tool-card-grid">
+  {{range .Tools}}
+  <a class="tool-card" href="/tools/{{.Name}}">
+    <span class="tool-card-kicker">{{.Name}}</span>
+    <strong>{{.Title}}</strong>
+    <span>{{.Summary}}</span>
+    <em>打开参数页 →</em>
+  </a>
+  {{end}}
+</section>
 
-    <label>
-      <span>工具</span>
-      <select name="tool">
-        <option value="rustscan">rustscan - 端口扫描</option>
-        <option value="nmap">nmap - 存活/指纹识别</option>
-        <option value="httpx">httpx - Web 指纹</option>
-        <option value="nuclei">nuclei - 漏洞探测</option>
-      </select>
-    </label>
-
-    <label>
-      <span>Nmap 模式</span>
-      <select name="mode">
-        <option value="service">service - 指纹识别</option>
-        <option value="alive">alive - 存活验证</option>
-      </select>
-    </label>
-
-    <label>
-      <span>端口 (rustscan / nmap service)</span>
-      <input name="ports" placeholder="留空使用全局默认端口，例如 80,443,3389">
-    </label>
-
-    <label class="full-width">
-      <span>主机目标 (rustscan / nmap)</span>
-      <input name="target" placeholder="例如 192.168.1.10">
-    </label>
-
-    <label class="full-width">
-      <span>URL 目标 (httpx / nuclei)</span>
-      <input name="url" placeholder="例如 http://192.168.1.10:8080">
-    </label>
-
-    <label>
-      <span>Nuclei Tags</span>
-      <input name="tags" placeholder="例如 cve,exposure">
-    </label>
-
-    <label>
-      <span>Nuclei Template</span>
-      <input name="template" placeholder="例如 cves/2021/CVE-2021-41773.yaml">
-    </label>
-
-    <details class="details-block full-width" style="margin-top: 1rem;">
-      <summary style="font-size: 0.95rem; font-weight: 600; padding: 0.5rem 0;">高级参数</summary>
-      <div class="form-grid" style="padding-top: 1rem; border-top: 1px dashed rgba(59, 130, 246, 0.1); margin-top: 0.5rem;">
-        <label class="full-width">
-          <span>当前工具附加参数</span>
-          <input name="extra_args" placeholder="例如 --min-rate 50 或 -rate-limit 5">
-        </label>
-      </div>
-    </details>
-
-    <div class="form-actions form-submit-row full-width">
-      <button class="button button-primary primary-submit" type="submit">
-        <span>启动单工具任务</span>
-      </button>
-    </div>
-  </form>
+<section class="panel tool-project-note">
+  <p class="eyebrow">可选绑定到项目</p>
+  <p class="muted">启动任务时可以选择“不绑定项目”，也可以绑定到已有项目，报告会跟随项目保存。</p>
+  {{if .Projects}}
+  <div class="project-chip-row">
+    {{range .Projects}}<span class="status-badge port-badge">{{.Name}}</span>{{end}}
+  </div>
+  {{end}}
 </section>
 {{end}}

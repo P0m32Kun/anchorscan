@@ -1,0 +1,80 @@
+{{define "content"}}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">单工具调用 / {{.Tool.Name}}</p>
+    <h2>{{.Tool.Title}}</h2>
+    <p class="meta-line">{{.Tool.Summary}}</p>
+  </div>
+  <div class="header-actions">
+    <a class="button button-secondary" href="/tools/new">切换工具</a>
+    <a class="button button-secondary" href="/runs">查看历史</a>
+  </div>
+</section>
+
+<section class="tool-run-layout">
+  <form class="panel form-grid tool-run-form" method="post" action="/tools" data-tool-form data-tool="{{.Tool.Name}}">
+    <input type="hidden" name="tool" value="{{.Tool.Name}}">
+
+    <label class="full-width">
+      <span>可选绑定到项目</span>
+      <select name="project_id">
+        <option value="">不绑定项目</option>
+        {{range .Projects}}
+        <option value="{{.ID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+
+    <label class="full-width">
+      <span>参数</span>
+      <textarea name="raw_args" class="tool-args-input" placeholder="例如 -sn 192.168.1.10 或 -u http://192.168.1.10:8080"></textarea>
+    </label>
+
+    <div class="form-actions form-submit-row full-width">
+      <button class="button button-primary primary-submit" type="submit">启动 {{.Tool.Name}}</button>
+    </div>
+  </form>
+
+  <aside class="panel tool-help-panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">中文 Help</p>
+        <h3>参数怎么填</h3>
+      </div>
+    </div>
+
+    <details class="details-block tool-help-details" open>
+      <summary>查看中文 Help</summary>
+      <ul class="tool-help-list">
+        {{range .Tool.Help}}<li>{{.}}</li>{{end}}
+      </ul>
+    </details>
+
+    <div class="preset-block">
+      <p class="eyebrow">常用参数组合</p>
+      <div class="preset-chip-row">
+        {{range .Tool.Presets}}
+        <button class="preset-chip" type="button" data-set-raw-args="{{.RawArgs}}">
+          <strong>{{.Label}}</strong>
+          <span>{{.Hint}}</span>
+        </button>
+        {{end}}
+      </div>
+    </div>
+
+    <div class="terminal-window tool-preview-window">
+      <div class="terminal-header">
+        <div class="terminal-dots">
+          <span class="terminal-dot dot-red"></span>
+          <span class="terminal-dot dot-yellow"></span>
+          <span class="terminal-dot dot-green"></span>
+        </div>
+      <div class="terminal-title">tool output</div>
+      </div>
+      <pre class="event-log tool-command-preview" id="tool-output">等待启动工具...</pre>
+    </div>
+  </aside>
+</section>
+
+<script src="/static/app.js"></script>
+{{end}}
