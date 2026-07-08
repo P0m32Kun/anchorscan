@@ -289,7 +289,20 @@ V1 lab pass is good enough when:
 | Check | Expected |
 | --- | --- |
 | `make package` | Creates `dist/<package>/` and `dist/<package>.tar.gz` |
+| `make e2e` | Runs CLI/Web smoke against the local lab with real binaries |
 | Packaged doctor | Reports config, tool, database, and reports checks |
 | CLI scan preflight | Prints target count, ports, profile, and workers before rustscan |
 | Web scan preflight | Blocks missing required tools before scan starts |
 | Existing DB open | Migrates old schema and preserves rows |
+
+## E2E Smoke Command
+
+```bash
+make e2e
+```
+
+Expected:
+
+- CLI smoke writes SQLite / JSON / HTML successfully
+- JSON report contains `6379` and `8080`
+- Web smoke can start a scan and open the generated report page

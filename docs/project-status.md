@@ -36,6 +36,7 @@ Implemented capabilities:
 - shared scan preflight for CLI and Web Console
 - SQLite migrations through `schema_migrations`
 - current-platform package workflow through `make package`
+- optional real-binary smoke e2e through `make e2e`
 - stronger doctor checks for tools, ports, rule files, database, and reports path
 - SQLite persistence for scan runs, events, fingerprints, findings, projects, and config snapshots
 - persisted fingerprint fields including service, product, version, normalized service, web flag, and URL
@@ -97,5 +98,6 @@ Before claiming a branch is ready:
 
 ```bash
 go test ./...
+make e2e
 make package
 ```

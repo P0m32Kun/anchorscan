@@ -74,11 +74,13 @@ go run ./cmd/anchorscan tools check --config config/default.yaml
 
 ```bash
 make test
+make e2e
 make build
 make package
 ```
 
 - `make test`: 运行全部测试
+- `make e2e`: 运行真实二进制 + 本地 lab 的 smoke e2e
 - `make build`: 输出当前平台二进制到 `dist/anchorscan`
 - `make package`: 生成当前平台归档包到 `dist/`
 
@@ -150,6 +152,37 @@ go run ./cmd/anchorscan scan --config config/default.yaml --target 127.0.0.1 --p
 
 ```bash
 go run ./cmd/anchorscan doctor --config config/default.yaml --db data/scans.sqlite --reports reports
+```
+
+## E2E Smoke
+
+默认的 `go test ./...` 不会跑真实扫描 e2e。  
+真实链路 smoke 单独执行：
+
+```bash
+make e2e
+```
+
+它会做两件事：
+
+1. 启动或复用 `docker-compose.lab.yml` 里的本地靶场
+2. 运行两条真实 smoke：
+   - CLI：真实执行 `anchorscan scan`
+   - Web：真实启动 `anchorscan web`，通过 HTTP 发起扫描并检查报告页
+
+当前 smoke 目标固定为：
+
+- `127.0.0.1`
+- 端口 `8080,6379`
+
+如果工具不在 `PATH`，可以临时指定：
+
+```bash
+ANCHORSCAN_RUSTSCAN=/path/to/rustscan \
+ANCHORSCAN_NMAP=/path/to/nmap \
+ANCHORSCAN_HTTPX=/path/to/httpx \
+ANCHORSCAN_NUCLEI=/path/to/nuclei \
+make e2e
 ```
 
 ## Port Selection

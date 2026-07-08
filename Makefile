@@ -7,10 +7,13 @@ GOARCH ?= $(shell go env GOARCH)
 PACKAGE_NAME := $(APP)-$(VERSION)-$(GOOS)-$(GOARCH)
 PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
 
-.PHONY: test build package clean
+.PHONY: test e2e build package clean
 
 test:
 	go test ./...
+
+e2e:
+	go test -tags e2e ./e2e -count=1 -v
 
 build:
 	mkdir -p $(DIST_DIR)
