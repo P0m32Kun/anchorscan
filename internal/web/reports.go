@@ -8,7 +8,10 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
+	"github.com/P0m32Kun/anchorscan/internal/store"
 )
+
+const runMetaSummaryLimit = 80
 
 type reportFilters struct {
 	IP       string
@@ -27,7 +30,12 @@ type reportPage struct {
 	HasNext    bool
 	PrevURL    string
 	NextURL    string
+	Size       int
+	SizeStr    string
+	SizeURLs   map[int]string
 }
+
+var reportPageSizes = []int{10, 20, 50}
 
 type hostAssetView struct {
 	IP        string
@@ -37,6 +45,35 @@ type hostAssetView struct {
 	URLs      string
 	CopyPorts string
 	CopyPairs string
+}
+
+type runMetaView struct {
+	Target      string
+	Ports       string
+	Profile     string
+	FullTarget  string
+	FullPorts   string
+	FullProfile string
+}
+
+func newRunMetaView(run store.ScanRun) runMetaView {
+	return runMetaView{
+		Target:      summarizeRunValue(run.Target),
+		Ports:       summarizeRunValue(run.Ports),
+		Profile:     summarizeRunValue(run.Profile),
+		FullTarget:  run.Target,
+		FullPorts:   run.Ports,
+		FullProfile: run.Profile,
+	}
+}
+
+func summarizeRunValue(value string) string {
+	value = strings.TrimSpace(value)
+	runes := []rune(value)
+	if len(runes) <= runMetaSummaryLimit {
+		return value
+	}
+	return string(runes[:runMetaSummaryLimit]) + "..."
 }
 
 func filterFingerprints(items []fingerprint.ServiceFingerprint, filters reportFilters) []fingerprint.ServiceFingerprint {
@@ -266,7 +303,23 @@ func parsePage(value string) int {
 	return page
 }
 
-func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base url.Values, key string, size int) reportPage {
+// parseSize resolves the per-page size from a query value. Only the values in
+// reportPageSizes are accepted; anything else (including empty) falls back to
+// reportPageSize so the default behavior is unchanged.
+func parseSize(value string) int {
+	size, err := strconv.Atoi(value)
+	if err != nil {
+		return reportPageSize
+	}
+	for _, allowed := range reportPageSizes {
+		if size == allowed {
+			return size
+		}
+	}
+	return reportPageSize
+}
+
+func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base url.Values, key, sizeKey string, size int) reportPage {
 	sliced, current, total := paginate(items, page, size)
 	values := cloneValues(base)
 	return reportPage{
@@ -277,10 +330,13 @@ func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		Size:       size,
+		SizeStr:    strconv.Itoa(size),
+		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
 }
 
-func paginateFindings(items []report.Finding, page int, base url.Values, key string, size int) reportPage {
+func paginateFindings(items []report.Finding, page int, base url.Values, key, sizeKey string, size int) reportPage {
 	sliced, current, total := paginate(items, page, size)
 	values := cloneValues(base)
 	return reportPage{
@@ -291,10 +347,13 @@ func paginateFindings(items []report.Finding, page int, base url.Values, key str
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		Size:       size,
+		SizeStr:    strconv.Itoa(size),
+		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
 }
 
-func paginateHostAssets(items []hostAssetView, page int, base url.Values, key string, size int) reportPage {
+func paginateHostAssets(items []hostAssetView, page int, base url.Values, key, sizeKey string, size int) reportPage {
 	sliced, current, total := paginate(items, page, size)
 	values := cloneValues(base)
 	return reportPage{
@@ -305,6 +364,9 @@ func paginateHostAssets(items []hostAssetView, page int, base url.Values, key st
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		Size:       size,
+		SizeStr:    strconv.Itoa(size),
+		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
 }
 
@@ -353,6 +415,27 @@ func pageURL(values url.Values, key string, page int) string {
 		return "?"
 	}
 	return "?" + encoded
+}
+
+// pageSizeURLs builds the "?assets_size=20&..." style links for each option in
+// reportPageSizes. It drops the page key so switching the size always lands on
+// the first page, and preserves every other filter parameter.
+func pageSizeURLs(values url.Values, pageKey, sizeKey string) map[int]string {
+	urls := make(map[int]string, len(reportPageSizes))
+	for _, size := range reportPageSizes {
+		clone := cloneValues(values)
+		if pageKey != "" {
+			clone.Del(pageKey)
+		}
+		clone.Set(sizeKey, strconv.Itoa(size))
+		encoded := clone.Encode()
+		if encoded == "" {
+			urls[size] = "?"
+		} else {
+			urls[size] = "?" + encoded
+		}
+	}
+	return urls
 }
 
 func withQuery(values url.Values, key string, value string) string {

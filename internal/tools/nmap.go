@@ -15,7 +15,7 @@ func Fingerprint(ctx context.Context, runner Runner, binaryPath string, ip strin
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, err
+		return nil, withOutputError(err, out)
 	}
 
 	parsed, err := fingerprint.ParseNmapXML(out)
@@ -43,26 +43,53 @@ type aliveXML struct {
 		Status struct {
 			State string `xml:"state,attr"`
 		} `xml:"status"`
+		Address struct {
+			Addr string `xml:"addr,attr"`
+		} `xml:"address"`
 	} `xml:"host"`
 }
 
-func CheckAlive(ctx context.Context, runner Runner, binaryPath string, target string, extraArgs []string) (bool, error) {
-	args := []string{"-sn", target, "-oX", "-"}
+func DiscoverAlive(ctx context.Context, runner Runner, binaryPath string, targets []string, extraArgs []string) ([]string, error) {
+	args := []string{"-sn"}
+	args = append(args, targets...)
+	args = append(args, "-oX", "-")
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return false, err
+		return nil, withOutputError(err, out)
 	}
 
 	var parsed aliveXML
 	if err := xml.Unmarshal(out, &parsed); err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{}, len(parsed.Hosts))
+	alive := make([]string, 0, len(parsed.Hosts))
+	for _, host := range parsed.Hosts {
+		if host.Status.State != "up" {
+			continue
+		}
+		addr := host.Address.Addr
+		if addr == "" && len(targets) == 1 {
+			addr = targets[0]
+		}
+		if addr == "" {
+			continue
+		}
+		if _, ok := seen[addr]; ok {
+			continue
+		}
+		seen[addr] = struct{}{}
+		alive = append(alive, addr)
+	}
+	return alive, nil
+}
+
+func CheckAlive(ctx context.Context, runner Runner, binaryPath string, target string, extraArgs []string) (bool, error) {
+	alive, err := DiscoverAlive(ctx, runner, binaryPath, []string{target}, extraArgs)
+	if err != nil {
 		return false, err
 	}
-	for _, host := range parsed.Hosts {
-		if host.Status.State == "up" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return len(alive) > 0, nil
 }

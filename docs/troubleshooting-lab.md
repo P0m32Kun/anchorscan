@@ -17,6 +17,8 @@ Quick check:
 ss -lntp
 ```
 
+If you are testing the Docker lab from macOS, confirm you are scanning the real container IP and that `docker-mac-net-connect` is installed. Without it, a container can be healthy but still unreachable from the host by its bridge IP.
+
 ## 2. rustscan works, nmap finds nothing useful
 
 Check:
@@ -166,7 +168,63 @@ Capture:
 - saved JSON
 - saved SQLite rows for the run
 
-## 11. Minimal triage flow
+If the service stays stable and the run completes, a weak fingerprint like `unknown`, missing `product`, or no secondary routing is acceptable for this lab target.
+
+## 11. Image pull is slow or stalls
+
+The most common first-run case is `mariadb:11` taking longer than the other lab images. When every layer sits at `Pulling fs layer` and never progresses, the Docker Hub connection is being throttled or reset. Try the options below in order.
+
+### 11a. Use a registry mirror (no local proxy needed)
+
+Pull through a mirror, then re-tag it back to `mariadb:11` so `docker-compose.lab.yml` does not need to change:
+
+```bash
+docker pull docker.m.daocloud.io/library/mariadb:11
+docker tag docker.m.daocloud.io/library/mariadb:11 mariadb:11
+```
+
+Other mirror prefixes if the first one is slow or down — rotate through them:
+
+- `docker.1ms.run/library/mariadb:11`
+- `docker.xuanyuan.me/library/mariadb:11`
+- `hub.rat.dev/library/mariadb:11`
+
+### 11b. Pin the mirror once for all pulls
+
+Add a `registry-mirrors` entry to Docker Desktop (Settings → Docker Engine, i.e. `~/.docker/daemon.json`):
+
+```json
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ]
+}
+```
+
+Apply & Restart, then a plain `docker pull mariadb:11` routes through the mirror automatically.
+
+### 11c. Use a local proxy
+
+If you already run a local proxy (e.g. Clash on `127.0.0.1:7897`):
+
+```bash
+export http_proxy=http://127.0.0.1:7897
+export https_proxy=http://127.0.0.1:7897
+export all_proxy=http://127.0.0.1:7897
+docker pull mariadb:11
+```
+
+### After the image is available
+
+Restart the lab:
+
+```bash
+docker compose -f docker-compose.lab.yml up -d
+```
+
+## 12. Minimal triage flow
 
 When a lab case fails, answer these in order:
 
@@ -185,7 +243,7 @@ Check listen address, DB path, and config path.
 
 ## Scan cannot start from Web
 
-Check if another scan is running. v1.1 allows one active scan.
+Check if another scan is running. v1.3 allows one active scan.
 
 ## Cancel does not work
 

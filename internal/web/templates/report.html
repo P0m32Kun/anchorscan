@@ -3,11 +3,21 @@
   <div>
     <p class="eyebrow">扫描报告</p>
     <h2 class="mono-heading">{{.Run.RunID}}</h2>
-    <p class="meta-line">
-      目标: <span class="mono-value">{{.Run.Target}}</span> |
-      端口: <span class="mono-value">{{.Run.Ports}}</span> |
-      档位: <span class="mono-value">{{.Run.Profile}}</span>
-    </p>
+    <details class="run-meta-details">
+      <summary>
+        <span>扫描参数</span>
+        <span class="mono-value">目标: {{.RunMeta.Target}} | 端口: {{.RunMeta.Ports}} | 档位: {{.RunMeta.Profile}}</span>
+        <span class="meta-expand-text">展开全部扫描参数</span>
+      </summary>
+      <dl class="run-meta-full">
+        <dt>目标</dt>
+        <dd class="mono-value">{{.RunMeta.FullTarget}}</dd>
+        <dt>端口</dt>
+        <dd class="mono-value">{{.RunMeta.FullPorts}}</dd>
+        <dt>档位</dt>
+        <dd class="mono-value">{{.RunMeta.FullProfile}}</dd>
+      </dl>
+    </details>
   </div>
   <div class="header-actions">
     <span class="status-badge status-{{.Run.Status}}" style="margin-right: 0.5rem;">{{.Run.Status}}</span>
@@ -60,10 +70,20 @@
       <span>主机第 {{.HostPage.Page}} / {{.HostPage.TotalPages}} 页</span>
       {{if .HostPage.HasPrev}}<a href="{{.HostPage.PrevURL}}">上一页</a>{{end}}
       {{if .HostPage.HasNext}}<a href="{{.HostPage.NextURL}}">下一页</a>{{end}}
+      <select class="page-size" onchange="location.href=this.value">
+        <option value="{{index .HostPage.SizeURLs 10}}" {{if eq .HostPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
+        <option value="{{index .HostPage.SizeURLs 20}}" {{if eq .HostPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
+        <option value="{{index .HostPage.SizeURLs 50}}" {{if eq .HostPage.SizeStr "50"}}selected{{end}}>50 / 页</option>
+      </select>
       {{else}}
       <span>资产第 {{.AssetPage.Page}} / {{.AssetPage.TotalPages}} 页</span>
       {{if .AssetPage.HasPrev}}<a href="{{.AssetPage.PrevURL}}">上一页</a>{{end}}
       {{if .AssetPage.HasNext}}<a href="{{.AssetPage.NextURL}}">下一页</a>{{end}}
+      <select class="page-size" onchange="location.href=this.value">
+        <option value="{{index .AssetPage.SizeURLs 10}}" {{if eq .AssetPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
+        <option value="{{index .AssetPage.SizeURLs 20}}" {{if eq .AssetPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
+        <option value="{{index .AssetPage.SizeURLs 50}}" {{if eq .AssetPage.SizeStr "50"}}selected{{end}}>50 / 页</option>
+      </select>
       {{end}}
     </div>
   </div>
@@ -72,8 +92,8 @@
     <button class="button button-secondary" type="button" data-copy-url="{{.AssetTXTIP}}">复制 IP</button>
     <button class="button button-secondary" type="button" data-copy-url="{{.AssetTXTIPPort}}">复制 IP:PORT</button>
     <button class="button button-secondary" type="button" data-copy-url="{{.AssetTXTURL}}">复制 URL</button>
-    <a class="button button-secondary" href="{{.AssetCSV}}" target="_blank">导出 CSV</a>
-    <a class="button button-secondary" href="{{.AssetTXTIPPort}}" target="_blank">导出 TXT</a>
+    <a class="button button-secondary" href="{{.AssetCSV}}" download>导出 CSV</a>
+    <a class="button button-secondary" href="{{.AssetTXTIPPort}}" download>导出 TXT</a>
   </div>
   
   {{if eq .AssetView "hosts"}}
@@ -182,6 +202,11 @@
       <span>漏洞第 {{.FindingPage.Page}} / {{.FindingPage.TotalPages}} 页</span>
       {{if .FindingPage.HasPrev}}<a href="{{.FindingPage.PrevURL}}">上一页</a>{{end}}
       {{if .FindingPage.HasNext}}<a href="{{.FindingPage.NextURL}}">下一页</a>{{end}}
+      <select class="page-size" onchange="location.href=this.value">
+        <option value="{{index .FindingPage.SizeURLs 10}}" {{if eq .FindingPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
+        <option value="{{index .FindingPage.SizeURLs 20}}" {{if eq .FindingPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
+        <option value="{{index .FindingPage.SizeURLs 50}}" {{if eq .FindingPage.SizeStr "50"}}selected{{end}}>50 / 页</option>
+      </select>
     </div>
   </div>
   
@@ -261,6 +286,7 @@
     </details>
   </div>
   
+  <script src="/static/app.js"></script>
   <script>
     function toggleFindingDetails(index) {
       const detailsRow = document.getElementById('finding-details-' + index);

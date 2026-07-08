@@ -52,6 +52,7 @@ type ScanOptions struct {
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
+	scanTargets := opts.Targets
 
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
@@ -84,23 +85,39 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
 	}()
 
+	if opts.Tools.Nmap != "" && len(scanTargets) > 0 {
+		emit(opts, scanStore, "info", "nmap", "nmap alive sweep targets=%v", scanTargets)
+		aliveTargets, err := tools.DiscoverAlive(ctx, runner, opts.Tools.Nmap, scanTargets, opts.ExtraArgs.Nmap)
+		if err != nil {
+			return normalizeToolError(ctx, err)
+		}
+		scanTargets = aliveTargets
+		emit(opts, scanStore, "info", "nmap", "nmap alive hosts=%v", scanTargets)
+		if len(scanTargets) == 0 {
+			emit(opts, scanStore, "info", "target", "no live hosts discovered; skip port scan")
+		}
+	}
+
 	workers := opts.HostWorkers
 	if workers <= 0 {
 		workers = 1
 	}
-	if workers > len(opts.Targets) {
-		workers = len(opts.Targets)
+	if workers > len(scanTargets) {
+		workers = len(scanTargets)
 	}
 	if workers > 0 {
-		targets := make(chan string)
-		results := make(chan targetResult, len(opts.Targets))
+		targetCh := make(chan string)
+		results := make(chan targetResult, len(scanTargets))
 		var wg sync.WaitGroup
 
 		for range workers {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for target := range targets {
+				for target := range targetCh {
+					if ctx.Err() != nil {
+						return
+					}
 					fingerprints, findings, err := scanTarget(ctx, runner, scanStore, opts, target)
 					results <- targetResult{
 						target:       target,
@@ -118,12 +135,12 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}()
 
 		go func() {
-			defer close(targets)
-			for _, target := range opts.Targets {
+			defer close(targetCh)
+			for _, target := range scanTargets {
 				select {
 				case <-ctx.Done():
 					return
-				case targets <- target:
+				case targetCh <- target:
 				}
 			}
 		}()
@@ -156,7 +173,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		if canceledErr != nil {
 			return canceledErr
 		}
-		if failed == len(opts.Targets) {
+		if failed == len(scanTargets) {
 			return fmt.Errorf("all targets failed: %w", firstErr)
 		}
 	}
@@ -183,6 +200,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		return nil, nil, normalizeToolError(ctx, err)
 	}
 	emit(opts, scanStore, "info", "rustscan", "rustscan %s open=%v", target, ports)
+	if len(ports) == 0 {
+		emit(opts, scanStore, "info", "target", "target %s has no open ports; skip fingerprint and vulnerability checks", target)
+		return nil, nil, nil
+	}
 
 	emit(opts, scanStore, "info", "nmap", "nmap %s ports=%v (service detection may be slow)", target, ports)
 	started := time.Now()

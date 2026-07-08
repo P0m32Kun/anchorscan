@@ -23,7 +23,7 @@ func DiscoverPorts(ctx context.Context, runner Runner, binaryPath string, target
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, err
+		return nil, withOutputError(err, out)
 	}
 
 	matches := extractPortMatches(string(out))
