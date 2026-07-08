@@ -24,7 +24,7 @@ The current direction explicitly does not include:
 
 ## Current Baseline
 
-The project is at a V1.1 local-operator baseline.
+The project is preparing the V1.2 stable deploy and controlled scan baseline.
 
 Implemented capabilities:
 
@@ -33,6 +33,10 @@ Implemented capabilities:
 - port selection: custom lists, ranges like `100-1000`, `top100`, `top1000`, and `full`
 - scan profiles: `slow`, `normal`, `fast`
 - per-tool extra args through configuration
+- shared scan preflight for CLI and Web Console
+- SQLite migrations through `schema_migrations`
+- current-platform package workflow through `make package`
+- stronger doctor checks for tools, ports, rule files, database, and reports path
 - SQLite persistence for scan runs, events, fingerprints, findings, projects, and config snapshots
 - persisted fingerprint fields including service, product, version, normalized service, web flag, and URL
 - JSON and HTML report generation
@@ -51,7 +55,7 @@ Implemented capabilities:
 | `config/nse.yaml` | fingerprint-driven NSE script mapping |
 | `config/service-aliases.yaml` | service normalization aliases |
 
-Third-party tools are configured by path. V1.1 does not package `rustscan`, `nmap`, `httpx`, or `nuclei` into the AnchorScan binary.
+Third-party tools are configured by path. V1.2 still does not package `rustscan`, `nmap`, `httpx`, or `nuclei` into the AnchorScan binary.
 
 ## Runtime Artifacts
 
@@ -59,6 +63,7 @@ These are generated locally and should not be treated as source:
 
 - `data/`
 - `reports/`
+- `dist/`
 - built binary such as `anchorscan`
 
 ## Known Operational Notes
@@ -82,8 +87,8 @@ These are generated locally and should not be treated as source:
 
 1. Run a full local Web Console regression with Playwright or manual browser testing.
 2. Add more local lab services to exercise MySQL, SMB, SSH, unknown services, and mixed hosts.
-3. Decide a lightweight SQLite migration policy before changing schema again.
-4. Improve release packaging later, after tool paths and runtime behavior are stable.
+3. Keep refining scan controllability so fast/normal/slow defaults and per-tool overrides stay observable and safe.
+4. Improve the front-end usability and visual polish without sacrificing Chinese-first operator workflow.
 5. Keep report exports practical for follow-up tooling: filtered `IP`, `IP:PORT`, `URL`, and CSV should remain first-class.
 
 ## Verification Command
@@ -92,4 +97,5 @@ Before claiming a branch is ready:
 
 ```bash
 go test ./...
+make package
 ```

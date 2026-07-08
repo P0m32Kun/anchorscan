@@ -283,3 +283,13 @@ V1 lab pass is good enough when:
 | Copy `URL` | Clipboard contains only web assets with saved URLs |
 | TXT export | Output follows the selected kind and current filters |
 | CSV export | Header includes `ip,port,service,product,version,url` and rows match current filters |
+
+## V1.2 Deployment And Preflight Checks
+
+| Check | Expected |
+| --- | --- |
+| `make package` | Creates `dist/<package>/` and `dist/<package>.tar.gz` |
+| Packaged doctor | Reports config, tool, database, and reports checks |
+| CLI scan preflight | Prints target count, ports, profile, and workers before rustscan |
+| Web scan preflight | Blocks missing required tools before scan starts |
+| Existing DB open | Migrates old schema and preserves rows |
