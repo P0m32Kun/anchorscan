@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -616,10 +617,55 @@ func (s *server) renderImportForm(w http.ResponseWriter, errMsg string) {
 	})
 }
 
-// importNmapRun handles the POST submission of the Nmap XML import form. It is
-// a placeholder stub (501) here; the full handler is implemented in Task 3.
+// importNmapRun handles the POST submission of the Nmap XML import form. A
+// valid upload is imported as a completed run and the client is redirected to
+// its detail page; on any failure the form is re-rendered with an error banner
+// (no run is persisted).
 func (s *server) importNmapRun(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		s.renderImportForm(w, "文件过大或格式错误")
+		return
+	}
+
+	file, _, err := r.FormFile("xml_file")
+	if err != nil {
+		s.renderImportForm(w, "请选择要导入的 Nmap XML 文件")
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		s.renderImportForm(w, err.Error())
+		return
+	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		s.renderImportForm(w, "empty XML file")
+		return
+	}
+
+	projectID := r.FormValue("project_id")
+	runID := newID("run", s.opts.Now())
+	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
+
+	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := app.ImportNmap(context.Background(), s.store, app.ImportNmapOptions{
+		XMLData:   data,
+		RunID:     runID,
+		ProjectID: projectID,
+		JSONPath:  jsonPath,
+	}); err != nil {
+		s.renderImportForm(w, err.Error())
+		return
+	}
+	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
 }
 
 func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
