@@ -2,15 +2,24 @@
 
 All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5).
+adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1).
+
+## [1.5.1] - 2026-07-09
+
+v1.5.1 completes the v1.5 merge by adding the v1.4 inline HTML report restyle
+that was still only present on `codex/v1.4-inline`.
+
+### Changed
+- Restyled HTML security reports and finding details from the v1.4 inline
+  report branch.
+- Ignored generated `cmd/anchorscan/data/` scan artifacts.
 
 ## [1.5] - 2026-07-09
 
 v1.5 backfills the v1.2 stability work that was developed on a parallel
 branch but never merged into `main`. These capabilities were listed in the
 v1.2 changelog but absent from the released code; this release lands them on
-the current baseline alongside the v1.3/v1.4 features, including the inline
-HTML report restyle from the v1.4 line.
+the current baseline alongside the v1.3/v1.4 features.
 
 ### Added
 - Deterministic SQLite schema migrations via a `schema_migrations` table and
