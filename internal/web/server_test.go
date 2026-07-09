@@ -56,7 +56,7 @@ func TestHomePageRenders(t *testing.T) {
 		t.Fatalf("expected home links in body: %s", res.Body.String())
 	}
 	// footer version is rendered from the version package, not hardcoded
-	if !strings.Contains(res.Body.String(), "AnchorScan Console v1.5") {
+	if !strings.Contains(res.Body.String(), "AnchorScan Console v1.5.1") {
 		t.Fatalf("expected versioned footer in body: %s", res.Body.String())
 	}
 }

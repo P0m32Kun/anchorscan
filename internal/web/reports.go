@@ -14,13 +14,13 @@ import (
 const runMetaSummaryLimit = 80
 
 type reportFilters struct {
-	IP       string
-	Port     string
-	Service  string
-	Keyword  string
-	Severity string
+	IP         string
+	Port       string
+	Service    string
+	Keyword    string
+	Severity   string
 	Severities []string
-	Source   string
+	Source     string
 }
 
 type reportPage struct {

@@ -1,6 +1,6 @@
 # AnchorScan Project Status
 
-Last reviewed: 2026-07-08
+Last reviewed: 2026-07-09
 
 This document records the current development baseline so later work can start from a shared understanding of what exists, what is intentionally out of scope, and what should be verified before changes.
 
@@ -25,7 +25,7 @@ The current direction explicitly does not include:
 
 ## Current Baseline
 
-The project is at a V1.5 local-operator baseline.
+The project is at a V1.5.1 local-operator baseline.
 
 Implemented capabilities:
 
@@ -87,7 +87,7 @@ These are generated locally and should not be treated as source:
 - `docs/testing-lab-checklist.md` - local lab validation checklist
 - `docs/testing-results-template.md` - reusable lab result record
 - `docs/troubleshooting-lab.md` - stage-by-stage lab troubleshooting
-- `docs/superpowers/plans/` - implementation plans used during development
+- `docs/superpowers/specs/` - durable design notes worth keeping after implementation
 
 ## Recommended Next Steps
 

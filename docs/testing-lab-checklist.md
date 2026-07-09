@@ -490,6 +490,6 @@ where source = 'manual-review';
 
 | Check | Expected |
 | --- | --- |
-| `anchorscan version` | Prints `anchorscan version 1.5` |
+| `anchorscan version` | Prints `anchorscan version 1.5.1` |
 | `anchorscan --version` | Same as above |
-| Web Console footer | Shows `AnchorScan Console v1.5` |
+| Web Console footer | Shows `AnchorScan Console v1.5.1` |

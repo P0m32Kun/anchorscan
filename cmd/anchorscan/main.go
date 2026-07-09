@@ -15,9 +15,8 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/doctor"
-	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
-	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
+	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/target"
@@ -626,18 +625,6 @@ func loadRuleFile[T any](configPath string, fileName string, loader func(string)
 		return zero, err
 	}
 	return zero, nil
-}
-
-func sampleFingerprint() fingerprint.ServiceFingerprint {
-	return fingerprint.ServiceFingerprint{
-		IP:         "192.168.1.10",
-		Port:       8080,
-		Service:    "http",
-		Product:    "Apache Tomcat",
-		Normalized: "http",
-		IsWeb:      true,
-		URL:        "http://192.168.1.10:8080",
-	}
 }
 
 func isHelpRequest(arg string) bool {

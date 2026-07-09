@@ -11,6 +11,7 @@ PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
 
 test:
 	go test ./...
+	node --test internal/web/static/app.test.mjs
 
 e2e:
 	go test -tags e2e ./e2e -count=1 -v

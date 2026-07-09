@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
@@ -300,7 +301,7 @@ func TestExecuteScanStopsOnPreflightError(t *testing.T) {
 		"--target", "127.0.0.1",
 		"--db", filepath.Join(dir, "scan.db"),
 		"--json", filepath.Join(dir, "report.json"),
-	}, &stdout, &stderr, cliDeps{newRunner: func() tools.Runner { return failRunner{}}})
+	}, &stdout, &stderr, cliDeps{newRunner: func() tools.Runner { return failRunner{} }})
 	if err == nil {
 		t.Fatal("expected preflight error")
 	}
@@ -464,6 +465,18 @@ func TestExecuteReportWritesHTMLFromStoredRun(t *testing.T) {
 	}
 }
 
+func sampleFingerprint() fingerprint.ServiceFingerprint {
+	return fingerprint.ServiceFingerprint{
+		IP:         "192.168.1.10",
+		Port:       8080,
+		Service:    "http",
+		Product:    "Apache Tomcat",
+		Normalized: "http",
+		IsWeb:      true,
+		URL:        "http://192.168.1.10:8080",
+	}
+}
+
 type fakeRunner struct {
 	outputs [][]byte
 	index   int
@@ -559,7 +572,7 @@ func TestVersionCommandPrintsVersion(t *testing.T) {
 		if err := run(args, &stdout, &bytes.Buffer{}, cliDeps{}); err != nil {
 			t.Fatalf("run(%v) returned error: %v", args, err)
 		}
-		if !strings.Contains(stdout.String(), "anchorscan version 1.5") {
+		if !strings.Contains(stdout.String(), "anchorscan version 1.5.1") {
 			t.Fatalf("run(%v) output missing version: %q", args, stdout.String())
 		}
 	}

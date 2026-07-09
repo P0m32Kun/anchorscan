@@ -3,12 +3,12 @@ package fingerprint
 import "strings"
 
 var aliases = map[string]string{
-	"ssl/http":    "http",
-	"http-proxy":  "http",
-	"microsoft-ds": "smb",
-	"netbios-ssn": "smb",
+	"ssl/http":      "http",
+	"http-proxy":    "http",
+	"microsoft-ds":  "smb",
+	"netbios-ssn":   "smb",
 	"ms-wbt-server": "rdp",
-	"mariadb":     "mysql",
+	"mariadb":       "mysql",
 }
 
 func normalizeService(service string, product string) string {

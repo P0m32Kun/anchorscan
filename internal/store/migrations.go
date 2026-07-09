@@ -73,19 +73,19 @@ CREATE TABLE IF NOT EXISTS scan_events (
   stage TEXT NOT NULL,
   message TEXT NOT NULL
 );`,
-			up: func(tx *sql.Tx) error {
-				for _, stmt := range []string{
-					`ALTER TABLE projects ADD COLUMN exclude_targets TEXT NOT NULL DEFAULT ''`,
-					`ALTER TABLE projects ADD COLUMN exclude_ports TEXT NOT NULL DEFAULT ''`,
-					`ALTER TABLE fingerprints ADD COLUMN version TEXT NOT NULL DEFAULT ''`,
-				} {
-					if _, err := tx.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
-						return err
-					}
+		up: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`ALTER TABLE projects ADD COLUMN exclude_targets TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE projects ADD COLUMN exclude_ports TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE fingerprints ADD COLUMN version TEXT NOT NULL DEFAULT ''`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+					return err
 				}
-				return nil
-			},
+			}
+			return nil
 		},
+	},
 	{
 		version: 2,
 		name:    "add_scan_run_artifact_dir",

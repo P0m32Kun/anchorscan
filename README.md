@@ -4,7 +4,7 @@
 
 ## Current Status
 
-AnchorScan is currently at a V1.5 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review. The stability baseline (deterministic migrations, shared scan preflight, stronger doctor, packaging, and real-binary e2e) is in place.
+AnchorScan is currently at a V1.5.1 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review. The stability baseline (deterministic migrations, shared scan preflight, stronger doctor, packaging, and real-binary e2e) is in place.
 
 Implemented:
 
