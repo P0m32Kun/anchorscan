@@ -22,3 +22,15 @@ func Resolve(spec string, presetDir string) (string, error) {
 		return spec, nil
 	}
 }
+
+func ResolveForConfig(spec string, configPath string) (string, error) {
+	dir := filepath.Dir(configPath)
+	resolved, err := Resolve(spec, dir)
+	if err == nil {
+		return resolved, nil
+	}
+	if dir != "config" {
+		return Resolve(spec, "config")
+	}
+	return "", err
+}

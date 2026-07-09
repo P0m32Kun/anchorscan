@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 	"gopkg.in/yaml.v3"
@@ -29,4 +31,27 @@ func LoadTagRules(path string) ([]vuln.TagRule, error) {
 		return nil, err
 	}
 	return rules, nil
+}
+
+func LoadNSERulesForConfig(configPath string) (map[string][]string, error) {
+	return loadRuleFileForConfig(configPath, "nse.yaml", LoadNSERules)
+}
+
+func LoadTagRulesForConfig(configPath string) ([]vuln.TagRule, error) {
+	return loadRuleFileForConfig(configPath, "service-tags.yaml", LoadTagRules)
+}
+
+func loadRuleFileForConfig[T any](configPath string, fileName string, loader func(string) (T, error)) (T, error) {
+	var zero T
+	for _, candidate := range []string{filepath.Join(filepath.Dir(configPath), fileName), filepath.Join("config", fileName)} {
+		value, err := loader(candidate)
+		if err == nil {
+			return value, nil
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		return zero, err
+	}
+	return zero, nil
 }

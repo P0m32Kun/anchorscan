@@ -395,7 +395,7 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		if portsValue == "" {
 			portsValue = cfg.Scan.Ports
 		}
-		portsValue, err = resolvePorts(portsValue, s.opts.ConfigPath)
+		portsValue, err = ports.ResolveForConfig(portsValue, s.opts.ConfigPath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -494,7 +494,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	resolvedPorts, err := resolvePorts(portValue, s.opts.ConfigPath)
+	resolvedPorts, err := ports.ResolveForConfig(portValue, s.opts.ConfigPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -510,12 +510,12 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	nseRules, err := loadRuleFile(s.opts.ConfigPath, "nse.yaml", config.LoadNSERules)
+	nseRules, err := config.LoadNSERulesForConfig(s.opts.ConfigPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	tagRules, err := loadRuleFile(s.opts.ConfigPath, "service-tags.yaml", config.LoadTagRules)
+	tagRules, err := config.LoadTagRulesForConfig(s.opts.ConfigPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -1194,30 +1194,4 @@ func render(w http.ResponseWriter, file string, data any) {
 
 func newID(prefix string, now time.Time) string {
 	return fmt.Sprintf("%s-%s", prefix, now.Format("20060102-150405.000000000"))
-}
-
-func resolvePorts(value string, configPath string) (string, error) {
-	resolved, err := ports.Resolve(value, filepath.Dir(configPath))
-	if err == nil {
-		return resolved, nil
-	}
-	if filepath.Dir(configPath) != "config" {
-		return ports.Resolve(value, "config")
-	}
-	return "", err
-}
-
-func loadRuleFile[T any](configPath string, fileName string, loader func(string) (T, error)) (T, error) {
-	var zero T
-	for _, candidate := range []string{filepath.Join(filepath.Dir(configPath), fileName), filepath.Join("config", fileName)} {
-		value, err := loader(candidate)
-		if err == nil {
-			return value, nil
-		}
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		return zero, err
-	}
-	return zero, nil
 }

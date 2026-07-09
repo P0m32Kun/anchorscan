@@ -117,11 +117,11 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	if err != nil {
 		return err
 	}
-	nseRules, err := loadNSERulesForConfig(*configPath)
+	nseRules, err := config.LoadNSERulesForConfig(*configPath)
 	if err != nil {
 		return err
 	}
-	tagRules, err := loadTagRulesForConfig(*configPath)
+	tagRules, err := config.LoadTagRulesForConfig(*configPath)
 	if err != nil {
 		return err
 	}
@@ -134,14 +134,9 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	if *portsSpec != "" {
 		portValue = *portsSpec
 	}
-	resolvedPorts, err := ports.Resolve(portValue, filepath.Dir(*configPath))
+	resolvedPorts, err := ports.ResolveForConfig(portValue, *configPath)
 	if err != nil {
-		if filepath.Dir(*configPath) != "config" {
-			resolvedPorts, err = ports.Resolve(portValue, "config")
-		}
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	effective, err := config.ResolveScan(cfg, config.Overrides{
@@ -597,34 +592,6 @@ func ensureParentDir(path string) error {
 		return nil
 	}
 	return os.MkdirAll(dir, 0o755)
-}
-
-func loadNSERulesForConfig(configPath string) (map[string][]string, error) {
-	return loadRuleFile(configPath, "nse.yaml", config.LoadNSERules)
-}
-
-func loadTagRulesForConfig(configPath string) ([]app.TagRule, error) {
-	return loadRuleFile(configPath, "service-tags.yaml", config.LoadTagRules)
-}
-
-func loadRuleFile[T any](configPath string, fileName string, loader func(string) (T, error)) (T, error) {
-	var zero T
-	candidates := []string{
-		filepath.Join(filepath.Dir(configPath), fileName),
-		filepath.Join("config", fileName),
-	}
-
-	for _, candidate := range candidates {
-		value, err := loader(candidate)
-		if err == nil {
-			return value, nil
-		}
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		return zero, err
-	}
-	return zero, nil
 }
 
 func isHelpRequest(arg string) bool {

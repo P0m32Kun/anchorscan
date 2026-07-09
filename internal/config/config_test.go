@@ -120,3 +120,33 @@ func TestLoadDefaultsProfileToNormal(t *testing.T) {
 		t.Fatalf("profile mismatch: got %q want normal", cfg.Scan.Profile)
 	}
 }
+
+func TestLoadRulesForConfigFallsBackToRootConfig(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "nse.yaml"), []byte("http:\n  - http-title\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "service-tags.yaml"), []byte("- name: http\n  service: [http]\n  nuclei_tags: [http]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	nseRules, err := LoadNSERulesForConfig(filepath.Join(root, "custom", "default.yaml"))
+	if err != nil {
+		t.Fatalf("LoadNSERulesForConfig returned error: %v", err)
+	}
+	if got := nseRules["http"]; len(got) != 1 || got[0] != "http-title" {
+		t.Fatalf("unexpected nse rules: %#v", nseRules)
+	}
+
+	tagRules, err := LoadTagRulesForConfig(filepath.Join(root, "custom", "default.yaml"))
+	if err != nil {
+		t.Fatalf("LoadTagRulesForConfig returned error: %v", err)
+	}
+	if len(tagRules) != 1 || tagRules[0].Name != "http" {
+		t.Fatalf("unexpected tag rules: %#v", tagRules)
+	}
+}
