@@ -89,4 +89,28 @@
     </form>
   </article>
 </section>
+
+<section class="panel" style="margin-top: 1.5rem;">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">端口预设</p>
+      <h3>高危端口列表 (highrisk)</h3>
+      <p class="meta-line">此处维护 highrisk 预设端口，保存后写回 config/ports-highrisk.txt。扫描时填入 highrisk 短语或在表单点击「插入高危端口列表」都会使用此列表。</p>
+    </div>
+  </div>
+  <form class="form-grid" method="post" action="/config/ports">
+    <label class="full-width">
+      <span>高危端口 (逗号分隔，会自动去空格与空行)</span>
+      <textarea class="code-editor" name="highrisk_ports" rows="5" spellcheck="false" placeholder="例如: 22,80,443,10022,13306,502,2404">{{.HighriskPorts}}</textarea>
+    </label>
+    <div class="form-actions full-width" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+      <button class="button button-primary" type="submit">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
+        </svg>
+        <span>保存高危端口列表</span>
+      </button>
+    </div>
+  </form>
+</section>
 {{end}}

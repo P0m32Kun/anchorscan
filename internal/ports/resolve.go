@@ -11,7 +11,7 @@ func Resolve(spec string, presetDir string) (string, error) {
 	switch spec {
 	case "full":
 		return "1-65535", nil
-	case "top100", "top1000":
+	case "top100", "top1000", "highrisk":
 		name := fmt.Sprintf("ports-%s.txt", spec)
 		data, err := os.ReadFile(filepath.Join(presetDir, name))
 		if err != nil {

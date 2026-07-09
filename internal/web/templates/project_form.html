@@ -47,7 +47,10 @@
 
     <label class="full-width">
       <span>默认扫描端口</span>
-      <input name="default_ports" value="{{.Project.DefaultPorts}}" placeholder="支持常用短语(top100 / top1000 / full) 或范围(100-1000) 或自定义(80,443,8080)">
+      <textarea name="default_ports" rows="3" placeholder="支持常用短语(top100 / top1000 / full / highrisk) 或范围(100-1000) 或自定义(80,443,8080)">{{.Project.DefaultPorts}}</textarea>
+      <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="default_ports">
+        ＋ 插入高危端口列表
+      </button>
     </label>
     
     <label>
@@ -93,4 +96,6 @@ function confirmDelete() {
 }
 </script>
 {{end}}
+
+<script src="/static/app.js"></script>
 {{end}}

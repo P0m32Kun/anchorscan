@@ -59,7 +59,10 @@
 
         <label class="full-width">
           <span>临时覆盖端口</span>
-          <input name="ports" placeholder="可留空使用项目的默认端口。支持: top100, top1000, full, 80,443,8080 等">
+          <textarea name="ports" rows="3" placeholder="可留空使用项目的默认端口。支持: top100, top1000, full, highrisk, 80,443,8080 等"></textarea>
+          <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="ports">
+            ＋ 插入高危端口列表
+          </button>
         </label>
 
         <label class="full-width">
@@ -101,4 +104,6 @@
     </div>
   </form>
 </section>
+
+<script src="/static/app.js"></script>
 {{end}}

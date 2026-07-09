@@ -157,6 +157,23 @@ document.addEventListener('click', async (event) => {
     return;
   }
 
+  const insertBtn = event.target.closest('[data-insert-ports]');
+  if(insertBtn){
+    const targetName = insertBtn.dataset.insertTarget;
+    const input = document.querySelector(`[name="${targetName}"]`);
+    if(input){
+      const value = insertBtn.dataset.insertPorts || '';
+      if(insertBtn.dataset.insertMode === 'append'){
+        const current = input.value.trim();
+        input.value = current ? current + ' ' + value : value;
+      } else {
+        input.value = value;
+      }
+      input.dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    return;
+  }
+
   const button = event.target.closest('[data-copy-url],[data-copy-text]');
   if(!button) return;
   const original = button.textContent;

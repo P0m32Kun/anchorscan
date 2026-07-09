@@ -40,15 +40,17 @@ type server struct {
 }
 
 type configPageData struct {
-	Config    config.Config
-	RawConfig string
-	Error     string
+	Config        config.Config
+	RawConfig     string
+	Error         string
+	HighriskPorts string
 }
 
 type toolPageData struct {
-	Projects []store.Project
-	Tools    []manualTool
-	Tool     manualTool
+	Projects      []store.Project
+	Tools         []manualTool
+	Tool          manualTool
+	HighriskPorts string
 }
 
 type manualTool struct {
@@ -118,6 +120,7 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/api/runs/", s.runAPI)
 	mux.HandleFunc("/reports/", s.reportDetail)
 	mux.HandleFunc("/config", s.configPage)
+	mux.HandleFunc("/config/ports", s.configPorts)
 	mux.HandleFunc("/import/nmap", s.importNmapForm)
 	mux.HandleFunc("/import/nmap/run", s.importNmapRun)
 	mux.HandleFunc("/", s.home)
@@ -199,10 +202,12 @@ func (s *server) projectNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
 	render(w, "templates/project_form.html", map[string]any{
-		"Title":   "新建项目",
-		"Action":  "/projects",
-		"Project": store.Project{DefaultProfile: "normal"},
+		"Title":         "新建项目",
+		"Action":        "/projects",
+		"Project":       store.Project{DefaultProfile: "normal"},
+		"HighriskPorts": highriskPorts,
 	})
 }
 
@@ -217,10 +222,12 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
 		render(w, "templates/project_form.html", map[string]any{
-			"Title":   "编辑项目",
-			"Action":  "/projects/" + id,
-			"Project": project,
+			"Title":         "编辑项目",
+			"Action":        "/projects/" + id,
+			"Project":       project,
+			"HighriskPorts": highriskPorts,
 		})
 	case r.Method == http.MethodGet:
 		project, err := s.store.GetProject(id)
@@ -228,10 +235,12 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
 		render(w, "templates/project_form.html", map[string]any{
-			"Title":   project.Name,
-			"Action":  "/projects/" + id,
-			"Project": project,
+			"Title":         project.Name,
+			"Action":        "/projects/" + id,
+			"Project":       project,
+			"HighriskPorts": highriskPorts,
 		})
 	case r.Method == http.MethodPost:
 		if err := parseProjectRequest(r); err != nil {
@@ -318,10 +327,12 @@ func (s *server) renderScanForm(w http.ResponseWriter, preflightResult preflight
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
 	render(w, "templates/scan_new.html", map[string]any{
-		"Projects":     projects,
-		"ArtifactRoot": managedArtifactRoot(s.opts.DBPath),
-		"Preflight":    preflightResult,
+		"Projects":      projects,
+		"ArtifactRoot":  managedArtifactRoot(s.opts.DBPath),
+		"Preflight":     preflightResult,
+		"HighriskPorts": highriskPorts,
 	})
 }
 
@@ -354,7 +365,8 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool})
+	highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool, HighriskPorts: highriskPorts})
 }
 
 func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
@@ -927,7 +939,8 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw)})
+		highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -937,10 +950,12 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 			rawConfig := r.FormValue("raw_config")
 			if _, err := config.SaveRawWithBackup(s.opts.ConfigPath, rawConfig, s.opts.Now()); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
+				highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
 				render(w, "templates/config.html", configPageData{
-					Config:    cfg,
-					RawConfig: rawConfig,
-					Error:     "invalid YAML: " + err.Error(),
+					Config:        cfg,
+					RawConfig:     rawConfig,
+					Error:         "invalid YAML: " + err.Error(),
+					HighriskPorts: highriskPorts,
 				})
 				return
 			}
@@ -961,6 +976,41 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// configPorts handles saving the highrisk port preset file from the config page.
+func (s *server) configPorts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	dir := filepath.Dir(s.opts.ConfigPath)
+	normalized := normalizePortCSV(r.FormValue("highrisk_ports"))
+	if _, err := ports.SavePresetWithBackup("highrisk", dir, normalized, s.opts.Now()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/config", http.StatusSeeOther)
+}
+
+// normalizePortCSV accepts free-form port input (comma / newline / space
+// separated) and returns a single trimmed, comma-separated CSV line.
+func normalizePortCSV(value string) string {
+	fields := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ',' || r == '\n' || r == '\r' || r == ' ' || r == '\t'
+	})
+	out := make([]string, 0, len(fields))
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if f != "" {
+			out = append(out, f)
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 func parseProjectRequest(r *http.Request) error {
