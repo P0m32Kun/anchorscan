@@ -26,7 +26,7 @@ func RunNuclei(ctx context.Context, runner Runner, binaryPath string, target str
 	args = append(args, extraArgs...)
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, withOutputError(err, out)
+		return out, withOutputError(err, out)
 	}
 	return out, nil
 }
@@ -36,7 +36,7 @@ func RunNucleiTemplate(ctx context.Context, runner Runner, binaryPath string, ta
 	args = append(args, extraArgs...)
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, withOutputError(err, out)
+		return out, withOutputError(err, out)
 	}
 	return out, nil
 }

@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +47,7 @@ type ScanOptions struct {
 	ExtraArgs      ToolExtraArgs
 	ConfigSnapshot string
 	JSONReportPath string
+	ArtifactRoot   string
 	NSERules       map[string][]string
 	TagRules       []TagRule
 	Logf           func(format string, args ...any)
@@ -53,9 +57,16 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
 	scanTargets := opts.Targets
+	artifactDir := ""
 
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
+	}
+	if opts.RunID != "" && strings.TrimSpace(opts.ArtifactRoot) != "" {
+		artifactDir = filepath.Join(opts.ArtifactRoot, opts.RunID)
+		if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+			return err
+		}
 	}
 	if opts.RunID != "" && scanStore != nil {
 		_ = scanStore.SaveScanRun(store.ScanRun{
@@ -67,6 +78,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			Status:         "running",
 			StartedAt:      time.Now(),
 			ConfigSnapshot: opts.ConfigSnapshot,
+			ArtifactDir:    artifactDir,
 		})
 	}
 	defer func() {
@@ -87,7 +99,10 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 	if opts.Tools.Nmap != "" && len(scanTargets) > 0 {
 		emit(opts, scanStore, "info", "nmap", "nmap alive sweep targets=%v", scanTargets)
-		aliveTargets, err := tools.DiscoverAlive(ctx, runner, opts.Tools.Nmap, scanTargets, opts.ExtraArgs.Nmap)
+		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, scanTargets, opts.ExtraArgs.Nmap)
+		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
+			return writeErr
+		}
 		if err != nil {
 			return normalizeToolError(ctx, err)
 		}
@@ -118,7 +133,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 					if ctx.Err() != nil {
 						return
 					}
-					fingerprints, findings, err := scanTarget(ctx, runner, scanStore, opts, target)
+					fingerprints, findings, err := scanTarget(ctx, runner, scanStore, opts, target, artifactDir)
 					results <- targetResult{
 						target:       target,
 						fingerprints: fingerprints,
@@ -189,13 +204,16 @@ type targetResult struct {
 	err          error
 }
 
-func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string) ([]fingerprint.ServiceFingerprint, []report.Finding, error) {
+func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
 
 	logf(opts, "target %s", target)
 	emit(opts, scanStore, "info", "rustscan", "rustscan %s ports=%s", target, opts.Ports)
-	ports, err := tools.DiscoverPorts(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
+	ports, out, err := tools.DiscoverPortsWithOutput(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
+	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("rustscan", target, "ports")+".txt", out); writeErr != nil {
+		return nil, nil, writeErr
+	}
 	if err != nil {
 		return nil, nil, normalizeToolError(ctx, err)
 	}
@@ -220,8 +238,11 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 			}
 		}
 	}()
-	fingerprints, err := tools.Fingerprint(ctx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
+	fingerprints, out, err := tools.FingerprintWithOutput(ctx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
 	close(done)
+	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nmap-service", target, joinIntParts(ports))+".xml", out); writeErr != nil {
+		return nil, nil, writeErr
+	}
 	if err != nil {
 		return nil, nil, normalizeToolError(ctx, err)
 	}
@@ -231,7 +252,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		httpResult := tools.HTTPResult{}
 		if fp.IsWeb && opts.Tools.Httpx != "" {
 			emit(opts, scanStore, "info", "httpx", "httpx %s", fp.URL)
-			httpResult, err = tools.EnrichWeb(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
+			httpResult, out, err = tools.EnrichWebWithOutput(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("httpx", fp.IP, strconv.Itoa(fp.Port))+".jsonl", out); writeErr != nil {
+				return nil, nil, writeErr
+			}
 			if err != nil {
 				return nil, nil, normalizeToolError(ctx, err)
 			}
@@ -255,7 +279,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		scripts := vuln.MatchNSE(fp, opts.NSERules)
 		if len(scripts) > 0 {
 			emit(opts, scanStore, "info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
-			nseResults, err := tools.RunNSE(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
+			nseResults, out, err := tools.RunNSEWithOutput(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nse", fp.IP, strconv.Itoa(fp.Port), strings.Join(scripts, ","))+".xml", out); writeErr != nil {
+				return nil, nil, writeErr
+			}
 			if err != nil {
 				return nil, nil, normalizeToolError(ctx, err)
 			}
@@ -281,6 +308,9 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		if len(match.Tags) > 0 && opts.Tools.Nuclei != "" {
 			emit(opts, scanStore, "info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, opts.ExtraArgs.Nuclei)
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
+				return nil, nil, writeErr
+			}
 			if err != nil {
 				return nil, nil, normalizeToolError(ctx, err)
 			}

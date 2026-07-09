@@ -567,6 +567,121 @@ func TestRunScanReturnsErrorWhenAllTargetsFail(t *testing.T) {
 	}
 }
 
+func TestRunScanWritesAuditArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
+		case binary == "rustscan":
+			return []byte("127.0.0.1 -> [80]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "httpx":
+			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
+		default:
+			return []byte(""), nil
+		}
+	})
+
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-artifacts",
+		Targets:        []string{"127.0.0.1"},
+		Ports:          "80",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx"},
+		ProfileName:    "normal",
+		HostWorkers:    1,
+		ArtifactRoot:   dir,
+		JSONReportPath: filepath.Join(dir, "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	artifactDir := filepath.Join(dir, "run-artifacts")
+	entries, err := os.ReadDir(artifactDir)
+	if err != nil {
+		t.Fatalf("ReadDir returned error: %v", err)
+	}
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	joinedNames := strings.Join(names, "\n")
+	for _, want := range []string{"nmap-alive", "rustscan-127.0.0.1-ports", "nmap-service-127.0.0.1", "httpx-127.0.0.1-80"} {
+		if !strings.Contains(joinedNames, want) {
+			t.Fatalf("missing artifact %q in files:\n%s", want, joinedNames)
+		}
+	}
+
+	run, err := scanStore.GetScanRun("run-artifacts")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if run.ArtifactDir != artifactDir {
+		t.Fatalf("artifact dir mismatch: got %q want %q", run.ArtifactDir, artifactDir)
+	}
+}
+
+func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
+	dir := t.TempDir()
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
+		case binary == "rustscan":
+			return []byte("127.0.0.1 -> [80]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "httpx":
+			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
+		case binary == "nuclei":
+			return []byte("{\"template-id\":\"demo\",\"info\":{\"name\":\"demo\",\"severity\":\"medium\"},\"matched-at\":\"http://127.0.0.1:80\"}\n"), errors.New("exit status 1")
+		default:
+			return []byte(""), nil
+		}
+	})
+
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-failed-nuclei",
+		Targets:        []string{"127.0.0.1"},
+		Ports:          "80",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+		ProfileName:    "normal",
+		HostWorkers:    1,
+		ArtifactRoot:   dir,
+		JSONReportPath: filepath.Join(dir, "report.json"),
+		TagRules: []TagRule{
+			{
+				Name:       "nginx",
+				Service:    []string{"http"},
+				Product:    []string{"nginx"},
+				Tech:       []string{"nginx"},
+				NucleiTags: []string{"demo"},
+				Target:     "url",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected scan error")
+	}
+
+	entries, readErr := os.ReadDir(filepath.Join(dir, "run-failed-nuclei"))
+	if readErr != nil {
+		t.Fatalf("ReadDir returned error: %v", readErr)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "nuclei-127.0.0.1-80-demo") {
+			return
+		}
+	}
+	t.Fatalf("expected failed nuclei artifact, got %#v", entries)
+}
+
 type sequenceRunner struct {
 	outputs [][]byte
 	sleeps  []time.Duration
@@ -580,6 +695,21 @@ func (s *sequenceRunner) Run(_ context.Context, _ string, _ []string) ([]byte, e
 	out := s.outputs[s.index]
 	s.index++
 	return out, nil
+}
+
+type runnerFunc func(ctx context.Context, binary string, args []string) ([]byte, error)
+
+func (f runnerFunc) Run(ctx context.Context, binary string, args []string) ([]byte, error) {
+	return f(ctx, binary, args)
+}
+
+func newScanStore(t *testing.T) *store.Store {
+	t.Helper()
+	scanStore, err := store.Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	return scanStore
 }
 
 type cancelRunner struct{}
