@@ -11,18 +11,24 @@ const htmlTemplate = `<!doctype html>
   <meta charset="utf-8">
   <title>AnchorScan 扫描安全报告</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
-    
     :root {
-      --bg: #090a0c;
-      --panel: #121316;
-      --border: #1f2126;
-      --border-strong: #2c2f37;
-      --text: #d2d5dc;
-      --muted: #666a73;
-      --heading: #f0f2f5;
+      --bg: #0b0c10;
+      --bg-dots: rgba(249, 115, 22, 0.012);
+      --panel: #13141c;
+      --panel-light: #1c1e28;
+      --border: #222533;
+      --border-strong: #30354a;
+      --text: #d5d8e2;
+      --muted: #72778f;
+      --heading: #f3f4f8;
+      
       --primary: #f97316;
+      --primary-hover: #ea580c;
+      --primary-glow: rgba(249, 115, 22, 0.15);
       --success: #10b981;
       
       --sev-critical: #f43f5e;
@@ -45,30 +51,36 @@ const htmlTemplate = `<!doctype html>
       --sev-info-soft: rgba(148, 163, 184, 0.06);
       --sev-info-border: rgba(148, 163, 184, 0.25);
 
-      --radius: 4px;
+      --radius-lg: 8px;
+      --radius-md: 6px;
+      --radius-sm: 4px;
     }
     
     * { box-sizing: border-box; }
     
     body {
       margin: 0;
-      padding: 2.5rem 1.5rem;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      padding: 3rem 2rem;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg);
+      background-image: 
+        radial-gradient(var(--bg-dots) 1px, transparent 0),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.005) 1px, transparent 1px);
+      background-size: 20px 20px, 100% 4px;
       color: var(--text);
-      line-height: 1.5;
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
     
     .container {
-      max-width: 1200px;
+      max-width: 1280px;
       margin: 0 auto;
     }
     
     header {
       border-bottom: 1px solid var(--border);
-      padding-bottom: 1.25rem;
-      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      margin-bottom: 2.5rem;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
@@ -76,78 +88,177 @@ const htmlTemplate = `<!doctype html>
     
     h1 {
       margin: 0;
-      font-size: 1.65rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
+      font-family: 'Outfit', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
       color: var(--heading);
+      background: linear-gradient(135deg, var(--heading) 50%, var(--muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     
     .brand-tag {
-      font-size: 0.72rem;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.75rem;
       font-weight: 700;
       color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 0.35rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Stats Dashboard */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1rem;
     }
     
-    .meta-card {
+    .stat-card {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1rem 1.25rem;
-      margin-bottom: 2rem;
-      display: flex;
-      gap: 2.5rem;
-      flex-wrap: wrap;
-    }
-    
-    .meta-item {
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.5rem;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
-    .meta-label {
-      font-size: 0.68rem;
+    .clickable-stat {
+      cursor: pointer;
+    }
+    
+    .clickable-stat:hover {
+      background: var(--panel-light);
+      border-color: var(--border-strong);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+    
+    .clickable-stat.active {
+      border-color: var(--primary);
+      background: rgba(249, 115, 22, 0.03);
+      box-shadow: 0 0 12px rgba(249, 115, 22, 0.08);
+    }
+    
+    .stat-label {
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
     }
     
-    .meta-value {
-      font-size: 0.95rem;
-      font-weight: 600;
+    .stat-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.75rem;
+      font-weight: 800;
       color: var(--heading);
-      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Filter Panel */
+    .filter-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
     }
     
+    .filter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+    
+    .filter-header h3 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--heading);
+    }
+    
+    .showing-badge {
+      font-size: 0.78rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.25rem 0.6rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+    
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+    
+    .filter-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    
+    .filter-input-group label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    
+    .filter-input-group input {
+      background: #090a0d;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      color: var(--text);
+      padding: 0.55rem 0.75rem;
+      font-size: 0.82rem;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    
+    .filter-input-group input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary-glow);
+    }
+
+    /* Table Styles */
     table {
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
       border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-radius: var(--radius-lg);
       overflow: hidden;
       margin-bottom: 2.5rem;
-      background: #0f1013;
+      background: var(--panel);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     }
     
     th, td {
-      padding: 0.85rem 1.1rem;
+      padding: 1rem 1.25rem;
       text-align: left;
       border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
     
     th {
-      background-color: #14151a;
+      background-color: #121319;
       color: var(--muted);
-      font-size: 0.72rem;
+      font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+      border-bottom: 1.5px solid var(--border-strong);
     }
     
     tr:last-child td {
@@ -155,32 +266,34 @@ const htmlTemplate = `<!doctype html>
     }
     
     tr:hover td {
-      background-color: rgba(255, 255, 255, 0.015);
+      background-color: rgba(255, 255, 255, 0.012);
     }
     
     .ip-cell {
       font-family: 'JetBrains Mono', monospace;
       font-weight: 700;
       color: var(--heading);
+      font-size: 0.9rem;
     }
     
     .port-badge {
       display: inline-block;
-      padding: 0.2rem 0.5rem;
-      background: #17181c;
+      padding: 0.25rem 0.6rem;
+      background: #090a0d;
       border: 1px solid var(--border-strong);
       color: var(--heading);
-      border-radius: 2px;
+      border-radius: var(--radius-sm);
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8rem;
+      font-weight: 600;
     }
     
     .severity-badge {
       display: inline-flex;
       align-items: center;
       padding: 0.2rem 0.5rem;
-      border-radius: 2px;
-      font-size: 0.72rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.7rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -195,56 +308,124 @@ const htmlTemplate = `<!doctype html>
     .sev-low { color: var(--sev-low); background: var(--sev-low-soft); border-color: var(--sev-low-border); }
     .sev-info { color: var(--sev-info); background: var(--sev-info-soft); border-color: var(--sev-info-border); }
     
+    .severity-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+
     .finding-item {
-      padding: 0.5rem 0;
+      padding: 0.25rem 0;
       border-bottom: 1px dashed var(--border);
     }
     
     .finding-item:last-child {
       border-bottom: none;
-      padding-bottom: 0;
     }
     
     .finding-summary {
       font-weight: 600;
-      margin-bottom: 0.25rem;
       color: var(--heading);
+      font-size: 0.88rem;
     }
     
     .finding-meta {
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       color: var(--muted);
+      margin-top: 0.2rem;
+    }
+
+    .finding-details {
+      padding: 0.4rem 0;
+    }
+
+    .finding-details summary {
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      user-select: none;
+    }
+
+    .finding-details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .finding-details summary::before {
+      content: '▶';
+      display: inline-block;
+      color: var(--primary);
+      font-size: 0.6rem;
+      transition: transform 0.15s ease;
+      margin-right: 0.1rem;
+    }
+
+    .finding-details[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .evidence-title {
+      border-top: 1px dashed var(--border);
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      text-transform: uppercase;
     }
 
     .evidence-block {
-      margin-top: 0.6rem;
-      padding: 0.75rem;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      background: #0b0c0f;
-      color: var(--text);
+      margin-top: 0.5rem;
+      padding: 0.85rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      background: #090a0d;
+      color: #9cdcfe;
       font-size: 0.78rem;
-      line-height: 1.45;
+      line-height: 1.5;
       white-space: pre-wrap;
-      word-break: break-word;
+      word-break: break-all;
       font-family: 'JetBrains Mono', monospace;
+      max-height: 350px;
+      overflow-y: auto;
     }
     
     .web-badge {
       display: inline-block;
-      padding: 0.15rem 0.4rem;
+      padding: 0.15rem 0.45rem;
       background: rgba(14, 165, 233, 0.05);
       border: 1px solid rgba(14, 165, 233, 0.25);
       color: #38bdf8;
-      border-radius: 2px;
-      font-size: 0.7rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.68rem;
       font-weight: 700;
+      letter-spacing: 0.05em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .web-url-link {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      word-break: break-all;
+      margin-top: 0.35rem;
+      color: var(--primary);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+    .web-url-link:hover {
+      color: var(--primary-hover);
+      text-decoration: underline;
     }
     
     @media print {
       body { background: #fff; color: #000; }
       th, td, table { border-color: #ccc; }
-      .meta-card { background: #f5f5f5; border-color: #ccc; color: #000; box-shadow: none; }
+      .meta-card, .stat-card, .filter-panel { background: #f5f5f5; border-color: #ccc; color: #000; box-shadow: none; }
       .port-badge { border-color: #ccc; color: #000; }
     }
   </style>
@@ -261,18 +442,79 @@ const htmlTemplate = `<!doctype html>
       </div>
     </header>
     
-    <div class="meta-card">
-      <div class="meta-item">
-        <span class="meta-label">安全引擎模块</span>
-        <span class="meta-value">Rustscan / Nmap / Httpx / Nuclei / NSE</span>
+    <!-- Dynamic Stats Dashboard -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">发现主机数 (Hosts)</span>
+        <span class="stat-value" id="stat-hosts">-</span>
       </div>
-      <div class="meta-item">
-        <span class="meta-label">报告类型</span>
-        <span class="meta-value" style="color: var(--primary);">HTML 离线便携版</span>
+      <div class="stat-card">
+        <span class="stat-label">开放端口数 (Services)</span>
+        <span class="stat-value" id="stat-ports">-</span>
       </div>
-      <div class="meta-item">
-        <span class="meta-label">总发现目标数</span>
-        <span class="meta-value">{{len .Hosts}} 个主机</span>
+      <div class="stat-card clickable-stat" id="card-crit" onclick="filterBySeverity('critical')">
+        <span class="stat-label">
+          <span class="severity-dot" style="background: var(--sev-critical); opacity: 1; box-shadow: 0 0 6px var(--sev-critical);"></span>
+          严重漏洞 (Critical)
+        </span>
+        <span class="stat-value" id="count-critical" style="color: var(--sev-critical);">-</span>
+      </div>
+      <div class="stat-card clickable-stat" id="card-high" onclick="filterBySeverity('high')">
+        <span class="stat-label">
+          <span class="severity-dot" style="background: var(--sev-high); opacity: 1; box-shadow: 0 0 6px var(--sev-high);"></span>
+          高危漏洞 (High)
+        </span>
+        <span class="stat-value" id="count-high" style="color: var(--sev-high);">-</span>
+      </div>
+    </div>
+    
+    <div class="stats-grid" style="margin-top: 1rem; grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+      <div class="stat-card clickable-stat" id="card-med" onclick="filterBySeverity('medium')">
+        <span class="stat-label">
+          <span class="severity-dot" style="background: var(--sev-medium); opacity: 1;"></span>
+          中危漏洞 (Medium)
+        </span>
+        <span class="stat-value" id="count-medium" style="color: var(--sev-medium);">-</span>
+      </div>
+      <div class="stat-card clickable-stat" id="card-low" onclick="filterBySeverity('low')">
+        <span class="stat-label">
+          <span class="severity-dot" style="background: var(--sev-low); opacity: 1;"></span>
+          低危漏洞 (Low)
+        </span>
+        <span class="stat-value" id="count-low" style="color: var(--sev-low);">-</span>
+      </div>
+      <div class="stat-card clickable-stat" id="card-info" onclick="filterBySeverity('info')">
+        <span class="stat-label">
+          <span class="severity-dot" style="background: var(--sev-info); opacity: 1;"></span>
+          信息提示 (Info)
+        </span>
+        <span class="stat-value" id="count-info" style="color: var(--sev-info);">-</span>
+      </div>
+      <div class="stat-card clickable-stat active" id="btn-all-severities" onclick="filterBySeverity('all')">
+        <span class="stat-label">全部项 (All Records)</span>
+        <span class="stat-value" style="color: var(--primary); font-size: 1.25rem; font-weight: 700; margin-top: 0.35rem;">重置筛选</span>
+      </div>
+    </div>
+
+    <!-- Search / Filter panel -->
+    <div class="filter-panel">
+      <div class="filter-header">
+        <h3>🔍 离线数据检索与过滤</h3>
+        <span class="showing-badge">当前显示: <span id="showing-count">-</span> / <span id="total-count">-</span></span>
+      </div>
+      <div class="filter-grid">
+        <div class="filter-input-group">
+          <label for="filter-ip">主机 IP 地址</label>
+          <input type="text" id="filter-ip" placeholder="输入 IP (如 192.168)" oninput="applyFilters()">
+        </div>
+        <div class="filter-input-group">
+          <label for="filter-port">端口号</label>
+          <input type="text" id="filter-port" placeholder="输入端口 (如 80)" oninput="applyFilters()">
+        </div>
+        <div class="filter-input-group" style="grid-column: span 2;">
+          <label for="filter-keyword">多字段模糊检索</label>
+          <input type="text" id="filter-keyword" placeholder="模糊匹配服务、产品指纹或漏洞信息..." oninput="applyFilters()">
+        </div>
       </div>
     </div>
     
@@ -291,7 +533,14 @@ const htmlTemplate = `<!doctype html>
         {{range .Hosts}}
         {{$host := .}}
         {{range .Ports}}
-        <tr>
+        <tr data-ip="{{$host.IP}}" data-port="{{.Port}}" data-service="{{.Service}}" data-product="{{.Product}}" data-url="{{.URL}}" data-severities='[
+          {{- $first := true -}}
+          {{- range .Findings -}}
+            {{- if not $first -}},{{- end -}}
+            "{{.Severity}}"
+            {{- $first = false -}}
+          {{- end -}}
+        ]'>
           <td class="ip-cell">{{$host.IP}}</td>
           <td><span class="port-badge">{{.Port}}</span></td>
           <td style="font-weight: 600; color: var(--heading);">{{.Service}}</td>
@@ -299,8 +548,8 @@ const htmlTemplate = `<!doctype html>
           <td>
             {{if .IsWeb}}
             <span class="web-badge">WEB</span>
-            <div style="font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; word-break: break-all; margin-top: 0.25rem;">
-              <a href="{{.URL}}" target="_blank" style="color: var(--primary);">{{.URL}}</a>
+            <div>
+              <a href="{{.URL}}" target="_blank" class="web-url-link">{{.URL}}</a>
             </div>
             {{else}}
             <span style="color: rgba(255,255,255,0.15);">—</span>
@@ -309,16 +558,24 @@ const htmlTemplate = `<!doctype html>
           <td>
             {{range .Findings}}
             <div class="finding-item">
-              <div>
-                <span class="severity-badge sev-{{.Severity}}">{{.Severity}}</span>
-              </div>
-              <div class="finding-summary">{{.Summary}}</div>
-              <div class="finding-meta">来源: {{.Source}} | 规则: {{.ID}}</div>
-              {{if .Target}}<div class="finding-meta">目标: {{.Target}}</div>{{end}}
-              {{if .Output}}<pre class="evidence-block">{{.Output}}</pre>{{end}}
+              <details class="finding-details">
+                <summary>
+                  <span class="severity-badge sev-{{.Severity}}">{{.Severity}}</span>
+                  <span class="finding-summary">{{.Summary}}</span>
+                </summary>
+                <div class="finding-meta">来源: {{.Source}} | 规则: {{.ID}}</div>
+                {{if .Target}}<div class="finding-meta">目标: {{.Target}}</div>{{end}}
+                {{if .Output}}
+                <div class="evidence-title">验证证据 / 原始输出</div>
+                <pre class="evidence-block">{{.Output}}</pre>
+                {{end}}
+              </details>
             </div>
             {{else}}
-            <div style="color: var(--success); font-weight: 600; font-size: 0.85rem;">🛡️ 未发现高危漏洞</div>
+            <div style="color: var(--success); font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
+              <span>🛡️</span>
+              <span>未发现安全漏洞</span>
+            </div>
             {{end}}
           </td>
         </tr>
@@ -327,6 +584,116 @@ const htmlTemplate = `<!doctype html>
       </tbody>
     </table>
   </div>
+
+  <script>
+    let currentSeverity = 'all';
+
+    document.addEventListener("DOMContentLoaded", function() {
+      const rows = document.querySelectorAll('tbody tr');
+      
+      let hostSet = new Set();
+      let portCount = 0;
+      let criticalCount = 0;
+      let highCount = 0;
+      let mediumCount = 0;
+      let lowCount = 0;
+      let infoCount = 0;
+      
+      rows.forEach(row => {
+        hostSet.add(row.dataset.ip);
+        portCount++;
+        
+        const severities = JSON.parse(row.dataset.severities || '[]');
+        severities.forEach(s => {
+          if (s === 'critical') criticalCount++;
+          else if (s === 'high') highCount++;
+          else if (s === 'medium') mediumCount++;
+          else if (s === 'low') lowCount++;
+          else if (s === 'info') infoCount++;
+        });
+      });
+      
+      document.getElementById('stat-hosts').innerText = hostSet.size;
+      document.getElementById('stat-ports').innerText = portCount;
+      document.getElementById('count-critical').innerText = criticalCount;
+      document.getElementById('count-high').innerText = highCount;
+      document.getElementById('count-medium').innerText = mediumCount;
+      document.getElementById('count-low').innerText = lowCount;
+      document.getElementById('count-info').innerText = infoCount;
+      document.getElementById('showing-count').innerText = portCount;
+      document.getElementById('total-count').innerText = portCount;
+    });
+
+    function filterBySeverity(sev) {
+      currentSeverity = sev;
+      
+      document.querySelectorAll('.clickable-stat').forEach(card => {
+        card.classList.remove('active');
+      });
+      
+      if (sev === 'all') {
+        document.getElementById('btn-all-severities').classList.add('active');
+      } else {
+        const cardMap = {
+          'critical': 'card-crit',
+          'high': 'card-high',
+          'medium': 'card-med',
+          'low': 'card-low',
+          'info': 'card-info'
+        };
+        const targetId = cardMap[sev];
+        if (targetId) {
+          document.getElementById(targetId).classList.add('active');
+        }
+      }
+      
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const ipVal = document.getElementById('filter-ip').value.toLowerCase().trim();
+      const portVal = document.getElementById('filter-port').value.toLowerCase().trim();
+      const keywordVal = document.getElementById('filter-keyword').value.toLowerCase().trim();
+      
+      const rows = document.querySelectorAll('tbody tr');
+      let visibleCount = 0;
+      
+      rows.forEach(row => {
+        const ip = row.dataset.ip.toLowerCase();
+        const port = row.dataset.port.toLowerCase();
+        const service = row.dataset.service.toLowerCase();
+        const product = row.dataset.product.toLowerCase();
+        const url = row.dataset.url.toLowerCase();
+        const severities = JSON.parse(row.dataset.severities || '[]');
+        
+        const matchIp = !ipVal || ip.includes(ipVal);
+        const matchPort = !portVal || port.includes(portVal);
+        const matchKeyword = !keywordVal || 
+                             ip.includes(keywordVal) || 
+                             port.includes(keywordVal) || 
+                             service.includes(keywordVal) || 
+                             product.includes(keywordVal) || 
+                             url.includes(keywordVal) ||
+                             row.innerText.toLowerCase().includes(keywordVal);
+                             
+        let matchSeverity = false;
+        if (currentSeverity === 'all') {
+          matchSeverity = true;
+        } else {
+          matchSeverity = severities.includes(currentSeverity);
+        }
+        
+        if (matchIp && matchPort && matchKeyword && matchSeverity) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+      
+      document.getElementById('showing-count').innerText = visibleCount;
+    }
+  </script>
 </body>
 </html>`
 

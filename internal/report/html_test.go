@@ -31,6 +31,9 @@ func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 	if !strings.Contains(string(data), "Tomcat Default Login") {
 		t.Fatalf("expected finding summary in html: %s", string(data))
 	}
+	if !strings.Contains(string(data), `<details class="finding-details">`) {
+		t.Fatalf("expected collapsible finding details in html: %s", string(data))
+	}
 	if !strings.Contains(string(data), "matched-at") || !strings.Contains(string(data), "http://192.168.1.10:8080") {
 		t.Fatalf("expected finding evidence in html: %s", string(data))
 	}

@@ -55,14 +55,34 @@
     <input name="service" placeholder="服务精确匹配 (如 redis)" value="{{.Filters.Service}}">
     <input name="q" placeholder="关键词 (如 redis/tomcat/admin)" value="{{.Filters.Keyword}}">
     <input name="source" placeholder="数据源 (nuclei)" value="{{.Filters.Source}}">
-    <div class="full-width" style="display: flex; flex-direction: column; gap: 0.6rem;">
-      <span style="font-size: 0.85rem; color: var(--muted);">危险等级筛选</span>
-      <div style="display: flex; flex-wrap: wrap; gap: 0.85rem 1rem;">
-        <label><input type="checkbox" name="severity" value="critical" {{if contains .Filters.Severities "critical"}}checked{{end}}> critical</label>
-        <label><input type="checkbox" name="severity" value="high" {{if contains .Filters.Severities "high"}}checked{{end}}> high</label>
-        <label><input type="checkbox" name="severity" value="medium" {{if contains .Filters.Severities "medium"}}checked{{end}}> medium</label>
-        <label><input type="checkbox" name="severity" value="low" {{if contains .Filters.Severities "low"}}checked{{end}}> low</label>
-        <label><input type="checkbox" name="severity" value="info" {{if contains .Filters.Severities "info"}}checked{{end}}> info</label>
+    <div class="full-width severity-filter-container">
+      <span class="severity-filter-title">危险等级筛选</span>
+      <div class="severity-filter-group">
+        <label class="severity-filter-chip critical{{if contains .Filters.Severities "critical"}} active{{end}}">
+          <input type="checkbox" name="severity" value="critical" {{if contains .Filters.Severities "critical"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <span class="severity-dot"></span>
+          critical
+        </label>
+        <label class="severity-filter-chip high{{if contains .Filters.Severities "high"}} active{{end}}">
+          <input type="checkbox" name="severity" value="high" {{if contains .Filters.Severities "high"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <span class="severity-dot"></span>
+          high
+        </label>
+        <label class="severity-filter-chip medium{{if contains .Filters.Severities "medium"}} active{{end}}">
+          <input type="checkbox" name="severity" value="medium" {{if contains .Filters.Severities "medium"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <span class="severity-dot"></span>
+          medium
+        </label>
+        <label class="severity-filter-chip low{{if contains .Filters.Severities "low"}} active{{end}}">
+          <input type="checkbox" name="severity" value="low" {{if contains .Filters.Severities "low"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <span class="severity-dot"></span>
+          low
+        </label>
+        <label class="severity-filter-chip info{{if contains .Filters.Severities "info"}} active{{end}}">
+          <input type="checkbox" name="severity" value="info" {{if contains .Filters.Severities "info"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <span class="severity-dot"></span>
+          info
+        </label>
       </div>
     </div>
     <select name="view">
@@ -263,21 +283,11 @@
         <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
           <td colspan="6">
             <div class="details-expanded-content">
-              <dl class="detail-list">
-                <dt>探测规则:</dt>
-                <dd>{{.ID}}</dd>
-                <dt>扫描引擎:</dt>
-                <dd>{{.Source}}</dd>
-                <dt>危险指数:</dt>
-                <dd><span class="severity-badge sev-{{.Severity}}">{{.Severity}}</span></dd>
-                <dt>目标地址:</dt>
-                <dd style="font-weight: 700; color: #fff;">{{.IP}}:{{.Port}}</dd>
-                <dt>影响范围:</dt>
-                <dd>{{.Target}}</dd>
-              </dl>
               {{if .Output}}
-              <div class="evidence-title">漏洞响应报文 / 验证证据 (Output):</div>
-              <pre class="evidence-block" style="border-radius: var(--radius-md); max-height: 400px;">{{.Output}}</pre>
+              <div class="evidence-title">漏洞响应报文 / 验证证据</div>
+              <pre class="evidence-block evidence-output">{{.Output}}</pre>
+              {{else}}
+              <p class="evidence-empty">暂无原始证据输出。</p>
               {{end}}
             </div>
           </td>

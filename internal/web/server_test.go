@@ -802,6 +802,12 @@ func TestReportPageRendersFindings(t *testing.T) {
 	if !strings.Contains(res.Body.String(), "<details") || !strings.Contains(res.Body.String(), "matched-at") {
 		t.Fatalf("expected finding details in body: %s", res.Body.String())
 	}
+	if strings.Contains(res.Body.String(), "探测规则:") || strings.Contains(res.Body.String(), "危险指数:") {
+		t.Fatalf("expected details panel to avoid duplicated finding metadata: %s", res.Body.String())
+	}
+	if strings.Contains(res.Body.String(), "展开原始输出") || strings.Contains(res.Body.String(), `class="evidence-details"`) {
+		t.Fatalf("expected finding evidence to render directly after opening details: %s", res.Body.String())
+	}
 	if !strings.Contains(res.Body.String(), "筛选") || !strings.Contains(res.Body.String(), "证据与详情") {
 		t.Fatalf("expected chinese report copy: %s", res.Body.String())
 	}
