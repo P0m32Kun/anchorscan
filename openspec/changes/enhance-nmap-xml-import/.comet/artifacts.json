@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/enhance-nmap-xml-import/proposal.md",
+  "openspec_design": "openspec/changes/enhance-nmap-xml-import/design.md",
+  "openspec_tasks": "openspec/changes/enhance-nmap-xml-import/tasks.md",
+  "openspec_delta_spec": "openspec/changes/enhance-nmap-xml-import/specs/nmap-xml-import/spec.md",
+  "handoff_context": "openspec/changes/enhance-nmap-xml-import/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/enhance-nmap-xml-import/.comet/handoff/design-context.md"
+}

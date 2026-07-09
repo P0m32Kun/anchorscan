@@ -40,19 +40,19 @@ func (s *Store) Close() error {
 
 func (s *Store) SaveFingerprint(runID string, fp fingerprint.ServiceFingerprint) error {
 	_, err := s.db.Exec(
-		`INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		runID, fp.IP, fp.Port, fp.Service, fp.Product, fp.Version, fp.Normalized, boolToInt(fp.IsWeb), fp.URL,
+		`INSERT INTO fingerprints (run_id, ip, port, protocol, service, product, version, extrainfo, tunnel, cpe, normalized, is_web, url)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		runID, fp.IP, fp.Port, fp.Protocol, fp.Service, fp.Product, fp.Version, fp.ExtraInfo, fp.Tunnel, fp.CPE, fp.Normalized, boolToInt(fp.IsWeb), fp.URL,
 	)
 	return err
 }
 
 func (s *Store) ListFingerprints(runID string) ([]fingerprint.ServiceFingerprint, error) {
 	rows, err := s.db.Query(
-		`SELECT ip, port, service, product, version, normalized, is_web, url
+		`SELECT ip, port, protocol, service, product, version, extrainfo, tunnel, cpe, normalized, is_web, url
 		 FROM fingerprints
 		 WHERE run_id = ?
-		 ORDER BY ip, port`,
+		 ORDER BY ip, port, protocol`,
 		runID,
 	)
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *Store) ListFingerprints(runID string) ([]fingerprint.ServiceFingerprint
 	for rows.Next() {
 		var fp fingerprint.ServiceFingerprint
 		var isWeb int
-		if err := rows.Scan(&fp.IP, &fp.Port, &fp.Service, &fp.Product, &fp.Version, &fp.Normalized, &isWeb, &fp.URL); err != nil {
+		if err := rows.Scan(&fp.IP, &fp.Port, &fp.Protocol, &fp.Service, &fp.Product, &fp.Version, &fp.ExtraInfo, &fp.Tunnel, &fp.CPE, &fp.Normalized, &isWeb, &fp.URL); err != nil {
 			return nil, err
 		}
 		fp.IsWeb = isWeb == 1
@@ -75,19 +75,19 @@ func (s *Store) ListFingerprints(runID string) ([]fingerprint.ServiceFingerprint
 
 func (s *Store) SaveFinding(runID string, finding report.Finding) error {
 	_, err := s.db.Exec(
-		`INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		runID, finding.IP, finding.Port, finding.Source, finding.ID, finding.Severity, finding.Summary, finding.Target, finding.Output,
+		`INSERT INTO findings (run_id, ip, port, protocol, scope, source, finding_id, severity, summary, target, output)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		runID, finding.IP, finding.Port, finding.Protocol, finding.Scope, finding.Source, finding.ID, finding.Severity, finding.Summary, finding.Target, finding.Output,
 	)
 	return err
 }
 
 func (s *Store) ListFindings(runID string) ([]report.Finding, error) {
 	rows, err := s.db.Query(
-		`SELECT ip, port, source, finding_id, severity, summary, target, output
+		`SELECT ip, port, protocol, scope, source, finding_id, severity, summary, target, output
 		 FROM findings
 		 WHERE run_id = ?
-		 ORDER BY ip, port, finding_id`,
+		 ORDER BY ip, port, protocol, finding_id`,
 		runID,
 	)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *Store) ListFindings(runID string) ([]report.Finding, error) {
 	var out []report.Finding
 	for rows.Next() {
 		var finding report.Finding
-		if err := rows.Scan(&finding.IP, &finding.Port, &finding.Source, &finding.ID, &finding.Severity, &finding.Summary, &finding.Target, &finding.Output); err != nil {
+		if err := rows.Scan(&finding.IP, &finding.Port, &finding.Protocol, &finding.Scope, &finding.Source, &finding.ID, &finding.Severity, &finding.Summary, &finding.Target, &finding.Output); err != nil {
 			return nil, err
 		}
 		out = append(out, finding)

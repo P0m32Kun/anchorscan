@@ -75,6 +75,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 		return runCancel(args[1:], stdout)
 	case "report":
 		return runReport(args[1:], stdout, deps)
+	case "import-nmap":
+		return runImportNmap(args[1:], stdout, deps)
 	case "tools":
 		return runTools(args[1:], stdout)
 	case "version":
@@ -452,6 +454,46 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	return nil
 }
 
+func runImportNmap(args []string, stdout io.Writer, deps cliDeps) error {
+	fs := flag.NewFlagSet("import-nmap", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	xmlPath := fs.String("xml", "", "path to Nmap XML file to import")
+	dbPath := fs.String("db", filepath.Join("data", "scans.sqlite"), "path to sqlite database")
+	runID := fs.String("run-id", "", "import run id (default: import-<timestamp>)")
+	projectID := fs.String("project", "", "project id to attach the run to")
+	jsonPath := fs.String("json", "", "path to JSON report output")
+	htmlPath := fs.String("html", "", "path to HTML report output")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			printImportNmapHelp(stdout)
+			return nil
+		}
+		return err
+	}
+	if *xmlPath == "" {
+		return errors.New("import-nmap requires --xml")
+	}
+
+	scanStore, err := deps.openStore(*dbPath)
+	if err != nil {
+		return err
+	}
+
+	resolvedRunID, err := app.ImportNmap(context.Background(), scanStore, app.ImportNmapOptions{
+		XMLPath:   *xmlPath,
+		RunID:     *runID,
+		ProjectID: *projectID,
+		JSONPath:  *jsonPath,
+		HTMLPath:  *htmlPath,
+	})
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(stdout, "run_id=%s\n", resolvedRunID)
+	return nil
+}
+
 func runDoctor(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -612,6 +654,7 @@ Commands:
   web         Start the local Web Console
   cancel      Cancel a Web-managed scan
   report      Rebuild reports from stored results
+  import-nmap Import an existing Nmap XML into an AnchorScan run
   tools check Verify configured external tools
   version     Print the AnchorScan version
 
@@ -677,6 +720,22 @@ Flags:
   --run-id <id>     Scan run id
   --json <path>     JSON report output path
   --html <path>     HTML report output path`)
+}
+
+func printImportNmapHelp(w io.Writer) {
+	_, _ = fmt.Fprintln(w, `Usage: anchorscan import-nmap --xml <path> [flags]
+
+Import an existing Nmap XML file as a completed AnchorScan run, preserving
+service protocol, CPE and NSE script output. Reuses the existing SQLite,
+JSON/HTML report and Web Console pipeline.
+
+Flags:
+  --xml <path>      Nmap XML file to import (required)
+  --db <path>       SQLite database path
+  --run-id <id>     Import run id (default: import-<timestamp>)
+  --project <id>    Project id to attach the run to
+  --json <path>     JSON report output path (optional)
+  --html <path>     HTML report output path (optional)`)
 }
 
 func printDoctorHelp(w io.Writer) {

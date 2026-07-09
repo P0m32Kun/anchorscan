@@ -70,6 +70,31 @@ go run ./cmd/anchorscan report \
 go run ./cmd/anchorscan tools check --config config/default.yaml
 ```
 
+## Importing Existing Nmap XML
+
+Use `anchorscan import-nmap` to turn an existing Nmap XML file into a completed
+AnchorScan run. The importer preserves the service protocol (so `53/tcp` and
+`53/udp` stay separate), CPE values, and NSE script output with its scope
+(port / hostscript / prescript / postscript). Imported data reuses the existing
+SQLite, JSON/HTML report and Web Console pipeline — no extra service or
+database is introduced.
+
+```bash
+go run ./cmd/anchorscan import-nmap \
+  --xml path/to/scan.xml \
+  --db data/scans.sqlite \
+  --json reports/import.json \
+  --html reports/import.html
+```
+
+Invalid, empty, or non-`nmaprun` XML fails fast with a clear error and never
+leaves a partial run behind. Optional flags: `--run-id <id>` (defaults to
+`import-<timestamp>`), `--project <id>`.
+
+> Non-goals of this command: it does not run Python/FastAPI, does not read
+> `nmap_viewer.db`, does not migrate `risk_rules.json`, and does not add a
+> Web Console upload entry (that may be a later change).
+
 ## Single Tool Runs
 
 Use `anchorscan tool` when you want to run one engine without the full rustscan -> nmap -> httpx/NSE/nuclei pipeline. Results are still written to SQLite and JSON reports, so they can be reviewed through the same `/runs/<run_id>` and `/reports/<run_id>` pages.

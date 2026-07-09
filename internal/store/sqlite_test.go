@@ -94,6 +94,8 @@ CREATE TABLE projects (
 	for _, query := range []string{
 		`SELECT version FROM fingerprints LIMIT 0`,
 		`SELECT exclude_targets, exclude_ports FROM projects LIMIT 0`,
+		`SELECT protocol, cpe, extrainfo, tunnel FROM fingerprints LIMIT 0`,
+		`SELECT protocol, scope FROM findings LIMIT 0`,
 	} {
 		if _, err := scanStore.db.Exec(query); err != nil {
 			t.Fatalf("expected migrated schema for %q: %v", query, err)
@@ -122,8 +124,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 2 {
-		t.Fatalf("expected 2 applied migrations, got %d", count)
+	if count != 3 {
+		t.Fatalf("expected 3 applied migrations, got %d", count)
 	}
 }
 
@@ -182,6 +184,86 @@ func TestSQLiteStoreSavesAndListsFindings(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].ID != "redis-detect" {
 		t.Fatalf("unexpected findings: %#v", got)
+	}
+}
+
+func TestSQLiteStoreKeepsTCPAndUDPSamePort(t *testing.T) {
+	db := t.TempDir() + "/scan.db"
+	store, err := Open(db)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	for _, proto := range []string{"tcp", "udp"} {
+		fp := fingerprint.ServiceFingerprint{
+			IP:       "10.0.0.53",
+			Port:     53,
+			Protocol: proto,
+			Service:  "domain",
+			CPE:      "cpe:/a:isc:bind:9",
+		}
+		if err := store.SaveFingerprint("run-1", fp); err != nil {
+			t.Fatalf("SaveFingerprint (%s) returned error: %v", proto, err)
+		}
+	}
+
+	got, err := store.ListFingerprints("run-1")
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected two fingerprints for tcp+udp, got %d", len(got))
+	}
+	protocols := map[string]bool{}
+	for _, fp := range got {
+		if fp.Port != 53 {
+			t.Fatalf("unexpected port: %d", fp.Port)
+		}
+		if fp.CPE != "cpe:/a:isc:bind:9" {
+			t.Fatalf("CPE not persisted: %q", fp.CPE)
+		}
+		protocols[fp.Protocol] = true
+	}
+	if !protocols["tcp"] || !protocols["udp"] {
+		t.Fatalf("expected both tcp and udp persisted, got %v", protocols)
+	}
+}
+
+func TestSaveImportRunWritesRunFingerprintsAndFindings(t *testing.T) {
+	db := t.TempDir() + "/scan.db"
+	scanStore, err := Open(db)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	run := ScanRun{
+		RunID:     "import-1",
+		Target:    "nmap-import",
+		Status:    "completed",
+		StartedAt: time.Unix(1, 0),
+		FinishedAt: time.Unix(2, 0),
+	}
+	fps := []fingerprint.ServiceFingerprint{
+		{IP: "10.0.0.1", Port: 22, Protocol: "tcp", Service: "ssh", CPE: "cpe:/a:openbsd:openssh:9"},
+	}
+	findings := []report.Finding{
+		{IP: "10.0.0.1", Port: 22, Protocol: "tcp", Source: "nmap-import:port:ssh-banner", ID: "ssh-banner", Severity: "info", Output: "SSH-2.0"},
+	}
+	if err := scanStore.SaveImportRun(run, fps, findings); err != nil {
+		t.Fatalf("SaveImportRun returned error: %v", err)
+	}
+
+	gotRun, err := scanStore.GetScanRun("import-1")
+	if err != nil || gotRun.Status != "completed" {
+		t.Fatalf("expected completed run persisted, got %#v err=%v", gotRun, err)
+	}
+	gotFps, err := scanStore.ListFingerprints("import-1")
+	if err != nil || len(gotFps) != 1 || gotFps[0].CPE != "cpe:/a:openbsd:openssh:9" {
+		t.Fatalf("expected fingerprint with CPE persisted, got %#v err=%v", gotFps, err)
+	}
+	gotFindings, err := scanStore.ListFindings("import-1")
+	if err != nil || len(gotFindings) != 1 || gotFindings[0].Source != "nmap-import:port:ssh-banner" {
+		t.Fatalf("expected finding persisted, got %#v err=%v", gotFindings, err)
 	}
 }
 

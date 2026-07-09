@@ -1,0 +1,14 @@
+{
+  "change": "enhance-nmap-xml-import",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "1763bb505da82e51162b2547483767f9b40ac82cec52acd0272122e7f0f42acf",
+  "files": [
+    { "path": "openspec/changes/enhance-nmap-xml-import/proposal.md", "sha256": "7dd92a62b939473f903129df8b0e982dd907c471d1bfe3d3cc726c9ed4c36758" },
+    { "path": "openspec/changes/enhance-nmap-xml-import/design.md", "sha256": "489efbba6d2879ad40a78b4911ec52f6c3fe6fd7afc9043f87215156ffff6a30" },
+    { "path": "openspec/changes/enhance-nmap-xml-import/tasks.md", "sha256": "16a4084e9a87d5b344ae3ae54075b447d9baa0a7d41d3085fe40d12c6eca5819" },
+    { "path": "openspec/changes/enhance-nmap-xml-import/specs/nmap-xml-import/spec.md", "sha256": "8c51d342464dc9e2efaa7319d146724dd8a020e899f504aa1e11f542f4f2e74b" }
+  ]
+}

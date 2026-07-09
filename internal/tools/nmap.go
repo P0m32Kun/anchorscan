@@ -23,7 +23,7 @@ func FingerprintWithOutput(ctx context.Context, runner Runner, binaryPath string
 		return nil, out, withOutputError(err, out)
 	}
 
-	parsed, err := fingerprint.ParseNmapXML(out)
+	parsed, _, err := fingerprint.ParseNmapXML(out)
 	if err != nil {
 		return nil, out, err
 	}

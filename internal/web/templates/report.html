@@ -194,11 +194,11 @@
           <td style="font-family: var(--mono); font-weight: 700; color: var(--heading);">{{.IP}}</td>
           <td>
             <span class="status-badge compact-badge port-badge">
-              {{.Port}}
+              {{if .Protocol}}{{.Protocol}}/{{end}}{{.Port}}
             </span>
           </td>
           <td style="font-weight: 600;">{{.Service}}</td>
-          <td style="color: var(--muted); font-size: 0.9rem;">{{if .Product}}{{.Product}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}</td>
+          <td style="color: var(--muted); font-size: 0.9rem;">{{if .Product}}{{.Product}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}{{if .CPE}}<div style="font-size: 0.8rem; margin-top: 4px; color: rgba(255,255,255,0.4);">{{.CPE}}</div>{{end}}</td>
           <td>
             {{if .IsWeb}}
             <span class="status-badge compact-badge web-badge">WEB</span>

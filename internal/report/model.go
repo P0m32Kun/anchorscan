@@ -10,6 +10,8 @@ import (
 type Finding struct {
 	IP       string `json:"ip"`
 	Port     int    `json:"port"`
+	Protocol string `json:"protocol,omitempty"`
+	Scope    string `json:"scope,omitempty"`
 	Source   string `json:"source"`
 	ID       string `json:"id"`
 	Severity string `json:"severity"`
@@ -20,8 +22,10 @@ type Finding struct {
 
 type PortReport struct {
 	Port        int       `json:"port"`
+	Protocol    string    `json:"protocol"`
 	Service     string    `json:"service"`
 	Product     string    `json:"product"`
+	CPE         string    `json:"cpe,omitempty"`
 	Fingerprint string    `json:"fingerprint,omitempty"`
 	IsWeb       bool      `json:"is_web"`
 	URL         string    `json:"url,omitempty"`
@@ -47,7 +51,7 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 	findingsByPort := map[string][]Finding{}
 
 	for _, finding := range dedupeFindings(findings) {
-		key := portKey(finding.IP, finding.Port)
+		key := portKey(finding.IP, finding.Port, finding.Protocol)
 		findingsByPort[key] = append(findingsByPort[key], finding)
 	}
 
@@ -60,12 +64,14 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 
 		port := PortReport{
 			Port:        fp.Port,
+			Protocol:    fp.Protocol,
 			Service:     fp.Service,
 			Product:     fp.Product,
+			CPE:         fp.CPE,
 			Fingerprint: fp.Normalized,
 			IsWeb:       fp.IsWeb,
 			URL:         fp.URL,
-			Findings:    append([]Finding(nil), findingsByPort[portKey(fp.IP, fp.Port)]...),
+			Findings:    append([]Finding(nil), findingsByPort[portKey(fp.IP, fp.Port, fp.Protocol)]...),
 		}
 		host.Ports = append(host.Ports, port)
 	}
@@ -73,7 +79,10 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 	hosts := make([]HostReport, 0, len(hostMap))
 	for _, host := range hostMap {
 		sort.Slice(host.Ports, func(i, j int) bool {
-			return host.Ports[i].Port < host.Ports[j].Port
+			if host.Ports[i].Port != host.Ports[j].Port {
+				return host.Ports[i].Port < host.Ports[j].Port
+			}
+			return host.Ports[i].Protocol < host.Ports[j].Protocol
 		})
 		hosts = append(hosts, *host)
 	}
@@ -87,15 +96,15 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 	}
 }
 
-func portKey(ip string, port int) string {
-	return fmt.Sprintf("%s:%d", ip, port)
+func portKey(ip string, port int, protocol string) string {
+	return fmt.Sprintf("%s:%d:%s", ip, port, protocol)
 }
 
 func dedupeFindings(findings []Finding) []Finding {
 	seen := make(map[string]struct{}, len(findings))
 	out := make([]Finding, 0, len(findings))
 	for _, finding := range findings {
-		key := finding.IP + "\x00" + finding.ID
+		key := fmt.Sprintf("%s\x00%d\x00%s\x00%s", finding.IP, finding.Port, finding.Protocol, finding.ID)
 		if _, ok := seen[key]; ok {
 			continue
 		}

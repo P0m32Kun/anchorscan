@@ -290,6 +290,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 				finding := report.Finding{
 					IP:       fp.IP,
 					Port:     fp.Port,
+					Protocol: fp.Protocol,
 					Source:   "nse",
 					ID:       result.ID,
 					Severity: "info",
@@ -322,6 +323,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 				finding := report.Finding{
 					IP:       fp.IP,
 					Port:     fp.Port,
+					Protocol: fp.Protocol,
 					Source:   "nuclei",
 					ID:       result.TemplateID,
 					Severity: result.Severity,

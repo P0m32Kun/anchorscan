@@ -144,7 +144,7 @@ func containsValue(items []string, value string) bool {
 
 func findingMatchesService(item report.Finding, fps []fingerprint.ServiceFingerprint, service string) bool {
 	for _, fp := range fps {
-		if fp.IP == item.IP && fp.Port == item.Port && fp.Service == service {
+		if fp.IP == item.IP && fp.Port == item.Port && fp.Protocol == item.Protocol && fp.Service == service {
 			return true
 		}
 	}
@@ -221,13 +221,17 @@ func groupFingerprintsByHost(items []fingerprint.ServiceFingerprint) []hostAsset
 			order = append(order, item.IP)
 		}
 		port := strconv.Itoa(item.Port)
-		host.ports = append(host.ports, port)
+		displayPort := port
+		if item.Protocol != "" {
+			displayPort = item.Protocol + "/" + port
+		}
+		host.ports = append(host.ports, displayPort)
 		host.services = appendUnique(host.services, item.Service)
 		host.products = appendUnique(host.products, item.Product)
 		if item.URL != "" {
 			host.urls = append(host.urls, item.URL)
 		}
-		host.pairs = append(host.pairs, item.IP+":"+port)
+		host.pairs = append(host.pairs, item.IP+":"+displayPort)
 	}
 
 	out := make([]hostAssetView, 0, len(order))
@@ -287,16 +291,18 @@ func exportAssetsTXT(items []fingerprint.ServiceFingerprint, kind string) string
 func exportAssetsCSV(items []fingerprint.ServiceFingerprint) (string, error) {
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	if err := w.Write([]string{"ip", "port", "service", "product", "version", "url"}); err != nil {
+	if err := w.Write([]string{"ip", "port", "protocol", "service", "product", "version", "cpe", "url"}); err != nil {
 		return "", err
 	}
 	for _, item := range items {
 		if err := w.Write([]string{
 			item.IP,
 			strconv.Itoa(item.Port),
+			item.Protocol,
 			item.Service,
 			item.Product,
 			item.Version,
+			item.CPE,
 			item.URL,
 		}); err != nil {
 			return "", err
@@ -312,16 +318,16 @@ func exportAssetsCSV(items []fingerprint.ServiceFingerprint) (string, error) {
 func exportFindingsCSV(items []report.Finding, fps []fingerprint.ServiceFingerprint) (string, error) {
 	services := map[string]fingerprint.ServiceFingerprint{}
 	for _, item := range fps {
-		services[item.IP+":"+strconv.Itoa(item.Port)] = item
+		services[item.IP+":"+strconv.Itoa(item.Port)+":"+item.Protocol] = item
 	}
 
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	if err := w.Write([]string{"severity", "source", "id", "ip", "port", "service", "product", "target", "summary", "evidence"}); err != nil {
+	if err := w.Write([]string{"severity", "source", "id", "ip", "port", "protocol", "service", "product", "target", "summary", "evidence"}); err != nil {
 		return "", err
 	}
 	for _, item := range items {
-		fp := services[item.IP+":"+strconv.Itoa(item.Port)]
+		fp := services[item.IP+":"+strconv.Itoa(item.Port)+":"+item.Protocol]
 		if err := w.Write([]string{
 			item.Severity,
 			item.Source,

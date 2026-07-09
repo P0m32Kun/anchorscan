@@ -542,9 +542,9 @@ const htmlTemplate = `<!doctype html>
           {{- end -}}
         ]'>
           <td class="ip-cell">{{$host.IP}}</td>
-          <td><span class="port-badge">{{.Port}}</span></td>
+          <td><span class="port-badge">{{if .Protocol}}{{.Protocol}}/{{end}}{{.Port}}</span></td>
           <td style="font-weight: 600; color: var(--heading);">{{.Service}}</td>
-          <td style="color: var(--muted); font-size: 0.9rem;">{{if .Product}}{{.Product}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}</td>
+          <td style="color: var(--muted); font-size: 0.9rem;">{{if .Product}}{{.Product}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}{{if .CPE}}<div style="font-size: 0.8rem; margin-top: 4px; color: rgba(255,255,255,0.4);">{{.CPE}}</div>{{end}}</td>
           <td>
             {{if .IsWeb}}
             <span class="web-badge">WEB</span>

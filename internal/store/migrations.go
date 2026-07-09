@@ -96,6 +96,25 @@ CREATE TABLE IF NOT EXISTS scan_events (
 			return nil
 		},
 	},
+	{
+		version: 3,
+		name:    "add_nmap_import_fields",
+		up: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`ALTER TABLE fingerprints ADD COLUMN protocol TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE fingerprints ADD COLUMN cpe TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE fingerprints ADD COLUMN extrainfo TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE fingerprints ADD COLUMN tunnel TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE findings ADD COLUMN protocol TEXT NOT NULL DEFAULT ''`,
+				`ALTER TABLE findings ADD COLUMN scope TEXT NOT NULL DEFAULT ''`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 func runMigrations(db *sql.DB) error {

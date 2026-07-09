@@ -1146,7 +1146,7 @@ func TestReportAssetExportSupportsFilteredTXTAndCSV(t *testing.T) {
 		t.Fatalf("unexpected csv content-disposition: %s", cd)
 	}
 	csvBody := res.Body.String()
-	if !strings.Contains(csvBody, "ip,port,service,product,version,url") || !strings.Contains(csvBody, "127.0.0.1,6379,redis,Redis,7.2.0,") {
+	if !strings.Contains(csvBody, "ip,port,protocol,service,product,version,cpe,url") || !strings.Contains(csvBody, "127.0.0.1,6379,,redis,Redis,7.2.0,,") {
 		t.Fatalf("unexpected csv export: %s", csvBody)
 	}
 	if strings.Contains(csvBody, "127.0.0.2") {
@@ -1222,7 +1222,7 @@ func TestReportExportDownloadsRicherFormats(t *testing.T) {
 	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
 		t.Fatalf("unexpected csv content-type: %s", ct)
 	}
-	if !strings.Contains(res.Body.String(), "severity,source,id,ip,port,service,product,target,summary,evidence") || !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
+	if !strings.Contains(res.Body.String(), "severity,source,id,ip,port,protocol,service,product,target,summary,evidence") || !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
 		t.Fatalf("unexpected csv export: %s", res.Body.String())
 	}
 
