@@ -2,7 +2,32 @@
 
 All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3).
+adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4).
+
+## [1.4] - 2026-07-09
+
+v1.4 adds scan artifact persistence and richer reporting on top of v1.3: each
+run now saves its raw tool outputs and an audit artifact bundle under an
+operator-configured artifact root, and report filters and exports gain more
+control.
+
+### Added
+- Scan artifact directories persisted by the store layer (`store/runs.go`,
+  `models.go`) so each run carries its artifact root.
+- Raw tool outputs exposed by the engine tools (rustscan, nmap, NSE, httpx,
+  nuclei) for downstream artifact capture.
+- Scan audit artifact saving via the new `internal/app/artifacts.go` helper,
+  invoked from the scan pipeline.
+- Artifact-root inputs and cleanup wired into both the CLI
+  (`cmd/anchorscan/main.go`) and the Web Console (`scan_new.html`, server),
+  with cleanup on run deletion.
+- Report filters and exports improvements in the HTML report (`report.html`)
+  and Web report views (`internal/web/reports.go`, `server.go`), with
+  accompanying tests.
+
+### Documentation
+- v1.4 optimization design and implementation plan committed alongside the
+  feature work.
 
 ## [1.3] - 2026-07-09
 
