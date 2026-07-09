@@ -234,6 +234,46 @@ func TestDeleteProjectCascadeRemovesRunsAndArtifacts(t *testing.T) {
 	}
 }
 
+func TestStoreScanRunPersistsArtifactDir(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(filepath.Join(dir, "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	wantArtifactDir := filepath.Join(dir, "artifacts", "run-1")
+	run := ScanRun{
+		RunID:       "run-1",
+		ProjectID:   "project-1",
+		Target:      "127.0.0.1",
+		Ports:       "80",
+		Profile:     "normal",
+		Status:      "completed",
+		StartedAt:   time.Unix(1, 0),
+		FinishedAt:  time.Unix(2, 0),
+		ArtifactDir: wantArtifactDir,
+	}
+	if err := store.SaveScanRun(run); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	got, err := store.GetScanRun("run-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if got.ArtifactDir != wantArtifactDir {
+		t.Fatalf("artifact dir mismatch: got %q want %q", got.ArtifactDir, wantArtifactDir)
+	}
+
+	dirs, err := store.ListProjectArtifactDirs("project-1")
+	if err != nil {
+		t.Fatalf("ListProjectArtifactDirs returned error: %v", err)
+	}
+	if len(dirs) != 1 || dirs[0] != wantArtifactDir {
+		t.Fatalf("artifact dirs mismatch: got %#v want %#v", dirs, []string{wantArtifactDir})
+	}
+}
+
 func TestProjectHasRunningRuns(t *testing.T) {
 	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
 	if err != nil {

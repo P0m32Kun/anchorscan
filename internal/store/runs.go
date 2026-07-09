@@ -5,8 +5,8 @@ import "time"
 func (s *Store) SaveScanRun(run ScanRun) error {
 	_, err := s.db.Exec(
 		`INSERT INTO scan_runs (
-			run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(run_id) DO UPDATE SET
 			project_id = excluded.project_id,
 			target = excluded.target,
@@ -16,7 +16,8 @@ func (s *Store) SaveScanRun(run ScanRun) error {
 			started_at = excluded.started_at,
 			finished_at = excluded.finished_at,
 			error = excluded.error,
-			config_snapshot = excluded.config_snapshot`,
+			config_snapshot = excluded.config_snapshot,
+			artifact_dir = excluded.artifact_dir`,
 		run.RunID,
 		run.ProjectID,
 		run.Target,
@@ -27,13 +28,14 @@ func (s *Store) SaveScanRun(run ScanRun) error {
 		formatTime(run.FinishedAt),
 		run.Error,
 		run.ConfigSnapshot,
+		run.ArtifactDir,
 	)
 	return err
 }
 
 func (s *Store) GetScanRun(runID string) (ScanRun, error) {
 	row := s.db.QueryRow(
-		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot
+		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
 		 WHERE run_id = ?`,
 		runID,
@@ -44,7 +46,7 @@ func (s *Store) GetScanRun(runID string) (ScanRun, error) {
 
 func (s *Store) ListScanRuns(limit int) ([]ScanRun, error) {
 	rows, err := s.db.Query(
-		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot
+		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
 		 ORDER BY started_at DESC
 		 LIMIT ?`,
@@ -60,7 +62,7 @@ func (s *Store) ListScanRuns(limit int) ([]ScanRun, error) {
 
 func (s *Store) ListProjectScanRuns(projectID string, limit int) ([]ScanRun, error) {
 	rows, err := s.db.Query(
-		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot
+		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
 		 WHERE project_id = ?
 		 ORDER BY started_at DESC
@@ -99,6 +101,30 @@ func (s *Store) DeleteScanRunCascade(runID string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Store) ListProjectArtifactDirs(projectID string) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT artifact_dir
+		 FROM scan_runs
+		 WHERE project_id = ? AND artifact_dir != ''
+		 ORDER BY started_at ASC, run_id ASC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dirs []string
+	for rows.Next() {
+		var dir string
+		if err := rows.Scan(&dir); err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, dir)
+	}
+	return dirs, rows.Err()
 }
 
 func (s *Store) UpdateScanRunStatus(runID string, status string, message string, finishedAt time.Time) error {
@@ -176,6 +202,7 @@ func scanRunFromRow(scan func(dest ...any) error) (ScanRun, error) {
 		&finishedAt,
 		&run.Error,
 		&run.ConfigSnapshot,
+		&run.ArtifactDir,
 	); err != nil {
 		return ScanRun{}, err
 	}

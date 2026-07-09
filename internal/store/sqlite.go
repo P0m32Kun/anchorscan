@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
   started_at TEXT NOT NULL,
   finished_at TEXT NOT NULL,
   error TEXT NOT NULL,
-  config_snapshot TEXT NOT NULL
+  config_snapshot TEXT NOT NULL,
+  artifact_dir TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS scan_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS scan_events (
 		`ALTER TABLE projects ADD COLUMN exclude_targets TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE projects ADD COLUMN exclude_ports TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE fingerprints ADD COLUMN version TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE scan_runs ADD COLUMN artifact_dir TEXT NOT NULL DEFAULT ''`,
 	} {
 		if _, err := db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
 			_ = db.Close()
