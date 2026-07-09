@@ -1545,7 +1545,7 @@ func TestImportNmapRunEmptyFileRendersFormError(t *testing.T) {
 		t.Fatalf("expected 200 (form re-render), got %d", res.Code)
 	}
 	pageBody := res.Body.String()
-	if !strings.Contains(pageBody, "empty XML file") {
+	if !strings.Contains(pageBody, "XML 文件为空") {
 		t.Fatalf("expected error banner, got: %s", pageBody)
 	}
 

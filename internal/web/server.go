@@ -643,18 +643,13 @@ func (s *server) importNmapRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
-		s.renderImportForm(w, "empty XML file")
+		s.renderImportForm(w, "XML 文件为空")
 		return
 	}
 
 	projectID := r.FormValue("project_id")
 	runID := newID("run", s.opts.Now())
 	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
-
-	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
 	if _, err := app.ImportNmap(context.Background(), s.store, app.ImportNmapOptions{
 		XMLData:   data,
