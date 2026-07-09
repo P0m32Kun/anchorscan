@@ -24,17 +24,22 @@ type nseXML struct {
 }
 
 func RunNSE(ctx context.Context, runner Runner, binaryPath string, ip string, port int, scripts []string, extraArgs []string) ([]NSEScripResult, error) {
+	results, _, err := RunNSEWithOutput(ctx, runner, binaryPath, ip, port, scripts, extraArgs)
+	return results, err
+}
+
+func RunNSEWithOutput(ctx context.Context, runner Runner, binaryPath string, ip string, port int, scripts []string, extraArgs []string) ([]NSEScripResult, []byte, error) {
 	args := []string{"-p", strconv.Itoa(port), "--script", strings.Join(scripts, ","), ip, "-oX", "-"}
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, err
+		return nil, out, withOutputError(err, out)
 	}
 
 	var parsed nseXML
 	if err := xml.Unmarshal(out, &parsed); err != nil {
-		return nil, err
+		return nil, out, err
 	}
 
 	var results []NSEScripResult
@@ -48,5 +53,5 @@ func RunNSE(ctx context.Context, runner Runner, binaryPath string, ip string, po
 			}
 		}
 	}
-	return results, nil
+	return results, out, nil
 }

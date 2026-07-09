@@ -2,12 +2,36 @@ package store
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
+
+func TestOpenConfiguresSQLiteForConcurrentScanWrites(t *testing.T) {
+	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	var timeout int
+	if err := store.db.QueryRow(`PRAGMA busy_timeout`).Scan(&timeout); err != nil {
+		t.Fatalf("busy_timeout query returned error: %v", err)
+	}
+	if timeout < 5000 {
+		t.Fatalf("expected busy_timeout >= 5000, got %d", timeout)
+	}
+
+	var journalMode string
+	if err := store.db.QueryRow(`PRAGMA journal_mode`).Scan(&journalMode); err != nil {
+		t.Fatalf("journal_mode query returned error: %v", err)
+	}
+	if strings.ToLower(journalMode) != "wal" {
+		t.Fatalf("expected WAL journal mode, got %q", journalMode)
+	}
+}
 
 func TestSQLiteStoreSavesAndListsFingerprints(t *testing.T) {
 	db := t.TempDir() + "/scan.db"
@@ -207,6 +231,46 @@ func TestDeleteProjectCascadeRemovesRunsAndArtifacts(t *testing.T) {
 	}
 	if len(events) != 0 {
 		t.Fatalf("expected no events, got %#v", events)
+	}
+}
+
+func TestStoreScanRunPersistsArtifactDir(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(filepath.Join(dir, "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	wantArtifactDir := filepath.Join(dir, "artifacts", "run-1")
+	run := ScanRun{
+		RunID:       "run-1",
+		ProjectID:   "project-1",
+		Target:      "127.0.0.1",
+		Ports:       "80",
+		Profile:     "normal",
+		Status:      "completed",
+		StartedAt:   time.Unix(1, 0),
+		FinishedAt:  time.Unix(2, 0),
+		ArtifactDir: wantArtifactDir,
+	}
+	if err := store.SaveScanRun(run); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	got, err := store.GetScanRun("run-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if got.ArtifactDir != wantArtifactDir {
+		t.Fatalf("artifact dir mismatch: got %q want %q", got.ArtifactDir, wantArtifactDir)
+	}
+
+	dirs, err := store.ListProjectArtifactDirs("project-1")
+	if err != nil {
+		t.Fatalf("ListProjectArtifactDirs returned error: %v", err)
+	}
+	if len(dirs) != 1 || dirs[0] != wantArtifactDir {
+		t.Fatalf("artifact dirs mismatch: got %#v want %#v", dirs, []string{wantArtifactDir})
 	}
 }
 

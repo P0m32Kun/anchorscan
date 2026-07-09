@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
@@ -65,10 +66,72 @@ func TestExecuteRootHelpShowsCommands(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"Usage:", "scan", "report", "tools check", "doctor", "web", "cancel"} {
+	for _, want := range []string{"Usage:", "scan", "tool", "report", "tools check", "doctor", "web", "cancel"} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in help output %q", want, output)
 		}
+	}
+}
+
+func TestExecuteToolHelpShowsTools(t *testing.T) {
+	var stdout bytes.Buffer
+	err := run([]string{"tool", "--help"}, &stdout, &bytes.Buffer{}, cliDeps{})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	for _, want := range []string{"anchorscan tool", "rustscan", "nmap", "httpx", "nuclei"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected %q in %q", want, stdout.String())
+		}
+	}
+}
+
+func TestExecuteToolNucleiRejectsMissingTagsAndTemplate(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\n  httpx: httpx\n  nuclei: nuclei\n")
+
+	err := run([]string{
+		"tool", "nuclei",
+		"--config", configPath,
+		"--db", filepath.Join(dir, "scan.db"),
+		"--json", filepath.Join(dir, "report.json"),
+		"--url", "http://example.test",
+	}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{})
+	if err == nil || !strings.Contains(err.Error(), "nuclei requires tags or template") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestExecuteToolNmapAliveWritesRunOutput(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	dbPath := filepath.Join(dir, "scan.db")
+	jsonPath := filepath.Join(dir, "report.json")
+	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\n  httpx: httpx\n  nuclei: nuclei\n")
+	runner := &recordingRunner{outputs: [][]byte{[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)}}
+
+	var stdout bytes.Buffer
+	err := run([]string{
+		"tool", "nmap",
+		"--config", configPath,
+		"--db", dbPath,
+		"--json", jsonPath,
+		"--target", "192.0.2.10",
+		"--mode", "alive",
+		"--args", "--min-rate 50",
+	}, &stdout, &bytes.Buffer{}, cliDeps{newRunner: func() tools.Runner { return runner }})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "run_id=tool-nmap-") || !strings.Contains(stdout.String(), "json="+jsonPath) {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if !runner.hasArgs("nmap", "-sn", "192.0.2.10", "-oX", "-", "--min-rate", "50") {
+		t.Fatalf("commands = %#v", runner.commands)
+	}
+	if _, err := os.Stat(jsonPath); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -126,10 +189,70 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 		"--nuclei-args",
 		"--json",
 		"--html",
+		"--artifacts",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in help output %q", want, output)
 		}
+	}
+}
+
+func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	dbPath := filepath.Join(dir, "scan.db")
+	jsonPath := filepath.Join(dir, "report.json")
+	artifactRoot := filepath.Join(dir, "custom-artifacts")
+	writeFile(t, configPath, `tools:
+  rustscan: /opt/rustscan
+  nmap: /opt/nmap
+  httpx: ""
+  nuclei: ""
+scan:
+  ports: 80
+  profile: normal
+profiles:
+  normal:
+    host_workers: 1
+`)
+
+	runner := &recordingRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+		[]byte("127.0.0.1 -> [80]\n"),
+		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+	}}
+	now := time.Unix(10, 0)
+
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "127.0.0.1",
+		"--db", dbPath,
+		"--json", jsonPath,
+		"--artifacts", artifactRoot,
+	}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{
+		newRunner: func() tools.Runner { return runner },
+		now:       func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	runID := now.Format("20060102-150405")
+	runRow, err := scanStore.GetScanRun(runID)
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	wantDir := filepath.Join(artifactRoot, runID)
+	if runRow.ArtifactDir != wantDir {
+		t.Fatalf("artifact dir mismatch: got %q want %q", runRow.ArtifactDir, wantDir)
+	}
+	if _, err := os.Stat(wantDir); err != nil {
+		t.Fatalf("expected artifact dir at %s: %v", wantDir, err)
 	}
 }
 
@@ -162,6 +285,7 @@ profiles:
 `)
 
 	runner := &recordingRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		[]byte("Open 8080\n"),
 		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
@@ -203,6 +327,7 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
+			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 			[]byte("Open 8080\n"),
 			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
@@ -354,5 +479,18 @@ func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
+	}
+}
+
+func TestVersionCommandPrintsVersion(t *testing.T) {
+	cases := [][]string{{"version"}, {"--version"}, {"-v"}}
+	for _, args := range cases {
+		var stdout bytes.Buffer
+		if err := run(args, &stdout, &bytes.Buffer{}, cliDeps{}); err != nil {
+			t.Fatalf("run(%v) returned error: %v", args, err)
+		}
+		if !strings.Contains(stdout.String(), "anchorscan version 1.3") {
+			t.Fatalf("run(%v) output missing version: %q", args, stdout.String())
+		}
 	}
 }

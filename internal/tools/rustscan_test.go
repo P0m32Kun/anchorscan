@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -16,7 +17,7 @@ type fakeRunner struct {
 func (f *fakeRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
 	f.args = append([]string{binary}, args...)
 	if f.err != nil {
-		return nil, f.err
+		return f.output, f.err
 	}
 	return f.output, nil
 }
@@ -62,5 +63,29 @@ func TestDiscoverPortsReturnsRunnerError(t *testing.T) {
 	_, err := DiscoverPorts(context.Background(), runner, "/opt/rustscan", "192.168.1.10", "80", nil)
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestDiscoverPortsIncludesToolOutputOnFailure(t *testing.T) {
+	runner := &fakeRunner{output: []byte("permission denied\n"), err: errors.New("exit status 1")}
+	_, err := DiscoverPorts(context.Background(), runner, "/opt/rustscan", "192.168.1.10", "80", nil)
+	if err == nil || !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("expected tool output in error, got %v", err)
+	}
+}
+
+func TestDiscoverPortsWithOutputReturnsRawOutput(t *testing.T) {
+	raw := []byte("127.0.0.1 -> [80,443]\n")
+	runner := &fakeRunner{output: raw}
+
+	ports, out, err := DiscoverPortsWithOutput(context.Background(), runner, "/opt/rustscan", "127.0.0.1", "80,443", nil)
+	if err != nil {
+		t.Fatalf("DiscoverPortsWithOutput returned error: %v", err)
+	}
+	if !reflect.DeepEqual(ports, []int{80, 443}) {
+		t.Fatalf("ports mismatch: got %#v", ports)
+	}
+	if string(out) != string(raw) {
+		t.Fatalf("raw output mismatch: got %q want %q", out, raw)
 	}
 }

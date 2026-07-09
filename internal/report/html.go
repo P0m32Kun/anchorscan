@@ -12,23 +12,40 @@ const htmlTemplate = `<!doctype html>
   <title>AnchorScan 扫描安全报告</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
     
     :root {
-      --bg: #070a13;
-      --panel: #0f172a;
-      --border: rgba(59, 130, 246, 0.15);
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --heading: #f8fafc;
-      --primary: #3b82f6;
+      --bg: #090a0c;
+      --panel: #121316;
+      --border: #1f2126;
+      --border-strong: #2c2f37;
+      --text: #d2d5dc;
+      --muted: #666a73;
+      --heading: #f0f2f5;
+      --primary: #f97316;
       --success: #10b981;
       
       --sev-critical: #f43f5e;
-      --sev-high: #f97316;
-      --sev-medium: #eab308;
-      --sev-low: #3b82f6;
-      --sev-info: #64748b;
+      --sev-critical-soft: rgba(244, 63, 94, 0.06);
+      --sev-critical-border: rgba(244, 63, 94, 0.25);
+      
+      --sev-high: #ff8838;
+      --sev-high-soft: rgba(255, 136, 56, 0.06);
+      --sev-high-border: rgba(255, 136, 56, 0.25);
+
+      --sev-medium: #facc15;
+      --sev-medium-soft: rgba(250, 204, 21, 0.06);
+      --sev-medium-border: rgba(250, 204, 21, 0.25);
+
+      --sev-low: #38bdf8;
+      --sev-low-soft: rgba(56, 189, 248, 0.06);
+      --sev-low-border: rgba(56, 189, 248, 0.25);
+
+      --sev-info: #94a3b8;
+      --sev-info-soft: rgba(148, 163, 184, 0.06);
+      --sev-info-border: rgba(148, 163, 184, 0.25);
+
+      --radius: 4px;
     }
     
     * { box-sizing: border-box; }
@@ -36,10 +53,11 @@ const htmlTemplate = `<!doctype html>
     body {
       margin: 0;
       padding: 2.5rem 1.5rem;
-      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       background-color: var(--bg);
       color: var(--text);
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
     
     .container {
@@ -48,8 +66,8 @@ const htmlTemplate = `<!doctype html>
     }
     
     header {
-      border-bottom: 2px solid var(--border);
-      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
       margin-bottom: 2rem;
       display: flex;
       justify-content: space-between;
@@ -58,33 +76,30 @@ const htmlTemplate = `<!doctype html>
     
     h1 {
       margin: 0;
-      font-size: 2.25rem;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      background: linear-gradient(135deg, #ffffff 0%, #94a3b8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--heading);
     }
     
     .brand-tag {
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 0.25rem;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.35rem;
     }
     
     .meta-card {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem 1.5rem;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
       margin-bottom: 2rem;
       display: flex;
       gap: 2.5rem;
       flex-wrap: wrap;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     }
     
     .meta-item {
@@ -94,7 +109,7 @@ const htmlTemplate = `<!doctype html>
     }
     
     .meta-label {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
@@ -102,7 +117,7 @@ const htmlTemplate = `<!doctype html>
     }
     
     .meta-value {
-      font-size: 1rem;
+      font-size: 0.95rem;
       font-weight: 600;
       color: var(--heading);
       font-family: 'JetBrains Mono', monospace;
@@ -113,23 +128,23 @@ const htmlTemplate = `<!doctype html>
       border-collapse: separate;
       border-spacing: 0;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--radius);
       overflow: hidden;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
       margin-bottom: 2.5rem;
+      background: #0f1013;
     }
     
     th, td {
-      padding: 1rem 1.25rem;
+      padding: 0.85rem 1.1rem;
       text-align: left;
-      border-bottom: 1px solid rgba(59, 130, 246, 0.08);
+      border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
     
     th {
-      background-color: rgba(15, 23, 42, 0.6);
+      background-color: #14151a;
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.08em;
@@ -140,7 +155,7 @@ const htmlTemplate = `<!doctype html>
     }
     
     tr:hover td {
-      background-color: rgba(59, 130, 246, 0.02);
+      background-color: rgba(255, 255, 255, 0.015);
     }
     
     .ip-cell {
@@ -152,10 +167,10 @@ const htmlTemplate = `<!doctype html>
     .port-badge {
       display: inline-block;
       padding: 0.2rem 0.5rem;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
-      color: #fff;
-      border-radius: 4px;
+      background: #17181c;
+      border: 1px solid var(--border-strong);
+      color: var(--heading);
+      border-radius: 2px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.8rem;
     }
@@ -163,25 +178,26 @@ const htmlTemplate = `<!doctype html>
     .severity-badge {
       display: inline-flex;
       align-items: center;
-      padding: 0.25rem 0.6rem;
-      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      border-radius: 2px;
       font-size: 0.72rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       border: 1px solid transparent;
       margin-bottom: 0.25rem;
+      font-family: 'JetBrains Mono', monospace;
     }
     
-    .sev-critical { color: var(--sev-critical); background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.3); }
-    .sev-high { color: var(--sev-high); background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3); }
-    .sev-medium { color: var(--sev-medium); background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.3); }
-    .sev-low { color: var(--sev-low); background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3); }
-    .sev-info { color: var(--sev-info); background: rgba(100, 116, 139, 0.15); border-color: rgba(100, 116, 139, 0.3); }
+    .sev-critical { color: var(--sev-critical); background: var(--sev-critical-soft); border-color: var(--sev-critical-border); }
+    .sev-high { color: var(--sev-high); background: var(--sev-high-soft); border-color: var(--sev-high-border); }
+    .sev-medium { color: var(--sev-medium); background: var(--sev-medium-soft); border-color: var(--sev-medium-border); }
+    .sev-low { color: var(--sev-low); background: var(--sev-low-soft); border-color: var(--sev-low-border); }
+    .sev-info { color: var(--sev-info); background: var(--sev-info-soft); border-color: var(--sev-info-border); }
     
     .finding-item {
       padding: 0.5rem 0;
-      border-bottom: 1px dashed rgba(255,255,255,0.05);
+      border-bottom: 1px dashed var(--border);
     }
     
     .finding-item:last-child {
@@ -199,14 +215,28 @@ const htmlTemplate = `<!doctype html>
       font-size: 0.78rem;
       color: var(--muted);
     }
+
+    .evidence-block {
+      margin-top: 0.6rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #0b0c0f;
+      color: var(--text);
+      font-size: 0.78rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'JetBrains Mono', monospace;
+    }
     
     .web-badge {
       display: inline-block;
       padding: 0.15rem 0.4rem;
-      background: rgba(6, 182, 212, 0.1);
-      border: 1px solid rgba(6, 182, 212, 0.25);
-      color: #06b6d4;
-      border-radius: 4px;
+      background: rgba(14, 165, 233, 0.05);
+      border: 1px solid rgba(14, 165, 233, 0.25);
+      color: #38bdf8;
+      border-radius: 2px;
       font-size: 0.7rem;
       font-weight: 700;
     }
@@ -284,6 +314,8 @@ const htmlTemplate = `<!doctype html>
               </div>
               <div class="finding-summary">{{.Summary}}</div>
               <div class="finding-meta">来源: {{.Source}} | 规则: {{.ID}}</div>
+              {{if .Target}}<div class="finding-meta">目标: {{.Target}}</div>{{end}}
+              {{if .Output}}<pre class="evidence-block">{{.Output}}</pre>{{end}}
             </div>
             {{else}}
             <div style="color: var(--success); font-weight: 600; font-size: 0.85rem;">🛡️ 未发现高危漏洞</div>

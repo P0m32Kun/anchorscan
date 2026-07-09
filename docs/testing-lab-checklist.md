@@ -39,6 +39,61 @@ Current automated coverage:
 - 自动化不会使用不存在的测试 IP，而是直接从 `docker-compose.lab.yml` 启动或复用容器，并通过 `docker inspect` 获取真实容器 IP。
 - 如果你在 macOS 上跑这套用例，并希望从宿主机直接访问容器 IP，请保持 `docker-mac-net-connect` 可用。
 
+## Lab Startup Baseline
+
+Start or refresh the local lab:
+
+```bash
+docker compose -f docker-compose.lab.yml up -d
+```
+
+If `mariadb:11` is slow to pull, pre-pull it before the lab run:
+
+```bash
+docker pull mariadb:11
+```
+
+如果直连 Docker Hub 卡在 `Pulling fs layer`，优先走镜像加速源（不需要本机有代理），拉完 re-tag 回 `mariadb:11`，这样 compose 文件不用改：
+
+```bash
+docker pull docker.m.daocloud.io/library/mariadb:11
+docker tag docker.m.daocloud.io/library/mariadb:11 mariadb:11
+```
+
+其它可用的 mirror 前缀（轮着试）：`docker.1ms.run`、`docker.xuanyuan.me`、`hub.rat.dev`。
+一劳永逸：给 Docker Desktop（Settings → Docker Engine，即 `~/.docker/daemon.json`）加 `registry-mirrors`，之后 `docker pull mariadb:11` 会自动走 mirror。
+
+如果你已有本地代理（如 Clash），仍可用代理方式：
+
+```bash
+export http_proxy=http://127.0.0.1:7897
+export https_proxy=http://127.0.0.1:7897
+export all_proxy=http://127.0.0.1:7897
+docker pull mariadb:11
+```
+
+Resolve the real container IPs:
+
+```bash
+TOMCAT_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' anchorscan-lab-tomcat)
+REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' anchorscan-lab-redis)
+MARIADB_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' anchorscan-lab-mariadb)
+SSH_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' anchorscan-lab-ssh)
+SMB_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' anchorscan-lab-samba)
+UNKNOWN_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' anchorscan-lab-unknown)
+```
+
+Recommended service-to-port map:
+
+| Service | Container | Real port |
+| --- | --- | --- |
+| Tomcat | `anchorscan-lab-tomcat` | `8080` |
+| Redis | `anchorscan-lab-redis` | `6379` |
+| MariaDB | `anchorscan-lab-mariadb` | `3306` |
+| SSH | `anchorscan-lab-ssh` | `2222` |
+| SMB | `anchorscan-lab-samba` | `445` |
+| Unknown TCP | `anchorscan-lab-unknown` | `9099` |
+
 ## Recommended Lab Targets
 
 Use at least one target for each service family:
@@ -49,7 +104,7 @@ Use at least one target for each service family:
 | Redis | `6379/tcp` | Full non-web path with both NSE and nuclei |
 | MySQL / MariaDB | `3306/tcp` | Database fingerprint normalization and rules |
 | SMB | `445/tcp` | Alias normalization and NSE validation |
-| SSH | `22/tcp` | Common non-web baseline |
+| SSH | `2222/tcp` | Common non-web baseline |
 | Unknown service | custom listener | Stability check: no misroute, no crash |
 | Mixed host | one host with 2-3 services | Report grouping and finding ownership |
 
@@ -76,12 +131,12 @@ go run ./cmd/anchorscan scan \
   --html reports/<name>.html
 ```
 
-For the bundled Docker lab, start small:
+For the bundled Docker lab, prefer the real container IPs rather than `127.0.0.1`:
 
 ```bash
 go run ./cmd/anchorscan scan \
   --config config/default.yaml \
-  --target 127.0.0.1 \
+  --target "$TOMCAT_IP,$REDIS_IP" \
   --ports 8080,6379 \
   --db data/scans.sqlite \
   --json reports/lab.json \
@@ -173,6 +228,18 @@ Expected:
 
 ### 3. MySQL / MariaDB
 
+Command:
+
+```bash
+go run ./cmd/anchorscan scan \
+  --config config/default.yaml \
+  --target "$MARIADB_IP" \
+  --ports 3306 \
+  --db data/scans.sqlite \
+  --json reports/mariadb.json \
+  --html reports/mariadb.html
+```
+
 | Check | Expected |
 | --- | --- |
 | Open port | `3306` found |
@@ -183,6 +250,18 @@ Expected:
 
 ### 4. SMB
 
+Command:
+
+```bash
+go run ./cmd/anchorscan scan \
+  --config config/default.yaml \
+  --target "$SMB_IP" \
+  --ports 445 \
+  --db data/scans.sqlite \
+  --json reports/smb.json \
+  --html reports/smb.html
+```
+
 | Check | Expected |
 | --- | --- |
 | Open port | `445` found |
@@ -192,6 +271,18 @@ Expected:
 | nuclei | `smb` tags run |
 
 ### 5. SSH
+
+Command:
+
+```bash
+go run ./cmd/anchorscan scan \
+  --config config/default.yaml \
+  --target "$SSH_IP" \
+  --ports 2222 \
+  --db data/scans.sqlite \
+  --json reports/ssh.json \
+  --html reports/ssh.html
+```
 
 | Check | Expected |
 | --- | --- |
@@ -204,6 +295,18 @@ Expected:
 
 ### 6. Unknown Service
 
+Command:
+
+```bash
+go run ./cmd/anchorscan scan \
+  --config config/default.yaml \
+  --target "$UNKNOWN_IP" \
+  --ports 9099 \
+  --db data/scans.sqlite \
+  --json reports/unknown.json \
+  --html reports/unknown.html
+```
+
 | Check | Expected |
 | --- | --- |
 | Open port | found |
@@ -213,7 +316,7 @@ Expected:
 
 ### 7. Mixed Host
 
-Run one host with 2-3 services, for example `8080,6379,3306`.
+Run one host with 2-3 services, or one multi-target command that combines the lab IPs, for example `8080,6379,3306`.
 
 Expected:
 
@@ -307,3 +410,63 @@ V1 lab pass is good enough when:
 | Copy `URL` | Clipboard contains only web assets with saved URLs |
 | TXT export | Output follows the selected kind and current filters |
 | CSV export | Header includes `ip,port,service,product,version,url` and rows match current filters |
+
+## V1.3 Single Tool Runs Lab
+
+V1.3 lets an operator run one engine outside the automated pipeline. Each run still writes to SQLite and produces a JSON report, so it shows up under the same `/runs/<run_id>` and `/reports/<run_id>` pages.
+
+### CLI Single Tool Runs
+
+Use the lab container IPs resolved above. Keep `--ports` narrow.
+
+| Tool | Command | Expected |
+| --- | --- | --- |
+| rustscan | `anchorscan tool rustscan --target <IP> --ports 8080,6379 --db data/scans.sqlite --json reports/tool-rustscan.json` | Open ports land in fingerprints table |
+| nmap alive | `anchorscan tool nmap --mode alive --target <IP> --db data/scans.sqlite --json reports/tool-nmap-alive.json` | Host-up info finding recorded |
+| nmap service | `anchorscan tool nmap --mode service --target <IP> --ports 6379 --db data/scans.sqlite --json reports/tool-nmap-service.json` | redis fingerprint saved, normalized `mysql`/`redis` as expected |
+| httpx | `anchorscan tool httpx --url http://<IP>:8080 --db data/scans.sqlite --json reports/tool-httpx.json` | Web fingerprint with title/tech saved |
+| nuclei (tags) | `anchorscan tool nuclei --url http://<IP>:8080 --tags tomcat,cve --db data/scans.sqlite --json reports/tool-nuclei-tags.json` | Matching findings recorded |
+| nuclei (template) | `anchorscan tool nuclei --url http://<IP>:8080 --template cves/2021/CVE-2021-41773.yaml --db data/scans.sqlite --json reports/tool-nuclei-template.json` | Template finding recorded if it matches |
+| native args | `anchorscan tool nmap --target <IP> --args "--version" --db data/scans.sqlite --json reports/tool-native.json` | Tool runs with the raw flags, no crash |
+
+Pass criteria for each run:
+
+1. Command exits 0.
+2. `findings` or `fingerprints` table has rows for the new run id.
+3. JSON report is written and openable.
+4. The run appears on the Web Console runs list.
+
+### BlueKeep Manual Review
+
+When nmap service mode detects an RDP endpoint, the pipeline emits a manual-review finding instead of auto-confirming BlueKeep.
+
+| Check | Expected |
+| --- | --- |
+| Trigger | Scan a host with RDP exposed (or a lab listener on 3389) via nmap service mode |
+| Finding source | `source = manual-review` |
+| Finding id | `manual-review:CVE-2019-0708` |
+| Severity | `critical` |
+| Summary | Mentions BlueKeep / RDP verification |
+
+Quick DB check:
+
+```sql
+select source, finding_id, severity, summary from findings
+where source = 'manual-review';
+```
+
+### Web Console Single Tool Page
+
+1. Open `/tools/new` (or sidebar 单工具调用).
+2. Pick a tool card (rustscan / nmap / httpx / nuclei).
+3. Submit the per-tool form with a lab target.
+4. Confirm the run starts and shows up under runs.
+5. Open its report page; confirm the tool result is present.
+
+### Version Checks
+
+| Check | Expected |
+| --- | --- |
+| `anchorscan version` | Prints `anchorscan version 1.3` |
+| `anchorscan --version` | Same as above |
+| Web Console footer | Shows `AnchorScan Console v1.3` |

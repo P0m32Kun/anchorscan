@@ -26,6 +26,7 @@ type ScanRun struct {
 	FinishedAt     time.Time
 	Error          string
 	ConfigSnapshot string
+	ArtifactDir    string
 }
 
 type ScanEvent struct {

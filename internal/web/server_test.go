@@ -54,6 +54,10 @@ func TestHomePageRenders(t *testing.T) {
 	if !strings.Contains(res.Body.String(), `/projects/p1`) || !strings.Contains(res.Body.String(), `/runs/run-1`) {
 		t.Fatalf("expected home links in body: %s", res.Body.String())
 	}
+	// footer version is rendered from the version package, not hardcoded
+	if !strings.Contains(res.Body.String(), "AnchorScan Console v1.3") {
+		t.Fatalf("expected versioned footer in body: %s", res.Body.String())
+	}
 }
 
 func TestCreateProjectFromWeb(t *testing.T) {
@@ -140,6 +144,203 @@ func TestNewScanPageRenders(t *testing.T) {
 	if !strings.Contains(body, "支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔") {
 		t.Fatalf("expected updated target help text, got body=%s", body)
 	}
+	for _, want := range []string{"本次扫描覆盖设置", "临时覆盖档位", "临时覆盖目标", "临时覆盖端口"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected scan override copy %q, got body=%s", want, body)
+		}
+	}
+	if !strings.Contains(body, `name="artifact_root"`) {
+		t.Fatalf("expected artifact root input, got body=%s", body)
+	}
+}
+
+func TestToolNewPageRenders(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", DefaultTargets: "127.0.0.1", DefaultPorts: "8080", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/tools/new", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, want := range []string{"单独运行工具", "rustscan", "nmap", "httpx", "nuclei", "Local Lab"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body: %s", want, body)
+		}
+	}
+}
+
+func TestToolDetailPageRendersNmapHelpAndPresets(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/tools/nmap", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, want := range []string{
+		`name="tool" value="nmap"`,
+		`name="raw_args"`,
+		"Nmap 单工具调用",
+		"可选绑定到项目",
+		"中文 Help",
+		"存活检测",
+		`data-set-raw-args="-sn 192.168.1.10"`,
+		"tool-output",
+		"Local Lab",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body: %s", want, body)
+		}
+	}
+	for _, unwanted := range []string{`name="mode"`, `name="target"`, `name="url"`, `name="ports"`, `name="tags"`, `name="template"`, `name="extra_args"`} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("did not expect split parameter field %q in body: %s", unwanted, body)
+		}
+	}
+}
+
+func TestToolCreateRunsNativeRawArgs(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	runner := &serverSequenceRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+	}}
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     dbPath,
+		Listen:     "127.0.0.1:8088",
+		Runner:     runner,
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("tool=nmap&raw_args=-sn+192.0.2.10+--min-rate+50")
+	req := httptest.NewRequest(http.MethodPost, "/tools", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Requested-With", "fetch")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+	if !strings.HasPrefix(body["run_id"], "tool-nmap-") {
+		t.Fatalf("unexpected ajax body: %#v", body)
+	}
+
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	for range 200 {
+		runs, err := scanStore.ListScanRuns(10)
+		if err != nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		if runner.hasArgs("/opt/nmap", "-sn", "192.0.2.10", "--min-rate", "50") && len(runs) == 1 && runs[0].Status == "completed" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("unexpected nmap args: %#v", runner.commands)
+}
+
+func TestToolCreateStartsRun(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	runner := &serverSequenceRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+	}}
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     dbPath,
+		Listen:     "127.0.0.1:8088",
+		Runner:     runner,
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("tool=nmap&mode=alive&target=192.0.2.10&extra_args=--min-rate+50")
+	req := httptest.NewRequest(http.MethodPost, "/tools", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	location := res.Header().Get("Location")
+	if !strings.HasPrefix(location, "/runs/tool-nmap-") {
+		t.Fatalf("unexpected redirect: %s", location)
+	}
+
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	var run store.ScanRun
+	for range 200 {
+		runs, err := scanStore.ListScanRuns(10)
+		if err != nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		if len(runs) == 1 && runs[0].Status == "completed" {
+			run = runs[0]
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if run.RunID == "" || run.Profile != "tool:nmap" || run.Target != "192.0.2.10" {
+		t.Fatalf("unexpected run: %#v", run)
+	}
+	if !runner.hasArgs("/opt/nmap", "-sn", "192.0.2.10", "--min-rate", "50") {
+		t.Fatalf("unexpected nmap args: %#v", runner.commands)
+	}
+	reportPath := filepath.Join(dir, "runs", run.RunID, "report.json")
+	if _, err := os.Stat(reportPath); err != nil {
+		t.Fatalf("expected managed report at %s: %v", reportPath, err)
+	}
 }
 
 func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
@@ -170,6 +371,7 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	}
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		[]byte("127.0.0.1 -> [80,8080]\n"),
 		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 	}}
@@ -215,8 +417,18 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("expected managed report at %s: %v", reportPath, err)
 	}
+	wantArtifactDir := filepath.Join(dir, "artifacts", run.RunID)
+	if run.ArtifactDir != wantArtifactDir {
+		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
+	}
+	if _, err := os.Stat(wantArtifactDir); err != nil {
+		t.Fatalf("expected managed artifact dir at %s: %v", wantArtifactDir, err)
+	}
 	if !runner.hasArgs("/opt/rustscan", "-a", "127.0.0.1", "--ports", "80,8080") {
 		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
+	}
+	if !runner.hasArgs("/opt/nmap", "-sn", "127.0.0.1") {
+		t.Fatalf("unexpected alive check args: %#v", runner.commands)
 	}
 	if runner.callCount("/opt/rustscan") != 1 {
 		t.Fatalf("expected single rustscan target after exclusions, got %#v", runner.commands)
@@ -249,6 +461,7 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 		Ports:          "6379",
 		Profile:        "normal",
 		Status:         "completed",
+		ArtifactDir:    filepath.Join(dir, "artifacts", "run-1"),
 		ConfigSnapshot: "profile: normal",
 		StartedAt:      now,
 		FinishedAt:     now.Add(time.Second),
@@ -269,6 +482,13 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	artifactPath := filepath.Join(dir, "artifacts", "run-1", "rustscan-127.0.0.1.txt")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(artifactPath, []byte("127.0.0.1 -> [6379]\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -323,6 +543,9 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "projects", "p1")); !os.IsNotExist(err) {
 		t.Fatalf("expected project dir to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artifacts", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected artifact dir to be removed, got err=%v", err)
 	}
 }
 
@@ -380,6 +603,102 @@ func TestDeleteProjectRejectsRunningRuns(t *testing.T) {
 	}
 }
 
+func TestDeleteScanRunRemovesManagedFilesAndDatabaseRows(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	now := time.Unix(1, 0)
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "127.0.0.1",
+		Ports:          "6379",
+		Profile:        "normal",
+		Status:         "completed",
+		ArtifactDir:    filepath.Join(dir, "artifacts", "run-1"),
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      now,
+		FinishedAt:     now.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "127.0.0.1", Port: 6379, Service: "redis", Product: "Redis", Normalized: "redis"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+	if err := scanStore.SaveFinding("run-1", report.Finding{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "redis-default-logins", Severity: "high", Summary: "Redis Default Login", Target: "127.0.0.1:6379"}); err != nil {
+		t.Fatalf("SaveFinding returned error: %v", err)
+	}
+	if err := scanStore.AppendScanEvent(store.ScanEvent{RunID: "run-1", Time: now.Add(2 * time.Second), Level: "info", Stage: "nmap", Message: "done"}); err != nil {
+		t.Fatalf("AppendScanEvent returned error: %v", err)
+	}
+	reportPath := filepath.Join(dir, "projects", "p1", "runs", "run-1", "report.json")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	artifactPath := filepath.Join(dir, "artifacts", "run-1", "nmap-127.0.0.1.xml")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(artifactPath, []byte("<nmaprun/>"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("_method=delete")
+	req := httptest.NewRequest(http.MethodPost, "/runs/run-1", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+
+	runs, err := scanStore.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs, got %#v", runs)
+	}
+	fps, err := scanStore.ListFingerprints("run-1")
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(fps) != 0 {
+		t.Fatalf("expected no fingerprints, got %#v", fps)
+	}
+	findings, err := scanStore.ListFindings("run-1")
+	if err != nil {
+		t.Fatalf("ListFindings returned error: %v", err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings, got %#v", findings)
+	}
+	events, err := scanStore.ListScanEvents("run-1", 10)
+	if err != nil {
+		t.Fatalf("ListScanEvents returned error: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("expected no events, got %#v", events)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "p1", "runs", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected run dir to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artifacts", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected artifact dir to be removed, got err=%v", err)
+	}
+}
+
 func TestRunEventsAPI(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -408,6 +727,50 @@ func TestRunEventsAPI(t *testing.T) {
 	}
 	if len(events) != 1 || events[0]["time"] == nil || events[0]["stage"] == nil || events[0]["message"] == nil {
 		t.Fatalf("unexpected json fields: %#v", events)
+	}
+}
+
+func TestRunStatusAPI(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/status", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+	if body["status"] != "completed" {
+		t.Fatalf("unexpected status response: %#v", body)
+	}
+}
+
+func TestRunPageLoadsStatusPolling(t *testing.T) {
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(t.TempDir(), "config.yaml"), DBPath: filepath.Join(t.TempDir(), "scan.db")})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/static/app.js", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "/status") || !strings.Contains(res.Body.String(), "refreshRunStatus") {
+		t.Fatalf("expected run status polling script: %s", res.Body.String())
 	}
 }
 
@@ -441,6 +804,17 @@ func TestReportPageRendersFindings(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), "筛选") || !strings.Contains(res.Body.String(), "证据与详情") {
 		t.Fatalf("expected chinese report copy: %s", res.Body.String())
+	}
+	for _, want := range []string{
+		`type="checkbox" name="severity" value="critical"`,
+		`type="checkbox" name="severity" value="high"`,
+		`href="/reports/run-1/export?format=json"`,
+		`href="/reports/run-1/export?format=html"`,
+		`href="/reports/run-1/export?format=csv"`,
+	} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Fatalf("expected %q in report page: %s", want, res.Body.String())
+		}
 	}
 }
 
@@ -494,6 +868,28 @@ func TestReportPagePaginatesAssetsAndFindings(t *testing.T) {
 	if !strings.Contains(body, "finding-55") || strings.Contains(body, "finding-1") {
 		t.Fatalf("expected second page findings only: %s", body)
 	}
+
+	// Per-page size selector: switching to 10/rows re-paginates and keeps filters.
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1?findings_size=10&q=svc", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d", res.Code)
+	}
+	body = res.Body.String()
+	if !strings.Contains(body, "漏洞第 1 / 6 页") {
+		t.Fatalf("expected 6 pages at size 10: %s", body)
+	}
+	// size links must preserve the keyword filter and drop the page param so
+	// switching size resets to the first page. Since url.Values.Encode sorts
+	// keys, a page param would sort before size and break this exact prefix.
+	// html/template escapes "&" in the URL attribute.
+	if !strings.Contains(body, `value="?findings_size=10&amp;q=svc"`) {
+		t.Fatalf("expected size 10 link to carry filter and drop page: %s", body)
+	}
+	// the active size option should be marked selected
+	if !strings.Contains(body, `value="?findings_size=10&amp;q=svc" selected`) {
+		t.Fatalf("expected size 10 selected: %s", body)
+	}
 }
 
 func TestReportPageFiltersFindingsByService(t *testing.T) {
@@ -537,6 +933,40 @@ func TestReportPageFiltersFindingsByService(t *testing.T) {
 	}
 }
 
+func TestReportPageFiltersFindingsByMultipleSeveritySelections(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "443,6379,8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "127.0.0.1", Port: 443, Source: "nuclei", ID: "critical-one", Severity: "critical", Summary: "Critical One", Target: "https://127.0.0.1"},
+		{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "high-one", Severity: "high", Summary: "High One", Target: "127.0.0.1:6379"},
+		{IP: "127.0.0.1", Port: 8080, Source: "nuclei", ID: "info-one", Severity: "info", Summary: "Info One", Target: "http://127.0.0.1:8080"},
+	} {
+		if err := scanStore.SaveFinding("run-1", finding); err != nil {
+			t.Fatalf("SaveFinding returned error: %v", err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1?severity=critical&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d", res.Code)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "critical-one") || !strings.Contains(body, "high-one") || strings.Contains(body, "info-one") {
+		t.Fatalf("unexpected severity-filtered report: %s", body)
+	}
+}
+
 func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -570,11 +1000,47 @@ func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 	if !strings.Contains(body, "按主机聚合") || !strings.Contains(body, "复制 IP:PORT") || !strings.Contains(body, "/reports/run-1/assets.csv?q=redis") {
 		t.Fatalf("expected asset workbench controls: %s", body)
 	}
+	if !strings.Contains(body, `<script src="/static/app.js"></script>`) {
+		t.Fatalf("expected report page copy script: %s", body)
+	}
 	if !strings.Contains(body, "127.0.0.1") || !strings.Contains(body, "6379,6380") {
 		t.Fatalf("expected grouped host row: %s", body)
 	}
 	if strings.Contains(body, "127.0.0.2") {
 		t.Fatalf("expected redis filter to exclude non-matching host: %s", body)
+	}
+}
+
+func TestReportPageCollapsesLongRunMetadata(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	longPorts := strings.Join([]string{
+		"1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+		"11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+		"21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+	}, ",")
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1,127.0.0.2", Ports: longPorts, Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d", res.Code)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "展开全部扫描参数") || !strings.Contains(body, "run-meta-details") {
+		t.Fatalf("expected collapsed run metadata: %s", body)
+	}
+	if strings.Contains(body, `端口: <span class="mono-value">`+longPorts+`</span>`) {
+		t.Fatalf("expected long ports outside the report header: %s", body)
 	}
 }
 
@@ -610,6 +1076,9 @@ func TestReportAssetExportSupportsFilteredTXTAndCSV(t *testing.T) {
 	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/plain") {
 		t.Fatalf("unexpected txt content-type: %s", ct)
 	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="run-1-assets.txt"`) {
+		t.Fatalf("unexpected txt content-disposition: %s", cd)
+	}
 	txtBody := strings.TrimSpace(res.Body.String())
 	if txtBody != "127.0.0.1:6379" {
 		t.Fatalf("unexpected txt export: %q", txtBody)
@@ -623,12 +1092,94 @@ func TestReportAssetExportSupportsFilteredTXTAndCSV(t *testing.T) {
 	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
 		t.Fatalf("unexpected csv content-type: %s", ct)
 	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="run-1-assets.csv"`) {
+		t.Fatalf("unexpected csv content-disposition: %s", cd)
+	}
 	csvBody := res.Body.String()
 	if !strings.Contains(csvBody, "ip,port,service,product,version,url") || !strings.Contains(csvBody, "127.0.0.1,6379,redis,Redis,7.2.0,") {
 		t.Fatalf("unexpected csv export: %s", csvBody)
 	}
 	if strings.Contains(csvBody, "127.0.0.2") {
 		t.Fatalf("expected filtered csv export: %s", csvBody)
+	}
+}
+
+func TestReportExportDownloadsRicherFormats(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "6379,8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "127.0.0.1", Port: 6379, Service: "redis", Product: "Redis", Version: "7.2.0", Normalized: "redis"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "redis-default-logins", Severity: "high", Summary: "Redis Default Login", Target: "127.0.0.1:6379", Output: "{\"matched-at\":\"127.0.0.1:6379\"}"},
+		{IP: "127.0.0.1", Port: 8080, Source: "nuclei", ID: "tomcat-detect", Severity: "info", Summary: "Tomcat Detect", Target: "http://127.0.0.1:8080", Output: "{\"matched-at\":\"http://127.0.0.1:8080\"}"},
+	} {
+		if err := scanStore.SaveFinding("run-1", finding); err != nil {
+			t.Fatalf("SaveFinding returned error: %v", err)
+		}
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=html&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("html status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.html"`) {
+		t.Fatalf("unexpected html content-disposition: %s", cd)
+	}
+	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("unexpected html content-type: %s", ct)
+	}
+	if !strings.Contains(res.Body.String(), "matched-at") || strings.Contains(res.Body.String(), "tomcat-detect") {
+		t.Fatalf("unexpected html export: %s", res.Body.String())
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=json&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("json status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.json"`) {
+		t.Fatalf("unexpected json content-disposition: %s", cd)
+	}
+	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Fatalf("unexpected json content-type: %s", ct)
+	}
+	if !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
+		t.Fatalf("unexpected json export: %s", res.Body.String())
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=csv&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("csv status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.csv"`) {
+		t.Fatalf("unexpected csv content-disposition: %s", cd)
+	}
+	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
+		t.Fatalf("unexpected csv content-type: %s", ct)
+	}
+	if !strings.Contains(res.Body.String(), "severity,source,id,ip,port,service,product,target,summary,evidence") || !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
+		t.Fatalf("unexpected csv export: %s", res.Body.String())
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=pdf", nil))
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown export format, got %d body=%s", res.Code, res.Body.String())
 	}
 }
 

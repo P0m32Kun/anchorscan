@@ -56,3 +56,26 @@ func TestEnrichWebIgnoresHTTPXBannerLines(t *testing.T) {
 		t.Fatalf("unexpected http result: %#v", got)
 	}
 }
+
+func TestEnrichWebWithOutputReturnsRawOutput(t *testing.T) {
+	raw := []byte(`{"url":"https://127.0.0.1:8443","status-code":200,"title":"Admin","tech":["nginx"]}`)
+	runner := &fakeRunner{output: raw}
+
+	fp := fingerprint.ServiceFingerprint{
+		IP:    "127.0.0.1",
+		Port:  8443,
+		IsWeb: true,
+		URL:   "https://127.0.0.1:8443",
+	}
+
+	got, out, err := EnrichWebWithOutput(context.Background(), runner, "/opt/httpx", fp, nil)
+	if err != nil {
+		t.Fatalf("EnrichWebWithOutput returned error: %v", err)
+	}
+	if got.URL != "https://127.0.0.1:8443" || got.Title != "Admin" {
+		t.Fatalf("unexpected http result: %#v", got)
+	}
+	if string(out) != string(raw) {
+		t.Fatalf("raw output mismatch: got %q want %q", out, raw)
+	}
+}

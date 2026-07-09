@@ -17,6 +17,8 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+var aliveNmapXML = []byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)
+
 func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
 	type fieldCheck struct {
 		name string
@@ -43,6 +45,7 @@ func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
 func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	runner := &sequenceRunner{
 		outputs: [][]byte{
+			aliveNmapXML,
 			[]byte("192.168.1.10 -> [8080]\n"),
 			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
@@ -128,6 +131,7 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 
 func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 	runner := &sequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
 		[]byte("192.168.1.10 -> [22]\n"),
 		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
 	}}
@@ -165,6 +169,101 @@ func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 	}
 	if len(events) == 0 || events[0].Message == "" {
 		t.Fatalf("expected scan events, got %#v", events)
+	}
+}
+
+func TestRunScanSkipsNmapWhenRustscanFindsNoOpenPorts(t *testing.T) {
+	runner := &emptyPortRunner{}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-empty", Targets: []string{"172.22.0.7"}, Ports: "1-1000", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.nmapCalls != 0 {
+		t.Fatalf("expected nmap to be skipped, got %d calls", runner.nmapCalls)
+	}
+}
+
+func TestRunScanSkipsPortScanWhenHostIsDown(t *testing.T) {
+	runner := &downHostRunner{}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-down", Targets: []string{"172.22.0.7"}, Ports: "1-65535", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.rustscanCalls != 0 {
+		t.Fatalf("expected rustscan to be skipped for down host, got %d calls", runner.rustscanCalls)
+	}
+}
+
+func TestRunScanUsesAliveSweepResultsAsTargets(t *testing.T) {
+	runner := &aliveSweepRunner{}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-cidr", Targets: []string{"172.22.0.0/30"}, Ports: "1-1000", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	want := [][]string{
+		{"/opt/nmap", "-sn", "172.22.0.0/30", "-oX", "-"},
+		{"/opt/rustscan", "-a", "172.22.0.1", "--range", "1-1000", "-g", "--no-banner"},
+		{"/opt/rustscan", "-a", "172.22.0.2", "--range", "1-1000", "-g", "--no-banner"},
+	}
+	if !reflect.DeepEqual(runner.commands, want) {
+		t.Fatalf("commands = %#v want %#v", runner.commands, want)
+	}
+}
+
+func TestRunScanAddsManualReviewForRDP(t *testing.T) {
+	runner := &sequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.0.2.10 -> [3389]\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port></ports></host></nmaprun>`),
+	}}
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	reportPath := filepath.Join(t.TempDir(), "report.json")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-bluekeep", Targets: []string{"192.0.2.10"}, Ports: "3389", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	findings, err := scanStore.ListFindings("run-bluekeep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || findings[0].ID != "manual-review:CVE-2019-0708" {
+		t.Fatalf("findings = %#v", findings)
 	}
 }
 
@@ -242,10 +341,12 @@ func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 
 	runner := &sequenceRunner{
 		outputs: [][]byte{
+			aliveNmapXML,
 			[]byte("192.168.1.10 -> [6379,8080]\n"),
 			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 		},
 		sleeps: []time.Duration{
+			0,
 			0,
 			10 * time.Millisecond,
 		},
@@ -293,6 +394,7 @@ func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 
 func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
 		[]byte("192.168.1.10 -> [8080]\n"),
 		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
@@ -346,30 +448,52 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	}
 }
 
-func TestRunScanRespectsHostWorkers(t *testing.T) {
-	runner := &blockingRunner{}
-	dbPath := filepath.Join(t.TempDir(), "scan.db")
-	reportPath := filepath.Join(t.TempDir(), "report.json")
-	scanStore, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatalf("Open returned error: %v", err)
-	}
+func TestRunScanRespectsProfileHostWorkersAfterAliveSweep(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		workers int
+	}{
+		{name: "slow", workers: 1},
+		{name: "normal", workers: 3},
+		{name: "fast", workers: 8},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			targets := []string{
+				"10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4",
+				"10.0.0.5", "10.0.0.6", "10.0.0.7", "10.0.0.8",
+				"10.0.0.9", "10.0.0.10", "10.0.0.11", "10.0.0.12",
+			}
+			runner := newPostAliveConcurrencyRunner(targets, tc.workers)
+			dbPath := filepath.Join(t.TempDir(), "scan.db")
+			reportPath := filepath.Join(t.TempDir(), "report.json")
+			scanStore, err := store.Open(dbPath)
+			if err != nil {
+				t.Fatalf("Open returned error: %v", err)
+			}
 
-	opts := ScanOptions{
-		RunID:          "run-1",
-		ProfileName:    "slow",
-		HostWorkers:    1,
-		Targets:        []string{"10.0.0.1", "10.0.0.2"},
-		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
-		JSONReportPath: reportPath,
-	}
+			opts := ScanOptions{
+				RunID:          "run-" + tc.name,
+				ProfileName:    tc.name,
+				HostWorkers:    tc.workers,
+				Targets:        []string{"10.0.0.0/28"},
+				Ports:          "22",
+				Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+				JSONReportPath: reportPath,
+			}
 
-	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-	if runner.maxActive > 1 {
-		t.Fatalf("expected max active 1, got %d", runner.maxActive)
+			if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
+				t.Fatalf("RunScan returned error: %v", err)
+			}
+			if runner.aliveCalls != 1 {
+				t.Fatalf("expected one alive sweep, got %d", runner.aliveCalls)
+			}
+			if runner.maxActive != tc.workers {
+				t.Fatalf("expected max active %d, got %d", tc.workers, runner.maxActive)
+			}
+			if runner.rustscanCalls != len(targets) {
+				t.Fatalf("expected %d rustscan calls, got %d", len(targets), runner.rustscanCalls)
+			}
+		})
 	}
 }
 
@@ -443,6 +567,121 @@ func TestRunScanReturnsErrorWhenAllTargetsFail(t *testing.T) {
 	}
 }
 
+func TestRunScanWritesAuditArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
+		case binary == "rustscan":
+			return []byte("127.0.0.1 -> [80]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "httpx":
+			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
+		default:
+			return []byte(""), nil
+		}
+	})
+
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-artifacts",
+		Targets:        []string{"127.0.0.1"},
+		Ports:          "80",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx"},
+		ProfileName:    "normal",
+		HostWorkers:    1,
+		ArtifactRoot:   dir,
+		JSONReportPath: filepath.Join(dir, "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	artifactDir := filepath.Join(dir, "run-artifacts")
+	entries, err := os.ReadDir(artifactDir)
+	if err != nil {
+		t.Fatalf("ReadDir returned error: %v", err)
+	}
+	var names []string
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	joinedNames := strings.Join(names, "\n")
+	for _, want := range []string{"nmap-alive", "rustscan-127.0.0.1-ports", "nmap-service-127.0.0.1", "httpx-127.0.0.1-80"} {
+		if !strings.Contains(joinedNames, want) {
+			t.Fatalf("missing artifact %q in files:\n%s", want, joinedNames)
+		}
+	}
+
+	run, err := scanStore.GetScanRun("run-artifacts")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if run.ArtifactDir != artifactDir {
+		t.Fatalf("artifact dir mismatch: got %q want %q", run.ArtifactDir, artifactDir)
+	}
+}
+
+func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
+	dir := t.TempDir()
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
+		case binary == "rustscan":
+			return []byte("127.0.0.1 -> [80]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "httpx":
+			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
+		case binary == "nuclei":
+			return []byte("{\"template-id\":\"demo\",\"info\":{\"name\":\"demo\",\"severity\":\"medium\"},\"matched-at\":\"http://127.0.0.1:80\"}\n"), errors.New("exit status 1")
+		default:
+			return []byte(""), nil
+		}
+	})
+
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-failed-nuclei",
+		Targets:        []string{"127.0.0.1"},
+		Ports:          "80",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+		ProfileName:    "normal",
+		HostWorkers:    1,
+		ArtifactRoot:   dir,
+		JSONReportPath: filepath.Join(dir, "report.json"),
+		TagRules: []TagRule{
+			{
+				Name:       "nginx",
+				Service:    []string{"http"},
+				Product:    []string{"nginx"},
+				Tech:       []string{"nginx"},
+				NucleiTags: []string{"demo"},
+				Target:     "url",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected scan error")
+	}
+
+	entries, readErr := os.ReadDir(filepath.Join(dir, "run-failed-nuclei"))
+	if readErr != nil {
+		t.Fatalf("ReadDir returned error: %v", readErr)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "nuclei-127.0.0.1-80-demo") {
+			return
+		}
+	}
+	t.Fatalf("expected failed nuclei artifact, got %#v", entries)
+}
+
 type sequenceRunner struct {
 	outputs [][]byte
 	sleeps  []time.Duration
@@ -456,6 +695,21 @@ func (s *sequenceRunner) Run(_ context.Context, _ string, _ []string) ([]byte, e
 	out := s.outputs[s.index]
 	s.index++
 	return out, nil
+}
+
+type runnerFunc func(ctx context.Context, binary string, args []string) ([]byte, error)
+
+func (f runnerFunc) Run(ctx context.Context, binary string, args []string) ([]byte, error) {
+	return f(ctx, binary, args)
+}
+
+func newScanStore(t *testing.T) *store.Store {
+	t.Helper()
+	scanStore, err := store.Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	return scanStore
 }
 
 type cancelRunner struct{}
@@ -583,20 +837,78 @@ func (r *blockingRunner) Run(_ context.Context, binary string, _ []string) ([]by
 	}
 }
 
+type postAliveConcurrencyRunner struct {
+	mu            sync.Mutex
+	targets       []string
+	wantActive    int
+	release       chan struct{}
+	released      bool
+	aliveCalls    int
+	rustscanCalls int
+	active        int
+	maxActive     int
+}
+
+func newPostAliveConcurrencyRunner(targets []string, wantActive int) *postAliveConcurrencyRunner {
+	return &postAliveConcurrencyRunner{
+		targets:    targets,
+		wantActive: wantActive,
+		release:    make(chan struct{}),
+	}
+}
+
+func (r *postAliveConcurrencyRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	if binary == "/opt/nmap" && len(args) > 0 && args[0] == "-sn" {
+		r.mu.Lock()
+		r.aliveCalls++
+		r.mu.Unlock()
+		return []byte(aliveSweepXML(r.targets...)), nil
+	}
+	if binary != "/opt/rustscan" {
+		return nil, fmt.Errorf("unexpected command %s %v", binary, args)
+	}
+
+	r.mu.Lock()
+	r.rustscanCalls++
+	r.active++
+	if r.active > r.maxActive {
+		r.maxActive = r.active
+	}
+	if r.maxActive >= r.wantActive && !r.released {
+		close(r.release)
+		r.released = true
+	}
+	r.mu.Unlock()
+
+	select {
+	case <-r.release:
+	case <-time.After(time.Second):
+	}
+
+	r.mu.Lock()
+	r.active--
+	r.mu.Unlock()
+	return []byte("127.0.0.1 -> []\n"), nil
+}
+
 type failFirstRunner struct {
 	mu      sync.Mutex
 	outputs [][]byte
 	index   int
+	failed  bool
 }
 
-func (r *failFirstRunner) Run(_ context.Context, _ string, _ []string) ([]byte, error) {
+func (r *failFirstRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.index == 0 {
-		r.index++
+	if binary == "/opt/nmap" && len(args) > 0 && args[0] == "-sn" {
+		return []byte(aliveSweepXML("192.168.1.10", "192.168.1.11")), nil
+	}
+	if !r.failed {
+		r.failed = true
 		return nil, fmt.Errorf("boom")
 	}
-	out := r.outputs[r.index-1]
+	out := r.outputs[r.index]
 	r.index++
 	return out, nil
 }
@@ -605,8 +917,76 @@ type failRunner struct {
 	err error
 }
 
-func (r failRunner) Run(_ context.Context, _ string, _ []string) ([]byte, error) {
+func (r failRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	if binary == "/opt/nmap" && len(args) > 0 && args[0] == "-sn" {
+		return []byte(aliveSweepXML("192.168.1.10", "192.168.1.11")), nil
+	}
 	return nil, r.err
+}
+
+func aliveSweepXML(targets ...string) string {
+	var b strings.Builder
+	b.WriteString("<nmaprun>")
+	for _, target := range targets {
+		b.WriteString(`<host><status state="up"/><address addr="`)
+		b.WriteString(target)
+		b.WriteString(`" addrtype="ipv4"/></host>`)
+	}
+	b.WriteString("</nmaprun>")
+	return b.String()
+}
+
+type emptyPortRunner struct {
+	nmapCalls int
+}
+
+func (r *emptyPortRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	switch binary {
+	case "/opt/nmap":
+		if len(args) > 0 && args[0] == "-sn" {
+			return aliveNmapXML, nil
+		}
+		r.nmapCalls++
+		return nil, fmt.Errorf("nmap should not run without open ports")
+	case "/opt/rustscan":
+		return []byte("172.22.0.7 -> []\n"), nil
+	default:
+		return nil, fmt.Errorf("unexpected binary %s", binary)
+	}
+}
+
+type downHostRunner struct {
+	rustscanCalls int
+}
+
+func (r *downHostRunner) Run(_ context.Context, binary string, _ []string) ([]byte, error) {
+	switch binary {
+	case "/opt/nmap":
+		return []byte(`<nmaprun><host><status state="down"/></host></nmaprun>`), nil
+	case "/opt/rustscan":
+		r.rustscanCalls++
+		return nil, fmt.Errorf("rustscan should not run for down host")
+	default:
+		return nil, fmt.Errorf("unexpected binary %s", binary)
+	}
+}
+
+type aliveSweepRunner struct {
+	commands [][]string
+}
+
+func (r *aliveSweepRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	r.commands = append(r.commands, append([]string{binary}, args...))
+	switch {
+	case binary == "/opt/nmap":
+		return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1" addrtype="ipv4"/></host><host><status state="up"/><address addr="172.22.0.2" addrtype="ipv4"/></host></nmaprun>`), nil
+	case binary == "/opt/rustscan" && len(args) >= 2 && args[1] == "172.22.0.1":
+		return []byte("172.22.0.1 -> []\n"), nil
+	case binary == "/opt/rustscan" && len(args) >= 2 && args[1] == "172.22.0.2":
+		return []byte("172.22.0.2 -> []\n"), nil
+	default:
+		return nil, fmt.Errorf("unexpected command %s %v", binary, args)
+	}
 }
 
 func containsEvent(events []store.ScanEvent, level string, stage string, target string) bool {

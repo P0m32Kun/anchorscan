@@ -18,6 +18,22 @@ func TestFilterFindingsBySeverityAndSource(t *testing.T) {
 	}
 }
 
+func TestFilterFindingsByMultipleSeverities(t *testing.T) {
+	findings := []report.Finding{
+		{IP: "127.0.0.1", Port: 6379, Source: "nuclei", Severity: "critical", ID: "redis-rce"},
+		{IP: "127.0.0.1", Port: 8080, Source: "nse", Severity: "high", ID: "tomcat-default-login"},
+		{IP: "127.0.0.1", Port: 8443, Source: "nuclei", Severity: "low", ID: "banner-detect"},
+	}
+
+	got := filterFindings(findings, nil, reportFilters{Severities: []string{"critical", "high"}})
+	if len(got) != 2 {
+		t.Fatalf("unexpected findings count: %#v", got)
+	}
+	if got[0].ID != "redis-rce" || got[1].ID != "tomcat-default-login" {
+		t.Fatalf("unexpected findings: %#v", got)
+	}
+}
+
 func TestFilterFingerprintsMatchesKeywordAcrossFingerprintFields(t *testing.T) {
 	items := []fingerprint.ServiceFingerprint{
 		{IP: "127.0.0.1", Port: 6379, Service: "unknown", Product: "Redis", Version: "7.2.0", URL: "", Normalized: "redis"},

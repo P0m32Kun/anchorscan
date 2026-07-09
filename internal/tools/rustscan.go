@@ -12,6 +12,11 @@ var openPortPattern = regexp.MustCompile(`\b(\d+)\b`)
 var greppablePattern = regexp.MustCompile(`\[(.*?)\]`)
 
 func DiscoverPorts(ctx context.Context, runner Runner, binaryPath string, target string, ports string, extraArgs []string) ([]int, error) {
+	found, _, err := DiscoverPortsWithOutput(ctx, runner, binaryPath, target, ports, extraArgs)
+	return found, err
+}
+
+func DiscoverPortsWithOutput(ctx context.Context, runner Runner, binaryPath string, target string, ports string, extraArgs []string) ([]int, []byte, error) {
 	args := []string{"-a", target}
 	if strings.Contains(ports, "-") && !strings.Contains(ports, ",") {
 		args = append(args, "--range", ports)
@@ -23,7 +28,7 @@ func DiscoverPorts(ctx context.Context, runner Runner, binaryPath string, target
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, err
+		return nil, out, withOutputError(err, out)
 	}
 
 	matches := extractPortMatches(string(out))
@@ -42,7 +47,7 @@ func DiscoverPorts(ctx context.Context, runner Runner, binaryPath string, target
 	}
 
 	sort.Ints(found)
-	return found, nil
+	return found, out, nil
 }
 
 func extractPortMatches(output string) []string {

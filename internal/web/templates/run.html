@@ -8,11 +8,21 @@
       </svg>
       <span>{{.Run.RunID}}</span>
     </h2>
-    <p class="meta-line">
-      目标: <span class="mono-value">{{.Run.Target}}</span> |
-      端口: <span class="mono-value">{{.Run.Ports}}</span> |
-      档位: <span class="mono-value">{{.Run.Profile}}</span>
-    </p>
+    <details class="run-meta-details">
+      <summary>
+        <span>扫描参数</span>
+        <span class="mono-value">目标: {{.RunMeta.Target}} | 端口: {{.RunMeta.Ports}} | 档位: {{.RunMeta.Profile}}</span>
+        <span class="meta-expand-text">展开全部扫描参数</span>
+      </summary>
+      <dl class="run-meta-full">
+        <dt>目标</dt>
+        <dd class="mono-value">{{.RunMeta.FullTarget}}</dd>
+        <dt>端口</dt>
+        <dd class="mono-value">{{.RunMeta.FullPorts}}</dd>
+        <dt>档位</dt>
+        <dd class="mono-value">{{.RunMeta.FullProfile}}</dd>
+      </dl>
+    </details>
   </div>
   
   <div class="header-actions">
@@ -60,37 +70,9 @@
   </div>
 </section>
 
-<script src="/static/app.js"></script>
 <script>
   window.anchorRunID = "{{.Run.RunID}}";
-  
-  // Custom status checking loop to reload button if scan finishes
-  let prevStatus = "{{.Run.Status}}";
-  async function checkStatus() {
-    if (prevStatus !== 'running') return;
-    try {
-      const res = await fetch('/api/runs/' + window.anchorRunID + '/events');
-      if (res.ok) {
-        // If we can get active status or if the events contain finished tags, we reload
-        // A simple reload is extremely robust for SSR transitions
-      }
-    } catch(e) {}
-  }
-  // Let's reload the page if we notice the status badge text changes to completed or failed
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === "childList") {
-        const text = mutation.target.textContent.trim().toLowerCase();
-        if (text === "completed" || text === "failed" || text === "canceled") {
-          setTimeout(() => location.reload(), 1500);
-        }
-      }
-    });
-  });
-  
-  const badge = document.getElementById("run-status");
-  if (badge) {
-    observer.observe(badge, { childList: true });
-  }
+  window.anchorRunStatus = "{{.Run.Status}}";
 </script>
+<script src="/static/app.js"></script>
 {{end}}

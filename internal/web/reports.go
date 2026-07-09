@@ -8,7 +8,10 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
+	"github.com/P0m32Kun/anchorscan/internal/store"
 )
+
+const runMetaSummaryLimit = 80
 
 type reportFilters struct {
 	IP       string
@@ -16,6 +19,7 @@ type reportFilters struct {
 	Service  string
 	Keyword  string
 	Severity string
+	Severities []string
 	Source   string
 }
 
@@ -27,7 +31,13 @@ type reportPage struct {
 	HasNext    bool
 	PrevURL    string
 	NextURL    string
+	Size       int
+	SizeStr    string
+	SizeURLs   map[int]string
 }
+
+var reportPageSizes = []int{10, 20, 50}
+var supportedSeverities = []string{"critical", "high", "medium", "low", "info"}
 
 type hostAssetView struct {
 	IP        string
@@ -37,6 +47,35 @@ type hostAssetView struct {
 	URLs      string
 	CopyPorts string
 	CopyPairs string
+}
+
+type runMetaView struct {
+	Target      string
+	Ports       string
+	Profile     string
+	FullTarget  string
+	FullPorts   string
+	FullProfile string
+}
+
+func newRunMetaView(run store.ScanRun) runMetaView {
+	return runMetaView{
+		Target:      summarizeRunValue(run.Target),
+		Ports:       summarizeRunValue(run.Ports),
+		Profile:     summarizeRunValue(run.Profile),
+		FullTarget:  run.Target,
+		FullPorts:   run.Ports,
+		FullProfile: run.Profile,
+	}
+}
+
+func summarizeRunValue(value string) string {
+	value = strings.TrimSpace(value)
+	runes := []rune(value)
+	if len(runes) <= runMetaSummaryLimit {
+		return value
+	}
+	return string(runes[:runMetaSummaryLimit]) + "..."
 }
 
 func filterFingerprints(items []fingerprint.ServiceFingerprint, filters reportFilters) []fingerprint.ServiceFingerprint {
@@ -71,7 +110,10 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 		if filters.Service != "" && !findingMatchesService(item, fps, filters.Service) {
 			continue
 		}
-		if filters.Severity != "" && item.Severity != filters.Severity {
+		if len(filters.Severities) > 0 && !containsValue(filters.Severities, item.Severity) {
+			continue
+		}
+		if len(filters.Severities) == 0 && filters.Severity != "" && item.Severity != filters.Severity {
 			continue
 		}
 		if filters.Source != "" && item.Source != filters.Source {
@@ -89,6 +131,15 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 		out = append(out, item)
 	}
 	return out
+}
+
+func containsValue(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func findingMatchesService(item report.Finding, fps []fingerprint.ServiceFingerprint, service string) bool {
@@ -258,6 +309,63 @@ func exportAssetsCSV(items []fingerprint.ServiceFingerprint) (string, error) {
 	return b.String(), nil
 }
 
+func exportFindingsCSV(items []report.Finding, fps []fingerprint.ServiceFingerprint) (string, error) {
+	services := map[string]fingerprint.ServiceFingerprint{}
+	for _, item := range fps {
+		services[item.IP+":"+strconv.Itoa(item.Port)] = item
+	}
+
+	var b strings.Builder
+	w := csv.NewWriter(&b)
+	if err := w.Write([]string{"severity", "source", "id", "ip", "port", "service", "product", "target", "summary", "evidence"}); err != nil {
+		return "", err
+	}
+	for _, item := range items {
+		fp := services[item.IP+":"+strconv.Itoa(item.Port)]
+		if err := w.Write([]string{
+			item.Severity,
+			item.Source,
+			item.ID,
+			item.IP,
+			strconv.Itoa(item.Port),
+			fp.Service,
+			fp.Product,
+			item.Target,
+			item.Summary,
+			item.Output,
+		}); err != nil {
+			return "", err
+		}
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+func parseSeverityFilters(values url.Values) []string {
+	if len(values["severity"]) == 0 {
+		return nil
+	}
+	var out []string
+	seen := map[string]struct{}{}
+	for _, raw := range values["severity"] {
+		for _, item := range strings.Split(raw, ",") {
+			value := strings.ToLower(strings.TrimSpace(item))
+			if !containsValue(supportedSeverities, value) {
+				continue
+			}
+			if _, ok := seen[value]; ok {
+				continue
+			}
+			seen[value] = struct{}{}
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
 func parsePage(value string) int {
 	page, err := strconv.Atoi(value)
 	if err != nil || page < 1 {
@@ -266,7 +374,23 @@ func parsePage(value string) int {
 	return page
 }
 
-func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base url.Values, key string, size int) reportPage {
+// parseSize resolves the per-page size from a query value. Only the values in
+// reportPageSizes are accepted; anything else (including empty) falls back to
+// reportPageSize so the default behavior is unchanged.
+func parseSize(value string) int {
+	size, err := strconv.Atoi(value)
+	if err != nil {
+		return reportPageSize
+	}
+	for _, allowed := range reportPageSizes {
+		if size == allowed {
+			return size
+		}
+	}
+	return reportPageSize
+}
+
+func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base url.Values, key, sizeKey string, size int) reportPage {
 	sliced, current, total := paginate(items, page, size)
 	values := cloneValues(base)
 	return reportPage{
@@ -277,10 +401,13 @@ func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		Size:       size,
+		SizeStr:    strconv.Itoa(size),
+		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
 }
 
-func paginateFindings(items []report.Finding, page int, base url.Values, key string, size int) reportPage {
+func paginateFindings(items []report.Finding, page int, base url.Values, key, sizeKey string, size int) reportPage {
 	sliced, current, total := paginate(items, page, size)
 	values := cloneValues(base)
 	return reportPage{
@@ -291,10 +418,13 @@ func paginateFindings(items []report.Finding, page int, base url.Values, key str
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		Size:       size,
+		SizeStr:    strconv.Itoa(size),
+		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
 }
 
-func paginateHostAssets(items []hostAssetView, page int, base url.Values, key string, size int) reportPage {
+func paginateHostAssets(items []hostAssetView, page int, base url.Values, key, sizeKey string, size int) reportPage {
 	sliced, current, total := paginate(items, page, size)
 	values := cloneValues(base)
 	return reportPage{
@@ -305,6 +435,9 @@ func paginateHostAssets(items []hostAssetView, page int, base url.Values, key st
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		Size:       size,
+		SizeStr:    strconv.Itoa(size),
+		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
 }
 
@@ -353,6 +486,27 @@ func pageURL(values url.Values, key string, page int) string {
 		return "?"
 	}
 	return "?" + encoded
+}
+
+// pageSizeURLs builds the "?assets_size=20&..." style links for each option in
+// reportPageSizes. It drops the page key so switching the size always lands on
+// the first page, and preserves every other filter parameter.
+func pageSizeURLs(values url.Values, pageKey, sizeKey string) map[int]string {
+	urls := make(map[int]string, len(reportPageSizes))
+	for _, size := range reportPageSizes {
+		clone := cloneValues(values)
+		if pageKey != "" {
+			clone.Del(pageKey)
+		}
+		clone.Set(sizeKey, strconv.Itoa(size))
+		encoded := clone.Encode()
+		if encoded == "" {
+			urls[size] = "?"
+		} else {
+			urls[size] = "?" + encoded
+		}
+	}
+	return urls
 }
 
 func withQuery(values url.Values, key string, value string) string {
