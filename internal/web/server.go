@@ -76,6 +76,10 @@ func managedReportPath(dbPath string, projectID string, runID string) string {
 	return filepath.Join(root, "projects", projectID, "runs", runID, "report.json")
 }
 
+func managedArtifactRoot(dbPath string) string {
+	return filepath.Join(managedDataRoot(dbPath), "artifacts")
+}
+
 func managedProjectDir(dbPath string, projectID string) string {
 	return filepath.Join(managedDataRoot(dbPath), "projects", projectID)
 }
@@ -230,9 +234,23 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "project has running scans", http.StatusConflict)
 				return
 			}
+			artifactDirs, err := s.store.ListProjectArtifactDirs(id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			if err := s.store.DeleteProjectCascade(id); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
+			}
+			for _, dir := range artifactDirs {
+				if strings.TrimSpace(dir) == "" {
+					continue
+				}
+				if err := os.RemoveAll(dir); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 			if err := os.RemoveAll(managedProjectDir(s.opts.DBPath, id)); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -279,7 +297,10 @@ func (s *server) scanNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	render(w, "templates/scan_new.html", map[string]any{"Projects": projects})
+	render(w, "templates/scan_new.html", map[string]any{
+		"Projects":     projects,
+		"ArtifactRoot": managedArtifactRoot(s.opts.DBPath),
+	})
 }
 
 func (s *server) toolNew(w http.ResponseWriter, r *http.Request) {
@@ -484,6 +505,10 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	runID := newID("run", s.opts.Now())
 	projectID := r.FormValue("project_id")
 	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
+	artifactRoot := strings.TrimSpace(r.FormValue("artifact_root"))
+	if artifactRoot == "" {
+		artifactRoot = managedArtifactRoot(s.opts.DBPath)
+	}
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -508,6 +533,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 			Nuclei:   effective.Nuclei,
 		},
 		JSONReportPath: jsonPath,
+		ArtifactRoot:   artifactRoot,
 		NSERules:       nseRules,
 		TagRules:       tagRules,
 	})
@@ -547,6 +573,12 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 		if err := s.store.DeleteScanRunCascade(path); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if strings.TrimSpace(run.ArtifactDir) != "" {
+			if err := os.RemoveAll(run.ArtifactDir); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		if err := os.RemoveAll(filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, run.RunID))); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -61,6 +61,11 @@
           <span>临时覆盖端口</span>
           <input name="ports" placeholder="可留空使用项目的默认端口。支持: top100, top1000, full, 80,443,8080 等">
         </label>
+
+        <label class="full-width">
+          <span>过程文件目录</span>
+          <input name="artifact_root" value="{{.ArtifactRoot}}" placeholder="扫描过程文件根目录，例如 /data/anchorscan/artifacts">
+        </label>
       </div>
     </details>
     

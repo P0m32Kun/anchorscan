@@ -94,6 +94,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	dbPath := fs.String("db", filepath.Join("data", "scans.sqlite"), "path to sqlite database")
 	jsonPath := fs.String("json", "", "path to JSON report output")
 	htmlPath := fs.String("html", "", "path to HTML report output")
+	artifactRoot := fs.String("artifacts", filepath.Join("data", "artifacts"), "path to scan artifact directory root")
 	portsSpec := fs.String("ports", "", "ports preset or csv")
 	profileFlag := fs.String("profile", "", "scan profile: slow, normal, or fast")
 	hostWorkersFlag := fs.Int("host-workers", 0, "host-level worker count override")
@@ -170,6 +171,11 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 			return err
 		}
 	}
+	if strings.TrimSpace(*artifactRoot) != "" {
+		if err := os.MkdirAll(*artifactRoot, 0o755); err != nil {
+			return err
+		}
+	}
 
 	scanStore, err := deps.openStore(*dbPath)
 	if err != nil {
@@ -197,6 +203,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 			Nuclei:   effective.Nuclei,
 		},
 		JSONReportPath: *jsonPath,
+		ArtifactRoot:   strings.TrimSpace(*artifactRoot),
 		NSERules:       nseRules,
 		TagRules:       tagRules,
 		Logf: func(format string, args ...any) {
@@ -639,7 +646,8 @@ Flags:
   --nuclei-args "..."
   --db <path>       SQLite database path
   --json <path>     JSON report output path
-  --html <path>     HTML report output path`)
+  --html <path>     HTML report output path
+  --artifacts <path> Scan artifact directory root`)
 }
 
 func printToolHelp(w io.Writer) {

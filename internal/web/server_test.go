@@ -149,6 +149,9 @@ func TestNewScanPageRenders(t *testing.T) {
 			t.Fatalf("expected scan override copy %q, got body=%s", want, body)
 		}
 	}
+	if !strings.Contains(body, `name="artifact_root"`) {
+		t.Fatalf("expected artifact root input, got body=%s", body)
+	}
 }
 
 func TestToolNewPageRenders(t *testing.T) {
@@ -414,6 +417,13 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("expected managed report at %s: %v", reportPath, err)
 	}
+	wantArtifactDir := filepath.Join(dir, "artifacts", run.RunID)
+	if run.ArtifactDir != wantArtifactDir {
+		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
+	}
+	if _, err := os.Stat(wantArtifactDir); err != nil {
+		t.Fatalf("expected managed artifact dir at %s: %v", wantArtifactDir, err)
+	}
 	if !runner.hasArgs("/opt/rustscan", "-a", "127.0.0.1", "--ports", "80,8080") {
 		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
 	}
@@ -451,6 +461,7 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 		Ports:          "6379",
 		Profile:        "normal",
 		Status:         "completed",
+		ArtifactDir:    filepath.Join(dir, "artifacts", "run-1"),
 		ConfigSnapshot: "profile: normal",
 		StartedAt:      now,
 		FinishedAt:     now.Add(time.Second),
@@ -471,6 +482,13 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	artifactPath := filepath.Join(dir, "artifacts", "run-1", "rustscan-127.0.0.1.txt")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(artifactPath, []byte("127.0.0.1 -> [6379]\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -525,6 +543,9 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "projects", "p1")); !os.IsNotExist(err) {
 		t.Fatalf("expected project dir to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artifacts", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected artifact dir to be removed, got err=%v", err)
 	}
 }
 
@@ -597,6 +618,7 @@ func TestDeleteScanRunRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 		Ports:          "6379",
 		Profile:        "normal",
 		Status:         "completed",
+		ArtifactDir:    filepath.Join(dir, "artifacts", "run-1"),
 		ConfigSnapshot: "profile: normal",
 		StartedAt:      now,
 		FinishedAt:     now.Add(time.Second),
@@ -617,6 +639,13 @@ func TestDeleteScanRunRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	artifactPath := filepath.Join(dir, "artifacts", "run-1", "nmap-127.0.0.1.xml")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(artifactPath, []byte("<nmaprun/>"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -664,6 +693,9 @@ func TestDeleteScanRunRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "projects", "p1", "runs", "run-1")); !os.IsNotExist(err) {
 		t.Fatalf("expected run dir to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artifacts", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected artifact dir to be removed, got err=%v", err)
 	}
 }
 

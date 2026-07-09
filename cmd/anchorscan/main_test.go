@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
@@ -188,10 +189,70 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 		"--nuclei-args",
 		"--json",
 		"--html",
+		"--artifacts",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in help output %q", want, output)
 		}
+	}
+}
+
+func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	dbPath := filepath.Join(dir, "scan.db")
+	jsonPath := filepath.Join(dir, "report.json")
+	artifactRoot := filepath.Join(dir, "custom-artifacts")
+	writeFile(t, configPath, `tools:
+  rustscan: /opt/rustscan
+  nmap: /opt/nmap
+  httpx: ""
+  nuclei: ""
+scan:
+  ports: 80
+  profile: normal
+profiles:
+  normal:
+    host_workers: 1
+`)
+
+	runner := &recordingRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+		[]byte("127.0.0.1 -> [80]\n"),
+		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+	}}
+	now := time.Unix(10, 0)
+
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "127.0.0.1",
+		"--db", dbPath,
+		"--json", jsonPath,
+		"--artifacts", artifactRoot,
+	}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{
+		newRunner: func() tools.Runner { return runner },
+		now:       func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	runID := now.Format("20060102-150405")
+	runRow, err := scanStore.GetScanRun(runID)
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	wantDir := filepath.Join(artifactRoot, runID)
+	if runRow.ArtifactDir != wantDir {
+		t.Fatalf("artifact dir mismatch: got %q want %q", runRow.ArtifactDir, wantDir)
+	}
+	if _, err := os.Stat(wantDir); err != nil {
+		t.Fatalf("expected artifact dir at %s: %v", wantDir, err)
 	}
 }
 
