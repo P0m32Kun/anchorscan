@@ -1,3 +1,22 @@
+const beijingTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+  hourCycle: 'h23',
+});
+
+function formatEventTime(value){
+  const date = new Date(value);
+  if(Number.isNaN(date.getTime())) return value || '';
+  const parts = Object.fromEntries(beijingTimeFormatter.formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
 async function refreshEvents(){
   if(!window.anchorRunID) return;
   const res = await fetch('/api/runs/' + window.anchorRunID + '/events');
@@ -24,7 +43,7 @@ async function refreshEvents(){
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
         
-      return `<span style="color: #64748b;">${e.time}</span> <span style="color: #60a5fa; font-weight: 600;">[${e.stage}]</span> <span class="${cls}">${safeMsg}</span>`;
+      return `<span style="color: #64748b;">${formatEventTime(e.time)}</span> <span style="color: #60a5fa; font-weight: 600;">[${e.stage}]</span> <span class="${cls}">${safeMsg}</span>`;
     });
     box.innerHTML = lines.join('\n') + '\n<span class="terminal-cursor">█</span>';
     
