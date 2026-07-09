@@ -15,6 +15,7 @@ func TestManagerAllowsOnlyOneActiveScan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
+	defer scanStore.Close()
 	manager := NewManager(sleepRunner{}, scanStore)
 	opts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json")}
 	ctx, cancel := context.WithCancel(context.Background())

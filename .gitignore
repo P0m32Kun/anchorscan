@@ -1,6 +1,7 @@
 /anchorscan
 /data/
 /reports/
+/dist/
 /.worktrees/
 /.codegraph/
 /.zcode/

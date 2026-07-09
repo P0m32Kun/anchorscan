@@ -411,6 +411,29 @@ V1 lab pass is good enough when:
 | TXT export | Output follows the selected kind and current filters |
 | CSV export | Header includes `ip,port,service,product,version,url` and rows match current filters |
 
+## V1.2 Deployment And Preflight Checks
+
+| Check | Expected |
+| --- | --- |
+| `make package` | Creates `dist/<package>/` and `dist/<package>.tar.gz` |
+| `make e2e` | Runs CLI/Web smoke against the local lab with real binaries |
+| Packaged doctor | Reports config, tool, database, and reports checks |
+| CLI scan preflight | Prints target count, ports, profile, and workers before rustscan |
+| Web scan preflight | Blocks missing required tools before scan starts |
+| Existing DB open | Migrates old schema and preserves rows |
+
+## E2E Smoke Command
+
+```bash
+make e2e
+```
+
+Expected:
+
+- CLI smoke writes SQLite / JSON / HTML successfully
+- JSON report contains `6379` and `8080`
+- Web smoke can start a scan and open the generated report page
+
 ## V1.3 Single Tool Runs Lab
 
 V1.3 lets an operator run one engine outside the automated pipeline. Each run still writes to SQLite and produces a JSON report, so it shows up under the same `/runs/<run_id>` and `/reports/<run_id>` pages.
@@ -467,6 +490,6 @@ where source = 'manual-review';
 
 | Check | Expected |
 | --- | --- |
-| `anchorscan version` | Prints `anchorscan version 1.3` |
+| `anchorscan version` | Prints `anchorscan version 1.5` |
 | `anchorscan --version` | Same as above |
-| Web Console footer | Shows `AnchorScan Console v1.3` |
+| Web Console footer | Shows `AnchorScan Console v1.5` |

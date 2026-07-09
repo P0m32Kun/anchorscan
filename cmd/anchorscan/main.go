@@ -16,6 +16,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/doctor"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -158,6 +159,35 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 
 	if *jsonPath == "" {
 		*jsonPath = filepath.Join("reports", "scan-"+deps.now().Format("20060102-150405")+".json")
+	}
+
+	preflightResult := preflight.Run(preflight.Options{
+		ConfigDir: filepath.Dir(*configPath),
+		DBPath:    *dbPath,
+		JSONPath:  *jsonPath,
+		ReportDir: filepath.Dir(*jsonPath),
+		Targets:   targets,
+		PortSpec:  portValue,
+		Tools: app.ToolPaths{
+			Rustscan: cfg.Tools.Rustscan,
+			Nmap:     cfg.Tools.Nmap,
+			Httpx:    cfg.Tools.Httpx,
+			Nuclei:   cfg.Tools.Nuclei,
+		},
+		Profile: effective.ProfileName,
+		Workers: effective.HostWorkers,
+		ExtraArgs: app.ToolExtraArgs{
+			Rustscan: effective.Rustscan,
+			Nmap:     effective.Nmap,
+			Httpx:    effective.Httpx,
+			Nuclei:   effective.Nuclei,
+		},
+		NSERuleCount: len(nseRules),
+		TagRuleCount: len(tagRules),
+	})
+	logPreflight(stderr, preflightResult)
+	if preflightResult.HasErrors() {
+		return errors.New("preflight failed")
 	}
 
 	if err := ensureParentDir(*dbPath); err != nil {
@@ -357,6 +387,16 @@ func splitCSV(value string) []string {
 
 func logScan(w io.Writer, format string, args ...any) {
 	_, _ = fmt.Fprintf(w, "[scan] "+format+"\n", args...)
+}
+
+func logPreflight(w io.Writer, result preflight.Result) {
+	logScan(w, "preflight targets=%d ports=%s profile=%s workers=%d", result.Summary.TargetCount, result.Summary.PortSpec, result.Summary.Profile, result.Summary.Workers)
+	for _, warning := range result.Warnings {
+		logScan(w, "preflight warning %s: %s", warning.Field, warning.Message)
+	}
+	for _, issue := range result.Errors {
+		logScan(w, "preflight error %s: %s", issue.Field, issue.Message)
+	}
 }
 
 func runReport(args []string, stdout io.Writer, deps cliDeps) error {

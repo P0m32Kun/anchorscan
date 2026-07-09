@@ -7,6 +7,7 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
+	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
 type Check struct {
@@ -53,7 +54,7 @@ func Run(opts Options) []Check {
 	}
 
 	checks = append(checks,
-		writableParentCheck("database", opts.DBPath),
+		databaseCheck(opts.DBPath),
 		writableDirCheck("reports", opts.ReportDir),
 	)
 	return checks
@@ -108,6 +109,18 @@ func writableDirCheck(name string, path string) Check {
 		return Check{Name: name, OK: false, Message: message(err, "ok")}
 	}
 	return Check{Name: name, OK: true, Message: "ok"}
+}
+
+func databaseCheck(path string) Check {
+	if check := writableParentCheck("database", path); !check.OK {
+		return check
+	}
+	scanStore, err := store.Open(path)
+	if err != nil {
+		return Check{Name: "database", OK: false, Message: err.Error()}
+	}
+	_ = scanStore.Close()
+	return Check{Name: "database", OK: true, Message: "ok"}
 }
 
 func message(err error, ok string) string {

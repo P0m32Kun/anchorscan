@@ -1,10 +1,10 @@
 # AnchorScan
 
-`anchorscan` is a portable internal network scanner for authorized environments. It chains `rustscan` for port discovery, `nmap -sV` for service fingerprinting, `httpx` for web enrichment, and fingerprint-driven `nuclei`/NSE checks, then stores results in SQLite and renders JSON/HTML reports.
+`anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。它以“**指纹驱动、精准分类**”为核心，使用 `rustscan` 做端口发现，使用 `nmap -sV` 做服务指纹识别，再根据识别出的服务类型，进入 `httpx`、`nuclei`、NSE 等后续流程，并将结果统一落入 SQLite，最后导出 JSON / HTML 报告。
 
 ## Current Status
 
-AnchorScan is currently at a V1.3 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review.
+AnchorScan is currently at a V1.5 local-operator baseline. The CLI scan pipeline is usable, and the local Web Console is the preferred day-to-day interface for project setup, scan launch, progress tracking, config editing, and report review. The stability baseline (deterministic migrations, shared scan preflight, stronger doctor, packaging, and real-binary e2e) is in place.
 
 Implemented:
 
@@ -13,6 +13,9 @@ Implemented:
 - custom ports, ranges like `100-1000`, `top100`, `top1000`, and `full`
 - slow / normal / fast scan profiles with per-tool extra args
 - CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
+- shared preflight for CLI and Web scans; blocking errors stop before `rustscan`
+- SQLite schema migrations with legacy upgrade compatibility
+- stronger `doctor` checks for config, tools, ports, rule files, database, and reports path
 - SQLite persistence for runs, events, fingerprints, findings, projects, and config snapshots
 - JSON / HTML report generation
 - local Chinese Web Console for single-user operation
@@ -33,7 +36,13 @@ Not in scope for this baseline:
 ## Quick Start
 
 1. Edit [config/default.yaml](./config/default.yaml) so the tool paths point at your local binaries.
-2. Run a scan:
+2. Run self-check first:
+
+```bash
+go run ./cmd/anchorscan doctor --config config/default.yaml --db data/scans.sqlite --reports reports
+```
+
+3. Run a scan:
 
 ```bash
 go run ./cmd/anchorscan scan \
@@ -44,7 +53,7 @@ go run ./cmd/anchorscan scan \
   --html reports/test.html
 ```
 
-3. Rebuild a report from stored data:
+4. Rebuild a report from stored data:
 
 ```bash
 go run ./cmd/anchorscan report \
@@ -55,7 +64,7 @@ go run ./cmd/anchorscan report \
   --html reports/rerender.html
 ```
 
-4. Check configured tools:
+5. Check configured tools:
 
 ```bash
 go run ./cmd/anchorscan tools check --config config/default.yaml
@@ -120,7 +129,27 @@ Use `--args` to pass extra arguments to the selected tool only, for example `--a
 
 In the Web Console, open `http://127.0.0.1:8088/tools/new` or use the sidebar “单工具调用” entry.
 
-## V1.3 Web Console
+## Build / Package
+
+常用命令：
+
+```bash
+make test
+make e2e
+make build
+make package
+```
+
+- `make test`: 运行全部测试
+- `make e2e`: 运行真实二进制 + 本地 lab 的 smoke e2e
+- `make build`: 输出当前平台二进制到 `dist/anchorscan`
+- `make package`: 生成当前平台归档包到 `dist/`
+
+部署到新设备时，优先参考部署文档：
+
+- [docs/deploy.md](./docs/deploy.md)
+
+## Web Console
 
 Start local Web Console:
 
@@ -189,6 +218,37 @@ go run ./cmd/anchorscan scan --config config/default.yaml --target 127.0.0.1 --p
 
 ```bash
 go run ./cmd/anchorscan doctor --config config/default.yaml --db data/scans.sqlite --reports reports
+```
+
+## E2E Smoke
+
+默认的 `go test ./...` 不会跑真实扫描 e2e。  
+真实链路 smoke 单独执行：
+
+```bash
+make e2e
+```
+
+它会做两件事：
+
+1. 启动或复用 `docker-compose.lab.yml` 里的本地靶场
+2. 运行两条真实 smoke：
+   - CLI：真实执行 `anchorscan scan`
+   - Web：真实启动 `anchorscan web`，通过 HTTP 发起扫描并检查报告页
+
+当前 smoke 目标固定为：
+
+- `127.0.0.1`
+- 端口 `8080,6379`
+
+如果工具不在 `PATH`，可以临时指定：
+
+```bash
+ANCHORSCAN_RUSTSCAN=/path/to/rustscan \
+ANCHORSCAN_NMAP=/path/to/nmap \
+ANCHORSCAN_HTTPX=/path/to/httpx \
+ANCHORSCAN_NUCLEI=/path/to/nuclei \
+make e2e
 ```
 
 ## Port Selection

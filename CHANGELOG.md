@@ -2,7 +2,34 @@
 
 All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4).
+adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5).
+
+## [1.5] - 2026-07-09
+
+v1.5 backfills the v1.2 stability work that was developed on a parallel
+branch but never merged into `main`. These capabilities were listed in the
+v1.2 changelog but absent from the released code; this release lands them on
+the current baseline alongside the v1.3/v1.4 features.
+
+### Added
+- Deterministic SQLite schema migrations via a `schema_migrations` table and
+  versioned migrations (`internal/store/migrations.go`). The v1.4
+  `artifact_dir` column is included as migration v2.
+- Shared scan preflight (`internal/preflight`) used by both the CLI and the
+  Web Console: blocking errors (missing required tools, bad ports, no
+  targets, unwritable paths) stop a scan before `rustscan`.
+- Stronger `doctor` checks for config, tools, ports, rule files, database,
+  and reports path.
+- Current-platform package workflow (`Makefile`: `test`, `e2e`, `build`,
+  `package`) and a deployment guide (`docs/deploy.md`).
+- Real-binary smoke e2e coverage under `e2e/`.
+
+### Changed
+- CLI scan prints a preflight summary (targets, ports, profile, workers)
+  before scanning and stops on preflight errors.
+- Web Console scan form surfaces preflight validation errors on rejected
+  submissions.
+- `Store.Open` runs migrations instead of an inline schema.
 
 ## [1.4] - 2026-07-09
 

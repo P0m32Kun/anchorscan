@@ -51,7 +51,16 @@ func TestExecuteDoctorPrintsChecks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
-	for _, want := range []string{"config: ok", "rustscan: ok", "nmap: ok", "database: ok", "reports: ok"} {
+	for _, want := range []string{
+		"config: ok",
+		"rustscan: ok",
+		"nmap: ok",
+		"ports: ok",
+		"nse rules: ok",
+		"tag rules: ok",
+		"database: ok",
+		"reports: ok",
+	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected %q in %q", want, stdout.String())
 		}
@@ -203,18 +212,9 @@ func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	dbPath := filepath.Join(dir, "scan.db")
 	jsonPath := filepath.Join(dir, "report.json")
 	artifactRoot := filepath.Join(dir, "custom-artifacts")
-	writeFile(t, configPath, `tools:
-  rustscan: /opt/rustscan
-  nmap: /opt/nmap
-  httpx: ""
-  nuclei: ""
-scan:
-  ports: 80
-  profile: normal
-profiles:
-  normal:
-    host_workers: 1
-`)
+	rustscanPath := writeExecutable(t, dir, "rustscan")
+	nmapPath := writeExecutable(t, dir, "nmap")
+	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -256,16 +256,70 @@ profiles:
 	}
 }
 
+func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+
+	var stdout, stderr bytes.Buffer
+	runner := &fakeRunner{
+		outputs: [][]byte{
+			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+			[]byte("Open 80\nOpen 443\n"),
+			[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+			[]byte(`{"url":"http://127.0.0.1","status-code":200,"title":"nginx","tech":["nginx"]}`),
+		},
+	}
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "127.0.0.1",
+		"--db", filepath.Join(dir, "scan.db"),
+		"--json", filepath.Join(dir, "report.json"),
+	}, &stdout, &stderr, cliDeps{newRunner: func() tools.Runner { return runner }})
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stderr.String(), "[scan] preflight targets=1 ports=top100 profile=normal workers=1") {
+		t.Fatalf("expected preflight summary, got %q", stderr.String())
+	}
+}
+
+func TestExecuteScanStopsOnPreflightError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+
+	var stdout, stderr bytes.Buffer
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "127.0.0.1",
+		"--db", filepath.Join(dir, "scan.db"),
+		"--json", filepath.Join(dir, "report.json"),
+	}, &stdout, &stderr, cliDeps{newRunner: func() tools.Runner { return failRunner{}}})
+	if err == nil {
+		t.Fatal("expected preflight error")
+	}
+	if !strings.Contains(stderr.String(), "[scan] preflight error rustscan:") {
+		t.Fatalf("expected preflight error output, got %q", stderr.String())
+	}
+}
+
 func TestExecuteScanPassesProfileAndToolArgs(t *testing.T) {
 	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
 	dbPath := filepath.Join(dir, "scan.db")
 	jsonPath := filepath.Join(dir, "report.json")
 	writeFile(t, configPath, `tools:
-  rustscan: /opt/rustscan
-  nmap: /opt/nmap
-  httpx: /opt/httpx
-  nuclei: /opt/nuclei
+  rustscan: `+toolPath+`
+  nmap: `+toolPath+`
+  httpx: `+toolPath+`
+  nuclei: `+toolPath+`
 scan:
   ports: 8080
   profile: normal
@@ -305,25 +359,26 @@ profiles:
 		t.Fatalf("run returned error: %v", err)
 	}
 
-	if !runner.hasArgs("/opt/rustscan", "--batch-size", "100") {
+	if !runner.hasArgs(toolPath, "--batch-size", "100") {
 		t.Fatalf("expected slow profile rustscan args in %#v", runner.commands)
 	}
-	if !runner.hasArgs("/opt/httpx", "-rate-limit", "20") {
+	if !runner.hasArgs(toolPath, "-rate-limit", "20") {
 		t.Fatalf("expected slow profile httpx args in %#v", runner.commands)
 	}
-	if !runner.hasArgs("/opt/nmap", "-T2", "--max-retries", "5") {
+	if !runner.hasArgs(toolPath, "-T2", "--max-retries", "5") {
 		t.Fatalf("expected nmap override args in %#v", runner.commands)
 	}
 }
 
 func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
 	dbPath := filepath.Join(dir, "scan.db")
 	jsonPath := filepath.Join(dir, "report.json")
 	htmlPath := filepath.Join(dir, "report.html")
 
-	writeFile(t, configPath, "tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\nscan:\n  ports: 8080\n")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\nscan:\n  ports: 8080\n")
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
@@ -475,11 +530,26 @@ func (r *recordingRunner) hasArgs(binary string, args ...string) bool {
 	return false
 }
 
+type failRunner struct{}
+
+func (failRunner) Run(context.Context, string, []string) ([]byte, error) {
+	return nil, errors.New("runner should not be called")
+}
+
 func writeFile(t *testing.T, path string, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
 	}
+}
+
+func writeExecutable(t *testing.T, dir string, name string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
+	}
+	return path
 }
 
 func TestVersionCommandPrintsVersion(t *testing.T) {
@@ -489,7 +559,7 @@ func TestVersionCommandPrintsVersion(t *testing.T) {
 		if err := run(args, &stdout, &bytes.Buffer{}, cliDeps{}); err != nil {
 			t.Fatalf("run(%v) returned error: %v", args, err)
 		}
-		if !strings.Contains(stdout.String(), "anchorscan version 1.3") {
+		if !strings.Contains(stdout.String(), "anchorscan version 1.5") {
 			t.Fatalf("run(%v) output missing version: %q", args, stdout.String())
 		}
 	}
