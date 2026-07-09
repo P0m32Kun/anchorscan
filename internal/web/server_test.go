@@ -1604,3 +1604,20 @@ func TestImportNmapRunNonNmaprunRendersFormError(t *testing.T) {
 		t.Fatalf("expected no run on failure, got %d err=%v", len(runs), err)
 	}
 }
+
+func TestNavIncludesImportNmapEntry(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/", nil))
+	body := res.Body.String()
+	if !strings.Contains(body, `href="/import/nmap"`) || !strings.Contains(body, "导入 Nmap XML") {
+		t.Fatalf("expected import nav entry, got: %s", body)
+	}
+}

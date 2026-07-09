@@ -37,6 +37,12 @@
         </svg>
         <span>扫描历史</span>
       </a>
+      <a href="/import/nmap" class="nav-item" id="nav-import">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <span>导入 Nmap XML</span>
+      </a>
       <a href="/tools/new" class="nav-item" id="nav-tools">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.65 2.65 0 0021 17.25l-5.83-5.83m-3.75 3.75l-4.24 4.24a2.12 2.12 0 01-3-3l4.24-4.24m3 3l2.12-2.12m-2.12 2.12L8.83 8.34m4.71 4.71l1.06-1.06a2.25 2.25 0 000-3.18L12.77 6.98m-3.94 1.36l-1.77-1.77a2.25 2.25 0 010-3.18l.71-.71 4.3 4.3" />
@@ -71,6 +77,8 @@
         document.getElementById("nav-projects").classList.add("active");
       } else if (path.startsWith("/runs") || path.startsWith("/scan") || path.startsWith("/reports")) {
         document.getElementById("nav-runs").classList.add("active");
+      } else if (path.startsWith("/import")) {
+        document.getElementById("nav-import").classList.add("active");
       } else if (path.startsWith("/tools")) {
         document.getElementById("nav-tools").classList.add("active");
       } else if (path.startsWith("/config")) {
