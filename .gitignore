@@ -5,5 +5,7 @@
 /dist/
 /.worktrees/
 /.codegraph/
+/.agents/
+/.codex/settings.local.json
 /.zcode/
 /ip.txt
