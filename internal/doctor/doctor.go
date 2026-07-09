@@ -112,9 +112,6 @@ func writableDirCheck(name string, path string) Check {
 }
 
 func databaseCheck(path string) Check {
-	if check := writableParentCheck("database", path); !check.OK {
-		return check
-	}
 	scanStore, err := store.Open(path)
 	if err != nil {
 		return Check{Name: "database", OK: false, Message: err.Error()}

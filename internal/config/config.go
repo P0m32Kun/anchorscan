@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -36,6 +37,12 @@ func Load(path string) (Config, error) {
 	var cfg Config
 
 	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := EnsureInit(path); err != nil {
+			return cfg, err
+		}
+		data, err = os.ReadFile(path)
+	}
 	if err != nil {
 		return cfg, err
 	}

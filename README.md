@@ -6,17 +6,11 @@
 
 ## 快速开始
 
-### 1. 配置工具路径
+### 1. 前置依赖
 
-编辑 [config/default.yaml](./config/default.yaml)，把工具路径指向本机实际安装位置：
+确保本机已安装 `rustscan`、`nmap`、`httpx`、`nuclei`，并在系统 `PATH` 中可找到。配置文件无需手动创建——首次运行会自动生成 `config/default.yaml`，工具路径从 PATH 自动检测。
 
-```yaml
-tools:
-  rustscan: /usr/local/bin/rustscan
-  nmap: /usr/local/bin/nmap
-  httpx: /usr/local/bin/httpx
-  nuclei: /usr/local/bin/nuclei
-```
+如需手动调整（例如工具不在 PATH、想固定路径），编辑自动生成的 `config/default.yaml` 即可，参考 [config/default.yaml.example](./config/default.yaml.example)。
 
 ### 2. 自检
 

@@ -1,12 +1,17 @@
+# AnchorScan 配置模板
+# 实际使用时无需手动复制此文件——首次运行任意命令（如 anchorscan web）会
+# 自动生成 config/default.yaml，工具路径会从系统 PATH 自动检测。
+# 此文件仅作参考；如需自定义，编辑自动生成的 config/default.yaml 即可。
+
 tools:
-  rustscan: /opt/homebrew/bin/rustscan
-  nmap: /opt/homebrew/bin/nmap
-  httpx: /Users/kun/.pdtm/go/bin/httpx
-  nuclei: /Users/kun/.pdtm/go/bin/nuclei
+  rustscan: rustscan       # 留空或填工具名则运行时从 PATH 解析
+  nmap: nmap
+  httpx: httpx
+  nuclei: nuclei
 
 scan:
-  ports: top100
-  profile: normal
+  ports: top100            # 可选: top100, top1000, highrisk, full, 或自定义端口/范围
+  profile: normal          # 可选: slow, normal, fast
 
 profiles:
   slow:
