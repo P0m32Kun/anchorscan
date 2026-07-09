@@ -9,7 +9,8 @@ adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 →
 v1.5 backfills the v1.2 stability work that was developed on a parallel
 branch but never merged into `main`. These capabilities were listed in the
 v1.2 changelog but absent from the released code; this release lands them on
-the current baseline alongside the v1.3/v1.4 features.
+the current baseline alongside the v1.3/v1.4 features, including the inline
+HTML report restyle from the v1.4 line.
 
 ### Added
 - Deterministic SQLite schema migrations via a `schema_migrations` table and

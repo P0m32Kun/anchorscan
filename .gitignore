@@ -1,5 +1,6 @@
 /anchorscan
 /data/
+/cmd/anchorscan/data/
 /reports/
 /dist/
 /.worktrees/
