@@ -18,6 +18,7 @@ import (
 // ImportNmapOptions 配置 import-nmap 命令。
 type ImportNmapOptions struct {
 	XMLPath   string
+	XMLData   []byte
 	RunID     string
 	ProjectID string
 	JSONPath  string
@@ -28,16 +29,22 @@ type ImportNmapOptions struct {
 // ImportNmap 把已有 Nmap XML 导入为一条完成态 AnchorScan run。
 // 校验和解析在事务前完成；落库失败回滚，不会留下半截 run。
 func ImportNmap(ctx context.Context, scanStore *store.Store, opts ImportNmapOptions) (string, error) {
-	if opts.XMLPath == "" {
+	if opts.XMLPath == "" && len(opts.XMLData) == 0 {
 		return "", errors.New("--xml is required")
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
 
-	data, err := os.ReadFile(opts.XMLPath)
-	if err != nil {
-		return "", err
+	var data []byte
+	if opts.XMLPath != "" {
+		var err error
+		data, err = os.ReadFile(opts.XMLPath)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		data = opts.XMLData
 	}
 
 	fps, scripts, err := fingerprint.ParseNmapXML(data)

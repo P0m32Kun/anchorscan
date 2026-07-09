@@ -168,6 +168,26 @@ func TestImportNmapRequiresXMLPath(t *testing.T) {
 	}
 }
 
+func TestImportNmapAcceptsXMLData(t *testing.T) {
+	scanStore := newScanStore(t)
+
+	runID, err := ImportNmap(context.Background(), scanStore, ImportNmapOptions{
+		XMLData: []byte(importFixtureXML),
+		Now:     func() time.Time { return time.Unix(1700000000, 0) },
+	})
+	if err != nil {
+		t.Fatalf("ImportNmap returned error: %v", err)
+	}
+
+	fps, err := scanStore.ListFingerprints(runID)
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(fps) != 2 {
+		t.Fatalf("expected two fingerprints (tcp+udp), got %d", len(fps))
+	}
+}
+
 func countRuns(t *testing.T, scanStore *store.Store) int {
 	t.Helper()
 	rows, err := scanStore.ListScanRuns(100)
