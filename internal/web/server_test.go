@@ -1593,4 +1593,14 @@ func TestImportNmapRunNonNmaprunRendersFormError(t *testing.T) {
 	if !strings.Contains(res.Body.String(), "root element is not nmaprun") {
 		t.Fatalf("expected non-nmaprun error, got: %s", res.Body.String())
 	}
+
+	// 验证 DB 无新增 run
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	runs, err := scanStore.ListScanRuns(100)
+	if err != nil || len(runs) != 0 {
+		t.Fatalf("expected no run on failure, got %d err=%v", len(runs), err)
+	}
 }
