@@ -646,8 +646,13 @@ func (s *server) runs(w http.ResponseWriter, r *http.Request) {
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
 	format := ""
+	exportFormat := ""
 	assetExport := ""
 	runID := path
+	if strings.HasSuffix(path, "/export") {
+		exportFormat = strings.TrimSpace(r.URL.Query().Get("format"))
+		runID = strings.TrimSuffix(path, "/export")
+	}
 	if strings.HasSuffix(path, "/assets.txt") {
 		assetExport = "txt"
 		runID = strings.TrimSuffix(path, "/assets.txt")
@@ -680,30 +685,65 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	built := report.Build(fps, findings)
 	filters := reportFilters{
-		IP:       r.URL.Query().Get("ip"),
-		Port:     r.URL.Query().Get("port"),
-		Service:  r.URL.Query().Get("service"),
-		Keyword:  r.URL.Query().Get("q"),
-		Severity: r.URL.Query().Get("severity"),
-		Source:   r.URL.Query().Get("source"),
+		IP:         r.URL.Query().Get("ip"),
+		Port:       r.URL.Query().Get("port"),
+		Service:    r.URL.Query().Get("service"),
+		Keyword:    r.URL.Query().Get("q"),
+		Severity:   r.URL.Query().Get("severity"),
+		Severities: parseSeverityFilters(r.URL.Query()),
+		Source:     r.URL.Query().Get("source"),
 	}
 	filteredFingerprints := filterFingerprints(fps, filters)
 	filteredFindings := filterFindings(findings, fps, filters)
+	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
 	switch format {
 	case "json":
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(built)
+		_ = json.NewEncoder(w).Encode(filteredBuilt)
 	case "html":
 		tmp := filepath.Join(os.TempDir(), "anchorscan-report-"+runID+".html")
-		if err := report.WriteHTML(tmp, built); err != nil {
+		if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer os.Remove(tmp)
 		http.ServeFile(w, r, tmp)
 	default:
+		if exportFormat != "" {
+			filename := "anchorscan-" + runID
+			switch exportFormat {
+			case "json":
+				w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.json"`)
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(filteredBuilt)
+				return
+			case "html":
+				tmp := filepath.Join(os.TempDir(), "anchorscan-export-"+runID+".html")
+				if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				defer os.Remove(tmp)
+				w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.html"`)
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				http.ServeFile(w, r, tmp)
+				return
+			case "csv":
+				data, err := exportFindingsCSV(filteredFindings, filteredFingerprints)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.csv"`)
+				w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+				_, _ = io.WriteString(w, data)
+				return
+			default:
+				http.Error(w, "unknown export format", http.StatusBadRequest)
+				return
+			}
+		}
 		if assetExport == "txt" {
 			w.Header().Set("Content-Disposition", `attachment; filename="`+runID+`-assets.txt"`)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -732,6 +772,8 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		copyBase := cloneValues(query)
 		copyBase.Del("assets_page")
 		copyBase.Del("findings_page")
+		copyBase.Del("assets_size")
+		copyBase.Del("findings_size")
 		render(w, "templates/report.html", map[string]any{
 			"Run":            run,
 			"RunMeta":        newRunMetaView(run),
@@ -746,6 +788,9 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"AssetTXTIPPort": "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
 			"AssetTXTURL":    "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
 			"AssetCSV":       "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
+			"ExportJSON":     "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "json"),
+			"ExportHTML":     "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
+			"ExportCSV":      "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 		})
 	}
 }

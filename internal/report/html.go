@@ -215,6 +215,20 @@ const htmlTemplate = `<!doctype html>
       font-size: 0.78rem;
       color: var(--muted);
     }
+
+    .evidence-block {
+      margin-top: 0.6rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #0b0c0f;
+      color: var(--text);
+      font-size: 0.78rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: 'JetBrains Mono', monospace;
+    }
     
     .web-badge {
       display: inline-block;
@@ -300,6 +314,8 @@ const htmlTemplate = `<!doctype html>
               </div>
               <div class="finding-summary">{{.Summary}}</div>
               <div class="finding-meta">来源: {{.Source}} | 规则: {{.ID}}</div>
+              {{if .Target}}<div class="finding-meta">目标: {{.Target}}</div>{{end}}
+              {{if .Output}}<pre class="evidence-block">{{.Output}}</pre>{{end}}
             </div>
             {{else}}
             <div style="color: var(--success); font-weight: 600; font-size: 0.85rem;">🛡️ 未发现高危漏洞</div>

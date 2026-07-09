@@ -16,7 +16,7 @@ func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 			{IP: "192.168.1.10", Port: 8080, Service: "http", Product: "tomcat", IsWeb: true, URL: "http://192.168.1.10:8080"},
 		},
 		[]Finding{
-			{IP: "192.168.1.10", Port: 8080, Source: "nuclei", ID: "tomcat-default-login", Severity: "high", Summary: "Tomcat Default Login"},
+			{IP: "192.168.1.10", Port: 8080, Source: "nuclei", ID: "tomcat-default-login", Severity: "high", Summary: "Tomcat Default Login", Target: "http://192.168.1.10:8080", Output: "{\"matched-at\":\"http://192.168.1.10:8080\"}"},
 		},
 	)
 
@@ -30,5 +30,8 @@ func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "Tomcat Default Login") {
 		t.Fatalf("expected finding summary in html: %s", string(data))
+	}
+	if !strings.Contains(string(data), "matched-at") || !strings.Contains(string(data), "http://192.168.1.10:8080") {
+		t.Fatalf("expected finding evidence in html: %s", string(data))
 	}
 }

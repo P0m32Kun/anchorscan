@@ -805,6 +805,17 @@ func TestReportPageRendersFindings(t *testing.T) {
 	if !strings.Contains(res.Body.String(), "筛选") || !strings.Contains(res.Body.String(), "证据与详情") {
 		t.Fatalf("expected chinese report copy: %s", res.Body.String())
 	}
+	for _, want := range []string{
+		`type="checkbox" name="severity" value="critical"`,
+		`type="checkbox" name="severity" value="high"`,
+		`href="/reports/run-1/export?format=json"`,
+		`href="/reports/run-1/export?format=html"`,
+		`href="/reports/run-1/export?format=csv"`,
+	} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Fatalf("expected %q in report page: %s", want, res.Body.String())
+		}
+	}
 }
 
 func TestReportPagePaginatesAssetsAndFindings(t *testing.T) {
@@ -919,6 +930,40 @@ func TestReportPageFiltersFindingsByService(t *testing.T) {
 	body := res.Body.String()
 	if !strings.Contains(body, "redis-default-logins") || strings.Contains(body, "tomcat-detect") {
 		t.Fatalf("unexpected filtered report: %s", body)
+	}
+}
+
+func TestReportPageFiltersFindingsByMultipleSeveritySelections(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "443,6379,8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "127.0.0.1", Port: 443, Source: "nuclei", ID: "critical-one", Severity: "critical", Summary: "Critical One", Target: "https://127.0.0.1"},
+		{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "high-one", Severity: "high", Summary: "High One", Target: "127.0.0.1:6379"},
+		{IP: "127.0.0.1", Port: 8080, Source: "nuclei", ID: "info-one", Severity: "info", Summary: "Info One", Target: "http://127.0.0.1:8080"},
+	} {
+		if err := scanStore.SaveFinding("run-1", finding); err != nil {
+			t.Fatalf("SaveFinding returned error: %v", err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1?severity=critical&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d", res.Code)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "critical-one") || !strings.Contains(body, "high-one") || strings.Contains(body, "info-one") {
+		t.Fatalf("unexpected severity-filtered report: %s", body)
 	}
 }
 
@@ -1056,6 +1101,85 @@ func TestReportAssetExportSupportsFilteredTXTAndCSV(t *testing.T) {
 	}
 	if strings.Contains(csvBody, "127.0.0.2") {
 		t.Fatalf("expected filtered csv export: %s", csvBody)
+	}
+}
+
+func TestReportExportDownloadsRicherFormats(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "6379,8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "127.0.0.1", Port: 6379, Service: "redis", Product: "Redis", Version: "7.2.0", Normalized: "redis"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "redis-default-logins", Severity: "high", Summary: "Redis Default Login", Target: "127.0.0.1:6379", Output: "{\"matched-at\":\"127.0.0.1:6379\"}"},
+		{IP: "127.0.0.1", Port: 8080, Source: "nuclei", ID: "tomcat-detect", Severity: "info", Summary: "Tomcat Detect", Target: "http://127.0.0.1:8080", Output: "{\"matched-at\":\"http://127.0.0.1:8080\"}"},
+	} {
+		if err := scanStore.SaveFinding("run-1", finding); err != nil {
+			t.Fatalf("SaveFinding returned error: %v", err)
+		}
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=html&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("html status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.html"`) {
+		t.Fatalf("unexpected html content-disposition: %s", cd)
+	}
+	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/html") {
+		t.Fatalf("unexpected html content-type: %s", ct)
+	}
+	if !strings.Contains(res.Body.String(), "matched-at") || strings.Contains(res.Body.String(), "tomcat-detect") {
+		t.Fatalf("unexpected html export: %s", res.Body.String())
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=json&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("json status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.json"`) {
+		t.Fatalf("unexpected json content-disposition: %s", cd)
+	}
+	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
+		t.Fatalf("unexpected json content-type: %s", ct)
+	}
+	if !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
+		t.Fatalf("unexpected json export: %s", res.Body.String())
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=csv&severity=high", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("csv status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.csv"`) {
+		t.Fatalf("unexpected csv content-disposition: %s", cd)
+	}
+	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
+		t.Fatalf("unexpected csv content-type: %s", ct)
+	}
+	if !strings.Contains(res.Body.String(), "severity,source,id,ip,port,service,product,target,summary,evidence") || !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
+		t.Fatalf("unexpected csv export: %s", res.Body.String())
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=pdf", nil))
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown export format, got %d body=%s", res.Code, res.Body.String())
 	}
 }
 

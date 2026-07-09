@@ -19,6 +19,7 @@ type reportFilters struct {
 	Service  string
 	Keyword  string
 	Severity string
+	Severities []string
 	Source   string
 }
 
@@ -36,6 +37,7 @@ type reportPage struct {
 }
 
 var reportPageSizes = []int{10, 20, 50}
+var supportedSeverities = []string{"critical", "high", "medium", "low", "info"}
 
 type hostAssetView struct {
 	IP        string
@@ -108,7 +110,10 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 		if filters.Service != "" && !findingMatchesService(item, fps, filters.Service) {
 			continue
 		}
-		if filters.Severity != "" && item.Severity != filters.Severity {
+		if len(filters.Severities) > 0 && !containsValue(filters.Severities, item.Severity) {
+			continue
+		}
+		if len(filters.Severities) == 0 && filters.Severity != "" && item.Severity != filters.Severity {
 			continue
 		}
 		if filters.Source != "" && item.Source != filters.Source {
@@ -126,6 +131,15 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 		out = append(out, item)
 	}
 	return out
+}
+
+func containsValue(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func findingMatchesService(item report.Finding, fps []fingerprint.ServiceFingerprint, service string) bool {
@@ -293,6 +307,63 @@ func exportAssetsCSV(items []fingerprint.ServiceFingerprint) (string, error) {
 		return "", err
 	}
 	return b.String(), nil
+}
+
+func exportFindingsCSV(items []report.Finding, fps []fingerprint.ServiceFingerprint) (string, error) {
+	services := map[string]fingerprint.ServiceFingerprint{}
+	for _, item := range fps {
+		services[item.IP+":"+strconv.Itoa(item.Port)] = item
+	}
+
+	var b strings.Builder
+	w := csv.NewWriter(&b)
+	if err := w.Write([]string{"severity", "source", "id", "ip", "port", "service", "product", "target", "summary", "evidence"}); err != nil {
+		return "", err
+	}
+	for _, item := range items {
+		fp := services[item.IP+":"+strconv.Itoa(item.Port)]
+		if err := w.Write([]string{
+			item.Severity,
+			item.Source,
+			item.ID,
+			item.IP,
+			strconv.Itoa(item.Port),
+			fp.Service,
+			fp.Product,
+			item.Target,
+			item.Summary,
+			item.Output,
+		}); err != nil {
+			return "", err
+		}
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+func parseSeverityFilters(values url.Values) []string {
+	if len(values["severity"]) == 0 {
+		return nil
+	}
+	var out []string
+	seen := map[string]struct{}{}
+	for _, raw := range values["severity"] {
+		for _, item := range strings.Split(raw, ",") {
+			value := strings.ToLower(strings.TrimSpace(item))
+			if !containsValue(supportedSeverities, value) {
+				continue
+			}
+			if _, ok := seen[value]; ok {
+				continue
+			}
+			seen[value] = struct{}{}
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func parsePage(value string) int {
