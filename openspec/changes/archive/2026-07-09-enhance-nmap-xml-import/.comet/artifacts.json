@@ -4,5 +4,6 @@
   "openspec_tasks": "openspec/changes/enhance-nmap-xml-import/tasks.md",
   "openspec_delta_spec": "openspec/changes/enhance-nmap-xml-import/specs/nmap-xml-import/spec.md",
   "handoff_context": "openspec/changes/enhance-nmap-xml-import/.comet/handoff/design-context.json",
-  "handoff_markdown": "openspec/changes/enhance-nmap-xml-import/.comet/handoff/design-context.md"
+  "handoff_markdown": "openspec/changes/enhance-nmap-xml-import/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-07-09-enhance-nmap-xml-import"
 }

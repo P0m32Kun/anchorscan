@@ -2,6 +2,8 @@
 comet_change: enhance-nmap-xml-import
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-09-enhance-nmap-xml-import
+status: final
 ---
 
 # Enhance Nmap XML Import 技术设计
@@ -109,3 +111,4 @@ SQLite migration 必须向后兼容旧库：
 - Web Console 上传/导入 Nmap XML。
 - `risk_rules.json` 到 AnchorScan 规则包的迁移。
 - 可查询的 NSE structured output 存储和筛选。
+

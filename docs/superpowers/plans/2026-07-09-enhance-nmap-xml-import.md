@@ -2,6 +2,7 @@
 change: enhance-nmap-xml-import
 design-doc: docs/superpowers/specs/2026-07-09-enhance-nmap-xml-import-design.md
 base-ref: fa9b0590aadaca242a342db9912d6388cc37be38
+archived-with: 2026-07-09-enhance-nmap-xml-import
 ---
 
 # Enhance Nmap XML Import 实现计划
@@ -45,6 +46,7 @@ design 写作时假设 protocol/CPE/ExtraInfo/Tunnel 都需新增。探索代码
 - 每个任务完成后跑相关测试；全部完成后跑 `go test ./...`。
 - 用中文撰写面向用户的文案（错误信息、帮助文本），与现有 zh-CN 配置一致。
 
+archived-with: 2026-07-09-enhance-nmap-xml-import
 ---
 
 ## Phase 1 — Parser and Model（对应 tasks 1.1–1.3）
@@ -130,6 +132,7 @@ design 写作时假设 protocol/CPE/ExtraInfo/Tunnel 都需新增。探索代码
 - 新增/更新测试：TCP/UDP 同端口导入后，`Build` 产出两个独立 PortReport（不合并）；findings 按 protocol 正确挂载。
 - 现有报告/web 测试（无 protocol 的旧数据，protocol 默认 `""`）仍通过——需确认 key 不破坏（空 protocol 的 `ip:port:` 仍唯一）。
 
+archived-with: 2026-07-09-enhance-nmap-xml-import
 ---
 
 ## Phase 2 — Persistence（对应 tasks 2.1–2.3）
@@ -179,6 +182,7 @@ func (s *Store) SaveImportRun(run ScanRun, fps []fingerprint.ServiceFingerprint,
 
 **验收：** `go test ./internal/store/... -run Import` 全过；新增测试：中途构造失败（如 nil fp 或超长字段）确认事务回滚，DB 无新增 run/fingerprint。
 
+archived-with: 2026-07-09-enhance-nmap-xml-import
 ---
 
 ## Phase 3 — Import Command（对应 tasks 3.1–3.3）
@@ -237,6 +241,7 @@ func (s *Store) SaveImportRun(run ScanRun, fps []fingerprint.ServiceFingerprint,
 
 **验收：** 测试断言 `ListScanRuns` 在失败前后数量不变。
 
+archived-with: 2026-07-09-enhance-nmap-xml-import
 ---
 
 ## Phase 4 — Verification and Docs（对应 tasks 4.1–4.3）
@@ -273,6 +278,7 @@ func (s *Store) SaveImportRun(run ScanRun, fps []fingerprint.ServiceFingerprint,
 
 **验收：** 所有命令成功，输出符合预期；tasks.md 对应条目可勾选。
 
+archived-with: 2026-07-09-enhance-nmap-xml-import
 ---
 
 ## 任务依赖与执行顺序
@@ -300,3 +306,4 @@ Phase 4 (verification) 依赖 Phase 3。
 | CPE 多值编码格式 | 低 | design 定为字符串；用换行或分号分隔，测试固定一种 |
 | finding scope 编码方案 | 低 | 优先用 Source 编码（`nmap-import:hostscript:<id>`），scope 列预留 |
 | 现有 `tools/nmap.go` 调用 ParseNmapXML | 中 | 1.2 改签名时同步更新该调用方，忽略 script 返回值 |
+
