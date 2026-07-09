@@ -24,3 +24,19 @@ func TestRunNSEBuildsCommandAndParsesScripts(t *testing.T) {
 		t.Fatalf("unexpected results: %#v", got)
 	}
 }
+
+func TestRunNSEWithOutputReturnsRawOutput(t *testing.T) {
+	raw := []byte(`<nmaprun><host><ports><port protocol="tcp" portid="445"><script id="smb-protocols" output="SMBv1 disabled"/></port></ports></host></nmaprun>`)
+	runner := &fakeRunner{output: raw}
+
+	got, out, err := RunNSEWithOutput(context.Background(), runner, "/opt/nmap", "127.0.0.1", 445, []string{"smb-protocols"}, nil)
+	if err != nil {
+		t.Fatalf("RunNSEWithOutput returned error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "smb-protocols" || got[0].Output != "SMBv1 disabled" {
+		t.Fatalf("unexpected results: %#v", got)
+	}
+	if string(out) != string(raw) {
+		t.Fatalf("raw output mismatch: got %q want %q", out, raw)
+	}
+}

@@ -10,24 +10,29 @@ import (
 )
 
 func Fingerprint(ctx context.Context, runner Runner, binaryPath string, ip string, ports []int, extraArgs []string) ([]fingerprint.ServiceFingerprint, error) {
+	result, _, err := FingerprintWithOutput(ctx, runner, binaryPath, ip, ports, extraArgs)
+	return result, err
+}
+
+func FingerprintWithOutput(ctx context.Context, runner Runner, binaryPath string, ip string, ports []int, extraArgs []string) ([]fingerprint.ServiceFingerprint, []byte, error) {
 	args := []string{"-sV", "--version-intensity", "7", "-p", joinPorts(ports), ip, "-oX", "-"}
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, withOutputError(err, out)
+		return nil, out, withOutputError(err, out)
 	}
 
 	parsed, err := fingerprint.ParseNmapXML(out)
 	if err != nil {
-		return nil, err
+		return nil, out, err
 	}
 
 	result := make([]fingerprint.ServiceFingerprint, 0, len(parsed))
 	for _, fp := range parsed {
 		result = append(result, fingerprint.Classify(fp))
 	}
-	return result, nil
+	return result, out, nil
 }
 
 func joinPorts(ports []int) string {
@@ -50,6 +55,11 @@ type aliveXML struct {
 }
 
 func DiscoverAlive(ctx context.Context, runner Runner, binaryPath string, targets []string, extraArgs []string) ([]string, error) {
+	alive, _, err := DiscoverAliveWithOutput(ctx, runner, binaryPath, targets, extraArgs)
+	return alive, err
+}
+
+func DiscoverAliveWithOutput(ctx context.Context, runner Runner, binaryPath string, targets []string, extraArgs []string) ([]string, []byte, error) {
 	args := []string{"-sn"}
 	args = append(args, targets...)
 	args = append(args, "-oX", "-")
@@ -57,12 +67,12 @@ func DiscoverAlive(ctx context.Context, runner Runner, binaryPath string, target
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return nil, withOutputError(err, out)
+		return nil, out, withOutputError(err, out)
 	}
 
 	var parsed aliveXML
 	if err := xml.Unmarshal(out, &parsed); err != nil {
-		return nil, err
+		return nil, out, err
 	}
 	seen := make(map[string]struct{}, len(parsed.Hosts))
 	alive := make([]string, 0, len(parsed.Hosts))
@@ -83,7 +93,7 @@ func DiscoverAlive(ctx context.Context, runner Runner, binaryPath string, target
 		seen[addr] = struct{}{}
 		alive = append(alive, addr)
 	}
-	return alive, nil
+	return alive, out, nil
 }
 
 func CheckAlive(ctx context.Context, runner Runner, binaryPath string, target string, extraArgs []string) (bool, error) {

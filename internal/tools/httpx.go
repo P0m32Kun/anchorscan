@@ -16,20 +16,25 @@ type HTTPResult struct {
 }
 
 func EnrichWeb(ctx context.Context, runner Runner, binaryPath string, fp fingerprint.ServiceFingerprint, extraArgs []string) (HTTPResult, error) {
+	result, _, err := EnrichWebWithOutput(ctx, runner, binaryPath, fp, extraArgs)
+	return result, err
+}
+
+func EnrichWebWithOutput(ctx context.Context, runner Runner, binaryPath string, fp fingerprint.ServiceFingerprint, extraArgs []string) (HTTPResult, []byte, error) {
 	args := []string{"-json", "-status-code", "-title", "-tech-detect", "-follow-redirects", "-u", fp.URL}
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {
-		return HTTPResult{}, withOutputError(err, out)
+		return HTTPResult{}, out, withOutputError(err, out)
 	}
 
 	line := lastJSONLine(string(out))
 	var result HTTPResult
 	if err := json.Unmarshal([]byte(line), &result); err != nil {
-		return HTTPResult{}, err
+		return HTTPResult{}, out, err
 	}
-	return result, nil
+	return result, out, nil
 }
 
 func lastJSONLine(output string) string {

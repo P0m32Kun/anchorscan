@@ -73,3 +73,19 @@ func TestDiscoverPortsIncludesToolOutputOnFailure(t *testing.T) {
 		t.Fatalf("expected tool output in error, got %v", err)
 	}
 }
+
+func TestDiscoverPortsWithOutputReturnsRawOutput(t *testing.T) {
+	raw := []byte("127.0.0.1 -> [80,443]\n")
+	runner := &fakeRunner{output: raw}
+
+	ports, out, err := DiscoverPortsWithOutput(context.Background(), runner, "/opt/rustscan", "127.0.0.1", "80,443", nil)
+	if err != nil {
+		t.Fatalf("DiscoverPortsWithOutput returned error: %v", err)
+	}
+	if !reflect.DeepEqual(ports, []int{80, 443}) {
+		t.Fatalf("ports mismatch: got %#v", ports)
+	}
+	if string(out) != string(raw) {
+		t.Fatalf("raw output mismatch: got %q want %q", out, raw)
+	}
+}
