@@ -71,7 +71,6 @@ go run ./cmd/anchorscan scan --target 127.0.0.1 --profile slow
 
 ```bash
 make test      # 运行全部测试
-make e2e       # 真实二进制 + 本地靶场 smoke 测试
 make build     # 编译到 dist/anchorscan
 make package   # 打包到 dist/
 ```
@@ -101,4 +100,4 @@ go run ./cmd/anchorscan tool nmap --mode alive --target 192.0.2.10
 
 - 所有扫描需在已授权环境下进行
 - 不含登录/多用户/分布式/SaaS，定位为本机单兵工具
-- 部署、靶场搭建、测试细节见 [docs/](./docs/)
+- 部署细节见 [docs/deploy.md](./docs/deploy.md)

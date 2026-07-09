@@ -13,3 +13,10 @@
 # config/default.yaml 由首次运行自动生成（工具路径与本机 PATH 相关），不进版本控制
 # config/default.yaml.example 是提交进仓库的参考模板
 /config/default.yaml
+
+# 本地测试靶场与 e2e（仅本机使用，不进版本控制）
+/docker-compose.lab.yml
+/e2e/
+/docs/testing-lab-checklist.md
+/docs/troubleshooting-lab.md
+/docs/testing-results-template.md

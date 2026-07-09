@@ -7,14 +7,11 @@ GOARCH ?= $(shell go env GOARCH)
 PACKAGE_NAME := $(APP)-$(VERSION)-$(GOOS)-$(GOARCH)
 PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
 
-.PHONY: test e2e build package clean
+.PHONY: test build package clean
 
 test:
 	go test ./...
 	node --test internal/web/static/app.test.mjs
-
-e2e:
-	go test -tags e2e ./e2e -count=1 -v
 
 build:
 	mkdir -p $(DIST_DIR)
@@ -24,7 +21,7 @@ package:
 	rm -rf $(PACKAGE_DIR)
 	mkdir -p $(PACKAGE_DIR)/config $(PACKAGE_DIR)/docs
 	go build -o $(PACKAGE_DIR)/$(APP) $(CMD)
-	cp config/default.yaml $(PACKAGE_DIR)/config/default.yaml
+	cp config/default.yaml.example $(PACKAGE_DIR)/config/default.yaml.example
 	cp README.md $(PACKAGE_DIR)/docs/README.md
 	cp docs/deploy.md $(PACKAGE_DIR)/docs/deploy.md
 	tar -C $(DIST_DIR) -czf $(DIST_DIR)/$(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
