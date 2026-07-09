@@ -4,5 +4,5 @@
 package version
 
 // Version is the current AnchorScan release. Keep it in sync with the latest
-// git tag (e.g. "1.5.1" for tag v1.5.1) and the CHANGELOG.md entry.
-const Version = "1.5.1"
+// git tag (e.g. "1.6.0" for tag v1.6.0) and the CHANGELOG.md entry.
+const Version = "1.6.0"
