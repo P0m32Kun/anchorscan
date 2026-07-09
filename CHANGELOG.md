@@ -2,7 +2,26 @@
 
 All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1).
+adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
+
+## [1.6.0] - 2026-07-09
+
+v1.6.0 聚焦"开箱即用"与跨平台分发：高危端口预设、配置自动初始化、首次运行零手动配置，以及 GitHub Actions 自动打包多平台二进制。
+
+### Added
+- 新增 `highrisk` 端口预设（`config/ports-highrisk.txt`），覆盖运维改端口（10022/13306 等）、工控/SCADA 端口（502/2404 等）、标准高危服务，约 50 个端口。扫描页、项目表单、单工具页（rustscan）均支持一键插入。
+- 全局配置页新增「高危端口列表」可视化编辑面板，保存写回 `config/ports-highrisk.txt`（带时间戳备份），支持随使用持续积累常见高危端口。
+- `config.Load` 首次运行自动生成 `config/default.yaml`，工具路径通过 `exec.LookPath` 从系统 PATH 自动检测，无需手动编辑配置。
+- `store.Open` 自动创建数据库父目录，解决全新 clone 后 `data/` 缺失导致的 `out of memory (14)` 启动失败。
+- GitHub Actions（`.github/workflows/release.yml`）：打 tag 时自动交叉编译 linux/amd64、darwin/arm64、windows/amd64 裸二进制并发布到 Release；tag 含 `-rc`/`-beta`/`-alpha` 后缀自动标记为预发布。
+
+### Changed
+- 扫描页与项目表单的端口输入框改为自适应高度 textarea，避免长端口列表被截断。
+- `config/default.yaml` 移出版本控制（含机器相关绝对路径），新增 `config/default.yaml.example` 作为参考模板。
+- Docker 靶场（`docker-compose.lab.yml`）、e2e 测试、lab 文档移出版本控制（本地测试设施，不进仓库）。
+- Makefile 移除 `e2e` target；`package` target 改用 `default.yaml.example` 打包。
+- README 重写为简洁中文版，命令行参数依赖内置默认值精简；新增「下载预编译二进制」使用方式。
+- `doctor` 的 databaseCheck 修复父目录不存在时的误报。
 
 ## [1.5.1] - 2026-07-09
 

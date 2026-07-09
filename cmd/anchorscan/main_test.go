@@ -15,6 +15,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
+	"github.com/P0m32Kun/anchorscan/internal/version"
 )
 
 func TestExecuteToolsCheckReportsConfiguredTools(t *testing.T) {
@@ -712,7 +713,7 @@ func TestVersionCommandPrintsVersion(t *testing.T) {
 		if err := run(args, &stdout, &bytes.Buffer{}, cliDeps{}); err != nil {
 			t.Fatalf("run(%v) returned error: %v", args, err)
 		}
-		if !strings.Contains(stdout.String(), "anchorscan version 1.5.1") {
+		if !strings.Contains(stdout.String(), "anchorscan version "+version.Version) {
 			t.Fatalf("run(%v) output missing version: %q", args, stdout.String())
 		}
 	}

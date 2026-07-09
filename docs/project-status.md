@@ -25,20 +25,21 @@ The current direction explicitly does not include:
 
 ## Current Baseline
 
-The project is at a V1.5.1 local-operator baseline.
+The project is at a V1.6.0 local-operator baseline.
 
 Implemented capabilities:
 
 - CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
 - fixed scan pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
 - single-tool runs for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
-- port selection: custom lists, ranges like `100-1000`, `top100`, `top1000`, and `full`
+- port selection: custom lists, ranges like `100-1000`, `top100`, `top1000`, `highrisk`, and `full`
 - scan profiles: `slow`, `normal`, `fast`
 - per-tool extra args through configuration
 - shared scan preflight for CLI and Web Console
 - SQLite migrations through `schema_migrations`
 - current-platform package workflow through `make package`
-- optional real-binary smoke e2e through `make e2e`
+- cross-platform binary releases via GitHub Actions (linux/amd64, darwin/arm64, windows/amd64) on tag push
+- `highrisk` port preset covering ops-remapped, ICS/SCADA, and standard high-risk service ports, editable from the Web config page
 - stronger doctor checks for tools, ports, rule files, database, and reports path
 - SQLite persistence for scan runs, events, fingerprints, findings, projects, and config snapshots
 - persisted fingerprint fields including service, product, version, normalized service, web flag, and URL
@@ -54,7 +55,10 @@ Implemented capabilities:
 
 | File | Purpose |
 | --- | --- |
-| `config/default.yaml` | tool paths, scan defaults, scan profiles, and extra tool args |
+| `config/default.yaml` | tool paths, scan defaults, scan profiles, and extra tool args (auto-generated on first run; gitignored) |
+| `config/default.yaml.example` | human-readable config template (committed) |
+| `config/ports-highrisk.txt` | high-risk port preset (ops-remapped + ICS/SCADA + standard services) |
+| `config/ports-top100.txt` / `config/ports-top1000.txt` | common port presets |
 | `config/service-tags.yaml` | fingerprint-driven nuclei tag mapping |
 | `config/nse.yaml` | fingerprint-driven NSE script mapping |
 | `config/service-aliases.yaml` | service normalization aliases |
@@ -103,6 +107,5 @@ Before claiming a branch is ready:
 
 ```bash
 go test ./...
-make e2e
 make package
 ```

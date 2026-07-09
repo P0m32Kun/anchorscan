@@ -18,6 +18,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/version"
 )
 
 func TestHomePageRenders(t *testing.T) {
@@ -56,7 +57,7 @@ func TestHomePageRenders(t *testing.T) {
 		t.Fatalf("expected home links in body: %s", res.Body.String())
 	}
 	// footer version is rendered from the version package, not hardcoded
-	if !strings.Contains(res.Body.String(), "AnchorScan Console v1.5.1") {
+	if !strings.Contains(res.Body.String(), "AnchorScan Console v"+version.Version) {
 		t.Fatalf("expected versioned footer in body: %s", res.Body.String())
 	}
 }
