@@ -1,0 +1,44 @@
+{{define "content"}}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">数据导入</p>
+    <h2>导入 Nmap XML</h2>
+  </div>
+  <a class="button button-secondary" href="/runs">返回扫描历史</a>
+</section>
+
+{{if .Error}}
+<section class="panel" style="border-color: var(--danger, #dc2626); background: rgba(220,38,38,0.08);">
+  <p style="color: var(--danger, #dc2626); margin: 0; font-weight: 600;">导入失败：{{.Error}}</p>
+</section>
+{{end}}
+
+<section class="panel">
+  <form class="form-grid" method="post" action="/import/nmap/run" enctype="multipart/form-data">
+    <label class="full-width">
+      <span>Nmap XML 文件 *</span>
+      <div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 0.5rem; margin-top: 0.25rem;">上传已有的 Nmap XML 扫描结果，系统会保留协议（TCP/UDP）、CPE 和 NSE 脚本输出。</div>
+      <input type="file" name="xml_file" accept=".xml" required>
+    </label>
+
+    <label class="full-width">
+      <span>关联项目（可选）</span>
+      <select name="project_id">
+        <option value="">不关联项目</option>
+        {{range .Projects}}
+        <option value="{{.ID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+
+    <div class="form-actions full-width" style="margin-top: 1.5rem;">
+      <button class="button button-primary" type="submit">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+        </svg>
+        <span>导入</span>
+      </button>
+    </div>
+  </form>
+</section>
+{{end}}

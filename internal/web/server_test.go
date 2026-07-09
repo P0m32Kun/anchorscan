@@ -1423,3 +1423,23 @@ func TestConfigPageRawEditorRejectsInvalidYAML(t *testing.T) {
 		t.Fatalf("config should remain unchanged: %s", data)
 	}
 }
+
+func TestImportNmapFormRenders(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/import/nmap", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d", res.Code)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "导入 Nmap XML") || !strings.Contains(body, `name="xml_file"`) {
+		t.Fatalf("expected import form, got: %s", body)
+	}
+}

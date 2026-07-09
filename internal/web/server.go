@@ -117,6 +117,8 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/api/runs/", s.runAPI)
 	mux.HandleFunc("/reports/", s.reportDetail)
 	mux.HandleFunc("/config", s.configPage)
+	mux.HandleFunc("/import/nmap", s.importNmapForm)
+	mux.HandleFunc("/import/nmap/run", s.importNmapRun)
 	mux.HandleFunc("/", s.home)
 	s.mux = mux
 	return s, nil
@@ -590,6 +592,34 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
+}
+
+func (s *server) importNmapForm(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.renderImportForm(w, "")
+}
+
+// renderImportForm renders the Nmap XML import page with the project list and
+// an optional error message shown in a top banner.
+func (s *server) renderImportForm(w http.ResponseWriter, errMsg string) {
+	projects, err := s.store.ListProjects()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	render(w, "templates/import_nmap.html", map[string]any{
+		"Projects": projects,
+		"Error":    errMsg,
+	})
+}
+
+// importNmapRun handles the POST submission of the Nmap XML import form. It is
+// a placeholder stub (501) here; the full handler is implemented in Task 3.
+func (s *server) importNmapRun(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "not implemented", http.StatusNotImplemented)
 }
 
 func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
