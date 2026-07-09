@@ -1,0 +1,52 @@
+# 打 tag (v*) 时自动交叉编译多平台裸二进制并发布到 GitHub Release。
+# 纯 Go 无 cgo，交叉编译零障碍。下载后直接运行 anchorscan doctor 即可
+# 自动生成配置（工具路径从 PATH 检测）和数据库目录，无需额外文件。
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          BINARY=anchorscan-${{ matrix.goos }}-${{ matrix.goarch }}
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY="${BINARY}.exe"
+          fi
+          go build -trimpath -ldflags="-s -w" -o "$BINARY" ./cmd/anchorscan
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: anchorscan-*

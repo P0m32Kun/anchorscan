@@ -6,13 +6,28 @@
 
 ## 快速开始
 
-### 1. 前置依赖
+### 方式一：下载预编译二进制（推荐）
+
+到 [Releases 页面](../../releases) 下载对应平台的二进制（支持 linux/amd64、darwin/arm64、windows/amd64），无需安装 Go 环境。
+
+```bash
+# Linux / macOS 示例
+chmod +x anchorscan-linux-amd64
+./anchorscan-linux-amd64 doctor    # 自动生成配置、检测工具路径
+./anchorscan-linux-amd64 web       # 启动 Web 控制台
+```
+
+### 方式二：从源码编译
+
+需要本机安装 [Go](https://go.dev/dl/)。
+
+#### 1. 前置依赖
 
 确保本机已安装 `rustscan`、`nmap`、`httpx`、`nuclei`，并在系统 `PATH` 中可找到。配置文件无需手动创建——首次运行会自动生成 `config/default.yaml`，工具路径从 PATH 自动检测。
 
 如需手动调整（例如工具不在 PATH、想固定路径），编辑自动生成的 `config/default.yaml` 即可，参考 [config/default.yaml.example](./config/default.yaml.example)。
 
-### 2. 自检
+#### 2. 自检
 
 ```bash
 go run ./cmd/anchorscan doctor
@@ -20,7 +35,7 @@ go run ./cmd/anchorscan doctor
 
 检查配置、工具路径、数据库、报告目录是否就绪。
 
-### 3. 启动 Web 控制台（推荐日常使用）
+#### 3. 启动 Web 控制台（推荐日常使用）
 
 ```bash
 go run ./cmd/anchorscan web
@@ -34,7 +49,7 @@ go run ./cmd/anchorscan web
 go run ./cmd/anchorscan web --listen 127.0.0.1:9000 --config custom.yaml --db other.sqlite
 ```
 
-### 4. 或直接命令行扫描
+#### 4. 或直接命令行扫描
 
 ```bash
 go run ./cmd/anchorscan scan --target 127.0.0.1 --ports highrisk
