@@ -47,6 +47,10 @@ async function refreshEvents(){
     });
     box.innerHTML = lines.join('\n') + '\n<span class="terminal-cursor">█</span>';
     
+    // 触发 Stepper 更新
+    const statusText = document.getElementById('run-status')?.textContent || window.anchorRunStatus || '';
+    updateStepper(events, statusText);
+    
     // Auto scroll if user is already near bottom
     const threshold = 50;
     const isNearBottom = box.scrollHeight - box.clientHeight - box.scrollTop < threshold;
@@ -246,6 +250,67 @@ function renderVulnDistribution() {
 
   bar.innerHTML = barHTML;
   legend.innerHTML = legendHTML;
+}
+
+function updateStepper(events, runStatus) {
+  const steps = {
+    discover: document.getElementById('step-discover'),
+    portscan: document.getElementById('step-portscan'),
+    fingerprint: document.getElementById('step-fingerprint'),
+    vuln: document.getElementById('step-vuln'),
+    report: document.getElementById('step-report')
+  };
+  const lines = document.querySelectorAll('.step-line');
+  if (!steps.discover) return;
+
+  if ((runStatus || '').toLowerCase() === 'completed') {
+    Object.values(steps).forEach(s => {
+      s.className = 'step completed';
+      s.querySelector('.step-icon').innerHTML = '✓';
+    });
+    lines.forEach(l => l.className = 'step-line completed');
+    return;
+  }
+  
+  let currentStage = 'init';
+  events.forEach(e => {
+    const stage = (e.stage || '').toLowerCase();
+    const msg = (e.message || '').toLowerCase();
+    
+    if (stage === 'nmap' && msg.includes('alive')) {
+      currentStage = 'discover';
+    } else if (stage === 'rustscan') {
+      currentStage = 'portscan';
+    } else if (stage === 'nmap' && !msg.includes('alive')) {
+      currentStage = 'fingerprint';
+    } else if (stage === 'httpx' || stage === 'nse' || stage === 'nuclei') {
+      currentStage = 'vuln';
+    } else if (stage === 'report') {
+      currentStage = 'report';
+    }
+  });
+
+  const stageOrder = ['discover', 'portscan', 'fingerprint', 'vuln', 'report'];
+  const currentIndex = stageOrder.indexOf(currentStage);
+
+  stageOrder.forEach((stageName, idx) => {
+    const stepEl = steps[stageName];
+    if (!stepEl) return;
+    
+    if (idx < currentIndex) {
+      stepEl.className = 'step completed';
+      stepEl.querySelector('.step-icon').innerHTML = '✓';
+      if (lines[idx - 1]) lines[idx - 1].className = 'step-line completed';
+    } else if (idx === currentIndex) {
+      stepEl.className = 'step active';
+      stepEl.querySelector('.step-icon').innerHTML = idx + 1;
+      if (lines[idx - 1]) lines[idx - 1].className = 'step-line completed';
+    } else {
+      stepEl.className = 'step';
+      stepEl.querySelector('.step-icon').innerHTML = idx + 1;
+      if (lines[idx - 1]) lines[idx - 1].className = 'step-line';
+    }
+  });
 }
 
 // 绑定 DOM 载入回调
