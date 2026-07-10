@@ -373,3 +373,183 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+// Popover 控制和智能路由解析代码
+(() => {
+  const smartForm = document.getElementById('report-filter-form');
+  const smartInput = document.getElementById('smart-search-input');
+  const hiddenIP = document.getElementById('hidden-ip');
+  const hiddenQ = document.getElementById('hidden-q');
+  const popoverViewSelect = document.getElementById('filter-view-select');
+
+  if (smartForm) {
+    // 1. Popover Panel 的 Toggle 与点击外部关闭
+    document.querySelectorAll('[data-popover-target]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const targetId = btn.getAttribute('data-popover-target');
+        const panel = document.getElementById(targetId);
+        if (!panel) return;
+        
+        const isHidden = panel.style.display === 'none';
+        
+        document.querySelectorAll('.popover-panel').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.popover-trigger-btn').forEach(b => {
+          b.classList.remove('active');
+          const icon = b.querySelector('.chevron-icon');
+          if (icon) icon.style.transform = 'rotate(0deg)';
+        });
+
+        if (isHidden) {
+          panel.style.display = 'flex';
+          btn.classList.add('active');
+          const icon = btn.querySelector('.chevron-icon');
+          if (icon) icon.style.transform = 'rotate(180deg)';
+        }
+      });
+    });
+
+    document.querySelectorAll('.popover-panel').forEach(panel => {
+      panel.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.popover-panel').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.popover-trigger-btn').forEach(b => {
+        b.classList.remove('active');
+        const icon = b.querySelector('.chevron-icon');
+        if (icon) icon.style.transform = 'rotate(0deg)';
+      });
+    });
+
+    // 2. 智能搜索输入框路由逻辑
+    smartForm.addEventListener('submit', () => {
+      if (!smartInput) return;
+      const val = smartInput.value.trim();
+      if (!val) {
+        hiddenIP.value = '';
+        hiddenQ.value = '';
+      } else {
+        const ipPattern = /^([0-9]{1,3}\.){3}[0-9]{1,3}(\/[0-9]{1,2})?$/;
+        const rangePattern = /^([0-9]{1,3}\.){3}[0-9]{1,3}-[0-9]{1,3}$/;
+        if (ipPattern.test(val) || rangePattern.test(val) || val.includes(',')) {
+          hiddenIP.value = val;
+          hiddenQ.value = '';
+        } else {
+          hiddenQ.value = val;
+          hiddenIP.value = '';
+        }
+      }
+    });
+
+    // 3. 动态渲染活动过滤徽章 Tags & 计数 Badge
+    const generateFilterBadges = () => {
+      const badgesRow = document.getElementById('badges-row-content');
+      const container = document.getElementById('active-filter-badges');
+      if (!badgesRow || !container) return;
+
+      badgesRow.innerHTML = '';
+      let hasBadges = false;
+
+      const addTag = (label, val, removeCallback) => {
+        const tag = document.createElement('div');
+        tag.className = 'filter-badge-tag';
+        tag.innerHTML = `<span>${label}: ${val}</span>`;
+        
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'filter-badge-tag-remove';
+        removeBtn.innerHTML = '✕';
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          removeCallback();
+        });
+        
+        tag.appendChild(removeBtn);
+        badgesRow.appendChild(tag);
+      };
+
+      if (hiddenIP && hiddenIP.value.trim()) {
+        addTag('IP', hiddenIP.value.trim(), () => {
+          hiddenIP.value = '';
+          smartInput.value = '';
+          smartForm.submit();
+        });
+        hasBadges = true;
+      }
+      if (hiddenQ && hiddenQ.value.trim()) {
+        addTag('关键词', hiddenQ.value.trim(), () => {
+          hiddenQ.value = '';
+          smartInput.value = '';
+          smartForm.submit();
+        });
+        hasBadges = true;
+      }
+
+      const portInput = smartForm.querySelector('input[name="port"]');
+      if (portInput && portInput.value.trim()) {
+        addTag('端口', portInput.value.trim(), () => {
+          portInput.value = '';
+          smartForm.submit();
+        });
+        hasBadges = true;
+      }
+
+      const serviceInput = smartForm.querySelector('input[name="service"]');
+      if (serviceInput && serviceInput.value.trim()) {
+        addTag('服务', serviceInput.value.trim(), () => {
+          serviceInput.value = '';
+          smartForm.submit();
+        });
+        hasBadges = true;
+      }
+
+      const sourceInput = smartForm.querySelector('input[name="source"]');
+      if (sourceInput && sourceInput.value.trim()) {
+        addTag('数据源', sourceInput.value.trim(), () => {
+          sourceInput.value = '';
+          smartForm.submit();
+        });
+        hasBadges = true;
+      }
+
+      if (popoverViewSelect && popoverViewSelect.value !== 'ports') {
+        addTag('视图', '主机聚合', () => {
+          popoverViewSelect.value = 'ports';
+          smartForm.submit();
+        });
+        hasBadges = true;
+      }
+
+      const severities = [];
+      document.querySelectorAll('.popover-checkbox-item input[type="checkbox"]').forEach(box => {
+        if (box.checked) {
+          severities.push(box.value);
+        }
+      });
+
+      const severityCountEl = document.getElementById('active-severity-count');
+      if (severityCountEl) {
+        if (severities.length > 0) {
+          severityCountEl.textContent = severities.length;
+          severityCountEl.style.display = 'inline-block';
+        } else {
+          severityCountEl.style.display = 'none';
+        }
+      }
+
+      severities.forEach(sev => {
+        addTag('级别', sev, () => {
+          const box = smartForm.querySelector(`.popover-checkbox-item input[value="${sev}"]`);
+          if (box) box.checked = false;
+          smartForm.submit();
+        });
+        hasBadges = true;
+      });
+
+      container.style.display = hasBadges ? 'flex' : 'none';
+    };
+
+    generateFilterBadges();
+  }
+})();
+

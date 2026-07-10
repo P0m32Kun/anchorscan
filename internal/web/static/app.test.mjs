@@ -518,5 +518,399 @@ assert.equal(mockLines[3].className, 'step-line completed');
   assert.equal(mockBtn.innerHTML, '<span>复制数据</span>');
 }
 
+// Test suite for Popovers, smart search input routing, tags rendering & removal, and apply buttons
+{
+  let submitCount = 0;
+  const mockForm = {
+    id: 'report-filter-form',
+    submitCount: 0,
+    submit() {
+      this.submitCount++;
+    },
+    addEventListener(event, handler) {
+      if (event === 'submit') {
+        this.submitHandler = handler;
+      }
+    },
+    submitHandler: null,
+    querySelector(selector) {
+      if (selector === 'input[name="port"]') return mockPortInput;
+      if (selector === 'input[name="service"]') return mockServiceInput;
+      if (selector === 'input[name="source"]') return mockSourceInput;
+      if (selector.startsWith('.popover-checkbox-item input[value=')) {
+        const val = selector.match(/value="([^"]+)"/)[1];
+        return mockCheckboxes.find(c => c.value === val);
+      }
+      return null;
+    }
+  };
+
+  const mockSmartInput = { id: 'smart-search-input', value: '' };
+  const mockHiddenIP = { id: 'hidden-ip', value: '' };
+  const mockHiddenQ = { id: 'hidden-q', value: '' };
+  const mockViewSelect = { id: 'filter-view-select', value: 'ports' };
+  
+  const mockPortInput = { value: '' };
+  const mockServiceInput = { value: '' };
+  const mockSourceInput = { value: '' };
+
+  const mockCheckboxes = [
+    { checked: false, value: 'high' },
+    { checked: false, value: 'medium' }
+  ];
+
+  const mockBadgesRow = {
+    id: 'badges-row-content',
+    innerHTML: '',
+    children: [],
+    appendChild(child) {
+      this.children.push(child);
+    }
+  };
+  const mockBadgesContainer = {
+    id: 'active-filter-badges',
+    style: { display: 'none' }
+  };
+  const mockSeverityCount = {
+    id: 'active-severity-count',
+    textContent: '',
+    style: { display: 'none' }
+  };
+
+  const mockChevron = {
+    style: { transform: '' }
+  };
+  const mockTriggerBtn = {
+    listeners: {},
+    classList: {
+      classes: new Set(['popover-trigger-btn']),
+      add(cls) { this.classes.add(cls); },
+      remove(cls) { this.classes.delete(cls); },
+      contains(cls) { return this.classes.has(cls); }
+    },
+    getAttribute(name) {
+      if (name === 'data-popover-target') return 'popover-panel-1';
+      return null;
+    },
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    },
+    querySelector(sel) {
+      if (sel === '.chevron-icon') return mockChevron;
+      return null;
+    }
+  };
+
+  const mockPanel = {
+    id: 'popover-panel-1',
+    style: { display: 'none' },
+    listeners: {},
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    }
+  };
+
+  const elements = {
+    'report-filter-form': mockForm,
+    'smart-search-input': mockSmartInput,
+    'hidden-ip': mockHiddenIP,
+    'hidden-q': mockHiddenQ,
+    'filter-view-select': mockViewSelect,
+    'badges-row-content': mockBadgesRow,
+    'active-filter-badges': mockBadgesContainer,
+    'active-severity-count': mockSeverityCount,
+    'popover-panel-1': mockPanel
+  };
+
+  let docClickHandlers = [];
+  const testContext = {
+    window: {},
+    document: {
+      getElementById(id) {
+        return elements[id] || null;
+      },
+      querySelectorAll(selector) {
+        if (selector === '[data-popover-target]') {
+          return [mockTriggerBtn];
+        }
+        if (selector === '.popover-panel') {
+          return [mockPanel];
+        }
+        if (selector === '.popover-trigger-btn') {
+          return [mockTriggerBtn];
+        }
+        if (selector === '.popover-checkbox-item input[type="checkbox"]') {
+          return mockCheckboxes;
+        }
+        return [];
+      },
+      createElement(tag) {
+        return {
+          tagName: tag.toUpperCase(),
+          className: '',
+          innerHTML: '',
+          children: [],
+          listeners: {},
+          addEventListener(event, handler) {
+            this.listeners[event] = handler;
+          },
+          appendChild(child) {
+            this.children.push(child);
+          }
+        };
+      },
+      querySelector(selector) {
+        return null;
+      },
+      addEventListener(event, handler) {
+        if (event === 'click') {
+          docClickHandlers.push(handler);
+        }
+      }
+    },
+    setInterval() {}
+  };
+
+  vm.createContext(testContext);
+  vm.runInContext(source, testContext);
+
+  // 1. Popover clicks toggle display, chevron rotate, active classes
+  const clickHandler = mockTriggerBtn.listeners['click'];
+  assert.ok(clickHandler, 'Popover click handler should be registered');
+
+  // Click trigger (it was display 'none') -> should show ('flex'), rotate chevron, add active class
+  let triggerStopProp = false;
+  clickHandler({
+    stopPropagation() {
+      triggerStopProp = true;
+    }
+  });
+  assert.ok(triggerStopProp);
+  assert.equal(mockPanel.style.display, 'flex');
+  assert.ok(mockTriggerBtn.classList.contains('active'));
+  assert.equal(mockChevron.style.transform, 'rotate(180deg)');
+
+  // Click again (it is now 'flex', i.e. not 'none') -> should hide ('none'), reset chevron, remove active
+  triggerStopProp = false;
+  clickHandler({ stopPropagation() { triggerStopProp = true; } });
+  assert.ok(triggerStopProp);
+  assert.equal(mockPanel.style.display, 'none');
+  assert.ok(!mockTriggerBtn.classList.contains('active'));
+  assert.equal(mockChevron.style.transform, 'rotate(0deg)');
+
+  // Click panel directly -> should NOT hide (stopPropagation is called)
+  const panelClickHandler = mockPanel.listeners['click'];
+  assert.ok(panelClickHandler);
+  let panelStopProp = false;
+  panelClickHandler({ stopPropagation() { panelStopProp = true; } });
+  assert.ok(panelStopProp);
+
+  // Click document body -> should close popovers
+  // First make panel visible
+  mockPanel.style.display = 'flex';
+  mockTriggerBtn.classList.add('active');
+  mockChevron.style.transform = 'rotate(180deg)';
+  
+  assert.ok(docClickHandlers.length > 0);
+  docClickHandlers.forEach(h => h({ target: { closest: () => null } }));
+  assert.equal(mockPanel.style.display, 'none');
+  assert.ok(!mockTriggerBtn.classList.contains('active'));
+  assert.equal(mockChevron.style.transform, 'rotate(0deg)');
+
+  // 2. Smart search input routing tests
+  const submitHandler = mockForm.submitHandler;
+  assert.ok(submitHandler, 'Submit handler should be registered');
+
+  // Case 2.1: Input IP
+  mockSmartInput.value = '192.168.1.1';
+  submitHandler();
+  assert.equal(mockHiddenIP.value, '192.168.1.1');
+  assert.equal(mockHiddenQ.value, '');
+
+  // Case 2.2: Input IP CIDR
+  mockSmartInput.value = '10.0.0.0/24';
+  submitHandler();
+  assert.equal(mockHiddenIP.value, '10.0.0.0/24');
+  assert.equal(mockHiddenQ.value, '');
+
+  // Case 2.3: Input IP range
+  mockSmartInput.value = '192.168.1.1-254';
+  submitHandler();
+  assert.equal(mockHiddenIP.value, '192.168.1.1-254');
+  assert.equal(mockHiddenQ.value, '');
+
+  // Case 2.4: Input comma-separated IPs
+  mockSmartInput.value = '1.1.1.1,8.8.8.8';
+  submitHandler();
+  assert.equal(mockHiddenIP.value, '1.1.1.1,8.8.8.8');
+  assert.equal(mockHiddenQ.value, '');
+
+  // Case 2.5: Input non-IP text query
+  mockSmartInput.value = 'cve-2026';
+  submitHandler();
+  assert.equal(mockHiddenIP.value, '');
+  assert.equal(mockHiddenQ.value, 'cve-2026');
+
+  // Case 2.6: Input empty value
+  mockSmartInput.value = '  ';
+  submitHandler();
+  assert.equal(mockHiddenIP.value, '');
+  assert.equal(mockHiddenQ.value, '');
+
+  // 3. Test Popover-Apply Submit Button simulation
+  mockForm.submitCount = 0;
+  const mockApplyBtn = {
+    tagName: 'BUTTON',
+    type: 'submit',
+    click() {
+      if (mockForm.submitHandler) {
+        mockForm.submitHandler();
+      }
+    }
+  };
+  mockSmartInput.value = '192.168.2.2';
+  mockApplyBtn.click();
+  assert.equal(mockHiddenIP.value, '192.168.2.2');
+}
+
+// Test suite for dynamic tags rendering and badge removal triggers submit
+{
+  let submitCount = 0;
+  const mockForm = {
+    id: 'report-filter-form',
+    submit() {
+      submitCount++;
+    },
+    addEventListener(event, handler) {},
+    querySelector(selector) {
+      if (selector === 'input[name="port"]') return mockPortInput;
+      if (selector === 'input[name="service"]') return mockServiceInput;
+      if (selector === 'input[name="source"]') return mockSourceInput;
+      if (selector.startsWith('.popover-checkbox-item input[value=')) {
+        const val = selector.match(/value="([^"]+)"/)[1];
+        return mockCheckboxes.find(c => c.value === val);
+      }
+      return null;
+    }
+  };
+
+  const mockSmartInput = { id: 'smart-search-input', value: '192.168.1.1' };
+  const mockHiddenIP = { id: 'hidden-ip', value: '192.168.1.1' };
+  const mockHiddenQ = { id: 'hidden-q', value: 'cve-2026' };
+  const mockViewSelect = { id: 'filter-view-select', value: 'hosts' }; // not 'ports'
+  
+  const mockPortInput = { value: '80' };
+  const mockServiceInput = { value: 'http' };
+  const mockSourceInput = { value: 'nmap' };
+
+  const mockCheckboxes = [
+    { checked: true, value: 'high' },
+    { checked: false, value: 'medium' }
+  ];
+
+  const mockBadgesRow = {
+    id: 'badges-row-content',
+    innerHTML: '',
+    children: [],
+    appendChild(child) {
+      this.children.push(child);
+    }
+  };
+  const mockBadgesContainer = {
+    id: 'active-filter-badges',
+    style: { display: 'none' }
+  };
+  const mockSeverityCount = {
+    id: 'active-severity-count',
+    textContent: '',
+    style: { display: 'none' }
+  };
+
+  const elements = {
+    'report-filter-form': mockForm,
+    'smart-search-input': mockSmartInput,
+    'hidden-ip': mockHiddenIP,
+    'hidden-q': mockHiddenQ,
+    'filter-view-select': mockViewSelect,
+    'badges-row-content': mockBadgesRow,
+    'active-filter-badges': mockBadgesContainer,
+    'active-severity-count': mockSeverityCount,
+  };
+
+  const tagContext = {
+    window: {},
+    document: {
+      getElementById(id) {
+        return elements[id] || null;
+      },
+      querySelectorAll(selector) {
+        if (selector === '.popover-checkbox-item input[type="checkbox"]') {
+          return mockCheckboxes;
+        }
+        return [];
+      },
+      createElement(tag) {
+        return {
+          tagName: tag.toUpperCase(),
+          className: '',
+          innerHTML: '',
+          children: [],
+          listeners: {},
+          addEventListener(event, handler) {
+            this.listeners[event] = handler;
+          },
+          appendChild(child) {
+            this.children.push(child);
+          }
+        };
+      },
+      querySelector(selector) {
+        return null;
+      },
+      addEventListener(event, handler) {}
+    },
+    setInterval() {}
+  };
+
+  vm.createContext(tagContext);
+  vm.runInContext(source, tagContext);
+
+  // Assertions on tags generated
+  assert.equal(mockBadgesContainer.style.display, 'flex');
+  assert.equal(mockBadgesRow.children.length, 7); // IP, Q, port, service, source, view, severity (high)
+  assert.equal(mockSeverityCount.textContent, 1);
+  assert.equal(mockSeverityCount.style.display, 'inline-block');
+
+  // Find IP tag and click ✕
+  const ipTag = mockBadgesRow.children.find(t => t.innerHTML.includes('IP'));
+  assert.ok(ipTag);
+  const ipRemoveBtn = ipTag.children[0];
+  assert.ok(ipRemoveBtn);
+  assert.equal(ipRemoveBtn.innerHTML, '✕');
+
+  let stopPropagationCalled = false;
+  ipRemoveBtn.listeners['click']({
+    stopPropagation() {
+      stopPropagationCalled = true;
+    }
+  });
+  assert.ok(stopPropagationCalled);
+  assert.equal(mockHiddenIP.value, '');
+  assert.equal(mockSmartInput.value, '');
+  assert.equal(submitCount, 1);
+
+  // Find severity tag and click ✕
+  const lvlTag = mockBadgesRow.children.find(t => t.innerHTML.includes('级别'));
+  assert.ok(lvlTag);
+  const lvlRemoveBtn = lvlTag.children[0];
+  assert.ok(lvlRemoveBtn);
+
+  submitCount = 0;
+  lvlRemoveBtn.listeners['click']({ stopPropagation() {} });
+  assert.equal(mockCheckboxes[0].checked, false);
+  assert.equal(submitCount, 1);
+}
+
+
 
 
