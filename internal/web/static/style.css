@@ -746,7 +746,8 @@ input[type="file"]::file-selector-button:hover {
 }
 
 /* Filters and Search */
-.filter-grid {
+.filter-grid,
+.filter-grid-layout {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.65rem;
@@ -754,12 +755,16 @@ input[type="file"]::file-selector-button:hover {
 
 .filter-grid input,
 .filter-grid select,
-.filter-grid button {
+.filter-grid button,
+.filter-grid-layout input,
+.filter-grid-layout select,
+.filter-grid-layout button {
   font-size: 0.82rem;
   padding: 0.5rem 0.65rem;
 }
 
-.filter-grid button {
+.filter-grid button,
+.filter-grid-layout button {
   min-width: 7.5rem;
 }
 
@@ -767,12 +772,14 @@ input[type="file"]::file-selector-button:hover {
   padding: 0.85rem;
 }
 
-.report-filter .filter-grid {
+.report-filter .filter-grid,
+.report-filter .filter-grid-layout {
   align-items: end;
 }
 
 /* Severity Filter Chips */
-.filter-grid .full-width {
+.filter-grid .full-width,
+.filter-grid-layout .full-width {
   grid-column: 1 / -1;
 }
 
@@ -1783,7 +1790,21 @@ input[type="file"]::file-selector-button:hover {
   background: var(--success);
 }
 
-/* 高级筛选折叠样式 */
+/* 过滤布局折叠 */
+.filter-main-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.filter-main-row .input-with-icon {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+.filter-main-row input {
+  padding-left: 2.15rem;
+}
 .search-icon {
   position: absolute;
   left: 0.75rem;
@@ -1794,6 +1815,9 @@ input[type="file"]::file-selector-button:hover {
   pointer-events: none;
 }
 .filter-advanced-panel {
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+  margin-top: 0.85rem;
   animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 @keyframes slideDown {
