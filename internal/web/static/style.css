@@ -4,13 +4,13 @@
   /* Theme colors: Stealth Obsidian & Amber */
   --bg: #090a0c;                 /* Deep obsidian black */
   --bg-dots: rgba(249, 115, 22, 0.012); /* Barely visible warm grid dots */
-  --bg-accent: #0f1013;          /* Secondary bg for inputs/sidebar */
+  --bg-accent: #0b0c0f;          /* Secondary bg for inputs/sidebar - darker */
   --panel: #121316;              /* Dark charcoal panel background */
   --panel-strong: #17181c;       /* Solid dark panel background */
-  --border: #1f2126;             /* Ultra-crisp thin border */
+  --border: #22242a;             /* Ultra-crisp thin border - slightly lighter */
   --border-strong: #2c2f37;      /* Stronger divider border */
   --text: #d2d5dc;               /* Soft titanium gray text */
-  --muted: #666a73;              /* Muted text color */
+  --muted: #8e94a0;              /* Muted text color - lighter for WCAG AA (4.71:1) */
   --heading: #f0f2f5;            /* Bright header text */
   
   --primary: #f97316;            /* Copper Orange */
@@ -1587,5 +1587,18 @@ input[type="file"]::file-selector-button:hover {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+}
+
+/* 移动端页眉 & 遮罩 */
+.mobile-header { display: none; }
+.sidebar-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 99;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
 }
 
