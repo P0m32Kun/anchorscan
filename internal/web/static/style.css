@@ -840,19 +840,22 @@ input[type="file"]::file-selector-button:hover {
   opacity: 0.8;
 }
 
-.severity-filter-chip .severity-dot {
-  width: 6px;
-  height: 6px;
+.severity-dot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  display: inline-block;
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.severity-dot.critical { background: var(--sev-critical); }
+.severity-dot.high { background: var(--sev-high); }
+.severity-dot.medium { background: var(--sev-medium); }
+.severity-dot.low { background: var(--sev-low); }
+.severity-dot.info { background: var(--sev-info); }
 
-/* Severity specific default colors for the dot */
-.severity-filter-chip.critical .severity-dot { background: var(--sev-critical); opacity: 0.4; }
-.severity-filter-chip.high .severity-dot { background: var(--sev-high); opacity: 0.4; }
-.severity-filter-chip.medium .severity-dot { background: var(--sev-medium); opacity: 0.4; }
-.severity-filter-chip.low .severity-dot { background: var(--sev-low); opacity: 0.4; }
-.severity-filter-chip.info .severity-dot { background: var(--sev-info); opacity: 0.4; }
+.severity-filter-chip .severity-dot {
+  opacity: 0.4;
+}
 
 /* Active States (Selected) */
 .severity-filter-chip.critical:has(input:checked),

@@ -1,38 +1,57 @@
-# Task 3: JS 控制器及单元测试实现 - Execution Report
+# Execution Report: Task 3 - Security and Visual Issue Fixes
 
-## Overview
-We have successfully implemented the JavaScript controllers for popovers, smart search input routing, active filter badges rendering, and badge removals. We have also added comprehensive Node.js VM tests in `app.test.mjs` verifying all interaction behaviors.
+## 1. DOM-based Reflected XSS Prevention
+- **Issue Description:** Inside `app.js` in `generateFilterBadges()`, `tag.innerHTML` was used to render the active filter badges, leading to potential Reflected XSS if users inputted HTML/JS payloads.
+- **Fix:** Changed the element generation logic to safely assign the text representation using `textContent` within a newly created `span` element, which is then appended to the badge:
+  ```javascript
+  const tag = document.createElement('div');
+  tag.className = 'filter-badge-tag';
+  const textSpan = document.createElement('span');
+  textSpan.textContent = `${label}: ${val}`;
+  tag.appendChild(textSpan);
+  ```
 
-## Implementation Details
+## 2. Invisible Severity Dots
+- **Issue Description:** `.severity-dot` styling was nested only under `.severity-filter-chip`, making dots elsewhere in the DOM (such as the vulnerability distribution table/cards) invisible.
+- **Fix:** Restructured and generalized the `.severity-dot` selectors globally in `style.css` so width, height, and colors are defined independently of the filter chip structure:
+  ```css
+  .severity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .severity-dot.critical { background: var(--sev-critical); }
+  .severity-dot.high { background: var(--sev-high); }
+  .severity-dot.medium { background: var(--sev-medium); }
+  .severity-dot.low { background: var(--sev-low); }
+  .severity-dot.info { background: var(--sev-info); }
 
-### 1. JavaScript Controller (`internal/web/static/app.js`)
-We appended the interaction controller logic to `app.js`:
-- **Popover Toggling & Closing**: 
-  - Prevents clicks from propagating on trigger buttons and panels.
-  - Toggles panel display (`none` to `flex` and vice-versa) and rotates the chevron icons (`0deg` to `180deg`).
-  - Closes all popovers when clicking outside the panel.
-- **Smart Search Input Routing**:
-  - Automatically parses the search string inside the `submit` handler of the filter form.
-  - If the input matches IP (regex), IP range, CIDR format, or contains commas, it sets `hidden-ip` and clears `hidden-q`.
-  - Otherwise, it sets `hidden-q` and clears `hidden-ip`.
-- **Dynamic Active Filter Badges**:
-  - Dynamically populates `.filter-badge-tag` items into `#badges-row-content`.
-  - Calculates and shows/hides the active severity badge count.
-  - Attaches click listeners to the `✕` remove button of each tag to clear the specific filter value and automatically submit the form.
+  .severity-filter-chip .severity-dot {
+    opacity: 0.4;
+  }
+  ```
 
-### 2. Unit Tests (`internal/web/static/app.test.mjs`)
-We appended comprehensive tests covering:
-- **Popover Clicks & Chevron Rotation**: Verifies correct display toggling, active class assignment, chevron rotation (`180deg`), stop propagation on panel clicks, and click-away closing.
-- **Smart Input Routing**: Verifies IP, CIDR, IP range, and comma-delimited lists are routed to `hidden-ip`, and text queries (e.g. `cve-2026`) are routed to `hidden-q`.
-- **Apply Buttons**: Simulates the submit button click in the popover panel footer to verify form submission.
-- **Tags Generation & Removal**: Verifies rendering of active filters, correctness of severity counts, and that clicking `✕` clears parameters and triggers an automatic submit.
+## 3. Fragile Popover Toggle Check
+- **Issue Description:** The popover toggle logic relied directly on checking inline style properties (`panel.style.display === 'none'`), which is fragile and fails if styles are declared in external/internal stylesheets.
+- **Fix:** Updated the check to inspect the computed style directly:
+  ```javascript
+  const isHidden = window.getComputedStyle(panel).display === 'none';
+  ```
 
-## Test Summary
-All Go tests and the Node.js test runner passed successfully:
-```bash
-go test ./... - passed
-node --test internal/web/static/app.test.mjs - passed (1/1 test file passing)
-```
+## 4. Form Submit Event Bypass
+- **Issue Description:** Removing a filter badge called `smartForm.submit()`, which bypasses registered submit handlers (such as the custom IP routing/parsing logic).
+- **Fix:** Updated badge removal callback actions to invoke `requestSubmit()` where available, falling back safely to `submit()`:
+  ```javascript
+  if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
+  ```
 
-## Git Status
-Changes staged and committed to git repository.
+## 5. Defensive Checks & Unit Tests
+- **Defensive Checks:** Added checks in `app.js` to verify that `hiddenIP` and `hiddenQ` elements exist before attempting to read/write their properties. Also added a defensive check for the `.chevron-icon` presence.
+- **Unit Tests:** Added a new test suite inside `app.test.mjs` verifying that tags generated with malicious HTML payloads (like `<img src=x onerror=alert(1)>`) are safely treated as text without parsing HTML or allowing script execution. Updated the existing test context mocks to provide `getComputedStyle`, `requestSubmit`, and realistic `innerHTML` serialization properties to ensure complete test coverage.
+
+## Test Outcomes
+Running `make test` executes all Go tests and the frontend unit test suite:
+- **Go Tests:** 14/14 packages passing.
+- **Node Unit Tests:** Passed successfully.

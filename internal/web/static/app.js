@@ -326,7 +326,10 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const isHidden = advPanel.style.display === 'none';
       advPanel.style.display = isHidden ? 'block' : 'none';
-      toggleAdvBtn.querySelector('.chevron-icon').style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+      const chevron = toggleAdvBtn.querySelector('.chevron-icon');
+      if (chevron) {
+        chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+      }
     });
   }
 
@@ -391,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById(targetId);
         if (!panel) return;
         
-        const isHidden = panel.style.display === 'none';
+        const isHidden = window.getComputedStyle(panel).display === 'none';
         
         document.querySelectorAll('.popover-panel').forEach(p => p.style.display = 'none');
         document.querySelectorAll('.popover-trigger-btn').forEach(b => {
@@ -427,17 +430,17 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!smartInput) return;
       const val = smartInput.value.trim();
       if (!val) {
-        hiddenIP.value = '';
-        hiddenQ.value = '';
+        if (hiddenIP) hiddenIP.value = '';
+        if (hiddenQ) hiddenQ.value = '';
       } else {
         const ipPattern = /^([0-9]{1,3}\.){3}[0-9]{1,3}(\/[0-9]{1,2})?$/;
         const rangePattern = /^([0-9]{1,3}\.){3}[0-9]{1,3}-[0-9]{1,3}$/;
         if (ipPattern.test(val) || rangePattern.test(val) || val.includes(',')) {
-          hiddenIP.value = val;
-          hiddenQ.value = '';
+          if (hiddenIP) hiddenIP.value = val;
+          if (hiddenQ) hiddenQ.value = '';
         } else {
-          hiddenQ.value = val;
-          hiddenIP.value = '';
+          if (hiddenQ) hiddenQ.value = val;
+          if (hiddenIP) hiddenIP.value = '';
         }
       }
     });
@@ -454,7 +457,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const addTag = (label, val, removeCallback) => {
         const tag = document.createElement('div');
         tag.className = 'filter-badge-tag';
-        tag.innerHTML = `<span>${label}: ${val}</span>`;
+        const textSpan = document.createElement('span');
+        textSpan.textContent = `${label}: ${val}`;
+        tag.appendChild(textSpan);
         
         const removeBtn = document.createElement('span');
         removeBtn.className = 'filter-badge-tag-remove';
@@ -472,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addTag('IP', hiddenIP.value.trim(), () => {
           hiddenIP.value = '';
           smartInput.value = '';
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       }
@@ -480,7 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addTag('关键词', hiddenQ.value.trim(), () => {
           hiddenQ.value = '';
           smartInput.value = '';
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       }
@@ -489,7 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (portInput && portInput.value.trim()) {
         addTag('端口', portInput.value.trim(), () => {
           portInput.value = '';
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       }
@@ -498,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (serviceInput && serviceInput.value.trim()) {
         addTag('服务', serviceInput.value.trim(), () => {
           serviceInput.value = '';
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       }
@@ -507,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (sourceInput && sourceInput.value.trim()) {
         addTag('数据源', sourceInput.value.trim(), () => {
           sourceInput.value = '';
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       }
@@ -515,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (popoverViewSelect && popoverViewSelect.value !== 'ports') {
         addTag('视图', '主机聚合', () => {
           popoverViewSelect.value = 'ports';
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       }
@@ -541,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addTag('级别', sev, () => {
           const box = smartForm.querySelector(`.popover-checkbox-item input[value="${sev}"]`);
           if (box) box.checked = false;
-          smartForm.submit();
+          if (typeof smartForm.requestSubmit === 'function') { smartForm.requestSubmit(); } else { smartForm.submit(); }
         });
         hasBadges = true;
       });

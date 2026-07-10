@@ -4,7 +4,9 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('./app.js', import.meta.url), 'utf8');
 const context = {
-  window: {},
+  window: {
+    getComputedStyle: (el) => el.style || {}
+  },
   document: {
     getElementById: () => null,
     querySelector: () => null,
@@ -211,6 +213,9 @@ assert.equal(mockLines[3].className, 'step-line completed');
   let domContentLoadedCallback = null;
   const mockForm = {
     submitCalledCount: 0,
+    requestSubmit() {
+      this.submit();
+    },
     submit() {
       this.submitCalledCount++;
     }
@@ -273,7 +278,9 @@ assert.equal(mockLines[3].className, 'step-line completed');
   };
 
   const interactiveContext = {
-    window: {},
+    window: {
+      getComputedStyle: (el) => el.style || {}
+    },
     document: {
       addEventListener(event, handler) {
         if (event === 'DOMContentLoaded') {
@@ -373,7 +380,8 @@ assert.equal(mockLines[3].className, 'step-line completed');
 
   const copyContext = {
     window: {
-      isSecureContext: true
+      isSecureContext: true,
+      getComputedStyle: (el) => el.style || {}
     },
     navigator: {
       clipboard: {
@@ -467,7 +475,8 @@ assert.equal(mockLines[3].className, 'step-line completed');
 
   const copyContext = {
     window: {
-      isSecureContext: true
+      isSecureContext: true,
+      getComputedStyle: (el) => el.style || {}
     },
     navigator: {
       clipboard: {
@@ -524,6 +533,9 @@ assert.equal(mockLines[3].className, 'step-line completed');
   const mockForm = {
     id: 'report-filter-form',
     submitCount: 0,
+    requestSubmit() {
+      this.submit();
+    },
     submit() {
       this.submitCount++;
     },
@@ -624,7 +636,9 @@ assert.equal(mockLines[3].className, 'step-line completed');
 
   let docClickHandlers = [];
   const testContext = {
-    window: {},
+    window: {
+      getComputedStyle: (el) => el.style || {}
+    },
     document: {
       getElementById(id) {
         return elements[id] || null;
@@ -648,9 +662,20 @@ assert.equal(mockLines[3].className, 'step-line completed');
         return {
           tagName: tag.toUpperCase(),
           className: '',
-          innerHTML: '',
+          _innerHTML: '',
+          textContent: '',
           children: [],
           listeners: {},
+          get innerHTML() {
+            if (this._innerHTML) return this._innerHTML;
+            return this.children.map(c => {
+              const tagLower = c.tagName.toLowerCase();
+              return `<${tagLower} class="${c.className}">${c.textContent || c.innerHTML}</${tagLower}>`;
+            }).join('');
+          },
+          set innerHTML(val) {
+            this._innerHTML = val;
+          },
           addEventListener(event, handler) {
             this.listeners[event] = handler;
           },
@@ -778,6 +803,9 @@ assert.equal(mockLines[3].className, 'step-line completed');
   let submitCount = 0;
   const mockForm = {
     id: 'report-filter-form',
+    requestSubmit() {
+      this.submit();
+    },
     submit() {
       submitCount++;
     },
@@ -838,7 +866,9 @@ assert.equal(mockLines[3].className, 'step-line completed');
   };
 
   const tagContext = {
-    window: {},
+    window: {
+      getComputedStyle: (el) => el.style || {}
+    },
     document: {
       getElementById(id) {
         return elements[id] || null;
@@ -853,9 +883,20 @@ assert.equal(mockLines[3].className, 'step-line completed');
         return {
           tagName: tag.toUpperCase(),
           className: '',
-          innerHTML: '',
+          _innerHTML: '',
+          textContent: '',
           children: [],
           listeners: {},
+          get innerHTML() {
+            if (this._innerHTML) return this._innerHTML;
+            return this.children.map(c => {
+              const tagLower = c.tagName.toLowerCase();
+              return `<${tagLower} class="${c.className}">${c.textContent || c.innerHTML}</${tagLower}>`;
+            }).join('');
+          },
+          set innerHTML(val) {
+            this._innerHTML = val;
+          },
           addEventListener(event, handler) {
             this.listeners[event] = handler;
           },
@@ -884,7 +925,7 @@ assert.equal(mockLines[3].className, 'step-line completed');
   // Find IP tag and click ✕
   const ipTag = mockBadgesRow.children.find(t => t.innerHTML.includes('IP'));
   assert.ok(ipTag);
-  const ipRemoveBtn = ipTag.children[0];
+  const ipRemoveBtn = ipTag.children.find(c => c.className === 'filter-badge-tag-remove');
   assert.ok(ipRemoveBtn);
   assert.equal(ipRemoveBtn.innerHTML, '✕');
 
@@ -902,13 +943,121 @@ assert.equal(mockLines[3].className, 'step-line completed');
   // Find severity tag and click ✕
   const lvlTag = mockBadgesRow.children.find(t => t.innerHTML.includes('级别'));
   assert.ok(lvlTag);
-  const lvlRemoveBtn = lvlTag.children[0];
+  const lvlRemoveBtn = lvlTag.children.find(c => c.className === 'filter-badge-tag-remove');
   assert.ok(lvlRemoveBtn);
 
   submitCount = 0;
   lvlRemoveBtn.listeners['click']({ stopPropagation() {} });
   assert.equal(mockCheckboxes[0].checked, false);
   assert.equal(submitCount, 1);
+}
+
+// Test suite for XSS prevention when rendering tags with HTML characters
+{
+  const mockForm = {
+    id: 'report-filter-form',
+    requestSubmit() {},
+    submit() {},
+    addEventListener(event, handler) {},
+    querySelector(selector) {
+      return null;
+    }
+  };
+
+  const mockSmartInput = { id: 'smart-search-input', value: '' };
+  const mockHiddenIP = { id: 'hidden-ip', value: '' };
+  const mockHiddenQ = { id: 'hidden-q', value: '<img src=x onerror=alert(1)>' };
+  const mockViewSelect = { id: 'filter-view-select', value: 'ports' };
+
+  const mockBadgesRow = {
+    id: 'badges-row-content',
+    innerHTML: '',
+    children: [],
+    appendChild(child) {
+      this.children.push(child);
+    }
+  };
+  const mockBadgesContainer = {
+    id: 'active-filter-badges',
+    style: { display: 'none' }
+  };
+  const mockSeverityCount = {
+    id: 'active-severity-count',
+    textContent: '',
+    style: { display: 'none' }
+  };
+
+  const elements = {
+    'report-filter-form': mockForm,
+    'smart-search-input': mockSmartInput,
+    'hidden-ip': mockHiddenIP,
+    'hidden-q': mockHiddenQ,
+    'filter-view-select': mockViewSelect,
+    'badges-row-content': mockBadgesRow,
+    'active-filter-badges': mockBadgesContainer,
+    'active-severity-count': mockSeverityCount,
+  };
+
+  const xssContext = {
+    window: {
+      getComputedStyle: (el) => el.style || {}
+    },
+    document: {
+      getElementById(id) {
+        return elements[id] || null;
+      },
+      querySelectorAll(selector) {
+        return [];
+      },
+      createElement(tag) {
+        return {
+          tagName: tag.toUpperCase(),
+          className: '',
+          _innerHTML: '',
+          textContent: '',
+          children: [],
+          listeners: {},
+          get innerHTML() {
+            if (this._innerHTML) return this._innerHTML;
+            return this.children.map(c => {
+              const tagLower = c.tagName.toLowerCase();
+              return `<${tagLower} class="${c.className}">${c.textContent || c.innerHTML}</${tagLower}>`;
+            }).join('');
+          },
+          set innerHTML(val) {
+            this._innerHTML = val;
+          },
+          addEventListener(event, handler) {
+            this.listeners[event] = handler;
+          },
+          appendChild(child) {
+            this.children.push(child);
+          }
+        };
+      },
+      querySelector(selector) {
+        return null;
+      },
+      addEventListener(event, handler) {}
+    },
+    setInterval() {}
+  };
+
+  vm.createContext(xssContext);
+  vm.runInContext(source, xssContext);
+
+  // Assertions
+  assert.equal(mockBadgesRow.children.length, 1);
+  const keywordTag = mockBadgesRow.children[0];
+  
+  // The keyword tag should have two children: the text span and the remove button span
+  assert.equal(keywordTag.children.length, 2);
+  const textSpan = keywordTag.children[0];
+  assert.equal(textSpan.tagName, 'SPAN');
+  
+  // Verify that the HTML payload is safely stored in textContent and has NOT been parsed/rendered as HTML elements
+  assert.equal(textSpan.textContent, '关键词: <img src=x onerror=alert(1)>');
+  assert.equal(textSpan._innerHTML, ''); // should not set raw innerHTML of the text span!
 }
 
 
