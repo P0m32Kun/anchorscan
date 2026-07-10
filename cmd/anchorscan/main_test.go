@@ -191,7 +191,7 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 		"--target",
 		"IP range",
 		"--ports",
-		"100-1000",
+		"top1000",
 		"--profile",
 		"--host-workers",
 		"--rustscan-args",
@@ -262,8 +262,8 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
-	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	var stdout, stderr bytes.Buffer
 	runner := &fakeRunner{
@@ -284,7 +284,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
-	if !strings.Contains(stderr.String(), "[scan] preflight targets=1 ports=top100 profile=normal workers=1") {
+	if !strings.Contains(stderr.String(), "[scan] preflight targets=1 ports=top1000 profile=normal workers=1") {
 		t.Fatalf("expected preflight summary, got %q", stderr.String())
 	}
 }
@@ -292,8 +292,8 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 func TestExecuteScanStopsOnPreflightError(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
-	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	var stdout, stderr bytes.Buffer
 	err := run([]string{

@@ -2,7 +2,7 @@
 
 `anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。
 
-核心思路是「**指纹驱动、精准分类**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 根据服务类型进入 `httpx`、`nuclei`、NSE 后续流程 → 结果统一落入 SQLite → 导出 JSON / HTML 报告。
+核心思路是「**指纹驱动、精准分类、服务双引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 每个已识别服务按双引擎规则表（`config/service-tags.yaml` + `config/nse.yaml`）同时调度 `nuclei`（含默认凭据检测）和 nmap NSE → Web 服务额外走 `httpx` → 结果统一落入 SQLite → 导出 JSON / HTML 报告。
 
 ## 快速开始
 
@@ -52,25 +52,24 @@ go run ./cmd/anchorscan web --listen 127.0.0.1:9000 --config custom.yaml --db ot
 #### 4. 或直接命令行扫描
 
 ```bash
-go run ./cmd/anchorscan scan --target 127.0.0.1 --ports highrisk
+go run ./cmd/anchorscan scan --target 127.0.0.1 --ports top1000
 ```
 
 不传 `--json` 时，JSON 报告默认写到 `reports/scan-<时间戳>.json`。如需 HTML 报告或自定义路径，加 `--html reports/test.html`。
 
-## 端口预设
+## 端口格式
 
 `--ports` 或表单端口框支持以下写法：
 
 | 写法 | 含义 |
 |------|------|
-| `highrisk` | 高危端口列表（运维改端口 + 工控/SCADA + 标准高危服务，约 50 个） |
-| `top100` | 常见 100 端口 |
-| `top1000` | 常见 1000 端口 |
-| `full` | 全端口 1-65535（较慢） |
-| `80,443,8080` | 自定义端口列表 |
-| `100-1000` | 自定义范围 |
+| `top1000` | 使用 rustscan `--top` 扫常见 1000 端口 |
+| `100-1000` | 使用 rustscan `--range 100-1000` 扫端口范围 |
+| `80,443,8080` | 使用 rustscan `--ports 80,443,8080` 扫自定义端口列表 |
 
-**高危端口列表维护**：进入「全局配置」页，底部「高危端口列表」面板可可视化增删端口并保存，写回 `config/ports-highrisk.txt`（每次保存自动备份）。也可直接编辑该文件。
+不再接受 `full`、`highrisk` 或混合格式。需要全端口时填写 `1-65535`。
+
+**高危端口列表维护**：进入「全局配置」页，底部「高危端口列表」面板可可视化增删端口并保存，写回 `config/ports-highrisk.txt`（每次保存自动备份）。扫描表单的「插入高危端口列表」会写入实际 CSV，扫描输入不再接受 `highrisk` 短语。
 
 ## 扫描档位
 

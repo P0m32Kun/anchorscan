@@ -25,14 +25,14 @@ The current direction explicitly does not include:
 
 ## Current Baseline
 
-The project is at a V1.6.0 local-operator baseline.
+The project is at a V1.6.1 local-operator baseline.
 
 Implemented capabilities:
 
 - CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
 - fixed scan pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
 - single-tool runs for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
-- port selection: custom lists, ranges like `100-1000`, `top100`, `top1000`, `highrisk`, and `full`
+- port selection mirrors rustscan usage: `top1000` -> `--top`, numeric ranges like `100-1000` -> `--range`, and comma-separated numeric ports -> `--ports`; `highrisk` is maintained as an insertable CSV preset
 - scan profiles: `slow`, `normal`, `fast`
 - per-tool extra args through configuration
 - shared scan preflight for CLI and Web Console
@@ -58,9 +58,9 @@ Implemented capabilities:
 | `config/default.yaml` | tool paths, scan defaults, scan profiles, and extra tool args (auto-generated on first run; gitignored) |
 | `config/default.yaml.example` | human-readable config template (committed) |
 | `config/ports-highrisk.txt` | high-risk port preset (ops-remapped + ICS/SCADA + standard services) |
-| `config/ports-top100.txt` / `config/ports-top1000.txt` | common port presets |
-| `config/service-tags.yaml` | fingerprint-driven nuclei tag mapping |
-| `config/nse.yaml` | fingerprint-driven NSE script mapping |
+| `config/ports-top1000.txt` | common port preset used by `top1000` |
+| `config/service-tags.yaml` | dual-engine nuclei tag mapping (26+ services, each with `default-login`) |
+| `config/nse.yaml` | dual-engine NSE script mapping (information-collection scripts per service) |
 | `config/service-aliases.yaml` | service normalization aliases |
 
 Third-party tools are configured by path. AnchorScan does not package `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
@@ -78,8 +78,8 @@ These are generated locally and should not be treated as source:
 
 - Web Console is designed for local single-user use.
 - The current Web Console process supports one active pipeline scan or single-tool run at a time.
-- `nmap -sV --version-intensity 7` can be slow on full-port scans. This is expected; use narrow ports for lab checks.
-- nuclei execution is intentionally narrow and fingerprint-driven through tags such as `redis` or `tomcat`.
+- `nmap -sV --version-intensity 7` can be slow on `1-65535` full-range scans. This is expected; use narrow ports for lab checks.
+- nuclei and NSE run as a dual-engine matrix: every discovered service with configured rules runs both engines. `config/service-tags.yaml` maps 26+ common services (SSH, FTP, Redis, MySQL, SMB, etc.) to nuclei tags (each appending `default-login` for weak-credential coverage), while `config/nse.yaml` maps the same services to nmap NSE scripts. Services without NSE scripts (elasticsearch, kafka, kubernetes, winrm) run nuclei only.
 - Manual nuclei runs can target explicit tags or one template path from the CLI/Web single-tool flow.
 - BlueKeep / CVE-2019-0708 is flagged for manual review from RDP fingerprint evidence; AnchorScan does not attempt exploit-based confirmation.
 - Unknown services should not be forced into the Web pipeline.

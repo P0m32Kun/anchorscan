@@ -44,7 +44,8 @@
       
       <label>
         <span>全局默认端口</span>
-        <input name="ports" value="{{.Config.Scan.Ports}}" placeholder="例如: top1000">
+        <input name="ports" value="{{.Config.Scan.Ports}}" placeholder="例如: top1000、100-1000 或 80,443,8080">
+        <p class="meta-line" style="margin-top: 0.35rem;">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk。</p>
       </label>
       <label>
         <span>全局默认档位</span>
@@ -95,7 +96,7 @@
     <div>
       <p class="eyebrow">端口预设</p>
       <h3>高危端口列表 (highrisk)</h3>
-      <p class="meta-line">此处维护 highrisk 预设端口，保存后写回 config/ports-highrisk.txt。扫描时填入 highrisk 短语或在表单点击「插入高危端口列表」都会使用此列表。</p>
+      <p class="meta-line">此处维护 highrisk 端口列表，保存后写回 config/ports-highrisk.txt。扫描表单点击「插入高危端口列表」会写入实际 CSV；扫描输入不再接受 highrisk 短语。</p>
     </div>
   </div>
   <form class="form-grid" method="post" action="/config/ports">

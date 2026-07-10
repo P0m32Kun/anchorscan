@@ -18,8 +18,8 @@ func TestInitCreatesDefaultConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	if cfg.Scan.Ports != "top100" {
-		t.Fatalf("expected default ports top100, got %q", cfg.Scan.Ports)
+	if cfg.Scan.Ports != "top1000" {
+		t.Fatalf("expected default ports top1000, got %q", cfg.Scan.Ports)
 	}
 	if cfg.Scan.Profile != "normal" {
 		t.Fatalf("expected default profile normal, got %q", cfg.Scan.Profile)
@@ -58,7 +58,7 @@ func TestLoadDoesNotOverwriteExisting(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "default.yaml")
 
-	original := []byte("scan:\n  ports: full\n  profile: fast\n")
+	original := []byte("scan:\n  ports: 100-1000\n  profile: fast\n")
 	if err := os.WriteFile(path, original, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -67,8 +67,8 @@ func TestLoadDoesNotOverwriteExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	if cfg.Scan.Ports != "full" {
-		t.Fatalf("existing config was overwritten: expected ports full, got %q", cfg.Scan.Ports)
+	if cfg.Scan.Ports != "100-1000" {
+		t.Fatalf("existing config was overwritten: expected ports 100-1000, got %q", cfg.Scan.Ports)
 	}
 	if cfg.Scan.Profile != "fast" {
 		t.Fatalf("existing config was overwritten: expected profile fast, got %q", cfg.Scan.Profile)

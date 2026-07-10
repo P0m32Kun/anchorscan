@@ -46,7 +46,7 @@ func TestResolveScanRejectsUnknownProfile(t *testing.T) {
 func TestResolveScanDefaultsV1ConfigWithoutProfilesSection(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\nscan:\n  ports: top100\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\nscan:\n  ports: top1000\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 

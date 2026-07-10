@@ -84,8 +84,8 @@ func Run(opts Options) Result {
 		result.Summary.ResolvedPorts = resolved
 	}
 
-	if opts.PortSpec == "full" || result.Summary.ResolvedPorts == "1-65535" {
-		result.Warnings = append(result.Warnings, Message{Field: "ports", Message: "full port scan may be slow"})
+	if result.Summary.ResolvedPorts == "1-65535" {
+		result.Warnings = append(result.Warnings, Message{Field: "ports", Message: "full range scan may be slow"})
 	}
 	if opts.Profile == "fast" && len(opts.Targets) > 16 {
 		result.Warnings = append(result.Warnings, Message{Field: "profile", Message: "fast profile with many targets may increase load"})
@@ -159,6 +159,9 @@ func checkWritableDir(result *Result, name string, path string) {
 }
 
 func validatePorts(value string) error {
+	if value == "top1000" {
+		return nil
+	}
 	for _, part := range strings.Split(value, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {

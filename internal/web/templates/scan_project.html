@@ -1,10 +1,11 @@
 {{define "content"}}
 <section class="page-header">
   <div>
-    <p class="eyebrow">发起扫描</p>
-    <h2>开始扫描</h2>
+    <p class="eyebrow">项目扫描</p>
+    <h2>{{.Project.Name}} · 发起扫描</h2>
+    <p class="meta-line" style="margin-top: 0.25rem;">扫描将归属本项目并自动使用项目默认配置。</p>
   </div>
-  <a class="button button-secondary" href="/">返回面板</a>
+  <a class="button button-secondary" href="/projects/{{.Project.ID}}">返回项目</a>
 </section>
 
 <section class="panel">
@@ -25,18 +26,16 @@
   </div>
   {{end}}
   <form class="form-grid" method="post" action="/scan">
-    <label>
-      <span>选择项目模板</span>
-      <select name="project_id" id="project_select">
-        <option value="">不使用项目（完全自定义）</option>
-        {{range .Projects}}
-        <option value="{{.ID}}">{{.Name}}</option>
-        {{end}}
-      </select>
-    </label>
+    <input type="hidden" name="project_id" value="{{.Project.ID}}">
+
+    <div class="full-width" style="background: var(--bg-accent); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border-left: 3px solid var(--primary);">
+      <p class="meta-line" style="margin: 0;">
+        <strong>项目默认值</strong> · 目标: {{if .Project.DefaultTargets}}<code style="font-family: var(--mono);">{{.Project.DefaultTargets}}</code>{{else}}<span class="muted">未设置</span>{{end}} · 端口: {{if .Project.DefaultPorts}}<code style="font-family: var(--mono);">{{.Project.DefaultPorts}}</code>{{else}}<span class="muted">全局默认</span>{{end}} · 档位: {{if .Project.DefaultProfile}}{{.Project.DefaultProfile}}{{else}}<span class="muted">全局默认</span>{{end}}
+      </p>
+    </div>
 
     <p class="full-width" style="margin: 0; color: var(--muted); font-size: 0.9rem;">
-      选择项目后会自动使用项目里的默认目标、默认端口和默认档位；只在本次扫描需要临时调整时填写下面的覆盖项。
+      下方覆盖项留空即使用项目默认值；仅在本次扫描需要临时调整时填写。
     </p>
 
     <details class="details-block full-width" style="margin-top: 1rem;">
@@ -46,20 +45,21 @@
           <span>临时覆盖档位</span>
           <select name="profile">
             <option value="">使用项目/全局默认值</option>
-            <option value="slow">slow (轻载/低速率)</option>
-            <option value="normal">normal (均衡/默认值)</option>
-            <option value="fast">fast (极速/多路并发)</option>
+            <option value="slow" {{if eq .Project.DefaultProfile "slow"}}selected{{end}}>slow (轻载/低速率)</option>
+            <option value="normal" {{if eq .Project.DefaultProfile "normal"}}selected{{end}}>normal (均衡/默认值)</option>
+            <option value="fast" {{if eq .Project.DefaultProfile "fast"}}selected{{end}}>fast (极速/多路并发)</option>
           </select>
         </label>
 
         <label class="full-width">
           <span>临时覆盖目标</span>
-          <textarea name="target" rows="4" placeholder="可留空使用项目的默认目标。支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔"></textarea>
+          <textarea name="target" rows="4" placeholder="留空使用项目默认目标。支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔"></textarea>
         </label>
 
         <label class="full-width">
           <span>临时覆盖端口</span>
-          <textarea name="ports" rows="3" placeholder="可留空使用项目的默认端口。支持: top100, top1000, full, highrisk, 80,443,8080 等"></textarea>
+          <textarea name="ports" rows="3" placeholder="留空使用项目默认端口。支持: top1000、100-1000 或 80,443,8080"></textarea>
+          <p class="meta-line" style="margin-top: 0.35rem;">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
           <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="ports">
             ＋ 插入高危端口列表
           </button>
@@ -67,11 +67,11 @@
 
         <label class="full-width">
           <span>过程文件目录</span>
-          <input name="artifact_root" value="{{.ArtifactRoot}}" placeholder="扫描过程文件根目录，例如 /data/anchorscan/artifacts">
+          <input name="artifact_root" value="{{.ArtifactRoot}}" placeholder="留空则与 report.json 放在同一个 run 目录">
         </label>
       </div>
     </details>
-    
+
     <details class="details-block full-width" style="margin-top: 1rem;">
       <summary style="font-size: 0.95rem; font-weight: 600; padding: 0.5rem 0;">高级自定义参数 (自定义引擎命令行参数)</summary>
       <div class="form-grid" style="padding-top: 1rem; border-top: 1px dashed rgba(59, 130, 246, 0.1); margin-top: 0.5rem;">
@@ -93,7 +93,7 @@
         </label>
       </div>
     </details>
-    
+
     <div class="form-actions form-submit-row full-width">
       <button class="button button-primary primary-submit" type="submit">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">

@@ -47,7 +47,8 @@
 
     <label class="full-width">
       <span>默认扫描端口</span>
-      <textarea name="default_ports" rows="3" placeholder="支持常用短语(top100 / top1000 / full / highrisk) 或范围(100-1000) 或自定义(80,443,8080)">{{.Project.DefaultPorts}}</textarea>
+      <textarea name="default_ports" rows="3" placeholder="支持 top1000、100-1000 或 80,443,8080">{{.Project.DefaultPorts}}</textarea>
+      <p class="meta-line" style="margin-top: 0.35rem;">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
       <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="default_ports">
         ＋ 插入高危端口列表
       </button>
@@ -60,7 +61,7 @@
     
     <label>
       <span>排除端口</span>
-      <input name="exclude_ports" value="{{.Project.ExcludePorts}}" placeholder="例如: 22,3306 或 1-1024" style="margin-top: 0.5rem;">
+      <input name="exclude_ports" value="{{.Project.ExcludePorts}}" placeholder="例如: 22,3306（仅数字端口 CSV）" style="margin-top: 0.5rem;">
     </label>
     
     <div class="form-actions full-width" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); justify-content: space-between;">

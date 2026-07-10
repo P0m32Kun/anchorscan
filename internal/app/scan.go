@@ -277,7 +277,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		}
 
 		scripts := vuln.MatchNSE(fp, opts.NSERules)
-		if len(scripts) > 0 {
+		if len(scripts) > 0 && !fp.IsWeb {
 			emit(opts, scanStore, "info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
 			nseResults, out, err := tools.RunNSEWithOutput(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nse", fp.IP, strconv.Itoa(fp.Port), strings.Join(scripts, ","))+".xml", out); writeErr != nil {

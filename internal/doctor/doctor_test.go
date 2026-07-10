@@ -13,7 +13,7 @@ func TestRunReportsMissingTool(t *testing.T) {
   rustscan: /missing/rustscan
   nmap: /missing/nmap
 scan:
-  ports: top100
+  ports: top1000
   profile: normal
 profiles:
   normal:
@@ -35,8 +35,8 @@ func TestRunReportsDatabaseMigrationFailure(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
-	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 	badDB := filepath.Join(dir, "scan.db")
 	writeFile(t, badDB, "not sqlite")
 
@@ -50,8 +50,8 @@ func TestRunChecksDatabaseCanOpen(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
-	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: filepath.Join(dir, "reports")})
 	if !containsCheck(checks, "database", true) {

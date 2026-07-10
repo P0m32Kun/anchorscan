@@ -58,6 +58,23 @@ func TestDiscoverPortsUsesRangeForPortRanges(t *testing.T) {
 	}
 }
 
+func TestDiscoverPortsUsesTopForTop1000(t *testing.T) {
+	runner := &fakeRunner{output: []byte("127.0.0.1 -> [80,443]\n")}
+	got, err := DiscoverPorts(context.Background(), runner, "/opt/rustscan", "127.0.0.1", "top1000", nil)
+	if err != nil {
+		t.Fatalf("DiscoverPorts returned error: %v", err)
+	}
+
+	if !reflect.DeepEqual(got, []int{80, 443}) {
+		t.Fatalf("ports mismatch: got %#v", got)
+	}
+
+	wantArgs := []string{"/opt/rustscan", "-a", "127.0.0.1", "--top", "-g", "--no-banner"}
+	if !reflect.DeepEqual(runner.args, wantArgs) {
+		t.Fatalf("args mismatch: got %#v want %#v", runner.args, wantArgs)
+	}
+}
+
 func TestDiscoverPortsReturnsRunnerError(t *testing.T) {
 	runner := &fakeRunner{err: errors.New("boom")}
 	_, err := DiscoverPorts(context.Background(), runner, "/opt/rustscan", "192.168.1.10", "80", nil)

@@ -4,11 +4,11 @@
     <p class="eyebrow">任务队列</p>
     <h2>扫描记录历史</h2>
   </div>
-  <a class="button button-primary" href="/scan/new">
+  <a class="button button-primary" href="/projects">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-19.5 0A2.25 2.25 0 002.25 15v4.5a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V15a2.25 2.25 0 00-2.25-2.25m-19.5 0h19.5" />
     </svg>
-    <span>开始新扫描</span>
+    <span>进入项目扫描</span>
   </a>
 </section>
 
@@ -18,7 +18,8 @@
       <tr>
         <th style="width: 25%;">扫描任务ID (Run ID)</th>
         <th style="width: 15%;">任务状态</th>
-        <th style="width: 30%;">目标资产</th>
+        <th style="width: 20%;">目标资产</th>
+        <th style="width: 10%;">项目</th>
         <th style="width: 15%;">扫描档位</th>
         <th style="width: 15%; text-align: right;">操作</th>
       </tr>
@@ -36,6 +37,13 @@
         </td>
         <td style="font-family: var(--mono); font-size: 0.85rem; word-break: break-all; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           {{.Target}}
+        </td>
+        <td>
+          {{if .ProjectID}}
+          <a href="/projects/{{.ProjectID}}" class="status-badge">
+            {{with index $.ProjectNames .ProjectID}}{{.}}{{else}}已删除项目{{end}}
+          </a>
+          {{else}}<span class="muted">—</span>{{end}}
         </td>
         <td>
           <span class="status-badge" style="font-size: 0.7rem; padding: 0.2rem 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); color: var(--text);">
@@ -71,7 +79,7 @@
       </tr>
       {{else}}
       <tr>
-        <td colspan="5" class="muted" style="text-align: center; padding: 3rem 1rem;">
+        <td colspan="6" class="muted" style="text-align: center; padding: 3rem 1rem;">
           <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⏱️</div>
           暂无扫描记录。点击右上角按钮以发起第一次安全扫描。
         </td>

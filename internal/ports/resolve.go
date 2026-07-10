@@ -2,25 +2,61 @@ package ports
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 func Resolve(spec string, presetDir string) (string, error) {
-	switch spec {
-	case "full":
-		return "1-65535", nil
-	case "top100", "top1000", "highrisk":
-		name := fmt.Sprintf("ports-%s.txt", spec)
-		data, err := os.ReadFile(filepath.Join(presetDir, name))
+	spec = strings.TrimSpace(spec)
+	if spec == "top1000" {
+		return spec, nil
+	}
+	if strings.Contains(spec, "-") {
+		if strings.Contains(spec, ",") {
+			return "", fmt.Errorf("invalid port: %s", spec)
+		}
+		return normalizeRange(spec)
+	}
+
+	parts := strings.Split(spec, ",")
+	normalized := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(part)
+		port, err := parsePort(value)
 		if err != nil {
 			return "", err
 		}
-		return strings.TrimSpace(string(data)), nil
-	default:
-		return spec, nil
+		normalized = append(normalized, strconv.Itoa(port))
 	}
+	return strings.Join(normalized, ","), nil
+}
+
+func normalizeRange(spec string) (string, error) {
+	bounds := strings.SplitN(spec, "-", 2)
+	if len(bounds) != 2 {
+		return "", fmt.Errorf("invalid port: %s", spec)
+	}
+	start, err := parsePort(bounds[0])
+	if err != nil {
+		return "", err
+	}
+	end, err := parsePort(bounds[1])
+	if err != nil {
+		return "", err
+	}
+	if end < start {
+		start, end = end, start
+	}
+	return fmt.Sprintf("%d-%d", start, end), nil
+}
+
+func parsePort(value string) (int, error) {
+	port, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid port: %s", strings.TrimSpace(value))
+	}
+	return port, nil
 }
 
 func ResolveForConfig(spec string, configPath string) (string, error) {

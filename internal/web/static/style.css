@@ -1431,3 +1431,161 @@ input[type="file"]::file-selector-button:hover {
     grid-column: span 1;
   }
 }
+
+/* --- Project Detail Configuration Cards --- */
+.config-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.config-row-card {
+  background: #0f1013;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.15s ease;
+}
+
+.config-row-card:hover {
+  border-color: var(--border-strong);
+}
+
+.config-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.config-card-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--heading);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.config-card-body {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  background: #090a0d;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+  min-height: 2.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+  color: var(--text);
+}
+
+/* Custom dark scrollbar for bodies */
+.config-card-body::-webkit-scrollbar {
+  width: 6px;
+}
+.config-card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.config-card-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+}
+.config-card-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copy-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary-glow);
+  background: rgba(100, 116, 139, 0.05);
+}
+
+/* Three columns layout for summary cards */
+.config-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.config-column-card {
+  background: #0f1013;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.15s ease;
+}
+
+.config-column-card:hover {
+  border-color: var(--border-strong);
+}
+
+/* Ports badge styles */
+.ports-badge-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 100px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.ports-badge-container::-webkit-scrollbar {
+  width: 4px;
+}
+.ports-badge-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ports-badge-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
+
+.port-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: #17181c;
+  border: 1px solid var(--border-strong);
+  color: var(--primary);
+}
+
+.port-badge.exclude {
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+/* Adapt for responsiveness */
+@media (max-width: 768px) {
+  .config-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+

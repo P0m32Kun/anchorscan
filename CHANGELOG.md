@@ -4,6 +4,17 @@ All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
 
+## [1.6.1] - 2026-07-10
+
+### Added
+- 项目详情页与项目内发起扫描流程，运行列表显示所属项目。
+- 扩展 nuclei 与 NSE 服务规则，覆盖更多常见服务和默认凭据检测。
+
+### Changed
+- Web 扫描必须绑定项目，报告与扫描产物按项目和运行归档。
+- 端口输入与 rustscan 原生语义对齐：支持 `top1000`、数字范围和端口 CSV；高危端口作为可插入 CSV 预设。
+- Web 服务使用 httpx 与 nuclei，非 Web 服务按配置运行 nuclei 与 NSE，避免重复探测。
+
 ## [1.6.0] - 2026-07-09
 
 v1.6.0 聚焦"开箱即用"与跨平台分发：高危端口预设、配置自动初始化、首次运行零手动配置，以及 GitHub Actions 自动打包多平台二进制。

@@ -124,6 +124,8 @@ func TestCreateProjectFromWeb(t *testing.T) {
 func TestNewScanPageRenders(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, filepath.Join(dir, "ports-highrisk.txt"), "21,22,3306\n")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
@@ -131,17 +133,23 @@ func TestNewScanPageRenders(t *testing.T) {
 	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", DefaultTargets: "127.0.0.1", DefaultPorts: "8080", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatalf("SaveProject returned error: %v", err)
 	}
-	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Listen: "127.0.0.1:8088"})
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
 	closeServer(t, handler)
 	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/scan/new", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "开始扫描") {
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "发起扫描") {
 		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
+	if !strings.Contains(body, `<input type="hidden" name="project_id" value="p1">`) {
+		t.Fatalf("expected bound project_id hidden input, got body=%s", body)
+	}
+	if !strings.Contains(body, "Local Lab") {
+		t.Fatalf("expected project name in body, got body=%s", body)
+	}
 	if !strings.Contains(body, "<textarea name=\"target\"") {
 		t.Fatalf("expected target textarea, got body=%s", body)
 	}
@@ -155,6 +163,9 @@ func TestNewScanPageRenders(t *testing.T) {
 	}
 	if !strings.Contains(body, `name="artifact_root"`) {
 		t.Fatalf("expected artifact root input, got body=%s", body)
+	}
+	if !strings.Contains(body, `data-insert-ports="21,22,3306"`) {
+		t.Fatalf("expected highrisk button to insert CSV, got body=%s", body)
 	}
 }
 
@@ -350,12 +361,20 @@ func TestToolCreateStartsRun(t *testing.T) {
 func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
-	writeFile(t, filepath.Join(dir, "ports-top100.txt"), "80,443")
+	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
 
 	handler, err := NewServer(ServerOptions{
 		ConfigPath: configPath,
-		DBPath:     filepath.Join(dir, "scan.db"),
+		DBPath:     dbPath,
 		Runner:     &serverSequenceRunner{},
 		Now:        func() time.Time { return time.Unix(10, 0) },
 	})
@@ -364,7 +383,7 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("target=127.0.0.1&ports=top100&profile=normal")
+	body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=top1000&profile=normal")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -379,13 +398,156 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	}
 }
 
+func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	rustscanPath := writeExecutable(t, dir, "rustscan")
+	nmapPath := writeExecutable(t, dir, "nmap")
+	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+
+	runner := &serverSequenceRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+		[]byte("127.0.0.1 -> [80]\n"),
+		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+	}}
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     dbPath,
+		Runner:     runner,
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=top1000&profile=normal")
+	req := httptest.NewRequest(http.MethodPost, "/scan", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	for range 50 {
+		if runner.hasArgs(rustscanPath, "--top") {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !runner.hasArgs(rustscanPath, "--top") {
+		t.Fatalf("expected top1000 passed to rustscan --top, got %#v", runner.commands)
+	}
+}
+
+func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	rustscanPath := writeExecutable(t, dir, "rustscan")
+	nmapPath := writeExecutable(t, dir, "nmap")
+	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+
+	runner := &serverSequenceRunner{outputs: [][]byte{
+		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
+		[]byte("127.0.0.1 -> [80]\n"),
+		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+	}}
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     dbPath,
+		Runner:     runner,
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=100-1000&profile=normal")
+	req := httptest.NewRequest(http.MethodPost, "/scan", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	for range 50 {
+		if runner.hasArgs(rustscanPath, "--range", "100-1000") {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !runner.hasArgs(rustscanPath, "--range", "100-1000") {
+		t.Fatalf("expected port range passed to rustscan, got %#v", runner.commands)
+	}
+}
+
+func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: configPath,
+		DBPath:     dbPath,
+		Runner:     &serverSequenceRunner{},
+		Now:        func() time.Time { return time.Unix(10, 0) },
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	for _, ports := range []string{"full", "highrisk", "80,100-200"} {
+		body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=" + ports + "&profile=normal")
+		req := httptest.NewRequest(http.MethodPost, "/scan", body)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for ports=%q, got %d", ports, rec.Code)
+		}
+	}
+}
+
 func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "22,80,8080\n")
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -398,7 +560,7 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 		ID:             "p1",
 		Name:           "Local Lab",
 		DefaultTargets: "127.0.0.1\n127.0.0.2",
-		DefaultPorts:   "22,80,8080",
+		DefaultPorts:   "top1000",
 		ExcludeTargets: "127.0.0.2",
 		ExcludePorts:   "22",
 		DefaultProfile: "slow",
@@ -456,7 +618,7 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if _, err := os.Stat(reportPath); err != nil {
 		t.Fatalf("expected managed report at %s: %v", reportPath, err)
 	}
-	wantArtifactDir := filepath.Join(dir, "artifacts", run.RunID)
+	wantArtifactDir := filepath.Join(dir, "projects", "p1", "runs", run.RunID)
 	if run.ArtifactDir != wantArtifactDir {
 		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
 	}
@@ -471,6 +633,52 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	}
 	if runner.callCount(rustscanPath) != 1 {
 		t.Fatalf("expected single rustscan target after exclusions, got %#v", runner.commands)
+	}
+}
+
+func TestRunsPageShowsProjectID(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{
+		ID:        "p1",
+		Name:      "Local Lab",
+		CreatedAt: time.Unix(1, 0),
+		UpdatedAt: time.Unix(1, 0),
+	}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:     "run-1",
+		ProjectID: "p1",
+		Target:    "127.0.0.1",
+		Ports:     "80",
+		Profile:   "normal",
+		Status:    "completed",
+		StartedAt: time.Unix(1, 0),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/runs", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, `/projects/p1`) || !strings.Contains(body, "Local Lab") {
+		t.Fatalf("expected project name and link in runs page: %s", body)
+	}
+	if strings.Contains(body, `>p1</a>`) {
+		t.Fatalf("expected project name instead of project ID: %s", body)
 	}
 }
 
@@ -1237,7 +1445,7 @@ func TestReportExportDownloadsRicherFormats(t *testing.T) {
 func TestConfigPageUpdatesToolPath(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /old/rustscan\n  nmap: /old/nmap\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /old/rustscan\n  nmap: /old/nmap\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), Now: func() time.Time { return time.Date(2026, 7, 7, 21, 30, 0, 0, time.UTC) }})
@@ -1265,7 +1473,7 @@ func TestConfigPageUpdatesToolPath(t *testing.T) {
 func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
@@ -1287,7 +1495,7 @@ func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 func TestConfigPageRawEditorUpdatesConfig(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /old/rustscan\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /old/rustscan\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), Now: func() time.Time { return time.Date(2026, 7, 8, 10, 0, 0, 0, time.UTC) }})
@@ -1396,7 +1604,7 @@ func closeServer(t *testing.T, handler http.Handler) {
 func TestConfigPageRawEditorRejectsInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	original := "tools:\n  rustscan: /old/rustscan\nscan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"
+	original := "tools:\n  rustscan: /old/rustscan\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"
 	if err := os.WriteFile(configPath, []byte(original), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}

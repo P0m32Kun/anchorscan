@@ -33,7 +33,7 @@ func defaultConfig() Config {
 			Ports   string `yaml:"ports"`
 			Profile string `yaml:"profile"`
 		}{
-			Ports:   "top100",
+			Ports:   "top1000",
 			Profile: "normal",
 		},
 		Profiles: builtInProfiles(),

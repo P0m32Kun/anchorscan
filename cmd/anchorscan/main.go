@@ -674,7 +674,7 @@ func printScanHelp(w io.Writer) {
 Flags:
   --config <path>   Config file path
   --target <value>  Target IP, CIDR, IP range, or comma-separated list
-  --ports <value>   Comma list, range like 100-1000, top100, top1000, or full
+  --ports <value>   top1000, a range like 100-1000, or CSV like 80,443
   --profile slow|normal|fast
   --host-workers N
   --rustscan-args "..."

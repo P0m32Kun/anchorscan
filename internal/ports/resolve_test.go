@@ -8,32 +8,50 @@ import (
 	"time"
 )
 
-func TestResolveReadsPresetFile(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "ports-top100.txt")
-	if err := os.WriteFile(path, []byte("80,443,8080\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := Resolve("top100", dir)
+func TestResolveKeepsTop1000ForRustscanTop(t *testing.T) {
+	got, err := Resolve("top1000", t.TempDir())
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got != "80,443,8080" {
+	if got != "top1000" {
 		t.Fatalf("unexpected ports: %q", got)
 	}
 }
 
-func TestResolveHighriskReadsPresetFile(t *testing.T) {
+func TestResolveAcceptsRustscanRangeAndPortCSV(t *testing.T) {
+	for input, want := range map[string]string{
+		"1-65535":     "1-65535",
+		"1000-100":    "100-1000",
+		"80, 443, 22": "80,443,22",
+	} {
+		got, err := Resolve(input, t.TempDir())
+		if err != nil {
+			t.Fatalf("Resolve(%q) returned error: %v", input, err)
+		}
+		if got != want {
+			t.Fatalf("Resolve(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestResolveRejectsRemovedAndInvalidFormats(t *testing.T) {
+	for _, input := range []string{"top100", "full", "highrisk", "0", "65536", "80,abc", "80,100-200", "1-65536", "0-100"} {
+		if _, err := Resolve(input, t.TempDir()); err == nil {
+			t.Fatalf("Resolve(%q) unexpectedly succeeded", input)
+		}
+	}
+}
+
+func TestLoadPresetReadsHighriskFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ports-highrisk.txt")
 	if err := os.WriteFile(path, []byte("502,102,2404\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := Resolve("highrisk", dir)
+	got, err := LoadPreset("highrisk", dir)
 	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
+		t.Fatalf("LoadPreset returned error: %v", err)
 	}
 	if got != "502,102,2404" {
 		t.Fatalf("unexpected ports: %q", got)
@@ -46,15 +64,11 @@ func TestResolveForConfigFallsBackToRootConfig(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "config"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "config", "ports-top100.txt"), []byte("22,80\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	got, err := ResolveForConfig("top100", filepath.Join(root, "custom", "default.yaml"))
+	got, err := ResolveForConfig("top1000", filepath.Join(root, "custom", "default.yaml"))
 	if err != nil {
 		t.Fatalf("ResolveForConfig returned error: %v", err)
 	}
-	if got != "22,80" {
+	if got != "top1000" {
 		t.Fatalf("unexpected ports: %q", got)
 	}
 }
@@ -74,9 +88,9 @@ func TestSavePresetWithBackupWritesAndRoundTrips(t *testing.T) {
 		t.Fatalf("unexpected backup name: %q", backup)
 	}
 
-	got, err := Resolve("highrisk", dir)
+	got, err := LoadPreset("highrisk", dir)
 	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
+		t.Fatalf("LoadPreset returned error: %v", err)
 	}
 	if got != "502,102,2404" {
 		t.Fatalf("unexpected ports after save: %q", got)
@@ -96,9 +110,9 @@ func TestSavePresetWithBackupCreatesNewFile(t *testing.T) {
 	if _, err := SavePresetWithBackup("highrisk", dir, "502,102", time.Now()); err != nil {
 		t.Fatalf("SavePresetWithBackup returned error: %v", err)
 	}
-	got, err := Resolve("highrisk", dir)
+	got, err := LoadPreset("highrisk", dir)
 	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
+		t.Fatalf("LoadPreset returned error: %v", err)
 	}
 	if got != "502,102" {
 		t.Fatalf("unexpected ports: %q", got)

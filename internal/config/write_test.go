@@ -10,7 +10,7 @@ import (
 func TestSaveWithBackupCreatesTimestampedBackup(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "default.yaml")
-	if err := os.WriteFile(path, []byte("scan:\n  ports: top100\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("scan:\n  ports: top1000\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	var cfg Config
@@ -37,7 +37,7 @@ func TestSaveWithBackupCreatesTimestampedBackup(t *testing.T) {
 func TestSaveRawWithBackupWritesValidatedConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "default.yaml")
-	if err := os.WriteFile(path, []byte("scan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("scan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	raw := "tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\nscan:\n  ports: 8080,6379\n  profile: slow\nprofiles:\n  slow:\n    host_workers: 1\n"
@@ -61,7 +61,7 @@ func TestSaveRawWithBackupWritesValidatedConfig(t *testing.T) {
 func TestSaveRawWithBackupRejectsInvalidYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "default.yaml")
-	original := "scan:\n  ports: top100\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"
+	original := "scan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"
 	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}

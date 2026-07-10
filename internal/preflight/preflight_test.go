@@ -15,7 +15,7 @@ func TestRunBlocksMissingTargetsInvalidPortsAndRequiredTools(t *testing.T) {
 		DBPath:    filepath.Join(dir, "data", "scan.db"),
 		JSONPath:  filepath.Join(dir, "reports", "scan.json"),
 		Targets:   nil,
-		PortSpec:  "top100",
+		PortSpec:  "top1000",
 		Tools: app.ToolPaths{
 			Rustscan: filepath.Join(dir, "missing-rustscan"),
 			Nmap:     filepath.Join(dir, "missing-nmap"),
@@ -49,7 +49,7 @@ func TestRunBlocksInvalidPortExpression(t *testing.T) {
 	}
 }
 
-func TestRunSummarizesScanAndWarnsForFullPorts(t *testing.T) {
+func TestRunSummarizesScanAndWarnsForFullRange(t *testing.T) {
 	dir := t.TempDir()
 	rustscan := executable(t, dir, "rustscan")
 	nmap := executable(t, dir, "nmap")
@@ -59,7 +59,7 @@ func TestRunSummarizesScanAndWarnsForFullPorts(t *testing.T) {
 		DBPath:    filepath.Join(dir, "data", "scan.db"),
 		JSONPath:  filepath.Join(dir, "reports", "scan.json"),
 		Targets:   []string{"127.0.0.1"},
-		PortSpec:  "full",
+		PortSpec:  "1-65535",
 		Tools:     app.ToolPaths{Rustscan: rustscan, Nmap: nmap},
 		Profile:   "fast",
 		Workers:   4,
@@ -74,11 +74,11 @@ func TestRunSummarizesScanAndWarnsForFullPorts(t *testing.T) {
 	if result.HasErrors() {
 		t.Fatalf("expected no errors, got %#v", result.Errors)
 	}
-	if result.Summary.TargetCount != 1 || result.Summary.PortSpec != "full" || result.Summary.Profile != "fast" {
+	if result.Summary.TargetCount != 1 || result.Summary.PortSpec != "1-65535" || result.Summary.Profile != "fast" {
 		t.Fatalf("unexpected summary: %#v", result.Summary)
 	}
 	if len(result.Warnings) == 0 {
-		t.Fatal("expected full port warning")
+		t.Fatal("expected full range warning")
 	}
 }
 

@@ -14,6 +14,26 @@ func PresetPath(spec, dir string) string {
 	return filepath.Join(dir, fmt.Sprintf("ports-%s.txt", spec))
 }
 
+func LoadPreset(spec, dir string) (string, error) {
+	data, err := os.ReadFile(PresetPath(spec, dir))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+func LoadPresetForConfig(spec, configPath string) (string, error) {
+	dir := filepath.Dir(configPath)
+	value, err := LoadPreset(spec, dir)
+	if err == nil {
+		return value, nil
+	}
+	if dir != "config" {
+		return LoadPreset(spec, "config")
+	}
+	return "", err
+}
+
 // SavePresetWithBackup writes a port preset file with a timestamped backup and
 // an atomic rename, mirroring config.SaveWithBackup. The content is stored as a
 // single trimmed CSV line followed by a newline.

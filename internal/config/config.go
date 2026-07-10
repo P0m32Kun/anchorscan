@@ -50,7 +50,7 @@ func Load(path string) (Config, error) {
 		return cfg, err
 	}
 	if cfg.Scan.Ports == "" {
-		cfg.Scan.Ports = "top100"
+		cfg.Scan.Ports = "top1000"
 	}
 	if cfg.Scan.Profile == "" {
 		cfg.Scan.Profile = "normal"

@@ -18,7 +18,9 @@ func DiscoverPorts(ctx context.Context, runner Runner, binaryPath string, target
 
 func DiscoverPortsWithOutput(ctx context.Context, runner Runner, binaryPath string, target string, ports string, extraArgs []string) ([]int, []byte, error) {
 	args := []string{"-a", target}
-	if strings.Contains(ports, "-") && !strings.Contains(ports, ",") {
+	if ports == "top1000" {
+		args = append(args, "--top")
+	} else if strings.Contains(ports, "-") && !strings.Contains(ports, ",") {
 		args = append(args, "--range", ports)
 	} else {
 		args = append(args, "--ports", ports)

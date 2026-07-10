@@ -10,7 +10,7 @@ tools:
   nuclei: nuclei
 
 scan:
-  ports: top100            # 可选: top100, top1000, highrisk, full, 或自定义端口/范围
+  ports: top1000           # 可选: top1000、端口范围(100-1000)、或端口 CSV(80,443)；highrisk 仅用于按钮插入
   profile: normal          # 可选: slow, normal, fast
 
 profiles:

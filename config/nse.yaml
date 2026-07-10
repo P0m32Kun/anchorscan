@@ -1,16 +1,97 @@
+# NSE 脚本规则表（nmap Nmap Scripting Engine）
+#
+# 键 = 指纹归一化后的服务名（normalize.go 输出，MatchNSE 做 map[Normalized] 单键查找）
+# 值 = nmap NSE 脚本名（去掉 .nse 后缀，多个用列表）
+#
+# 每项优先选择信息收集类脚本；弱口令/默认凭据检测交给 nuclei default-login，
+# 避免在此处配置 brute 类脚本（耗时大、对目标压力大）。
+# 仅 nuclei 覆盖、无 NSE 脚本的服务（elasticsearch/kafka/kubernetes/winrm）不在此声明，
+# 扫描编排会自动跳过 NSE 步骤。
+
+# ===== 远程登录 =====
+ssh:
+  - ssh2-enum-algos
+  - ssh-hostkey
+ftp:
+  - ftp-anon
+  - ftp-syst
+  - ftp-bounce
+telnet:
+  - telnet-encryption
+
+# ===== 邮件 / 目录 =====
+smtp:
+  - smtp-commands
+  - smtp-open-relay
+  - smtp-enum-users
+ldap:
+  - ldap-rootdse
+  - ldap-search
+
+# ===== 基础设施 =====
+# nmap 报 DNS 服务的 service 名为 "domain"，归一化后仍为 domain
+domain:
+  - dns-nsid
+  - dns-recursion
+  - dns-zone-transfer
+  - dns-service-discovery
+snmp:
+  - snmp-info
+  - snmp-interfaces
+  - snmp-sysdescr
+  - snmp-processes
+
+# ===== 远程桌面 =====
+rdp:
+  - rdp-enum-encryption
+  - rdp-ntlm-info
+vnc:
+  - vnc-info
+  - vnc-title
+
+# ===== 数据库 =====
 redis:
   - redis-info
 mysql:
   - mysql-info
   - mysql-empty-password
+# nmap 报 PostgreSQL 的 service 名为 postgresql，归一化后仍为 postgresql
+postgresql:
+  - pgsql-brute
+# nmap 报 MSSQL 的 service 名为 ms-sql，归一化后仍为 ms-sql
+ms-sql:
+  - ms-sql-info
+  - ms-sql-empty-password
+  - ms-sql-ntlm-info
+mongodb:
+  - mongodb-info
+  - mongodb-databases
+memcached:
+  - memcached-info
+
+# ===== 消息队列 =====
+# nmap NSE 脚本前缀为 amqp-，service 名常为 amqp
+amqp:
+  - amqp-info
+mqtt:
+  - mqtt-subscribe
+
+# ===== 文件 / 共享 =====
 smb:
   - smb-protocols
   - smb-security-mode
-ssh:
-  - ssh2-enum-algos
-  - ssh-hostkey
-http:
-  - http-title
-  - http-server-header
-tomcat:
-  - http-tomcat-manager
+  - smb-os-discovery
+  - smb-enum-shares
+nfs:
+  - nfs-showmount
+  - nfs-ls
+# rpcbind / nlockmgr / mountd 等统一归入 rpc
+rpc:
+  - rpcinfo
+  - rpc-grind
+rsync:
+  - rsync-list-modules
+
+# ===== 容器 =====
+docker:
+  - docker-version

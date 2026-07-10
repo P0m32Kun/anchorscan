@@ -49,7 +49,6 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 			[]byte("192.168.1.10 -> [8080]\n"),
 			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
-			[]byte(`<nmaprun><host><ports><port protocol="tcp" portid="8080"><script id="http-tomcat-manager" output="manager exposed"/></port></ports></host></nmaprun>`),
 			[]byte("{\"template-id\":\"tomcat-default-login\",\"matcher-name\":\"basic-auth\",\"extractor-results\":[\"admin:admin\"],\"curl-command\":\"curl -u admin:admin http://192.168.1.10:8080/manager/html\",\"info\":{\"name\":\"Tomcat Default Login\",\"severity\":\"high\"},\"matched-at\":\"http://192.168.1.10:8080\"}\n"),
 		},
 	}
@@ -102,7 +101,7 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListFindings returned error: %v", err)
 	}
-	if len(findings) != 2 {
+	if len(findings) != 1 {
 		t.Fatalf("unexpected findings: %#v", findings)
 	}
 	for _, finding := range findings {
@@ -124,7 +123,7 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Unmarshal returned error: %v", err)
 	}
-	if len(decoded.Hosts) != 1 || len(decoded.Hosts[0].Ports[0].Findings) != 2 {
+	if len(decoded.Hosts) != 1 || len(decoded.Hosts[0].Ports[0].Findings) != 1 {
 		t.Fatalf("unexpected report: %#v", decoded)
 	}
 }
@@ -169,6 +168,83 @@ func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 	}
 	if len(events) == 0 || events[0].Message == "" {
 		t.Fatalf("expected scan events, got %#v", events)
+	}
+}
+
+// TestRunScanRunsNSEAndNucleiForSSH locks the dual-engine contract: once a
+// service is fingerprinted as SSH and rules are configured, both the nmap NSE
+// engine AND nuclei (with -tags ssh) must be invoked. SSH is non-web, so httpx
+// is never called — the runner output sequence reflects that ordering.
+func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.168.1.10 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+		[]byte(`<nmaprun><host><ports><port><script id="ssh2-enum-algos" output="kex_algorithms:..."/></port></ports></host></nmaprun>`),
+		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
+	}}
+
+	opts := ScanOptions{
+		RunID:          "run-ssh-dual",
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		NSERules: map[string][]string{
+			"ssh": {"ssh2-enum-algos", "ssh-hostkey"},
+		},
+		TagRules: []TagRule{
+			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh", "default-login"}, Target: "hostport"},
+		},
+	}
+	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	// NSE: nmap must be invoked with --script for both ssh scripts on port 22.
+	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos,ssh-hostkey", "-p", "22") {
+		t.Fatalf("expected nmap NSE invocation with ssh scripts, commands=%#v", runner.commands)
+	}
+	// Nuclei: must be invoked with -tags containing ssh, targeting IP:22, jsonl output.
+	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh,default-login", "-target", "192.168.1.10:22", "-jsonl") {
+		t.Fatalf("expected nuclei invocation with ssh tags, commands=%#v", runner.commands)
+	}
+}
+
+// TestRunScanRunsNSEAndNucleiForRedis guards against the SSH case being a
+// special-cased accident: a second non-web service (redis) must also trigger
+// both engines when configured.
+func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.168.1.10 -> [6379]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port></ports></host></nmaprun>`),
+		[]byte(`<nmaprun><host><ports><port><script id="redis-info" output="redis_version:7.0.0"/></port></ports></host></nmaprun>`),
+		[]byte("{\"template-id\":\"redis-info\",\"info\":{\"name\":\"Redis Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:6379\"}\n"),
+	}}
+
+	opts := ScanOptions{
+		RunID:          "run-redis-dual",
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "6379",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		NSERules: map[string][]string{
+			"redis": {"redis-info"},
+		},
+		TagRules: []TagRule{
+			{Name: "redis", Service: []string{"redis"}, NucleiTags: []string{"redis", "default-login"}, Target: "hostport"},
+		},
+	}
+	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	if !runner.hasArgs("/opt/nmap", "--script", "redis-info", "-p", "6379") {
+		t.Fatalf("expected nmap NSE invocation with redis-info, commands=%#v", runner.commands)
+	}
+	if !runner.hasArgs("/opt/nuclei", "-tags", "redis,default-login", "-target", "192.168.1.10:6379", "-jsonl") {
+		t.Fatalf("expected nuclei invocation with redis tags, commands=%#v", runner.commands)
 	}
 }
 
@@ -398,7 +474,6 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 		[]byte("192.168.1.10 -> [8080]\n"),
 		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
-		[]byte(`<nmaprun><host><ports><port protocol="tcp" portid="8080"><script id="http-tomcat-manager" output="manager exposed"/></port></ports></host></nmaprun>`),
 		[]byte("{" + `"template-id":"tomcat-default-login","info":{"name":"Tomcat Default Login","severity":"high"},"matched-at":"http://192.168.1.10:8080"` + "}\n"),
 	}}
 
@@ -442,9 +517,6 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	}
 	if !runner.hasArgs("/opt/nmap", "-sV", "--version-intensity", "7", "-T3") {
 		t.Fatalf("expected nmap fingerprint args in %#v", runner.commands)
-	}
-	if !runner.hasArgs("/opt/nmap", "--script", "http-tomcat-manager", "-T3") {
-		t.Fatalf("expected nmap NSE args in %#v", runner.commands)
 	}
 }
 

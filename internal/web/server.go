@@ -81,12 +81,12 @@ func managedReportPath(dbPath string, projectID string, runID string) string {
 	return filepath.Join(root, "projects", projectID, "runs", runID, "report.json")
 }
 
-func managedArtifactRoot(dbPath string) string {
-	return filepath.Join(managedDataRoot(dbPath), "artifacts")
-}
-
 func managedProjectDir(dbPath string, projectID string) string {
 	return filepath.Join(managedDataRoot(dbPath), "projects", projectID)
+}
+
+func managedArtifactParent(jsonPath string) string {
+	return filepath.Dir(filepath.Dir(jsonPath))
 }
 
 func NewServer(opts ServerOptions) (http.Handler, error) {
@@ -110,7 +110,6 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/projects", s.projects)
 	mux.HandleFunc("/projects/new", s.projectNew)
 	mux.HandleFunc("/projects/", s.projectDetail)
-	mux.HandleFunc("/scan/new", s.scanNew)
 	mux.HandleFunc("/scan", s.scanCreate)
 	mux.HandleFunc("/tools/new", s.toolNew)
 	mux.HandleFunc("/tools/", s.toolPage)
@@ -202,7 +201,7 @@ func (s *server) projectNew(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 	render(w, "templates/project_form.html", map[string]any{
 		"Title":         "新建项目",
 		"Action":        "/projects",
@@ -216,13 +215,28 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSuffix(path, "/edit")
 
 	switch {
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/scans/new"):
+		id := strings.TrimSuffix(path, "/scans/new")
+		project, err := s.store.GetProject(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
+		render(w, "templates/scan_project.html", map[string]any{
+			"Title":         "发起扫描",
+			"Project":       project,
+			"ArtifactRoot":  "",
+			"Preflight":     preflight.Result{},
+			"HighriskPorts": highriskPorts,
+		})
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/edit"):
 		project, err := s.store.GetProject(id)
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 		render(w, "templates/project_form.html", map[string]any{
 			"Title":         "编辑项目",
 			"Action":        "/projects/" + id,
@@ -235,11 +249,16 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
-		render(w, "templates/project_form.html", map[string]any{
+		runs, err := s.store.ListProjectScanRuns(id, 100)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
+		render(w, "templates/project_detail.html", map[string]any{
 			"Title":         project.Name,
-			"Action":        "/projects/" + id,
 			"Project":       project,
+			"Runs":          runs,
 			"HighriskPorts": highriskPorts,
 		})
 	case r.Method == http.MethodPost:
@@ -310,27 +329,15 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *server) scanNew(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	s.renderScanForm(w, preflight.Result{})
-}
-
-// renderScanForm renders the new-scan page with the project list, the managed
-// artifact root, and an optional preflight result used to surface validation
-// errors when a scan submission is rejected.
-func (s *server) renderScanForm(w http.ResponseWriter, preflightResult preflight.Result) {
-	projects, err := s.store.ListProjects()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
-	render(w, "templates/scan_new.html", map[string]any{
-		"Projects":      projects,
-		"ArtifactRoot":  managedArtifactRoot(s.opts.DBPath),
+// renderProjectScanForm renders the in-project scan form with the project
+// context and an optional preflight result used to surface validation errors
+// when a scan submission is rejected. Scans are always bound to a project.
+func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, preflightResult preflight.Result) {
+	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
+	render(w, "templates/scan_project.html", map[string]any{
+		"Title":         "发起扫描",
+		"Project":       project,
+		"ArtifactRoot":  "",
 		"Preflight":     preflightResult,
 		"HighriskPorts": highriskPorts,
 	})
@@ -365,7 +372,7 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool, HighriskPorts: highriskPorts})
 }
 
@@ -481,6 +488,11 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Web scans must belong to a project; CLI scans are unaffected.
+	if project == nil {
+		http.Error(w, "project_id is required", http.StatusBadRequest)
+		return
+	}
 	targetValue := strings.TrimSpace(r.FormValue("target"))
 	if targetValue == "" && project != nil {
 		targetValue = project.DefaultTargets
@@ -503,16 +515,18 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		portValue, err = excludePorts(portValue, project.ExcludePorts)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
 	}
 	resolvedPorts, err := ports.ResolveForConfig(portValue, s.opts.ConfigPath)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if project != nil {
+		resolvedPorts, err = s.excludePortsForScan(resolvedPorts, project.ExcludePorts)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 	effective, err := config.ResolveScan(cfg, config.Overrides{
 		ProfileName:  coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
@@ -541,7 +555,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
 	artifactRoot := strings.TrimSpace(r.FormValue("artifact_root"))
 	if artifactRoot == "" {
-		artifactRoot = managedArtifactRoot(s.opts.DBPath)
+		artifactRoot = managedArtifactParent(jsonPath)
 	}
 	preflightResult := preflight.Run(preflight.Options{
 		ConfigDir: filepath.Dir(s.opts.ConfigPath),
@@ -569,7 +583,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	})
 	if preflightResult.HasErrors() {
 		w.WriteHeader(http.StatusBadRequest)
-		s.renderScanForm(w, preflightResult)
+		s.renderProjectScanForm(w, *project, preflightResult)
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
@@ -771,7 +785,19 @@ func (s *server) runs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	render(w, "templates/runs.html", map[string]any{"Runs": runs})
+	projects, err := s.store.ListProjects()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	projectNames := make(map[string]string, len(projects))
+	for _, project := range projects {
+		projectNames[project.ID] = project.Name
+	}
+	render(w, "templates/runs.html", map[string]any{
+		"Runs":         runs,
+		"ProjectNames": projectNames,
+	})
 }
 
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
@@ -939,7 +965,7 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
@@ -950,7 +976,7 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 			rawConfig := r.FormValue("raw_config")
 			if _, err := config.SaveRawWithBackup(s.opts.ConfigPath, rawConfig, s.opts.Now()); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				highriskPorts, _ := ports.ResolveForConfig("highrisk", s.opts.ConfigPath)
+				highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 				render(w, "templates/config.html", configPageData{
 					Config:        cfg,
 					RawConfig:     rawConfig,
@@ -1118,6 +1144,17 @@ func excludePorts(portValue string, excludeValue string) (string, error) {
 	return compressPorts(filtered), nil
 }
 
+func (s *server) excludePortsForScan(portValue string, excludeValue string) (string, error) {
+	if strings.TrimSpace(portValue) == "top1000" && strings.TrimSpace(excludeValue) != "" {
+		var err error
+		portValue, err = ports.LoadPresetForConfig("top1000", s.opts.ConfigPath)
+		if err != nil {
+			return "", err
+		}
+	}
+	return excludePorts(portValue, excludeValue)
+}
+
 func expandPortSpec(spec string) ([]int, error) {
 	spec = strings.TrimSpace(spec)
 	if spec == "" {
@@ -1223,14 +1260,15 @@ func manualTools() []manualTool {
 			Title:   "Rustscan 单工具调用",
 			Summary: "快速发现主机开放端口，适合先摸清资产入口。",
 			Help: []string{
-				"参数框填写 rustscan 原生参数，例如 -a 192.168.1.10 -p 80,443。",
+				"参数框填写 rustscan 原生参数，例如 -a 192.168.1.10 --ports 80,443。",
+				"端口写法保持 rustscan 习惯：--top、--range 100-1000、--ports 80,443。",
 				"这里不会再包装参数；你输入什么就拼到 rustscan 后面执行。",
 				"需要调速、批量或脚本参数时，直接按 rustscan 原生命令写。",
 			},
 			Presets: []toolPreset{
-				{Label: "快速 Web", Hint: "常见 Web 端口", RawArgs: "-a 192.168.1.10 -p 80,443,8080,8443"},
-				{Label: "常见内网", Hint: "管理与中间件端口", RawArgs: "-a 192.168.1.10 -p 22,80,443,445,3389,6379,8080"},
-				{Label: "全端口慢扫", Hint: "覆盖完整端口", RawArgs: "-a 192.168.1.10 -r 1-65535"},
+				{Label: "快速 Web", Hint: "常见 Web 端口", RawArgs: "-a 192.168.1.10 --ports 80,443,8080,8443"},
+				{Label: "常见内网", Hint: "管理与中间件端口", RawArgs: "-a 192.168.1.10 --ports 22,80,443,445,3389,6379,8080"},
+				{Label: "全端口慢扫", Hint: "覆盖完整端口", RawArgs: "-a 192.168.1.10 --range 1-65535"},
 			},
 		},
 		{
