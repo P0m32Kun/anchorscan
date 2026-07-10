@@ -232,6 +232,10 @@
     <div>
       <p class="eyebrow">漏洞脆弱性</p>
       <h3>已发现的安全风险 (Findings)</h3>
+      <div class="vuln-distribution-container" id="distribution-container" style="display: none; margin-top: 0.85rem;">
+        <div class="vuln-distribution-bar" id="distribution-bar"></div>
+        <div class="vuln-distribution-legend" id="distribution-legend"></div>
+      </div>
     </div>
     <div class="pagination">
       <span>漏洞第 {{.FindingPage.Page}} / {{.FindingPage.TotalPages}} 页</span>

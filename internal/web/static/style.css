@@ -1649,3 +1649,67 @@ input[type="file"]::file-selector-button:hover {
   }
 }
 
+/* 漏洞分布条样式 */
+.vuln-distribution-container {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.vuln-distribution-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #191b22;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+.vuln-bar-segment {
+  height: 100%;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  cursor: pointer;
+}
+.vuln-bar-segment:hover::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 255, 255, 0.15);
+}
+.vuln-bar-segment.critical { background: var(--sev-critical); }
+.vuln-bar-segment.high { background: var(--sev-high); }
+.vuln-bar-segment.medium { background: var(--sev-medium); }
+.vuln-bar-segment.low { background: var(--sev-low); }
+.vuln-bar-segment.info { background: var(--sev-info); }
+
+.vuln-distribution-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  margin-top: 0.75rem;
+}
+.legend-item {
+  font-size: 0.8rem;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.legend-dot.critical { background: var(--sev-critical); }
+.legend-dot.high { background: var(--sev-high); }
+.legend-dot.medium { background: var(--sev-medium); }
+.legend-dot.low { background: var(--sev-low); }
+.legend-dot.info { background: var(--sev-info); }
+.legend-count {
+  font-weight: 700;
+  color: var(--heading);
+  font-family: var(--mono);
+}
+
+
