@@ -1825,5 +1825,54 @@ input[type="file"]::file-selector-button:hover {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* IDE 证据框 */
+.evidence-container {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-top: 0.75rem;
+  background: #050608;
+  text-align: left;
+}
+.evidence-header {
+  background: #131418;
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.evidence-pre {
+  margin: 0;
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 24rem;
+}
+.evidence-copy-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+.evidence-copy-btn:hover {
+  color: var(--primary);
+}
+
 
 

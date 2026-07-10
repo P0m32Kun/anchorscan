@@ -343,4 +343,33 @@ document.addEventListener('DOMContentLoaded', () => {
       this.closest('form').submit();
     });
   });
+
+  // 证据一键复制
+  document.querySelectorAll('[data-copy-target-id]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const targetId = btn.getAttribute('data-copy-target-id');
+      const targetEl = document.getElementById(targetId);
+      if (!targetEl) return;
+
+      const text = targetEl.innerText || targetEl.textContent || '';
+      btn.disabled = true;
+      const originalHTML = btn.innerHTML;
+      try {
+        await writeClipboard(text.trimEnd());
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.85rem; height: 0.85rem; color: var(--success);">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          <span style="color: var(--success); font-weight: 700;">已复制!</span>
+        `;
+      } catch (err) {
+        btn.innerHTML = `<span style="color: var(--danger);">复制失败</span>`;
+      }
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }, 1200);
+    });
+  });
 });

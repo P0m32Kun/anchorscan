@@ -345,5 +345,178 @@ assert.equal(mockLines[3].className, 'step-line completed');
   assert.equal(mockForm.submitCalledCount, 2);
 }
 
+// Test DOMContentLoaded - Evidence verification Copy Button (Success path)
+{
+  let domContentLoadedCallback = null;
+  let writtenText = '';
+  let writeClipboardCalled = false;
+
+  const mockTarget = {
+    innerText: 'evidence details content'
+  };
+
+  const mockBtn = {
+    listeners: {},
+    disabled: false,
+    innerHTML: '<span>复制数据</span>',
+    getAttribute(attr) {
+      if (attr === 'data-copy-target-id') return 'evidence-pre-0';
+      return null;
+    },
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    }
+  };
+
+  let setTimeoutCallback = null;
+  let setTimeoutDelay = 0;
+
+  const copyContext = {
+    window: {
+      isSecureContext: true
+    },
+    navigator: {
+      clipboard: {
+        writeText: async (text) => {
+          writeClipboardCalled = true;
+          writtenText = text;
+        }
+      }
+    },
+    document: {
+      addEventListener(event, handler) {
+        if (event === 'DOMContentLoaded') {
+          domContentLoadedCallback = handler;
+        }
+      },
+      getElementById(id) {
+        if (id === 'evidence-pre-0') return mockTarget;
+        return null;
+      },
+      querySelectorAll(sel) {
+        if (sel === '[data-copy-target-id]') {
+          return [mockBtn];
+        }
+        return [];
+      },
+      querySelector() {
+        return null;
+      }
+    },
+    setTimeout(handler, delay) {
+      setTimeoutCallback = handler;
+      setTimeoutDelay = delay;
+    },
+    setInterval: () => {}
+  };
+
+  vm.createContext(copyContext);
+  vm.runInContext(source, copyContext);
+
+  assert.ok(domContentLoadedCallback);
+  domContentLoadedCallback();
+
+  const clickHandler = mockBtn.listeners['click'];
+  assert.ok(clickHandler);
+
+  let preventDefaultCalled = false;
+  const clickPromise = clickHandler({
+    preventDefault() {
+      preventDefaultCalled = true;
+    }
+  });
+
+  await clickPromise;
+
+  assert.ok(preventDefaultCalled);
+  assert.ok(writeClipboardCalled);
+  assert.equal(writtenText, 'evidence details content');
+  assert.ok(mockBtn.disabled);
+  assert.ok(mockBtn.innerHTML.includes('已复制!'));
+
+  assert.ok(setTimeoutCallback);
+  assert.equal(setTimeoutDelay, 1200);
+  setTimeoutCallback();
+
+  assert.ok(!mockBtn.disabled);
+  assert.equal(mockBtn.innerHTML, '<span>复制数据</span>');
+}
+
+// Test DOMContentLoaded - Evidence verification Copy Button (Failure path)
+{
+  let domContentLoadedCallback = null;
+
+  const mockTarget = {
+    innerText: 'evidence details content'
+  };
+
+  const mockBtn = {
+    listeners: {},
+    disabled: false,
+    innerHTML: '<span>复制数据</span>',
+    getAttribute(attr) {
+      if (attr === 'data-copy-target-id') return 'evidence-pre-0';
+      return null;
+    },
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    }
+  };
+
+  let setTimeoutCallback = null;
+
+  const copyContext = {
+    window: {
+      isSecureContext: true
+    },
+    navigator: {
+      clipboard: {
+        writeText: async (text) => {
+          throw new Error('clipboard error');
+        }
+      }
+    },
+    document: {
+      addEventListener(event, handler) {
+        if (event === 'DOMContentLoaded') {
+          domContentLoadedCallback = handler;
+        }
+      },
+      getElementById(id) {
+        if (id === 'evidence-pre-0') return mockTarget;
+        return null;
+      },
+      querySelectorAll(sel) {
+        if (sel === '[data-copy-target-id]') {
+          return [mockBtn];
+        }
+        return [];
+      },
+      querySelector() {
+        return null;
+      }
+    },
+    setTimeout(handler, delay) {
+      setTimeoutCallback = handler;
+    },
+    setInterval: () => {}
+  };
+
+  vm.createContext(copyContext);
+  vm.runInContext(source, copyContext);
+
+  domContentLoadedCallback();
+
+  const clickHandler = mockBtn.listeners['click'];
+  await clickHandler({
+    preventDefault() {}
+  });
+
+  assert.ok(mockBtn.innerHTML.includes('复制失败'));
+
+  setTimeoutCallback();
+  assert.equal(mockBtn.innerHTML, '<span>复制数据</span>');
+}
+
 
 

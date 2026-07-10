@@ -321,12 +321,27 @@
         </tr>
         <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
           <td colspan="6">
-            <div class="details-expanded-content">
+            <div class="details-expanded-content" style="padding: 0.85rem 1rem;">
               {{if .Output}}
-              <div class="evidence-title">漏洞响应报文 / 验证证据</div>
-              <pre class="evidence-block evidence-output">{{.Output}}</pre>
+              <div class="evidence-container">
+                <div class="evidence-header">
+                  <div style="display: flex; align-items: center; gap: 0.45rem;">
+                    <span>📄</span>
+                    <span>漏洞验证证据报文 / 响应 RAW OUTPUT</span>
+                  </div>
+                  <button class="evidence-copy-btn" type="button" data-copy-target-id="evidence-pre-{{$index}}">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 0.85rem; height: 0.85rem;">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125v-9.75a1.125 1.125 0 011.125-1.125h3.375m1.5 1.5h9.75a1.125 1.125 0 011.125 1.125v-9.75a1.125 1.125 0 01-1.125-1.125h-9.75a1.125 1.125 0 01-1.125 1.125v9.75s0 .375.375.375h.75" />
+                    </svg>
+                    <span>复制数据</span>
+                  </button>
+                </div>
+                <div class="evidence-body">
+                  <pre class="evidence-pre" id="evidence-pre-{{$index}}">{{.Output}}</pre>
+                </div>
+              </div>
               {{else}}
-              <p class="evidence-empty">暂无原始证据输出。</p>
+              <p class="evidence-empty" style="color: var(--muted); font-size: 0.85rem; margin: 0; padding: 0.5rem 0;">暂无原始证据输出。</p>
               {{end}}
             </div>
           </td>
