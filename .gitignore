@@ -20,3 +20,8 @@
 /docs/testing-lab-checklist.md
 /docs/troubleshooting-lab.md
 /docs/testing-results-template.md
+
+# AIOS & ContextDB
+/.aios/
+/.contextdb-enable
+

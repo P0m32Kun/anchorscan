@@ -4,6 +4,22 @@ All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
 
+## [1.6.2] - 2026-07-10
+
+v1.6.2 聚焦控制台 UI/UX 深度重设计，大幅优化视觉对比度、响应式移动端布局、实时扫描状态监控，并重构了更加安全的智能过滤面板。
+
+### Added
+- 扫描实时 Stepper 进度条：在扫描详情页直观显示五个扫描阶段（主机发现、端口扫描、指纹探测、漏洞评估、报告生成），利用前端 JS 解析阶段事件动态流式推进。
+- 智能过滤面板：将漏洞与资产过滤拆分为一键应用检索与浮窗维度过滤。支持自动识别并分流 IP 与文本关键字，无需点击多余按钮即可通过 Popover 气泡菜单完成危险等级、端口服务、数据源、视图的筛选。
+- 活动过滤徽章（Filter Tags）：过滤条件生效后自动渲染为小胶囊徽章，点击徽章 ✕ 按钮即时清除对应条件并更新结果。
+- 漏洞原始证据块（Evidence Container）IDE 风格化重构，支持一键安全复制日志并提供临时绿勾反馈。
+
+### Changed
+- 将 muted 文本对比度从 #666a73 调优至 #8e94a0，通过 WCAG AA 级标准（4.71:1）无障碍评估。
+- 控制台在宽度 <= 1024px 时自适应展示，左侧菜单滑动收纳为高斯模糊遮罩覆盖下的侧边抽屉。
+- 安全加固：使用 textContent 彻底消除了由 URL Query 输入引发的 DOM-based 反射型 XSS 漏洞。
+- 清理遗留事件：移除了第一阶段遗留的下拉框 change 直接提交逻辑，交互机制完全由 Popover 应用及 requestSubmit 统一控制。
+
 ## [1.6.1] - 2026-07-10
 
 ### Added
