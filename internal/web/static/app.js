@@ -333,20 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 2. 联动即时筛选
-  const viewSelect = document.getElementById('filter-view-select');
-  if (viewSelect) {
-    viewSelect.addEventListener('change', () => viewSelect.closest('form').submit());
-  }
-  document.querySelectorAll('.severity-filter-chip input[type="checkbox"]').forEach(box => {
-    // 恢复初次渲染状态
-    box.parentElement.classList.toggle('active', box.checked);
-    box.addEventListener('change', function() {
-      this.parentElement.classList.toggle('active', this.checked);
-      this.closest('form').submit();
-    });
-  });
-
   // 证据一键复制
   document.querySelectorAll('[data-copy-target-id]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
