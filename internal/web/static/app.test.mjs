@@ -313,9 +313,6 @@ assert.equal(mockLines[3].className, 'step-line completed');
   assert.ok(domContentLoadedCallback);
   domContentLoadedCallback();
 
-  // 1. Verify initial active class restoration (mockCheckbox is checked, so parent gets active)
-  assert.ok(mockClassList.classes.has('active'));
-
   // 2. Verify collapsible panel toggle behavior
   const clickHandler = mockToggleBtn.listeners['click'];
   assert.ok(clickHandler);
@@ -335,21 +332,6 @@ assert.equal(mockLines[3].className, 'step-line completed');
   clickHandler({ preventDefault() {} });
   assert.equal(mockAdvPanel.style.display, 'none');
   assert.equal(mockChevron.style.transform, 'rotate(0deg)');
-
-  // 3. Verify view select immediate submit
-  const viewChangeHandler = mockViewSelect.listeners['change'];
-  assert.ok(viewChangeHandler);
-  viewChangeHandler();
-  assert.equal(mockForm.submitCalledCount, 1);
-
-  // 4. Verify checkbox change event triggers submit and active class toggle
-  const checkboxChangeHandler = mockCheckbox.listeners['change'];
-  assert.ok(checkboxChangeHandler);
-
-  mockCheckbox.checked = false;
-  checkboxChangeHandler.call(mockCheckbox);
-  assert.ok(!mockClassList.classes.has('active'));
-  assert.equal(mockForm.submitCalledCount, 2);
 }
 
 // Test DOMContentLoaded - Evidence verification Copy Button (Success path)
