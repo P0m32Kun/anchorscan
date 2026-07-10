@@ -1602,3 +1602,50 @@ input[type="file"]::file-selector-button:hover {
   transition: opacity 0.25s ease;
 }
 
+/* 窄屏断点适配 (max-width: 1024px) */
+@media (max-width: 1024px) {
+  .app-shell { flex-direction: column; }
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    background: #0d0e11;
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 98;
+  }
+  .mobile-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--heading);
+  }
+  .sidebar-toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+  }
+  .sidebar {
+    position: fixed;
+    left: -240px;
+    top: 0;
+    bottom: 0;
+    height: 100vh;
+    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
+  .page-shell {
+    width: 100%;
+    padding: 1.25rem 1rem;
+  }
+}
+
