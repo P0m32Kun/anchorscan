@@ -265,6 +265,7 @@ function updateStepper(events, runStatus) {
 
   if ((runStatus || '').toLowerCase() === 'completed') {
     Object.values(steps).forEach(s => {
+      if (!s) return;
       s.className = 'step completed';
       s.querySelector('.step-icon').innerHTML = '✓';
     });
@@ -316,4 +317,30 @@ function updateStepper(events, runStatus) {
 // 绑定 DOM 载入回调
 document.addEventListener('DOMContentLoaded', () => {
   renderVulnDistribution();
+
+  // 1. 高级过滤选项折叠/展开
+  const toggleAdvBtn = document.getElementById('btn-toggle-advanced');
+  const advPanel = document.getElementById('advanced-filter-panel');
+  if (toggleAdvBtn && advPanel) {
+    toggleAdvBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const isHidden = advPanel.style.display === 'none';
+      advPanel.style.display = isHidden ? 'block' : 'none';
+      toggleAdvBtn.querySelector('.chevron-icon').style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+  }
+
+  // 2. 联动即时筛选
+  const viewSelect = document.getElementById('filter-view-select');
+  if (viewSelect) {
+    viewSelect.addEventListener('change', () => viewSelect.closest('form').submit());
+  }
+  document.querySelectorAll('.severity-filter-chip input[type="checkbox"]').forEach(box => {
+    // 恢复初次渲染状态
+    box.parentElement.classList.toggle('active', box.checked);
+    box.addEventListener('change', function() {
+      this.parentElement.classList.toggle('active', this.checked);
+      this.closest('form').submit();
+    });
+  });
 });

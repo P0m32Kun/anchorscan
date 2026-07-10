@@ -191,4 +191,159 @@ assert.equal(mockSteps['step-report'].className, 'step active');
 assert.equal(mockSteps['step-report'].icon.innerHTML, 5);
 assert.equal(mockLines[3].className, 'step-line completed');
 
+// Test Case 7: updateStepper defensive check for null/missing steps
+{
+  resetMockStepper();
+  const originalReport = mockSteps['step-report'];
+  mockSteps['step-report'] = null;
+
+  // This should not crash when completing
+  context.updateStepper([], 'completed');
+  assert.equal(mockSteps['step-discover'].className, 'step completed');
+  assert.equal(mockSteps['step-discover'].icon.innerHTML, '✓');
+
+  // Restore
+  mockSteps['step-report'] = originalReport;
+}
+
+// Test DOMContentLoaded interactions (collapsible panel & auto-submit)
+{
+  let domContentLoadedCallback = null;
+  const mockForm = {
+    submitCalledCount: 0,
+    submit() {
+      this.submitCalledCount++;
+    }
+  };
+
+  const mockChevron = {
+    style: { transform: '' }
+  };
+
+  const mockToggleBtn = {
+    listeners: {},
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    },
+    querySelector(sel) {
+      if (sel === '.chevron-icon') return mockChevron;
+      return null;
+    }
+  };
+
+  const mockAdvPanel = {
+    style: { display: 'none' }
+  };
+
+  const mockViewSelect = {
+    listeners: {},
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    },
+    closest(sel) {
+      if (sel === 'form') return mockForm;
+      return null;
+    }
+  };
+
+  const mockClassList = {
+    classes: new Set(),
+    toggle(cls, state) {
+      if (state) {
+        this.classes.add(cls);
+      } else {
+        this.classes.delete(cls);
+      }
+    }
+  };
+
+  const mockCheckbox = {
+    checked: true,
+    listeners: {},
+    parentElement: {
+      classList: mockClassList
+    },
+    addEventListener(event, handler) {
+      this.listeners[event] = handler;
+    },
+    closest(sel) {
+      if (sel === 'form') return mockForm;
+      return null;
+    }
+  };
+
+  const interactiveContext = {
+    window: {},
+    document: {
+      addEventListener(event, handler) {
+        if (event === 'DOMContentLoaded') {
+          domContentLoadedCallback = handler;
+        }
+      },
+      getElementById(id) {
+        if (id === 'btn-toggle-advanced') return mockToggleBtn;
+        if (id === 'advanced-filter-panel') return mockAdvPanel;
+        if (id === 'filter-view-select') return mockViewSelect;
+        return null;
+      },
+      querySelectorAll(sel) {
+        if (sel === '.severity-filter-chip input[type="checkbox"]') {
+          return [mockCheckbox];
+        }
+        return [];
+      },
+      querySelector() {
+        return null;
+      }
+    },
+    setInterval() {},
+  };
+
+  vm.createContext(interactiveContext);
+  vm.runInContext(source, interactiveContext);
+
+  // Trigger DOMContentLoaded
+  assert.ok(domContentLoadedCallback);
+  domContentLoadedCallback();
+
+  // 1. Verify initial active class restoration (mockCheckbox is checked, so parent gets active)
+  assert.ok(mockClassList.classes.has('active'));
+
+  // 2. Verify collapsible panel toggle behavior
+  const clickHandler = mockToggleBtn.listeners['click'];
+  assert.ok(clickHandler);
+
+  // Call click handler
+  let preventDefaultCalled = false;
+  clickHandler({
+    preventDefault() {
+      preventDefaultCalled = true;
+    }
+  });
+  assert.ok(preventDefaultCalled);
+  assert.equal(mockAdvPanel.style.display, 'block');
+  assert.equal(mockChevron.style.transform, 'rotate(180deg)');
+
+  // Toggle again
+  clickHandler({ preventDefault() {} });
+  assert.equal(mockAdvPanel.style.display, 'none');
+  assert.equal(mockChevron.style.transform, 'rotate(0deg)');
+
+  // 3. Verify view select immediate submit
+  const viewChangeHandler = mockViewSelect.listeners['change'];
+  assert.ok(viewChangeHandler);
+  viewChangeHandler();
+  assert.equal(mockForm.submitCalledCount, 1);
+
+  // 4. Verify checkbox change event triggers submit and active class toggle
+  const checkboxChangeHandler = mockCheckbox.listeners['change'];
+  assert.ok(checkboxChangeHandler);
+
+  mockCheckbox.checked = false;
+  checkboxChangeHandler.call(mockCheckbox);
+  assert.ok(!mockClassList.classes.has('active'));
+  assert.equal(mockForm.submitCalledCount, 2);
+}
+
+
 

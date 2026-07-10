@@ -49,47 +49,82 @@
       <h3>漏洞与资产检索</h3>
     </div>
   </div>
-  <form class="filter-grid" method="get">
-    <input name="ip" placeholder="🔍 检索 IP" value="{{.Filters.IP}}">
-    <input name="port" placeholder="端口 (如 80)" value="{{.Filters.Port}}">
-    <input name="service" placeholder="服务精确匹配 (如 redis)" value="{{.Filters.Service}}">
-    <input name="q" placeholder="关键词 (如 redis/tomcat/admin)" value="{{.Filters.Keyword}}">
-    <input name="source" placeholder="数据源 (nuclei)" value="{{.Filters.Source}}">
-    <div class="full-width severity-filter-container">
-      <span class="severity-filter-title">危险等级筛选</span>
-      <div class="severity-filter-group">
+  <form class="filter-grid-layout" method="get" id="report-filter-form">
+    <!-- 核心过滤行 -->
+    <div class="filter-main-row">
+      <div class="input-with-icon" style="flex: 1; min-width: 200px; position: relative;">
+        <span class="search-icon">🔍</span>
+        <input name="ip" placeholder="检索 IP 地址 (如 192.168.1.1)" value="{{.Filters.IP}}" style="padding-left: 2.15rem;">
+      </div>
+      <div class="input-with-icon" style="flex: 1; min-width: 200px; position: relative;">
+        <span class="search-icon">🔍</span>
+        <input name="q" placeholder="检索漏洞 ID 或描述关键词" value="{{.Filters.Keyword}}" style="padding-left: 2.15rem;">
+      </div>
+      <button class="button button-secondary" type="button" id="btn-toggle-advanced">
+        <span>高级筛选</span>
+        <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.75rem; height: 0.75rem; transition: transform 0.2s ease;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      <button class="button button-primary" type="submit">开始筛选</button>
+    </div>
+
+    <!-- 高级隐藏面板 -->
+    <div class="filter-advanced-panel" id="advanced-filter-panel" style="display: none; padding-top: 1rem; border-top: 1px dashed var(--border); margin-top: 0.85rem;">
+      <div class="form-grid">
+        <label>
+          <span>过滤端口</span>
+          <input name="port" placeholder="特定端口 (如 80)" value="{{.Filters.Port}}">
+        </label>
+        <label>
+          <span>服务精确匹配</span>
+          <input name="service" placeholder="服务名称 (如 redis)" value="{{.Filters.Service}}">
+        </label>
+        <label>
+          <span>数据源</span>
+          <input name="source" placeholder="数据源 (nuclei)" value="{{.Filters.Source}}">
+        </label>
+        <label>
+          <span>视图模式</span>
+          <select name="view" id="filter-view-select">
+            <option value="ports" {{if eq .AssetView "ports"}}selected{{end}}>按端口列表</option>
+            <option value="hosts" {{if eq .AssetView "hosts"}}selected{{end}}>按主机聚合</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- 等级过滤 -->
+    <div class="severity-filter-container" style="margin-top: 0.85rem; border-top: 1px solid var(--border); padding-top: 0.85rem;">
+      <span class="severity-filter-title" style="font-size: 0.8rem; font-weight: 600; color: var(--muted);">危险等级过滤</span>
+      <div class="severity-filter-group" style="display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.4rem;">
         <label class="severity-filter-chip critical{{if contains .Filters.Severities "critical"}} active{{end}}">
-          <input type="checkbox" name="severity" value="critical" {{if contains .Filters.Severities "critical"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <input type="checkbox" name="severity" value="critical" {{if contains .Filters.Severities "critical"}}checked{{end}}>
           <span class="severity-dot"></span>
           critical
         </label>
         <label class="severity-filter-chip high{{if contains .Filters.Severities "high"}} active{{end}}">
-          <input type="checkbox" name="severity" value="high" {{if contains .Filters.Severities "high"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <input type="checkbox" name="severity" value="high" {{if contains .Filters.Severities "high"}}checked{{end}}>
           <span class="severity-dot"></span>
           high
         </label>
         <label class="severity-filter-chip medium{{if contains .Filters.Severities "medium"}} active{{end}}">
-          <input type="checkbox" name="severity" value="medium" {{if contains .Filters.Severities "medium"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <input type="checkbox" name="severity" value="medium" {{if contains .Filters.Severities "medium"}}checked{{end}}>
           <span class="severity-dot"></span>
           medium
         </label>
         <label class="severity-filter-chip low{{if contains .Filters.Severities "low"}} active{{end}}">
-          <input type="checkbox" name="severity" value="low" {{if contains .Filters.Severities "low"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <input type="checkbox" name="severity" value="low" {{if contains .Filters.Severities "low"}}checked{{end}}>
           <span class="severity-dot"></span>
           low
         </label>
         <label class="severity-filter-chip info{{if contains .Filters.Severities "info"}} active{{end}}">
-          <input type="checkbox" name="severity" value="info" {{if contains .Filters.Severities "info"}}checked{{end}} onchange="this.parentElement.classList.toggle('active', this.checked)">
+          <input type="checkbox" name="severity" value="info" {{if contains .Filters.Severities "info"}}checked{{end}}>
           <span class="severity-dot"></span>
           info
         </label>
       </div>
     </div>
-    <select name="view">
-      <option value="ports" {{if eq .AssetView "ports"}}selected{{end}}>按端口列表</option>
-      <option value="hosts" {{if eq .AssetView "hosts"}}selected{{end}}>按主机聚合</option>
-    </select>
-    <button class="button button-primary" type="submit">开始筛选</button>
   </form>
 </section>
 
