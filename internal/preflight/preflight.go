@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/P0m32Kun/anchorscan/internal/app"
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 )
 
@@ -19,10 +19,10 @@ type Options struct {
 	ReportDir    string
 	Targets      []string
 	PortSpec     string
-	Tools        app.ToolPaths
+	Tools        config.ToolPaths
 	Profile      string
 	Workers      int
-	ExtraArgs    app.ToolExtraArgs
+	ExtraArgs    config.ToolArgs
 	NSERuleCount int
 	TagRuleCount int
 }
@@ -40,8 +40,8 @@ type Summary struct {
 	ResolvedPorts string
 	Profile       string
 	Workers       int
-	Tools         app.ToolPaths
-	ExtraArgs     app.ToolExtraArgs
+	Tools         config.ToolPaths
+	ExtraArgs     config.ToolArgs
 	NSERuleCount  int
 	TagRuleCount  int
 }

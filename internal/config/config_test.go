@@ -29,6 +29,10 @@ scan:
 		t.Fatalf("Load returned error: %v", err)
 	}
 
+	var paths ToolPaths = cfg.Tools
+	if paths.Rustscan != "/usr/local/bin/rustscan" || paths.Nmap != "/usr/local/bin/nmap" {
+		t.Fatalf("unexpected tool paths: %#v", paths)
+	}
 	if cfg.Tools.Rustscan != "/usr/local/bin/rustscan" {
 		t.Fatalf("unexpected rustscan path: %q", cfg.Tools.Rustscan)
 	}

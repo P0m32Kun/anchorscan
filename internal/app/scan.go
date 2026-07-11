@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -20,19 +21,8 @@ import (
 
 var nmapHeartbeatEvery = 30 * time.Second
 
-type ToolPaths struct {
-	Rustscan string
-	Nmap     string
-	Httpx    string
-	Nuclei   string
-}
-
-type ToolExtraArgs struct {
-	Rustscan []string
-	Nmap     []string
-	Httpx    []string
-	Nuclei   []string
-}
+type ToolPaths = config.ToolPaths
+type ToolExtraArgs = config.ToolArgs
 
 type TagRule = vuln.TagRule
 
