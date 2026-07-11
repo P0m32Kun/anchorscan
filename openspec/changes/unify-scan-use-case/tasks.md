@@ -5,7 +5,7 @@
 
 ## 2. 建立最小共享边界
 
-- [ ] 2.1 解除 `internal/preflight` 对 `internal/app` 工具值类型的反向依赖，并用现有低层包或类型别名保持改动最小。
+- [x] 2.1 解除 `internal/preflight` 对 `internal/app` 工具值类型的反向依赖，并用现有低层包或类型别名保持改动最小。
 - [ ] 2.2 在 `internal/app` 实现单一扫描准备函数，复用现有 config、target、ports 和 preflight 逻辑生成结构化结果与 `ScanOptions`。
 
 ## 3. 迁移交付入口
