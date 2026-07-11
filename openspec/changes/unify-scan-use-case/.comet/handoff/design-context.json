@@ -1,0 +1,14 @@
+{
+  "change": "unify-scan-use-case",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "a34eac23929d16b07e460a19455f1fe14a321d4419278901e939665266986058",
+  "files": [
+    { "path": "openspec/changes/unify-scan-use-case/proposal.md", "sha256": "9f4a765d59a91e2b5a8815d548ec25d6c6f10c41b78778c38b40a01626c54197" },
+    { "path": "openspec/changes/unify-scan-use-case/design.md", "sha256": "80f186eaf75c49423b8ba0458665c6a949af07e70700dac851f6e71a85e4db2a" },
+    { "path": "openspec/changes/unify-scan-use-case/tasks.md", "sha256": "027cdd9cab1fbe11e9db344893e9edc1cefbe6fa3cdaaf5e533376b2f1840fe0" },
+    { "path": "openspec/changes/unify-scan-use-case/specs/shared-scan-preparation/spec.md", "sha256": "dae2aac357fe33829e1c0f9e6d30d14ff44784e15bd112fb55f719f1e0ac2e64" }
+  ]
+}
