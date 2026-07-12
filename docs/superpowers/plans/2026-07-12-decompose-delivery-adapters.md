@@ -123,7 +123,7 @@ Expected: exit 0、无输出。
 - Consumes: 当前 `run`、`parseSeverityFilters`、`paginateFingerprints`、`exportAssetsTXT`、`newRunMetaView`。
 - Produces: 根错误输出、过滤规范化、分页查询保持、TXT 输出、Unicode 摘要的稳定契约。
 
-- [ ] **Step 1: Add the root dispatch contract test to `main_test.go`**
+- [x] **Step 1: Add the root dispatch contract test to `main_test.go`**
 
 ```go
 func TestRunUnknownCommandPreservesStderrAndError(t *testing.T) {
@@ -138,7 +138,7 @@ func TestRunUnknownCommandPreservesStderrAndError(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Add pure report characterization tests to `reports_test.go`**
+- [x] **Step 2: Add pure report characterization tests to `reports_test.go`**
 
 Add imports `net/url`, `strings`, and `github.com/P0m32Kun/anchorscan/internal/store`, then add:
 
@@ -178,13 +178,13 @@ func TestNewRunMetaViewSummarizesByRune(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Verify the tests pass before moving code**
+- [x] **Step 3: Verify the tests pass before moving code**
 
 Run: `rtk go test ./cmd/anchorscan ./internal/web`
 
 Expected: PASS。它们是特征测试，不是新功能测试，因此在重构前就必须通过。
 
-- [ ] **Step 4: Commit the compatibility checks**
+- [x] **Step 4: Commit the compatibility checks**
 
 ```bash
 rtk git add cmd/anchorscan/main_test.go internal/web/reports_test.go

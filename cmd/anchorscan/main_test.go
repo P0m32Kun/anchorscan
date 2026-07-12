@@ -84,6 +84,17 @@ func TestExecuteRootHelpShowsCommands(t *testing.T) {
 	}
 }
 
+func TestRunUnknownCommandPreservesStderrAndError(t *testing.T) {
+	var stderr bytes.Buffer
+	err := run([]string{"missing"}, &bytes.Buffer{}, &stderr, cliDeps{})
+	if err == nil || err.Error() != "unknown command" {
+		t.Fatalf("error = %v", err)
+	}
+	if stderr.String() != "unknown command: missing\n" {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
 func TestExecuteToolHelpShowsTools(t *testing.T) {
 	var stdout bytes.Buffer
 	err := run([]string{"tool", "--help"}, &stdout, &bytes.Buffer{}, cliDeps{})
