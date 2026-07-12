@@ -167,13 +167,13 @@ rtk git commit -m "test: lock scan runtime boundaries"
 - Consumes: `scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, error)`。
 - Produces: 完全相同的私有 `scanTarget` 签名；`RunScan` 的调用点不变。
 
-- [ ] **Step 1: 建立迁移前的单目标行为基线**
+- [x] **Step 1: 建立迁移前的单目标行为基线**
 
 Run: `rtk go test ./internal/app -run 'Test(FindingFromNucleiUsesResultEndpoint|RunScanRunsNSEAndNucleiForSSH|RunScanRunsNSEAndNucleiForRedis|RunScanSkipsNmapWhenRustscanFindsNoOpenPorts|RunScanAddsManualReviewForRDP|RunScanLogsNmapHeartbeat|RunScanPassesExtraArgsToTools|RunScanWritesFailedNucleiOutputArtifact)$' -count=1`
 
 Expected: PASS。
 
-- [ ] **Step 2: 制造明确的编译红灯**
+- [x] **Step 2: 制造明确的编译红灯**
 
 从 `internal/app/scan.go` 删除以下完整定义，但暂不创建新文件：
 
@@ -188,7 +188,7 @@ Run: `rtk go test ./internal/app -run '^TestRunScanRunsNSEAndNucleiForSSH$' -cou
 
 Expected: FAIL to build，至少包含 `undefined: scanTarget`。
 
-- [ ] **Step 3: 在同包新文件恢复相同实现**
+- [x] **Step 3: 在同包新文件恢复相同实现**
 
 创建 `internal/app/scan_target.go`：使用 `package app`；从原 `scan.go` 原样放入刚删除的变量和三个函数，不改函数体、调用顺序、返回点、heartbeat goroutine、artifact 写入顺序或 error wrapping。只保留这些符号实际需要的 imports：
 
@@ -213,13 +213,13 @@ var nmapHeartbeatEvery = 30 * time.Second
 
 变量和函数在新文件中的顺序必须是 `nmapHeartbeatEvery`、`scanTarget`、`formatNucleiEvidence`、`findingFromNuclei`。这是纯移动。新文件尚未跟踪时，先运行 `rtk git add -N internal/app/scan_target.go`，再用 `rtk git diff --color-moved=dimmed-zebra -- internal/app/scan.go internal/app/scan_target.go` 检查只显示 moved code 和 import 调整；若函数体出现新增或删除行，恢复为基线实现。
 
-- [ ] **Step 4: 运行单目标测试，确认绿灯**
+- [x] **Step 4: 运行单目标测试，确认绿灯**
 
 Run: `rtk gofmt -w internal/app/scan.go internal/app/scan_target.go && rtk go test ./internal/app -run 'Test(FindingFromNucleiUsesResultEndpoint|RunScanRunsNSEAndNucleiForSSH|RunScanRunsNSEAndNucleiForRedis|RunScanSkipsNmapWhenRustscanFindsNoOpenPorts|RunScanAddsManualReviewForRDP|RunScanLogsNmapHeartbeat|RunScanPassesExtraArgsToTools|RunScanWritesFailedNucleiOutputArtifact)$' -count=1`
 
 Expected: PASS。
 
-- [ ] **Step 5: 按函数边界整理单目标测试文件**
+- [x] **Step 5: 按函数边界整理单目标测试文件**
 
 创建 `internal/app/scan_target_test.go`，保持每个测试函数内容逐字不变，按当前出现顺序从 `scan_test.go` 移动以下测试：
 
@@ -234,13 +234,13 @@ Expected: PASS。
 
 新文件 import 必须由 `rtk gofmt` 后的编译错误反推到最小集合；共享的 runner 类型、`aliveNmapXML`、`newScanStore` 和断言 helper 继续留在 `scan_test.go`，不新建测试框架或复制 fixture。
 
-- [ ] **Step 6: 验证移动后没有测试丢失**
+- [x] **Step 6: 验证移动后没有测试丢失**
 
 Run: `rtk gofmt -w internal/app/scan_test.go internal/app/scan_target_test.go && rtk go test ./internal/app && rtk git diff --check`
 
 Expected: PASS；`rtk git diff --check` 无输出。
 
-- [ ] **Step 7: 提交单目标边界**
+- [x] **Step 7: 提交单目标边界**
 
 ```bash
 rtk git add internal/app/scan.go internal/app/scan_target.go internal/app/scan_test.go internal/app/scan_target_test.go

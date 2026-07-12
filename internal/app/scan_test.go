@@ -13,33 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
-	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
 
 var aliveNmapXML = []byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)
-
-func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
-	fallback := fingerprint.ServiceFingerprint{IP: "172.22.0.1", Port: 8080, Protocol: "tcp"}
-	result := tools.NucleiFinding{
-		TemplateID: "redis-default-logins",
-		Name:       "Redis Default Login",
-		Severity:   "high",
-		IP:         "172.22.0.1",
-		Port:       "6379",
-		MatchedAt:  "172.22.0.1:6379",
-	}
-
-	finding := findingFromNuclei(result, fallback, nil)
-	if finding.IP != "172.22.0.1" || finding.Port != 6379 || finding.Protocol != "tcp" {
-		t.Fatalf("finding endpoint = %s:%d/%s, want 172.22.0.1:6379/tcp", finding.IP, finding.Port, finding.Protocol)
-	}
-	if finding.Target != "172.22.0.1:6379" {
-		t.Fatalf("finding target = %q", finding.Target)
-	}
-}
 
 func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
 	type fieldCheck struct {
@@ -193,103 +171,6 @@ func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 	}
 }
 
-// TestRunScanRunsNSEAndNucleiForSSH locks the dual-engine contract: once a
-// service is fingerprinted as SSH and rules are configured, both the nmap NSE
-// engine AND nuclei (with -tags ssh) must be invoked. SSH is non-web, so httpx
-// is never called — the runner output sequence reflects that ordering.
-func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
-	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
-		[]byte("192.168.1.10 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
-		[]byte(`<nmaprun><host><ports><port><script id="ssh2-enum-algos" output="kex_algorithms:..."/></port></ports></host></nmaprun>`),
-		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
-	}}
-
-	opts := ScanOptions{
-		RunID:          "run-ssh-dual",
-		Targets:        []string{"192.168.1.10"},
-		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
-		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
-		NSERules: map[string][]string{
-			"ssh": {"ssh2-enum-algos", "ssh-hostkey"},
-		},
-		TagRules: []TagRule{
-			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh", "default-login"}, Target: "hostport"},
-		},
-	}
-	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-
-	// NSE: nmap must be invoked with --script for both ssh scripts on port 22.
-	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos,ssh-hostkey", "-p", "22") {
-		t.Fatalf("expected nmap NSE invocation with ssh scripts, commands=%#v", runner.commands)
-	}
-	// Nuclei: must be invoked with -tags containing ssh, targeting IP:22, jsonl output.
-	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh,default-login", "-target", "192.168.1.10:22", "-jsonl") {
-		t.Fatalf("expected nuclei invocation with ssh tags, commands=%#v", runner.commands)
-	}
-}
-
-// TestRunScanRunsNSEAndNucleiForRedis guards against the SSH case being a
-// special-cased accident: a second non-web service (redis) must also trigger
-// both engines when configured.
-func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
-	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
-		[]byte("192.168.1.10 -> [6379]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port></ports></host></nmaprun>`),
-		[]byte(`<nmaprun><host><ports><port><script id="redis-info" output="redis_version:7.0.0"/></port></ports></host></nmaprun>`),
-		[]byte("{\"template-id\":\"redis-info\",\"info\":{\"name\":\"Redis Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:6379\"}\n"),
-	}}
-
-	opts := ScanOptions{
-		RunID:          "run-redis-dual",
-		Targets:        []string{"192.168.1.10"},
-		Ports:          "6379",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
-		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
-		NSERules: map[string][]string{
-			"redis": {"redis-info"},
-		},
-		TagRules: []TagRule{
-			{Name: "redis", Service: []string{"redis"}, NucleiTags: []string{"redis", "default-login"}, Target: "hostport"},
-		},
-	}
-	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-
-	if !runner.hasArgs("/opt/nmap", "--script", "redis-info", "-p", "6379") {
-		t.Fatalf("expected nmap NSE invocation with redis-info, commands=%#v", runner.commands)
-	}
-	if !runner.hasArgs("/opt/nuclei", "-tags", "redis,default-login", "-target", "192.168.1.10:6379", "-jsonl") {
-		t.Fatalf("expected nuclei invocation with redis tags, commands=%#v", runner.commands)
-	}
-}
-
-func TestRunScanSkipsNmapWhenRustscanFindsNoOpenPorts(t *testing.T) {
-	runner := &emptyPortRunner{}
-	dbPath := filepath.Join(t.TempDir(), "scan.db")
-	reportPath := filepath.Join(t.TempDir(), "report.json")
-	scanStore, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatalf("Open returned error: %v", err)
-	}
-
-	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID: "run-empty", Targets: []string{"172.22.0.7"}, Ports: "1-1000", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
-	})
-	if err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-	if runner.nmapCalls != 0 {
-		t.Fatalf("expected nmap to be skipped, got %d calls", runner.nmapCalls)
-	}
-}
-
 func TestRunScanSkipsPortScanWhenHostIsDown(t *testing.T) {
 	runner := &downHostRunner{}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
@@ -333,35 +214,6 @@ func TestRunScanUsesAliveSweepResultsAsTargets(t *testing.T) {
 	}
 	if !reflect.DeepEqual(runner.commands, want) {
 		t.Fatalf("commands = %#v want %#v", runner.commands, want)
-	}
-}
-
-func TestRunScanAddsManualReviewForRDP(t *testing.T) {
-	runner := &sequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
-		[]byte("192.0.2.10 -> [3389]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port></ports></host></nmaprun>`),
-	}}
-	dbPath := filepath.Join(t.TempDir(), "scan.db")
-	reportPath := filepath.Join(t.TempDir(), "report.json")
-	scanStore, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatalf("Open returned error: %v", err)
-	}
-
-	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID: "run-bluekeep", Targets: []string{"192.0.2.10"}, Ports: "3389", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	findings, err := scanStore.ListFindings("run-bluekeep")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(findings) != 1 || findings[0].ID != "manual-review:CVE-2019-0708" {
-		t.Fatalf("findings = %#v", findings)
 	}
 }
 
@@ -429,116 +281,6 @@ func TestRunScanMarksCanceledWhenToolIsKilledAfterCancel(t *testing.T) {
 	}
 	if run.Status != "canceled" {
 		t.Fatalf("status mismatch: %#v", run)
-	}
-}
-
-func TestRunScanLogsNmapHeartbeat(t *testing.T) {
-	oldHeartbeat := nmapHeartbeatEvery
-	nmapHeartbeatEvery = time.Millisecond
-	defer func() { nmapHeartbeatEvery = oldHeartbeat }()
-
-	runner := &sequenceRunner{
-		outputs: [][]byte{
-			aliveNmapXML,
-			[]byte("192.168.1.10 -> [6379,8080]\n"),
-			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
-		},
-		sleeps: []time.Duration{
-			0,
-			0,
-			10 * time.Millisecond,
-		},
-	}
-
-	dbPath := filepath.Join(t.TempDir(), "scan.db")
-	reportPath := filepath.Join(t.TempDir(), "report.json")
-	scanStore, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatalf("Open returned error: %v", err)
-	}
-
-	var mu sync.Mutex
-	var logs []string
-	opts := ScanOptions{
-		RunID:          "run-1",
-		Targets:        []string{"192.168.1.10"},
-		Ports:          "6379,8080",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
-		JSONReportPath: reportPath,
-		Logf: func(format string, args ...any) {
-			mu.Lock()
-			defer mu.Unlock()
-			logs = append(logs, fmt.Sprintf(format, args...))
-		},
-	}
-
-	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	wantSubstrings := []string{
-		"nmap 192.168.1.10 ports=[6379 8080] (service detection may be slow)",
-		"nmap 192.168.1.10 still running elapsed=",
-		"nmap 192.168.1.10 services=2 elapsed=",
-	}
-	for _, want := range wantSubstrings {
-		if !containsLogSubstring(logs, want) {
-			t.Fatalf("expected log containing %q in %#v", want, logs)
-		}
-	}
-}
-
-func TestRunScanPassesExtraArgsToTools(t *testing.T) {
-	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
-		[]byte("192.168.1.10 -> [8080]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
-		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
-		[]byte("{" + `"template-id":"tomcat-default-login","info":{"name":"Tomcat Default Login","severity":"high"},"matched-at":"http://192.168.1.10:8080"` + "}\n"),
-	}}
-
-	dbPath := filepath.Join(t.TempDir(), "scan.db")
-	reportPath := filepath.Join(t.TempDir(), "report.json")
-	scanStore, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatalf("Open returned error: %v", err)
-	}
-
-	opts := ScanOptions{
-		RunID:          "run-1",
-		Targets:        []string{"192.168.1.10"},
-		Ports:          "8080",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
-		JSONReportPath: reportPath,
-		ExtraArgs: ToolExtraArgs{
-			Rustscan: []string{"--batch-size", "500"},
-			Nmap:     []string{"-T3"},
-			Httpx:    []string{"-rate-limit", "100"},
-			Nuclei:   []string{"-rate-limit", "50"},
-		},
-		NSERules: map[string][]string{
-			"http": {"http-tomcat-manager"},
-		},
-		TagRules: []TagRule{{Name: "tomcat", Service: []string{"http"}, Product: []string{"tomcat"}, NucleiTags: []string{"tomcat"}, Target: "url"}},
-	}
-
-	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-
-	for _, check := range []struct{ binary, arg string }{
-		{"/opt/rustscan", "--batch-size"},
-		{"/opt/httpx", "-rate-limit"},
-		{"/opt/nuclei", "-rate-limit"},
-	} {
-		if !runner.hasArg(check.binary, check.arg) {
-			t.Fatalf("expected %s arg %s in %#v", check.binary, check.arg, runner.commands)
-		}
-	}
-	if !runner.hasArgs("/opt/nmap", "-sV", "--version-intensity", "7", "-T3") {
-		t.Fatalf("expected nmap fingerprint args in %#v", runner.commands)
 	}
 }
 
@@ -717,63 +459,6 @@ func TestRunScanWritesAuditArtifacts(t *testing.T) {
 	if run.ArtifactDir != artifactDir {
 		t.Fatalf("artifact dir mismatch: got %q want %q", run.ArtifactDir, artifactDir)
 	}
-}
-
-func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
-	dir := t.TempDir()
-	scanStore := newScanStore(t)
-	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
-		joined := strings.Join(args, " ")
-		switch {
-		case binary == "nmap" && strings.Contains(joined, "-sn"):
-			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
-		case binary == "rustscan":
-			return []byte("127.0.0.1 -> [80]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
-		case binary == "httpx":
-			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
-		case binary == "nuclei":
-			return []byte("{\"template-id\":\"demo\",\"info\":{\"name\":\"demo\",\"severity\":\"medium\"},\"matched-at\":\"http://127.0.0.1:80\"}\n"), errors.New("exit status 1")
-		default:
-			return []byte(""), nil
-		}
-	})
-
-	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID:          "run-failed-nuclei",
-		Targets:        []string{"127.0.0.1"},
-		Ports:          "80",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
-		ProfileName:    "normal",
-		HostWorkers:    1,
-		ArtifactRoot:   dir,
-		JSONReportPath: filepath.Join(dir, "report.json"),
-		TagRules: []TagRule{
-			{
-				Name:       "nginx",
-				Service:    []string{"http"},
-				Product:    []string{"nginx"},
-				Tech:       []string{"nginx"},
-				NucleiTags: []string{"demo"},
-				Target:     "url",
-			},
-		},
-	})
-	if err == nil {
-		t.Fatal("expected scan error")
-	}
-
-	entries, readErr := os.ReadDir(filepath.Join(dir, "run-failed-nuclei"))
-	if readErr != nil {
-		t.Fatalf("ReadDir returned error: %v", readErr)
-	}
-	for _, entry := range entries {
-		if strings.Contains(entry.Name(), "nuclei-127.0.0.1-80-demo") {
-			return
-		}
-	}
-	t.Fatalf("expected failed nuclei artifact, got %#v", entries)
 }
 
 type sequenceRunner struct {
