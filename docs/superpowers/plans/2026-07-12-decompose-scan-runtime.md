@@ -468,7 +468,7 @@ rtk git commit -m "refactor: narrow scan lifecycle entrypoint"
 - Consumes: 前四个任务的三个内部边界。
 - Produces: 可进入 Comet verify 阶段的测试、竞态和打包证据。
 
-- [ ] **Step 1: 检查范围和依赖没有扩大**
+- [x] **Step 1: 检查范围和依赖没有扩大**
 
 Run: `rtk git diff --exit-code 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8 -- go.mod go.sum cmd/anchorscan/main.go internal/app/manager.go`
 
@@ -478,31 +478,31 @@ Run: `rtk git diff --name-only 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8`
 
 Expected: 只包含本计划列出的 `internal/app` 生产/测试文件、本计划文件、当前 change 的 `tasks.md` 及 Comet 执行状态文件；不得出现 CLI、Web、schema、配置、依赖文件或其他 change 的文件。
 
-- [ ] **Step 2: 运行格式、静态和扫描包检查**
+- [x] **Step 2: 运行格式、静态和扫描包检查**
 
 Run: `rtk proxy test -z "$(rtk gofmt -l internal/app/scan.go internal/app/scan_targets.go internal/app/scan_target.go internal/app/scan_test.go internal/app/scan_lifecycle_test.go internal/app/scan_targets_test.go internal/app/scan_target_test.go)" && rtk go vet ./internal/app && rtk go test -race ./internal/app`
 
 Expected: 无格式文件输出；`rtk go vet` exit 0；测试 PASS 且无 data race。
 
-- [ ] **Step 3: 运行全仓测试**
+- [x] **Step 3: 运行全仓测试**
 
 Run: `rtk make test`
 
 Expected: Makefile 内部执行的 `go test ./...` PASS，`node --test internal/web/static/app.test.mjs` 全部 PASS。
 
-- [ ] **Step 4: 验证发布打包路径**
+- [x] **Step 4: 验证发布打包路径**
 
 Run: `rtk make clean && VERSION=v1.7.1-plan-check rtk make package`
 
 Expected: exit 0，并生成当前平台的 `dist/anchorscan-v1.7.1-plan-check-<goos>-<goarch>/anchorscan` 与对应 `.tar.gz`。验证后运行 `rtk make clean`，避免把构建产物带入提交。
 
-- [ ] **Step 5: 检查最终 diff**
+- [x] **Step 5: 检查最终 diff**
 
 Run: `rtk git diff --check && rtk git status --short`
 
 Expected: `rtk git diff --check` 无输出；状态只显示本 change 的计划内文件或 Comet 状态文件，没有 `dist/`。
 
-- [ ] **Step 6: 若验证阶段产生修正则提交，否则不制造空提交**
+- [x] **Step 6: 若验证阶段产生修正则提交，否则不制造空提交**
 
 若 Step 1-5 发现并修复了计划范围内问题：
 

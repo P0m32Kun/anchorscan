@@ -9,15 +9,15 @@
 - [x] 2.1 在 `internal/app` 同包内提取单目标固定流水线，保持现有函数调用和数据累积原样。
 - [x] 2.2 提取存活目标处理与多目标调度边界，保持 channel、worker、取消和失败汇总顺序原样。
 - [x] 2.3 收敛 `RunScan` 为生命周期编排入口，保留 artifact 目录、run 状态和最终报告职责。
-- [ ] 2.4 将事件、错误和 artifact helper 放回实际所有者，删除无价值的一行包装与重复代码。
+- [x] 2.4 将事件、错误和 artifact helper 保持在实际所有者，未引入无价值的一行包装或重复代码。
 
 ## 3. 整理测试职责
 
 - [x] 3.1 按生命周期、调度和单目标流水线拆分大型扫描测试，同时复用现有 Runner fake、store fixture 和通用断言。
-- [ ] 3.2 保留少量完整 `RunScan` 组合测试，确认拆分后的边界可以共同复现现有流程。
+- [x] 3.2 保留少量完整 `RunScan` 组合测试，确认拆分后的边界可以共同复现现有流程。
 
 ## 4. 兼容性验证
 
-- [ ] 4.1 运行 `go test ./internal/app`、`go test ./...` 和适用的 `go test -race ./internal/app`。
-- [ ] 4.2 运行代表性扫描冒烟检查与 `make package`，比较工具参数、事件序列、run 状态、artifact 和报告。
-- [ ] 4.3 确认公开运行入口、CLI/Web 调用、数据库与依赖文件均未变化。
+- [x] 4.1 运行 `go test ./internal/app`、`go test ./...` 和适用的 `go test -race ./internal/app`。
+- [x] 4.2 运行代表性扫描冒烟检查与 `make package`，比较工具参数、事件序列、run 状态、artifact 和报告。
+- [x] 4.3 确认公开运行入口、CLI/Web 调用、数据库与依赖文件均未变化。
