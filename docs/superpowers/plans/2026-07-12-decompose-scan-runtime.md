@@ -1,7 +1,7 @@
 ---
 change: decompose-scan-runtime
 design-doc: docs/superpowers/specs/2026-07-12-decompose-scan-runtime-design.md
-base-ref: f61b7109ba37a0d85466fbd023c22568723308b1
+base-ref: 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8
 ---
 
 # Decompose Scan Runtime Implementation Plan
@@ -16,16 +16,17 @@ base-ref: f61b7109ba37a0d85466fbd023c22568723308b1
 
 ## Global Constraints
 
-- 从提交 `f61b7109ba37a0d85466fbd023c22568723308b1` 开始实施；开始前运行 `rtk git status --short`，若工作区存在与本计划文件重叠的未提交修改，先停止并请求确认。
+- 从提交 `665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8` 开始实施；开始前运行 `rtk git status --short`，若工作区存在与本计划文件重叠的未提交修改，先停止并请求确认。
 - `RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) error`、`ScanOptions`、Manager 和 `tools.Runner` 契约不变。
 - 工具调用与顺序、参数、worker 裁剪、channel 容量、goroutine 启停、取消优先级、首错选择、事件、heartbeat、artifact 名称和 JSON 报告行为不变。
 - 所有生产代码仍在 `internal/app`；不新增导出符号、子包、接口、stage registry、插件系统、配置项或第三方依赖。
 - helper 仅在已有多个真实调用方时保留；不得创建可变的 scan context、orchestrator 类型或一行转发包装。
 - 每次机械迁移后先执行 `rtk gofmt`，再执行指定测试；测试失败时撤销本任务尚未提交的机械迁移，不增加兼容分支。
+- Task 1 新增的是重构前特征测试，必须在当前实现上保持 green；TDD 的明确 red 阶段从 Task 2、Task 3 的临时编译失败开始，不得为了制造红灯改写既有行为。
 
 ## File Map
 
-- Modify: `internal/app/scan.go` — 只保留 `ScanOptions`、`RunScan`、run 状态生命周期、最终报告写入，以及同时被生命周期和流水线使用的 `logf`、`emit`、`normalizeToolError`。
+- Modify: `internal/app/scan.go` — 只保留 `ScanOptions`、`RunScan`、run 状态生命周期、最终报告写入，以及同包多个执行路径复用的 `logf`、`emit`、`normalizeToolError`。
 - Create: `internal/app/scan_targets.go` — `targetResult`、存活探测、worker 裁剪、目标分发/收集、取消与部分/全部失败归并。
 - Create: `internal/app/scan_target.go` — `scanTarget`、Nmap heartbeat、单目标工具流水线、`formatNucleiEvidence` 和 `findingFromNuclei`。
 - Modify: `internal/app/scan_test.go` — 保留共享 runner/store fake 和少量完整 `RunScan` 组合测试；从中机械移动边界测试。
@@ -47,13 +48,13 @@ base-ref: f61b7109ba37a0d85466fbd023c22568723308b1
 - Consumes: 当前公开 `RunScan(context.Context, tools.Runner, *store.Store, ScanOptions) error`。
 - Produces: 报告写入失败的 run 状态契约；`HostWorkers <= 0` 默认 1、超过目标数时裁剪到目标数的契约。
 
-- [ ] **Step 1: 运行现有扫描测试基线**
+- [x] **Step 1: 运行现有扫描测试基线**
 
 Run: `rtk go test ./internal/app`
 
 Expected: PASS；若失败，不开始拆分，先报告基线失败。
 
-- [ ] **Step 2: 写报告失败生命周期特征测试**
+- [x] **Step 2: 写报告失败生命周期特征测试**
 
 创建 `internal/app/scan_lifecycle_test.go`，内容如下。该测试只使用无存活主机路径，使失败点确定地落在最终 `report.WriteJSON`：
 
@@ -63,7 +64,6 @@ package app
 import (
 	"context"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -84,19 +84,19 @@ func TestRunScanRecordsReportWriteFailure(t *testing.T) {
 	if getErr != nil {
 		t.Fatalf("GetScanRun returned error: %v", getErr)
 	}
-	if run.Status != "failed" || !strings.Contains(run.Message, "missing") {
+	if run.Status != "failed" || run.Error != err.Error() {
 		t.Fatalf("unexpected failed run: %#v", run)
 	}
 }
 ```
 
-- [ ] **Step 3: 运行生命周期特征测试，确认当前实现已满足契约**
+- [x] **Step 3: 运行生命周期特征测试，确认当前实现已满足契约**
 
 Run: `rtk go test ./internal/app -run '^TestRunScanRecordsReportWriteFailure$' -count=1`
 
 Expected: PASS。此处是重构前的 characterization green；若失败，说明规格与基线行为不一致，停止实施并回到 design 阶段。
 
-- [ ] **Step 4: 写 worker 默认值和上限特征测试**
+- [x] **Step 4: 写 worker 默认值和上限特征测试**
 
 创建 `internal/app/scan_targets_test.go`，内容如下：
 
@@ -140,13 +140,13 @@ func TestRunScanClampsHostWorkers(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: 运行新增边界测试和完整包测试**
+- [x] **Step 5: 运行新增边界测试和完整包测试**
 
 Run: `rtk gofmt -w internal/app/scan_lifecycle_test.go internal/app/scan_targets_test.go && rtk go test ./internal/app -run 'TestRunScan(RecordsReportWriteFailure|ClampsHostWorkers)$' -count=1 && rtk go test ./internal/app`
 
 Expected: 两条新增测试 PASS，随后 `internal/app` 全部 PASS。
 
-- [ ] **Step 6: 提交特征测试**
+- [x] **Step 6: 提交特征测试**
 
 ```bash
 rtk git add internal/app/scan_lifecycle_test.go internal/app/scan_targets_test.go
@@ -177,11 +177,12 @@ Expected: PASS。
 
 从 `internal/app/scan.go` 删除以下完整定义，但暂不创建新文件：
 
+- `nmapHeartbeatEvery`
 - `scanTarget`
 - `formatNucleiEvidence`
 - `findingFromNuclei`
 
-保留 `logf`、`emit` 和 `normalizeToolError`，因为生命周期和单目标流水线都调用它们。
+保留 `logf`、`emit` 和 `normalizeToolError`，因为它们仍被多个 `internal/app` 执行路径直接或间接调用。
 
 Run: `rtk go test ./internal/app -run '^TestRunScanRunsNSEAndNucleiForSSH$' -count=1`
 
@@ -189,7 +190,7 @@ Expected: FAIL to build，至少包含 `undefined: scanTarget`。
 
 - [ ] **Step 3: 在同包新文件恢复相同实现**
 
-创建 `internal/app/scan_target.go`：使用 `package app`；从原 `scan.go` 原样放入刚删除的三个函数，不改函数体、调用顺序、返回点、heartbeat goroutine、artifact 写入顺序或 error wrapping。只保留这些函数实际需要的 imports：
+创建 `internal/app/scan_target.go`：使用 `package app`；从原 `scan.go` 原样放入刚删除的变量和三个函数，不改函数体、调用顺序、返回点、heartbeat goroutine、artifact 写入顺序或 error wrapping。只保留这些符号实际需要的 imports：
 
 ```go
 package app
@@ -206,9 +207,11 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
+
+var nmapHeartbeatEvery = 30 * time.Second
 ```
 
-函数在新文件中的顺序必须是 `scanTarget`、`formatNucleiEvidence`、`findingFromNuclei`。这是纯移动：用 `rtk git diff --color-moved=dimmed-zebra -- internal/app/scan.go internal/app/scan_target.go` 检查函数体只显示 moved code 和 import 调整；若函数体出现新增或删除行，恢复为基线实现。
+变量和函数在新文件中的顺序必须是 `nmapHeartbeatEvery`、`scanTarget`、`formatNucleiEvidence`、`findingFromNuclei`。这是纯移动。新文件尚未跟踪时，先运行 `rtk git add -N internal/app/scan_target.go`，再用 `rtk git diff --color-moved=dimmed-zebra -- internal/app/scan.go internal/app/scan_target.go` 检查只显示 moved code 和 import 调整；若函数体出现新增或删除行，恢复为基线实现。
 
 - [ ] **Step 4: 运行单目标测试，确认绿灯**
 
@@ -266,7 +269,7 @@ Expected: PASS。
 
 - [ ] **Step 2: 让 `RunScan` 先调用尚不存在的调度函数，验证红灯**
 
-在 `RunScan` 中保留 artifact/run 初始化 defer，删除当前从 `scanTargets := opts.Targets` 到失败汇总结束的实现，替换为：
+在 `RunScan` 中保留 artifact/run 初始化 defer，删除当前从 `scanTargets := opts.Targets` 到失败汇总结束的实现，并同时删除 `scan.go` 中紧随 `RunScan` 的 `targetResult` 定义，然后替换为：
 
 ```go
 	allFingerprints, allFindings, err := scanTargets(ctx, runner, scanStore, opts, artifactDir)
@@ -312,7 +315,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 }
 ```
 
-函数体取自 `rtk git show f61b7109ba37a0d85466fbd023c22568723308b1:internal/app/scan.go`：按原顺序复制该版本 `RunScan` 中从 `if opts.Tools.Nmap != "" && len(scanTargets) > 0 {` 开始、到 worker/result 归并块结束的全部语句，最后追加 `return allFingerprints, allFindings, nil`。不要复制 run 初始化、defer 或最终 report 两行。
+函数体取自 `rtk git show 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8:internal/app/scan.go`：按原顺序复制该版本 `RunScan` 中从 `if opts.Tools.Nmap != "" && len(scanTargets) > 0 {` 开始、到 worker/result 归并块结束的全部语句，最后追加 `return allFingerprints, allFindings, nil`。不要复制 run 初始化、defer、`targetResult` 定义或最终 report 两行。
 
 机械迁移时只允许以下必需的返回值适配，其余语句顺序保持不变：
 
@@ -429,12 +432,11 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 - `TestScanOptionsIncludesTask2MetadataFields`
 - `TestRunScanStoresFingerprintAndWritesJSONReport`
-- `TestRunScanSkipsPortScanWhenHostIsDown` 若 Task 3 已移动则不重复
 - `TestRunScanWritesAuditArtifacts`
 
 - [ ] **Step 3: 检查公开入口调用方没有变化**
 
-Run: `rtk git diff --exit-code f61b7109ba37a0d85466fbd023c22568723308b1 -- cmd/anchorscan/main.go internal/app/manager.go`
+Run: `rtk git diff --exit-code 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8 -- cmd/anchorscan/main.go internal/app/manager.go`
 
 Expected: 无输出，exit 0。
 
@@ -468,17 +470,17 @@ rtk git commit -m "refactor: narrow scan lifecycle entrypoint"
 
 - [ ] **Step 1: 检查范围和依赖没有扩大**
 
-Run: `rtk git diff --exit-code f61b7109ba37a0d85466fbd023c22568723308b1 -- go.mod go.sum cmd/anchorscan/main.go internal/app/manager.go`
+Run: `rtk git diff --exit-code 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8 -- go.mod go.sum cmd/anchorscan/main.go internal/app/manager.go`
 
 Expected: 无输出，exit 0。
 
-Run: `rtk git diff --name-only f61b7109ba37a0d85466fbd023c22568723308b1`
+Run: `rtk git diff --name-only 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8`
 
-Expected: 只包含本计划列出的 `internal/app` 生产/测试文件及 Comet 执行过程中更新的 change 状态文件；不得出现 CLI、Web、schema、配置或依赖文件。
+Expected: 只包含本计划列出的 `internal/app` 生产/测试文件、本计划文件、当前 change 的 `tasks.md` 及 Comet 执行状态文件；不得出现 CLI、Web、schema、配置、依赖文件或其他 change 的文件。
 
 - [ ] **Step 2: 运行格式、静态和扫描包检查**
 
-Run: `rtk test -z "$(rtk gofmt -l internal/app/scan.go internal/app/scan_targets.go internal/app/scan_target.go internal/app/scan_test.go internal/app/scan_lifecycle_test.go internal/app/scan_targets_test.go internal/app/scan_target_test.go)" && rtk go vet ./internal/app && rtk go test -race ./internal/app`
+Run: `rtk proxy test -z "$(rtk gofmt -l internal/app/scan.go internal/app/scan_targets.go internal/app/scan_target.go internal/app/scan_test.go internal/app/scan_lifecycle_test.go internal/app/scan_targets_test.go internal/app/scan_target_test.go)" && rtk go vet ./internal/app && rtk go test -race ./internal/app`
 
 Expected: 无格式文件输出；`rtk go vet` exit 0；测试 PASS 且无 data race。
 
@@ -486,7 +488,7 @@ Expected: 无格式文件输出；`rtk go vet` exit 0；测试 PASS 且无 data 
 
 Run: `rtk make test`
 
-Expected: Makefile 内部执行的 `rtk go test ./...` PASS，`rtk node --test internal/web/static/app.test.mjs` 全部 PASS。
+Expected: Makefile 内部执行的 `go test ./...` PASS，`node --test internal/web/static/app.test.mjs` 全部 PASS。
 
 - [ ] **Step 4: 验证发布打包路径**
 
