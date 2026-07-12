@@ -373,7 +373,7 @@ rtk git commit -m "refactor: isolate scan target scheduling"
 - Consumes: Task 3 的 `scanTargets` 三值返回。
 - Produces: 保持原签名的 `RunScan`；该函数只拥有默认 profile、artifact 目录、run 初始化/defer、调度调用和报告提交。
 
-- [ ] **Step 1: 确认 `RunScan` 最终结构**
+- [x] **Step 1: 确认 `RunScan` 最终结构**
 
 整理 import 后，`RunScan` 的控制流必须等价于以下完整结构；不要为初始化或报告提交再提取 helper：
 
@@ -422,7 +422,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 字段可以由 `gofmt` 展开，但赋值值、defer 时机和返回顺序不得变化。
 
-- [ ] **Step 2: 将生命周期测试归入对应文件**
+- [x] **Step 2: 将生命周期测试归入对应文件**
 
 保留 Task 1 的 `TestRunScanRecordsReportWriteFailure`，从 `scan_test.go` 原样移动：
 
@@ -434,19 +434,19 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 - `TestRunScanStoresFingerprintAndWritesJSONReport`
 - `TestRunScanWritesAuditArtifacts`
 
-- [ ] **Step 3: 检查公开入口调用方没有变化**
+- [x] **Step 3: 检查公开入口调用方没有变化**
 
 Run: `rtk git diff --exit-code 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8 -- cmd/anchorscan/main.go internal/app/manager.go`
 
 Expected: 无输出，exit 0。
 
-- [ ] **Step 4: 运行生命周期和包级测试**
+- [x] **Step 4: 运行生命周期和包级测试**
 
 Run: `rtk gofmt -w internal/app/scan.go internal/app/scan_test.go internal/app/scan_lifecycle_test.go && rtk go test ./internal/app -run 'TestRunScan(PersistsRunLifecycleAndEvents|RecordsReportWriteFailure|StoresFingerprintAndWritesJSONReport|WritesAuditArtifacts)$' -count=1 && rtk go test ./internal/app`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交生命周期收敛**
+- [x] **Step 5: 提交生命周期收敛**
 
 ```bash
 rtk git add internal/app/scan.go internal/app/scan_test.go internal/app/scan_lifecycle_test.go

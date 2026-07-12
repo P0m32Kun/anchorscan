@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
-	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
@@ -40,8 +39,6 @@ type ScanOptions struct {
 }
 
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
-	var allFingerprints []fingerprint.ServiceFingerprint
-	var allFindings []report.Finding
 	artifactDir := ""
 
 	if opts.ProfileName == "" {
