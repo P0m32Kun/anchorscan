@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
-	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
 
@@ -478,11 +476,6 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg, err := config.Load(s.opts.ConfigPath)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	project, err := s.loadProjectForScan(r.FormValue("project_id"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -494,126 +487,54 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	targetValue := strings.TrimSpace(r.FormValue("target"))
-	if targetValue == "" && project != nil {
+	if targetValue == "" {
 		targetValue = project.DefaultTargets
 	}
-	targets, err := target.Parse(targetValue)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	portValue := r.FormValue("ports")
-	if portValue == "" && project != nil {
-		portValue = project.DefaultPorts
-	}
 	if portValue == "" {
-		portValue = cfg.Scan.Ports
-	}
-	if project != nil {
-		targets, err = excludeTargets(targets, project.ExcludeTargets)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	resolvedPorts, err := ports.ResolveForConfig(portValue, s.opts.ConfigPath)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if project != nil {
-		resolvedPorts, err = s.excludePortsForScan(resolvedPorts, project.ExcludePorts)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-	effective, err := config.ResolveScan(cfg, config.Overrides{
-		ProfileName:  coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
-		RustscanArgs: r.FormValue("rustscan_args"),
-		NmapArgs:     r.FormValue("nmap_args"),
-		HttpxArgs:    r.FormValue("httpx_args"),
-		NucleiArgs:   r.FormValue("nuclei_args"),
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	nseRules, err := config.LoadNSERulesForConfig(s.opts.ConfigPath)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	tagRules, err := config.LoadTagRulesForConfig(s.opts.ConfigPath)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		portValue = project.DefaultPorts
 	}
 
 	runID := newID("run", s.opts.Now())
-	projectID := r.FormValue("project_id")
+	projectID := project.ID
 	jsonPath := managedReportPath(s.opts.DBPath, projectID, runID)
 	artifactRoot := strings.TrimSpace(r.FormValue("artifact_root"))
 	if artifactRoot == "" {
 		artifactRoot = managedArtifactParent(jsonPath)
 	}
-	preflightResult := preflight.Run(preflight.Options{
-		ConfigDir: filepath.Dir(s.opts.ConfigPath),
-		DBPath:    s.opts.DBPath,
-		JSONPath:  jsonPath,
-		ReportDir: filepath.Dir(jsonPath),
-		Targets:   targets,
-		PortSpec:  portValue,
-		Tools: app.ToolPaths{
-			Rustscan: cfg.Tools.Rustscan,
-			Nmap:     cfg.Tools.Nmap,
-			Httpx:    cfg.Tools.Httpx,
-			Nuclei:   cfg.Tools.Nuclei,
+	prepared, err := app.PrepareScan(app.PrepareScanRequest{
+		ConfigPath:     s.opts.ConfigPath,
+		TargetSpec:     targetValue,
+		PortSpec:       portValue,
+		ExcludeTargets: project.ExcludeTargets,
+		ExcludePorts:   project.ExcludePorts,
+		Overrides: config.Overrides{
+			ProfileName:  coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
+			RustscanArgs: r.FormValue("rustscan_args"),
+			NmapArgs:     r.FormValue("nmap_args"),
+			HttpxArgs:    r.FormValue("httpx_args"),
+			NucleiArgs:   r.FormValue("nuclei_args"),
 		},
-		Profile: effective.ProfileName,
-		Workers: effective.HostWorkers,
-		ExtraArgs: app.ToolExtraArgs{
-			Rustscan: effective.Rustscan,
-			Nmap:     effective.Nmap,
-			Httpx:    effective.Httpx,
-			Nuclei:   effective.Nuclei,
-		},
-		NSERuleCount: len(nseRules),
-		TagRuleCount: len(tagRules),
+		DBPath:         s.opts.DBPath,
+		JSONReportPath: jsonPath,
+		ArtifactRoot:   artifactRoot,
+		RunID:          runID,
+		ProjectID:      projectID,
 	})
-	if preflightResult.HasErrors() {
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if prepared.Preflight.HasErrors() {
 		w.WriteHeader(http.StatusBadRequest)
-		s.renderProjectScanForm(w, *project, preflightResult)
+		s.renderProjectScanForm(w, *project, prepared.Preflight)
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	_, err = s.manager.Start(context.Background(), app.ScanOptions{
-		RunID:     runID,
-		ProjectID: projectID,
-		Targets:   targets,
-		Ports:     resolvedPorts,
-		Tools: app.ToolPaths{
-			Rustscan: cfg.Tools.Rustscan,
-			Nmap:     cfg.Tools.Nmap,
-			Httpx:    cfg.Tools.Httpx,
-			Nuclei:   cfg.Tools.Nuclei,
-		},
-		ProfileName: effective.ProfileName,
-		HostWorkers: effective.HostWorkers,
-		ExtraArgs: app.ToolExtraArgs{
-			Rustscan: effective.Rustscan,
-			Nmap:     effective.Nmap,
-			Httpx:    effective.Httpx,
-			Nuclei:   effective.Nuclei,
-		},
-		JSONReportPath: jsonPath,
-		ArtifactRoot:   artifactRoot,
-		NSERules:       nseRules,
-		TagRules:       tagRules,
-	})
+	_, err = s.manager.Start(context.Background(), prepared.Options)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -1092,138 +1013,6 @@ func defaultProjectProfile(project *store.Project) string {
 		return ""
 	}
 	return strings.TrimSpace(project.DefaultProfile)
-}
-
-func excludeTargets(targets []string, excludeValue string) ([]string, error) {
-	excluded, err := target.Parse(excludeValue)
-	if err != nil {
-		return nil, err
-	}
-	if len(excluded) == 0 {
-		return targets, nil
-	}
-	blocked := map[string]struct{}{}
-	for _, item := range excluded {
-		blocked[item] = struct{}{}
-	}
-	var out []string
-	for _, item := range targets {
-		if _, ok := blocked[item]; ok {
-			continue
-		}
-		out = append(out, item)
-	}
-	return out, nil
-}
-
-func excludePorts(portValue string, excludeValue string) (string, error) {
-	portValue = strings.TrimSpace(portValue)
-	excludeValue = strings.TrimSpace(excludeValue)
-	if portValue == "" || excludeValue == "" {
-		return portValue, nil
-	}
-	portsToUse, err := expandPortSpec(portValue)
-	if err != nil {
-		return "", err
-	}
-	portsToDrop, err := expandPortSpec(excludeValue)
-	if err != nil {
-		return "", err
-	}
-	blocked := map[int]struct{}{}
-	for _, port := range portsToDrop {
-		blocked[port] = struct{}{}
-	}
-	var filtered []int
-	for _, port := range portsToUse {
-		if _, ok := blocked[port]; ok {
-			continue
-		}
-		filtered = append(filtered, port)
-	}
-	return compressPorts(filtered), nil
-}
-
-func (s *server) excludePortsForScan(portValue string, excludeValue string) (string, error) {
-	if strings.TrimSpace(portValue) == "top1000" && strings.TrimSpace(excludeValue) != "" {
-		var err error
-		portValue, err = ports.LoadPresetForConfig("top1000", s.opts.ConfigPath)
-		if err != nil {
-			return "", err
-		}
-	}
-	return excludePorts(portValue, excludeValue)
-}
-
-func expandPortSpec(spec string) ([]int, error) {
-	spec = strings.TrimSpace(spec)
-	if spec == "" {
-		return nil, nil
-	}
-	var out []int
-	seen := map[int]struct{}{}
-	for _, part := range strings.Split(spec, ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if strings.Contains(part, "-") {
-			bounds := strings.SplitN(part, "-", 2)
-			if len(bounds) != 2 {
-				return nil, fmt.Errorf("invalid port range: %s", part)
-			}
-			start, err := parsePortNumber(bounds[0])
-			if err != nil {
-				return nil, err
-			}
-			end, err := parsePortNumber(bounds[1])
-			if err != nil {
-				return nil, err
-			}
-			if end < start {
-				start, end = end, start
-			}
-			for port := start; port <= end; port++ {
-				if _, ok := seen[port]; ok {
-					continue
-				}
-				seen[port] = struct{}{}
-				out = append(out, port)
-			}
-			continue
-		}
-		port, err := parsePortNumber(part)
-		if err != nil {
-			return nil, err
-		}
-		if _, ok := seen[port]; ok {
-			continue
-		}
-		seen[port] = struct{}{}
-		out = append(out, port)
-	}
-	slices.Sort(out)
-	return out, nil
-}
-
-func parsePortNumber(value string) (int, error) {
-	var port int
-	_, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &port)
-	if err != nil || port < 1 || port > 65535 {
-		return 0, fmt.Errorf("invalid port: %s", value)
-	}
-	return port, nil
-}
-
-func compressPorts(ports []int) string {
-	if len(ports) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(ports))
-	for _, port := range ports {
-		parts = append(parts, fmt.Sprintf("%d", port))
-	}
-	return strings.Join(parts, ",")
 }
 
 func coalesce(values ...string) string {
