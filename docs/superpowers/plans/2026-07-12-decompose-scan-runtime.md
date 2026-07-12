@@ -261,13 +261,13 @@ rtk git commit -m "refactor: isolate scan target pipeline"
 - Consumes: `scanTarget` 和当前 `ScanOptions`。
 - Produces: `scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, error)`；调用方获得已聚合的 fingerprints/findings 或与基线一致的 error。
 
-- [ ] **Step 1: 运行调度行为基线**
+- [x] **Step 1: 运行调度行为基线**
 
 Run: `rtk go test ./internal/app -run 'TestRunScan(SkipsPortScanWhenHostIsDown|UsesAliveSweepResultsAsTargets|ClampsHostWorkers|RespectsProfileHostWorkersAfterAliveSweep|ContinuesAfterTargetFailure|ReturnsErrorWhenAllTargetsFail|MarksCanceledWhenContextCanceled|MarksCanceledWhenToolIsKilledAfterCancel)$' -count=1`
 
 Expected: PASS。
 
-- [ ] **Step 2: 让 `RunScan` 先调用尚不存在的调度函数，验证红灯**
+- [x] **Step 2: 让 `RunScan` 先调用尚不存在的调度函数，验证红灯**
 
 在 `RunScan` 中保留 artifact/run 初始化 defer，删除当前从 `scanTargets := opts.Targets` 到失败汇总结束的实现，并同时删除 `scan.go` 中紧随 `RunScan` 的 `targetResult` 定义，然后替换为：
 
@@ -282,7 +282,7 @@ Expected: PASS。
 
 Expected: FAIL to build，包含 `undefined: scanTargets`。
 
-- [ ] **Step 3: 创建最小调度边界并恢复绿灯**
+- [x] **Step 3: 创建最小调度边界并恢复绿灯**
 
 创建 `internal/app/scan_targets.go`，imports、结果类型和函数签名如下：
 
@@ -328,13 +328,13 @@ return nil, nil, fmt.Errorf("all targets failed: %w", firstErr)
 
 存活探测继续使用 `opts.Targets`；`targetCh` 继续无缓冲；`results` 容量继续为 `len(scanTargets)`；worker 循环、`wg.Wait`/`close(results)` goroutine、分发 goroutine和结果 range 的相对顺序均不得改变。
 
-- [ ] **Step 4: 运行调度测试和竞态检查**
+- [x] **Step 4: 运行调度测试和竞态检查**
 
 Run: `rtk gofmt -w internal/app/scan.go internal/app/scan_targets.go && rtk go test ./internal/app -run 'TestRunScan(SkipsPortScanWhenHostIsDown|UsesAliveSweepResultsAsTargets|ClampsHostWorkers|RespectsProfileHostWorkersAfterAliveSweep|ContinuesAfterTargetFailure|ReturnsErrorWhenAllTargetsFail|MarksCanceledWhenContextCanceled|MarksCanceledWhenToolIsKilledAfterCancel)$' -count=1 && rtk go test -race ./internal/app`
 
 Expected: 所有目标测试 PASS，race detector PASS 且不报告 data race。
 
-- [ ] **Step 5: 把调度测试归入 `scan_targets_test.go`**
+- [x] **Step 5: 把调度测试归入 `scan_targets_test.go`**
 
 保留 Task 1 的 `TestRunScanClampsHostWorkers`，再从 `scan_test.go` 原样移动：
 
@@ -348,7 +348,7 @@ Expected: 所有目标测试 PASS，race detector PASS 且不报告 data race。
 
 共享 runner fake 仍留在 `scan_test.go`；只删除 `scan_test.go` 中因测试移动而不再使用的 imports，不移动 helper。
 
-- [ ] **Step 6: 验证调度拆分并提交**
+- [x] **Step 6: 验证调度拆分并提交**
 
 Run: `rtk gofmt -w internal/app/scan_test.go internal/app/scan_targets_test.go && rtk go test ./internal/app && rtk go test -race ./internal/app && rtk git diff --check`
 

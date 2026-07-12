@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
@@ -43,7 +42,6 @@ type ScanOptions struct {
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
-	scanTargets := opts.Targets
 	artifactDir := ""
 
 	if opts.ProfileName == "" {
@@ -84,111 +82,13 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
 	}()
 
-	if opts.Tools.Nmap != "" && len(scanTargets) > 0 {
-		emit(opts, scanStore, "info", "nmap", "nmap alive sweep targets=%v", scanTargets)
-		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, scanTargets, opts.ExtraArgs.Nmap)
-		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
-			return writeErr
-		}
-		if err != nil {
-			return normalizeToolError(ctx, err)
-		}
-		scanTargets = aliveTargets
-		emit(opts, scanStore, "info", "nmap", "nmap alive hosts=%v", scanTargets)
-		if len(scanTargets) == 0 {
-			emit(opts, scanStore, "info", "target", "no live hosts discovered; skip port scan")
-		}
-	}
-
-	workers := opts.HostWorkers
-	if workers <= 0 {
-		workers = 1
-	}
-	if workers > len(scanTargets) {
-		workers = len(scanTargets)
-	}
-	if workers > 0 {
-		targetCh := make(chan string)
-		results := make(chan targetResult, len(scanTargets))
-		var wg sync.WaitGroup
-
-		for range workers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for target := range targetCh {
-					if ctx.Err() != nil {
-						return
-					}
-					fingerprints, findings, err := scanTarget(ctx, runner, scanStore, opts, target, artifactDir)
-					results <- targetResult{
-						target:       target,
-						fingerprints: fingerprints,
-						findings:     findings,
-						err:          err,
-					}
-				}
-			}()
-		}
-
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
-
-		go func() {
-			defer close(targetCh)
-			for _, target := range scanTargets {
-				select {
-				case <-ctx.Done():
-					return
-				case targetCh <- target:
-				}
-			}
-		}()
-
-		var canceledErr error
-		var failed int
-		var failedTargets []targetResult
-		var firstErr error
-		for result := range results {
-			if result.err != nil {
-				if errors.Is(result.err, context.Canceled) {
-					if canceledErr == nil {
-						canceledErr = result.err
-					}
-					continue
-				}
-				failed++
-				if firstErr == nil {
-					firstErr = result.err
-				}
-				failedTargets = append(failedTargets, result)
-				continue
-			}
-			allFingerprints = append(allFingerprints, result.fingerprints...)
-			allFindings = append(allFindings, result.findings...)
-		}
-		for _, result := range failedTargets {
-			emit(opts, scanStore, "error", "target", "target %s failed: %v", result.target, result.err)
-		}
-		if canceledErr != nil {
-			return canceledErr
-		}
-		if failed == len(scanTargets) {
-			return fmt.Errorf("all targets failed: %w", firstErr)
-		}
+	allFingerprints, allFindings, err := scanTargets(ctx, runner, scanStore, opts, artifactDir)
+	if err != nil {
+		return err
 	}
 
 	emit(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
 	return report.WriteJSON(opts.JSONReportPath, report.Build(allFingerprints, allFindings))
-}
-
-type targetResult struct {
-	target       string
-	fingerprints []fingerprint.ServiceFingerprint
-	findings     []report.Finding
-	err          error
 }
 
 func logf(opts ScanOptions, format string, args ...any) {
