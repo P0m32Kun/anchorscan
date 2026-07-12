@@ -1,7 +1,7 @@
 ---
 change: decompose-delivery-adapters
 design-doc: docs/superpowers/specs/2026-07-12-decompose-delivery-adapters-design.md
-base-ref: f61b7109ba37a0d85466fbd023c22568723308b1
+base-ref: 141de6a359bd5c0b4be0e5d16400c07904784dde
 ---
 
 # Decompose Delivery Adapters Implementation Plan
