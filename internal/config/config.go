@@ -14,19 +14,21 @@ type ToolArgs struct {
 	Nuclei   []string `yaml:"nuclei_args"`
 }
 
+type ToolPaths struct {
+	Rustscan string `yaml:"rustscan"`
+	Nmap     string `yaml:"nmap"`
+	Httpx    string `yaml:"httpx"`
+	Nuclei   string `yaml:"nuclei"`
+}
+
 type Profile struct {
 	HostWorkers int `yaml:"host_workers"`
 	ToolArgs    `yaml:",inline"`
 }
 
 type Config struct {
-	Tools struct {
-		Rustscan string `yaml:"rustscan"`
-		Nmap     string `yaml:"nmap"`
-		Httpx    string `yaml:"httpx"`
-		Nuclei   string `yaml:"nuclei"`
-	} `yaml:"tools"`
-	Scan struct {
+	Tools ToolPaths `yaml:"tools"`
+	Scan  struct {
 		Ports   string `yaml:"ports"`
 		Profile string `yaml:"profile"`
 	} `yaml:"scan"`

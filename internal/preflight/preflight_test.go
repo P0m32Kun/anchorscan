@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/P0m32Kun/anchorscan/internal/app"
+	"github.com/P0m32Kun/anchorscan/internal/config"
 )
 
 func TestRunBlocksMissingTargetsInvalidPortsAndRequiredTools(t *testing.T) {
@@ -16,7 +16,7 @@ func TestRunBlocksMissingTargetsInvalidPortsAndRequiredTools(t *testing.T) {
 		JSONPath:  filepath.Join(dir, "reports", "scan.json"),
 		Targets:   nil,
 		PortSpec:  "top1000",
-		Tools: app.ToolPaths{
+		Tools: config.ToolPaths{
 			Rustscan: filepath.Join(dir, "missing-rustscan"),
 			Nmap:     filepath.Join(dir, "missing-nmap"),
 		},
@@ -41,7 +41,7 @@ func TestRunBlocksInvalidPortExpression(t *testing.T) {
 		JSONPath:  filepath.Join(dir, "reports", "scan.json"),
 		Targets:   []string{"127.0.0.1"},
 		PortSpec:  "eighty",
-		Tools:     app.ToolPaths{Rustscan: rustscan, Nmap: nmap},
+		Tools:     config.ToolPaths{Rustscan: rustscan, Nmap: nmap},
 	})
 
 	if !result.HasErrors() {
@@ -60,10 +60,10 @@ func TestRunSummarizesScanAndWarnsForFullRange(t *testing.T) {
 		JSONPath:  filepath.Join(dir, "reports", "scan.json"),
 		Targets:   []string{"127.0.0.1"},
 		PortSpec:  "1-65535",
-		Tools:     app.ToolPaths{Rustscan: rustscan, Nmap: nmap},
+		Tools:     config.ToolPaths{Rustscan: rustscan, Nmap: nmap},
 		Profile:   "fast",
 		Workers:   4,
-		ExtraArgs: app.ToolExtraArgs{
+		ExtraArgs: config.ToolArgs{
 			Rustscan: []string{"--batch-size", "1000"},
 			Nmap:     []string{"-T4"},
 		},

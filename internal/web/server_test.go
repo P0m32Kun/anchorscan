@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -540,6 +541,82 @@ func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
 	}
 }
 
+func TestScanCreateDoesNotStartManagerWhenPreparationReturnsOrdinaryError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "scan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: &serverSequenceRunner{}})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader("project_id=p1&target=127.0.0.1&ports=full"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", res.Code)
+	}
+	runs, err := scanStore.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no run after preparation error, got %#v", runs)
+	}
+}
+
+func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	rustscanPath := writeExecutable(t, dir, "rustscan")
+	nmapPath := writeExecutable(t, dir, "nmap")
+	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	runner := &serverSequenceRunner{started: make(chan struct{}), block: make(chan struct{})}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner, Now: func() time.Time { return time.Unix(10, 0) }})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	form := "project_id=p1&target=127.0.0.1&ports=80"
+	first := httptest.NewRecorder()
+	firstReq := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(form))
+	firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(first, firstReq)
+	if first.Code != http.StatusSeeOther {
+		t.Fatalf("expected redirect, got %d", first.Code)
+	}
+	<-runner.started
+
+	second := httptest.NewRecorder()
+	secondReq := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(form))
+	secondReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(second, secondReq)
+	if second.Code != http.StatusConflict {
+		t.Fatalf("expected conflict, got %d", second.Code)
+	}
+	close(runner.block)
+}
+
 func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -633,6 +710,49 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	}
 	if runner.callCount(rustscanPath) != 1 {
 		t.Fatalf("expected single rustscan target after exclusions, got %#v", runner.commands)
+	}
+}
+
+func TestScanCreateLoadsConfigBeforeValidatingProject(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "scan: [\n")
+
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	_, wantErr := config.Load(configPath)
+	if wantErr == nil {
+		t.Fatal("config.Load returned nil error")
+	}
+
+	for _, tc := range []struct {
+		name       string
+		form       string
+		unexpected string
+	}{
+		{name: "missing project ID", unexpected: "project_id is required"},
+		{name: "unknown project ID", form: "project_id=does-not-exist", unexpected: sql.ErrNoRows.Error()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(tc.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != http.StatusBadRequest {
+				t.Fatalf("status mismatch: got %d body=%s", res.Code, res.Body.String())
+			}
+			if !strings.Contains(res.Body.String(), wantErr.Error()) {
+				t.Fatalf("expected config error %q, got body=%s", wantErr, res.Body.String())
+			}
+			if strings.Contains(res.Body.String(), tc.unexpected) {
+				t.Fatalf("expected config error before project validation, got body=%s", res.Body.String())
+			}
+		})
 	}
 }
 
@@ -1524,10 +1644,19 @@ type serverSequenceRunner struct {
 	outputs  [][]byte
 	commands [][]string
 	index    int
+	started  chan struct{}
+	block    chan struct{}
 }
 
 func (r *serverSequenceRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
 	r.commands = append(r.commands, append([]string{binary}, args...))
+	if r.started != nil {
+		close(r.started)
+		r.started = nil
+	}
+	if r.block != nil {
+		<-r.block
+	}
 	if r.index >= len(r.outputs) {
 		return []byte{}, nil
 	}

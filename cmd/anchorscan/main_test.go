@@ -208,6 +208,58 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	}
 }
 
+func TestExecuteScanReturnsPortErrorBeforeProfileError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "192.0.2.1",
+		"--ports", "invalid",
+		"--profile", "unknown",
+	}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{})
+	if err == nil || !strings.Contains(err.Error(), "invalid port") {
+		t.Fatalf("error = %v, want invalid port error", err)
+	}
+}
+
+func TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+
+	storeOpened := false
+	runnerCalled := false
+	var stderr bytes.Buffer
+	err := run([]string{
+		"scan",
+		"--config", configPath,
+		"--target", "192.0.2.1",
+		"--db", filepath.Join(dir, "scan.db"),
+		"--json", filepath.Join(dir, "report.json"),
+	}, &bytes.Buffer{}, &stderr, cliDeps{
+		openStore: func(string) (*store.Store, error) {
+			storeOpened = true
+			return nil, errors.New("store should not be opened")
+		},
+		newRunner: func() tools.Runner {
+			runnerCalled = true
+			return failRunner{}
+		},
+	})
+	if err == nil || err.Error() != "preflight failed" {
+		t.Fatalf("error = %v, want preflight failed", err)
+	}
+	if !strings.Contains(stderr.String(), "[scan] preflight error rustscan:") {
+		t.Fatalf("stderr = %q, want preflight diagnostic", stderr.String())
+	}
+	if storeOpened || runnerCalled {
+		t.Fatalf("storeOpened=%t runnerCalled=%t, want both false", storeOpened, runnerCalled)
+	}
+}
+
 func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

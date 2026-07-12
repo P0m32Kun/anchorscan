@@ -118,3 +118,54 @@ func TestSavePresetWithBackupCreatesNewFile(t *testing.T) {
 		t.Fatalf("unexpected ports: %q", got)
 	}
 }
+
+func TestExcludeForConfigFiltersCSVAndRange(t *testing.T) {
+	for _, test := range []struct {
+		ports   string
+		exclude string
+		want    string
+	}{
+		{ports: "22,80,443", exclude: "22,443", want: "80"},
+		{ports: "80-83", exclude: "81,83", want: "80,82"},
+	} {
+		got, err := ExcludeForConfig(test.ports, test.exclude, "config/default.yaml")
+		if err != nil {
+			t.Fatalf("ExcludeForConfig(%q, %q) returned error: %v", test.ports, test.exclude, err)
+		}
+		if got != test.want {
+			t.Fatalf("ExcludeForConfig(%q, %q) = %q, want %q", test.ports, test.exclude, got, test.want)
+		}
+	}
+}
+
+func TestExcludeForConfigLoadsTop1000OnlyWhenNeeded(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "default.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "ports-top1000.txt"), []byte("22,80,443\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ExcludeForConfig("top1000", "22", configPath)
+	if err != nil {
+		t.Fatalf("ExcludeForConfig returned error: %v", err)
+	}
+	if got != "80,443" {
+		t.Fatalf("ExcludeForConfig returned %q, want %q", got, "80,443")
+	}
+}
+
+func TestExcludeForConfigReturnsOriginalWhenExclusionIsEmpty(t *testing.T) {
+	got, err := ExcludeForConfig("top1000", "", filepath.Join(t.TempDir(), "default.yaml"))
+	if err != nil {
+		t.Fatalf("ExcludeForConfig returned error: %v", err)
+	}
+	if got != "top1000" {
+		t.Fatalf("ExcludeForConfig returned %q, want %q", got, "top1000")
+	}
+}
+
+func TestExcludeForConfigRejectsInvalidExcludedPort(t *testing.T) {
+	if _, err := ExcludeForConfig("80,443", "70000", "config/default.yaml"); err == nil || !strings.Contains(err.Error(), "invalid port") {
+		t.Fatalf("ExcludeForConfig returned error %v, want invalid port", err)
+	}
+}

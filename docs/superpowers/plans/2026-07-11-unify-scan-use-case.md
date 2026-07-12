@@ -21,6 +21,14 @@ base-ref: 370e7ef66842adf193c9ad2b3e4d92fda2dfa2dc
 - `openspec/changes/unify-scan-use-case/specs/shared-scan-preparation/spec.md`
 - `openspec/changes/unify-scan-use-case/tasks.md`
 
+## 执行进度
+
+- [x] Task 1：下沉工具值类型并解除 `preflight -> app` 依赖
+- [x] Task 2：把项目目标/端口排除归位到领域包
+- [x] Task 3：建立 `app.PrepareScan` 唯一扫描准备边界
+- [x] Task 4：迁移 CLI `runScan`
+- [x] Task 5：迁移 Web、删除第二条准备路径并完成兼容验证
+
 ## 全局约束
 
 - 不创建 `internal/scanprep`、`internal/common`、Service/Repository 接口、Builder、Factory 或 feature flag。

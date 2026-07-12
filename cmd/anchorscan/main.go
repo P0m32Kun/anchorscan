@@ -19,7 +19,6 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
-	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 	"github.com/P0m32Kun/anchorscan/internal/version"
 	"github.com/P0m32Kun/anchorscan/internal/web"
@@ -115,74 +114,31 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		return errors.New("scan requires --target")
 	}
 
-	cfg, err := config.Load(*configPath)
-	if err != nil {
-		return err
-	}
-	nseRules, err := config.LoadNSERulesForConfig(*configPath)
-	if err != nil {
-		return err
-	}
-	tagRules, err := config.LoadTagRulesForConfig(*configPath)
-	if err != nil {
-		return err
-	}
-	targets, err := target.Parse(*targetSpec)
-	if err != nil {
-		return err
-	}
-
-	portValue := cfg.Scan.Ports
-	if *portsSpec != "" {
-		portValue = *portsSpec
-	}
-	resolvedPorts, err := ports.ResolveForConfig(portValue, *configPath)
-	if err != nil {
-		return err
-	}
-
-	effective, err := config.ResolveScan(cfg, config.Overrides{
-		ProfileName:  *profileFlag,
-		HostWorkers:  *hostWorkersFlag,
-		RustscanArgs: *rustscanArgsFlag,
-		NmapArgs:     *nmapArgsFlag,
-		HttpxArgs:    *httpxArgsFlag,
-		NucleiArgs:   *nucleiArgsFlag,
-	})
-	if err != nil {
-		return err
-	}
-
 	if *jsonPath == "" {
 		*jsonPath = filepath.Join("reports", "scan-"+deps.now().Format("20060102-150405")+".json")
 	}
 
-	preflightResult := preflight.Run(preflight.Options{
-		ConfigDir: filepath.Dir(*configPath),
-		DBPath:    *dbPath,
-		JSONPath:  *jsonPath,
-		ReportDir: filepath.Dir(*jsonPath),
-		Targets:   targets,
-		PortSpec:  portValue,
-		Tools: app.ToolPaths{
-			Rustscan: cfg.Tools.Rustscan,
-			Nmap:     cfg.Tools.Nmap,
-			Httpx:    cfg.Tools.Httpx,
-			Nuclei:   cfg.Tools.Nuclei,
+	prepared, err := app.PrepareScan(app.PrepareScanRequest{
+		ConfigPath:     *configPath,
+		TargetSpec:     *targetSpec,
+		PortSpec:       *portsSpec,
+		DBPath:         *dbPath,
+		JSONReportPath: *jsonPath,
+		ArtifactRoot:   strings.TrimSpace(*artifactRoot),
+		Overrides: config.Overrides{
+			ProfileName:  *profileFlag,
+			HostWorkers:  *hostWorkersFlag,
+			RustscanArgs: *rustscanArgsFlag,
+			NmapArgs:     *nmapArgsFlag,
+			HttpxArgs:    *httpxArgsFlag,
+			NucleiArgs:   *nucleiArgsFlag,
 		},
-		Profile: effective.ProfileName,
-		Workers: effective.HostWorkers,
-		ExtraArgs: app.ToolExtraArgs{
-			Rustscan: effective.Rustscan,
-			Nmap:     effective.Nmap,
-			Httpx:    effective.Httpx,
-			Nuclei:   effective.Nuclei,
-		},
-		NSERuleCount: len(nseRules),
-		TagRuleCount: len(tagRules),
 	})
-	logPreflight(stderr, preflightResult)
-	if preflightResult.HasErrors() {
+	if err != nil {
+		return err
+	}
+	logPreflight(stderr, prepared.Preflight)
+	if prepared.Preflight.HasErrors() {
 		return errors.New("preflight failed")
 	}
 
@@ -210,33 +166,11 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 
 	runID := deps.now().Format("20060102-150405")
 	logScan(stderr, "run %s", runID)
-	opts := app.ScanOptions{
-		RunID:   runID,
-		Targets: targets,
-		Ports:   resolvedPorts,
-		Tools: app.ToolPaths{
-			Rustscan: cfg.Tools.Rustscan,
-			Nmap:     cfg.Tools.Nmap,
-			Httpx:    cfg.Tools.Httpx,
-			Nuclei:   cfg.Tools.Nuclei,
-		},
-		ProfileName: effective.ProfileName,
-		HostWorkers: effective.HostWorkers,
-		ExtraArgs: app.ToolExtraArgs{
-			Rustscan: effective.Rustscan,
-			Nmap:     effective.Nmap,
-			Httpx:    effective.Httpx,
-			Nuclei:   effective.Nuclei,
-		},
-		JSONReportPath: *jsonPath,
-		ArtifactRoot:   strings.TrimSpace(*artifactRoot),
-		NSERules:       nseRules,
-		TagRules:       tagRules,
-		Logf: func(format string, args ...any) {
-			logScan(stderr, format, args...)
-		},
+	prepared.Options.RunID = runID
+	prepared.Options.Logf = func(format string, args ...any) {
+		logScan(stderr, format, args...)
 	}
-	if err := app.RunScan(context.Background(), deps.newRunner(), scanStore, opts); err != nil {
+	if err := app.RunScan(context.Background(), deps.newRunner(), scanStore, prepared.Options); err != nil {
 		return err
 	}
 
