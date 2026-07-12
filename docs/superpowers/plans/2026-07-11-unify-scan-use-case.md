@@ -2,6 +2,7 @@
 change: unify-scan-use-case
 design-doc: docs/superpowers/specs/2026-07-11-unify-scan-use-case-design.md
 base-ref: 370e7ef66842adf193c9ad2b3e4d92fda2dfa2dc
+archived-with: 2026-07-12-unify-scan-use-case
 ---
 
 # 统一扫描准备用例实施计划
@@ -85,6 +86,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error)
 8. `preflight.Run`
 9. 预检失败只返回诊断；预检通过才构造完整 `ScanOptions`
 
+archived-with: 2026-07-12-unify-scan-use-case
 ---
 
 ## Task 1：下沉工具值类型并解除 `preflight -> app` 依赖
@@ -170,6 +172,7 @@ go test ./internal/config ./internal/preflight ./internal/app
 - `app.ToolPaths` 和 `app.ToolExtraArgs` 的所有现有调用方继续编译。
 - 不出现第二套等价工具类型。
 
+archived-with: 2026-07-12-unify-scan-use-case
 ---
 
 ## Task 2：把项目目标/端口排除归位到领域包
@@ -293,6 +296,7 @@ go test ./internal/target ./internal/ports
 
 验收：新 helper 的结果与当前 Web 私有 helper 一致，且尚未改变 CLI/Web 入口。
 
+archived-with: 2026-07-12-unify-scan-use-case
 ---
 
 ## Task 3：建立 `app.PrepareScan` 唯一扫描准备边界
@@ -459,6 +463,7 @@ go test ./internal/app ./internal/config ./internal/target ./internal/ports ./in
 
 验收：三通道契约准确（普通错误、预检错误、成功/警告），且函数没有 Store、Runner、Manager 或 HTTP 依赖。
 
+archived-with: 2026-07-12-unify-scan-use-case
 ---
 
 ## Task 4：迁移 CLI `runScan`
@@ -546,6 +551,7 @@ go test ./cmd/anchorscan
 
 验收：帮助、错误文本、预检日志、Runner 参数、artifact 目录、JSON/HTML 和 stdout 与现有测试一致；预检失败前不打开 Store、不启动 Runner。
 
+archived-with: 2026-07-12-unify-scan-use-case
 ---
 
 ## Task 5：迁移 Web、删除第二条准备路径并完成兼容验证

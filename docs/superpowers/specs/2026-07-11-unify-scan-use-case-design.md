@@ -2,6 +2,8 @@
 comet_change: unify-scan-use-case
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-12-unify-scan-use-case
+status: final
 ---
 
 # 统一扫描准备用例技术设计
