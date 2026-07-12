@@ -27,7 +27,7 @@ base-ref: 370e7ef66842adf193c9ad2b3e4d92fda2dfa2dc
 - [x] Task 2：把项目目标/端口排除归位到领域包
 - [x] Task 3：建立 `app.PrepareScan` 唯一扫描准备边界
 - [x] Task 4：迁移 CLI `runScan`
-- [ ] Task 5：迁移 Web、删除第二条准备路径并完成兼容验证
+- [x] Task 5：迁移 Web、删除第二条准备路径并完成兼容验证
 
 ## 全局约束
 
