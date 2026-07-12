@@ -200,15 +200,17 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 			t.Fatalf("expected nuclei tag rule for %s: %#v", service, tagRules)
 		}
 	}
-	// 双引擎覆盖矩阵契约：
-	// (1) 非服务都应追加 default-login 弱口令 tag；
-	// (2) 非 Web 规则 target 必须为 hostport，Web 规则 target 必须为 url。
+	// 双引擎覆盖矩阵契约：Web URL 规则不得携带宽泛 default-login 标签。
 	for _, rule := range tagRules {
 		if len(rule.NucleiTags) == 0 {
 			t.Fatalf("rule %s has no nuclei_tags: %#v", rule.Name, rule)
 		}
 		if rule.Target == "url" {
-			// Web 规则必须通过 service["http"] 或 tech 匹配
+			for _, tag := range rule.NucleiTags {
+				if tag == "default-login" {
+					t.Fatalf("url rule %s must not include default-login: %#v", rule.Name, rule)
+				}
+			}
 			continue
 		}
 		if rule.Target != "hostport" {
