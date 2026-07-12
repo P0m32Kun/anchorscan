@@ -290,16 +290,7 @@ func runNucleiTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 	}
 	findings := make([]report.Finding, 0, len(parsed))
 	for _, result := range parsed {
-		finding := report.Finding{
-			IP:       fp.IP,
-			Port:     fp.Port,
-			Source:   "nuclei",
-			ID:       result.TemplateID,
-			Severity: result.Severity,
-			Summary:  result.Name,
-			Target:   result.MatchedAt,
-			Output:   formatNucleiEvidence(result),
-		}
+		finding := findingFromNuclei(result, fp, nil)
 		if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
 			return nil, err
 		}

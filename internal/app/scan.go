@@ -310,17 +310,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 				return nil, nil, err
 			}
 			for _, result := range nucleiFindings {
-				finding := report.Finding{
-					IP:       fp.IP,
-					Port:     fp.Port,
-					Protocol: fp.Protocol,
-					Source:   "nuclei",
-					ID:       result.TemplateID,
-					Severity: result.Severity,
-					Summary:  result.Name,
-					Target:   result.MatchedAt,
-					Output:   formatNucleiEvidence(result),
-				}
+				finding := findingFromNuclei(result, fp, allFingerprints)
 				if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
 					return nil, nil, err
 				}
@@ -381,4 +371,26 @@ func formatNucleiEvidence(result tools.NucleiFinding) string {
 		lines = append(lines, "", result.Raw)
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func findingFromNuclei(result tools.NucleiFinding, fallback fingerprint.ServiceFingerprint, fingerprints []fingerprint.ServiceFingerprint) report.Finding {
+	ip, port := result.Endpoint(fallback.IP, fallback.Port)
+	protocol := fallback.Protocol
+	for _, fp := range fingerprints {
+		if fp.IP == ip && fp.Port == port {
+			protocol = fp.Protocol
+			break
+		}
+	}
+	return report.Finding{
+		IP:       ip,
+		Port:     port,
+		Protocol: protocol,
+		Source:   "nuclei",
+		ID:       result.TemplateID,
+		Severity: result.Severity,
+		Summary:  result.Name,
+		Target:   result.MatchedAt,
+		Output:   formatNucleiEvidence(result),
+	}
 }
