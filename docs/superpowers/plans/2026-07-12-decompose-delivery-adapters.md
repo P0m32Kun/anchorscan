@@ -81,19 +81,19 @@ base-ref: 141de6a359bd5c0b4be0e5d16400c07904784dde
 - Consumes: 已归档 change 中仍由 `app.PrepareScan(PrepareScanRequest) (PreparedScan, error)` 与 `app.RunScan(context.Context, tools.Runner, *store.Store, app.ScanOptions) error` 提供的稳定入口。
 - Produces: 一个全绿、可与每次机械移动比较的基线；不产生代码。
 
-- [ ] **Step 1: Confirm the predecessor is archived**
+- [x] **Step 1: Confirm the predecessor is archived**
 
 Run: `rtk find openspec/changes/archive -maxdepth 1 -type d -name '*-decompose-scan-runtime'`
 
 Expected: 恰好输出一个归档目录。没有输出或存在 active `openspec/changes/decompose-scan-runtime/` 时立即停止并回到前序 change。
 
-- [ ] **Step 2: Confirm the shared scan boundary is the one actually consumed**
+- [x] **Step 2: Confirm the shared scan boundary is the one actually consumed**
 
 Run: `rtk codegraph explore "callers of app.PrepareScan and app.RunScan in cmd/anchorscan and internal/web"`
 
 Expected: CLI `runScan` 与 Web `scanCreate` 使用共享准备入口；没有各自复制的 target/port/profile 准备流程。
 
-- [ ] **Step 3: Record the green baseline**
+- [x] **Step 3: Record the green baseline**
 
 Run: `rtk go test ./...`
 
@@ -107,7 +107,7 @@ Run: `rtk make package`
 
 Expected: exit 0，并在 `dist/` 生成当前平台 tarball。
 
-- [ ] **Step 4: Confirm dependency files are untouched**
+- [x] **Step 4: Confirm dependency files are untouched**
 
 Run: `rtk git diff --exit-code -- go.mod go.sum`
 
