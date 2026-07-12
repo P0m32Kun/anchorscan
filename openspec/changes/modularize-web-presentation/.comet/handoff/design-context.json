@@ -1,0 +1,14 @@
+{
+  "change": "modularize-web-presentation",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "12b7cf1265f3b63b8bbc51ed526a6ef515cf684a1129a79082be18f44ad7b350",
+  "files": [
+    { "path": "openspec/changes/modularize-web-presentation/proposal.md", "sha256": "0e566b83a1a2d165aa626509238491817cfa88f54d005626f34471675aaef473" },
+    { "path": "openspec/changes/modularize-web-presentation/design.md", "sha256": "2f5c9ba1ec6d8a5ae3bdab23f5874de08e931505c1a8285dd34a91288fb0c14a" },
+    { "path": "openspec/changes/modularize-web-presentation/tasks.md", "sha256": "f5e869666279f16b4b9178acd382a8e9f91eb929365110cfce9e4d2353b4bca1" },
+    { "path": "openspec/changes/modularize-web-presentation/specs/web-presentation-modularity/spec.md", "sha256": "ed37cf0ea07bd84bd3681f9a8370822e940bb26a6768b5e4f99c63204df54006" }
+  ]
+}

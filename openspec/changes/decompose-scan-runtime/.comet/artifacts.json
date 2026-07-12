@@ -2,5 +2,7 @@
   "openspec_proposal": "openspec/changes/decompose-scan-runtime/proposal.md",
   "openspec_design": "openspec/changes/decompose-scan-runtime/design.md",
   "openspec_tasks": "openspec/changes/decompose-scan-runtime/tasks.md",
-  "openspec_delta_spec": "openspec/changes/decompose-scan-runtime/specs/scan-runtime-boundaries/spec.md"
+  "openspec_delta_spec": "openspec/changes/decompose-scan-runtime/specs/scan-runtime-boundaries/spec.md",
+  "handoff_context": "openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.md"
 }

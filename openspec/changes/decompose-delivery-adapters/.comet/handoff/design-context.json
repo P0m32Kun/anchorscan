@@ -1,0 +1,14 @@
+{
+  "change": "decompose-delivery-adapters",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "d09a6cd1e7f053f9fbb9bf0359c3574392e21590f6d406bd0378e41623c777b6",
+  "files": [
+    { "path": "openspec/changes/decompose-delivery-adapters/proposal.md", "sha256": "b7a5b34b12e5a0d6c71563c1937074a35a0052cbcdfd2d1bf4339a5103b665ba" },
+    { "path": "openspec/changes/decompose-delivery-adapters/design.md", "sha256": "2afa7f368a207b5345100828cb6d3667101a40339b9825205501d678dac3c4b2" },
+    { "path": "openspec/changes/decompose-delivery-adapters/tasks.md", "sha256": "a026014aa4d6ebf7c0b8a81f2d581da78fc775d7154d83756d9eb01cea539ec6" },
+    { "path": "openspec/changes/decompose-delivery-adapters/specs/delivery-adapter-modularity/spec.md", "sha256": "35f0f0d54f9283350fd8dc131b8709dc51eb714b4a59c52ca8c9bfb9cd396baf" }
+  ]
+}

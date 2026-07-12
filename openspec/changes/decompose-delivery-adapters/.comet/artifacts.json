@@ -2,5 +2,7 @@
   "openspec_proposal": "openspec/changes/decompose-delivery-adapters/proposal.md",
   "openspec_design": "openspec/changes/decompose-delivery-adapters/design.md",
   "openspec_tasks": "openspec/changes/decompose-delivery-adapters/tasks.md",
-  "openspec_delta_spec": "openspec/changes/decompose-delivery-adapters/specs/delivery-adapter-modularity/spec.md"
+  "openspec_delta_spec": "openspec/changes/decompose-delivery-adapters/specs/delivery-adapter-modularity/spec.md",
+  "handoff_context": "openspec/changes/decompose-delivery-adapters/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/decompose-delivery-adapters/.comet/handoff/design-context.md"
 }
