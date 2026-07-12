@@ -13,11 +13,33 @@ import (
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
 
 var aliveNmapXML = []byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)
+
+func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
+	fallback := fingerprint.ServiceFingerprint{IP: "172.22.0.1", Port: 8080, Protocol: "tcp"}
+	result := tools.NucleiFinding{
+		TemplateID: "redis-default-logins",
+		Name:       "Redis Default Login",
+		Severity:   "high",
+		IP:         "172.22.0.1",
+		Port:       "6379",
+		MatchedAt:  "172.22.0.1:6379",
+	}
+
+	finding := findingFromNuclei(result, fallback, nil)
+	if finding.IP != "172.22.0.1" || finding.Port != 6379 || finding.Protocol != "tcp" {
+		t.Fatalf("finding endpoint = %s:%d/%s, want 172.22.0.1:6379/tcp", finding.IP, finding.Port, finding.Protocol)
+	}
+	if finding.Target != "172.22.0.1:6379" {
+		t.Fatalf("finding target = %q", finding.Target)
+	}
+}
 
 func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
 	type fieldCheck struct {

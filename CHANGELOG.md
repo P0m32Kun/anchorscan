@@ -4,6 +4,12 @@ All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
 
+## [1.7.1] - 2026-07-12
+
+### Fixed
+- Nuclei 漏洞记录优先采用其结构化返回的目标 IP 与端口，避免跨端口模板结果错误归属到发起扫描的服务。
+- URL 类型服务规则移除宽泛的 `default-login` 标签，并通过配置契约测试防止该标签重新进入 Web URL 扫描。
+
 ## [1.7.0] - 2026-07-12
 
 v1.7.0 将 CLI 与 Web 的扫描准备流程收敛为一个应用层用例，作为后续扫描能力演进的架构稳定性版本。

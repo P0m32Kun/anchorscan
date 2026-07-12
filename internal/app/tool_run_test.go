@@ -140,7 +140,7 @@ func TestRunToolHttpxSavesWebFingerprint(t *testing.T) {
 func TestRunToolNucleiSavesFindings(t *testing.T) {
 	st := newToolRunStore(t)
 	runner := toolRunnerFunc(func(_ string, _ []string) ([]byte, error) {
-		return []byte(`{"template-id":"cve-test","info":{"name":"Example CVE","severity":"high"},"matched-at":"http://192.0.2.10:8080"}` + "\n"), nil
+		return []byte(`{"template-id":"redis-default-logins","ip":"192.0.2.10","port":"6379","info":{"name":"Redis Default Login","severity":"high"},"matched-at":"192.0.2.10:6379"}` + "\n"), nil
 	})
 
 	err := RunTool(context.Background(), runner, st, ToolRunOptions{
@@ -154,7 +154,7 @@ func TestRunToolNucleiSavesFindings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(findings) != 1 || findings[0].Source != "nuclei" || findings[0].ID != "cve-test" || findings[0].Severity != "high" {
+	if len(findings) != 1 || findings[0].Source != "nuclei" || findings[0].ID != "redis-default-logins" || findings[0].Severity != "high" || findings[0].IP != "192.0.2.10" || findings[0].Port != 6379 || findings[0].Target != "192.0.2.10:6379" {
 		t.Fatalf("findings = %#v", findings)
 	}
 }

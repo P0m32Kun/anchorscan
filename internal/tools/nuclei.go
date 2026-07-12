@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/netip"
+	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +17,10 @@ type NucleiFinding struct {
 	TemplateID       string
 	Name             string
 	Severity         string
+	Host             string
+	IP               string
+	Port             string
+	URL              string
 	MatchedAt        string
 	MatcherName      string
 	ExtractedResults []string
@@ -59,6 +66,10 @@ func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 			ExtractedResults []string `json:"extracted-results"`
 			ExtractorResults []string `json:"extractor-results"`
 			CurlCommand      string   `json:"curl-command"`
+			Host             string   `json:"host"`
+			IP               string   `json:"ip"`
+			Port             string   `json:"port"`
+			URL              string   `json:"url"`
 			Info             struct {
 				Name     string `json:"name"`
 				Severity string `json:"severity"`
@@ -81,6 +92,10 @@ func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 			TemplateID:       row.TemplateID,
 			Name:             row.Info.Name,
 			Severity:         row.Info.Severity,
+			Host:             row.Host,
+			IP:               row.IP,
+			Port:             row.Port,
+			URL:              row.URL,
 			MatchedAt:        row.MatchedAt,
 			MatcherName:      row.MatcherName,
 			ExtractedResults: extracted,
@@ -92,4 +107,71 @@ func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 		return nil, err
 	}
 	return findings, nil
+}
+
+// Endpoint returns Nuclei's endpoint when present, otherwise the scan target.
+func (f NucleiFinding) Endpoint(fallbackHost string, fallbackPort int) (string, int) {
+	host := strings.TrimSpace(f.IP)
+	if host == "" {
+		for _, value := range []string{f.Host, f.MatchedAt} {
+			host, _ = parseNucleiEndpoint(value)
+			if host != "" {
+				break
+			}
+		}
+	}
+	if host == "" {
+		host = fallbackHost
+	}
+
+	port := parseNucleiPort(f.Port)
+	if port == 0 {
+		for _, value := range []string{f.Host, f.URL, f.MatchedAt} {
+			_, port = parseNucleiEndpoint(value)
+			if port != 0 {
+				break
+			}
+		}
+	}
+	if port == 0 {
+		port = fallbackPort
+	}
+	return host, port
+}
+
+func parseNucleiEndpoint(value string) (string, int) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", 0
+	}
+	if addr, err := netip.ParseAddr(strings.Trim(value, "[]")); err == nil {
+		return addr.String(), 0
+	}
+
+	candidate := value
+	if !strings.Contains(candidate, "://") {
+		candidate = "//" + candidate
+	}
+	parsed, err := url.Parse(candidate)
+	if err != nil || parsed.Hostname() == "" {
+		return "", 0
+	}
+	port := parseNucleiPort(parsed.Port())
+	if port == 0 {
+		switch parsed.Scheme {
+		case "http":
+			port = 80
+		case "https":
+			port = 443
+		}
+	}
+	return parsed.Hostname(), port
+}
+
+func parseNucleiPort(value string) int {
+	port, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || port < 1 || port > 65535 {
+		return 0
+	}
+	return port
 }

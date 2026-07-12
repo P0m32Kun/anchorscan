@@ -154,38 +154,38 @@
   service: ["http"]
   product: ["tomcat", "apache tomcat"]
   tech: ["tomcat"]
-  nuclei_tags: ["tomcat", "apache-tomcat", "default-login"]
+  nuclei_tags: ["tomcat", "apache-tomcat"]
   target: "url"
 - name: nginx
   service: ["http"]
   product: ["nginx"]
   tech: ["nginx"]
-  nuclei_tags: ["nginx", "default-login"]
+  nuclei_tags: ["nginx"]
   target: "url"
 - name: apache
   service: ["http"]
   product: ["apache", "apache httpd", "apache http server"]
   tech: ["apache"]
-  nuclei_tags: ["apache", "default-login"]
+  nuclei_tags: ["apache"]
   target: "url"
 - name: iis
   service: ["http"]
   product: ["iis", "microsoft iis"]
   tech: ["iis", "microsoft-iis"]
-  nuclei_tags: ["iis", "default-login"]
+  nuclei_tags: ["iis"]
   target: "url"
 - name: wordpress
   service: ["http"]
   tech: ["wordpress"]
-  nuclei_tags: ["wordpress", "default-login"]
+  nuclei_tags: ["wordpress"]
   target: "url"
 - name: joomla
   service: ["http"]
   tech: ["joomla"]
-  nuclei_tags: ["joomla", "default-login"]
+  nuclei_tags: ["joomla"]
   target: "url"
 # 通用 HTTP 兜底：识别为 http 但未命中具体产品时，跑通用 web 模板
 - name: http-generic
   service: ["http"]
-  nuclei_tags: ["http", "exposure", "misconfig", "default-login"]
+  nuclei_tags: ["http", "exposure", "misconfig"]
   target: "url"
