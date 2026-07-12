@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 370e7ef66842adf193c9ad2b3e4d92fda2dfa2dc
 design_doc: docs/superpowers/specs/2026-07-12-decompose-scan-runtime-design.md
 plan: docs/superpowers/plans/2026-07-12-decompose-scan-runtime.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-07-12-decompose-scan-runtime-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-07-10
-verified_at: null
+verified_at: 2026-07-12
 archived: false
 direct_override: null
 handoff_context: openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.json
