@@ -4,6 +4,15 @@ All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
 
+## [1.7.0] - 2026-07-12
+
+v1.7.0 将 CLI 与 Web 的扫描准备流程收敛为一个应用层用例，作为后续扫描能力演进的架构稳定性版本。
+
+### Changed
+- CLI 与 Web 统一通过 `app.PrepareScan` 加载配置和规则、规范化目标与端口、解析扫描档位并执行预检，避免两条等价准备路径产生行为漂移。
+- 工具路径类型归属 `config`，项目目标和端口排除规则分别归属 `target` 与 `ports`，消除 `preflight -> app` 反向依赖。
+- 保持现有 CLI/Web 输入输出、预检诊断、项目默认值、扫描执行、数据库、报告和依赖契约；补充共享准备、错误优先级和入口生命周期回归测试。
+
 ## [1.6.2] - 2026-07-10
 
 v1.6.2 聚焦控制台 UI/UX 深度重设计，大幅优化视觉对比度、响应式移动端布局、实时扫描状态监控，并重构了更加安全的智能过滤面板。
