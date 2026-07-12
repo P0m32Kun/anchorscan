@@ -712,6 +712,36 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	}
 }
 
+func TestScanCreateLoadsConfigBeforeValidatingProject(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "scan: [\n")
+
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	_, wantErr := config.Load(configPath)
+	if wantErr == nil {
+		t.Fatal("config.Load returned nil error")
+	}
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/scan", nil))
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("status mismatch: got %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), wantErr.Error()) {
+		t.Fatalf("expected config error %q, got body=%s", wantErr, res.Body.String())
+	}
+	if strings.Contains(res.Body.String(), "project_id is required") {
+		t.Fatalf("expected config error before project validation, got body=%s", res.Body.String())
+	}
+}
+
 func TestRunsPageShowsProjectID(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

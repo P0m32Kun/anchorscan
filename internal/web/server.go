@@ -475,6 +475,10 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if _, err := config.Load(s.opts.ConfigPath); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	project, err := s.loadProjectForScan(r.FormValue("project_id"))
 	if err != nil {
