@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-07-12-decompose-scan-runtime-
 branch_status: handled
 created_at: 2026-07-10
 verified_at: 2026-07-12
-archived: false
+archived: true
 direct_override: null
 handoff_context: openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.json
 handoff_hash: 5ffae416991d131fbfe8d6f1d1a3cbd15ae3463bcc9c9c0d253708b2f6075718

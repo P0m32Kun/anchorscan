@@ -4,5 +4,6 @@
   "openspec_tasks": "openspec/changes/decompose-scan-runtime/tasks.md",
   "openspec_delta_spec": "openspec/changes/decompose-scan-runtime/specs/scan-runtime-boundaries/spec.md",
   "handoff_context": "openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.json",
-  "handoff_markdown": "openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.md"
+  "handoff_markdown": "openspec/changes/decompose-scan-runtime/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-07-12-decompose-scan-runtime"
 }

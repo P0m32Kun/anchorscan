@@ -2,6 +2,8 @@
 comet_change: decompose-scan-runtime
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-12-decompose-scan-runtime
+status: final
 ---
 
 # 扫描运行时职责拆分技术设计
@@ -71,4 +73,5 @@ canonical_spec: openspec
 - 部分失败仍提交成功目标，全部失败仍包装首个错误，取消仍优先。
 - 工具参数、调用顺序、事件、artifact、JSON 报告和打包结果不变。
 - 不增加依赖、导出符号、接口或子包。
+
 

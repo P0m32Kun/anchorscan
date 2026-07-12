@@ -2,6 +2,7 @@
 change: decompose-scan-runtime
 design-doc: docs/superpowers/specs/2026-07-12-decompose-scan-runtime-design.md
 base-ref: 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8
+archived-with: 2026-07-12-decompose-scan-runtime
 ---
 
 # Decompose Scan Runtime Implementation Plan
@@ -35,6 +36,7 @@ base-ref: 665c0ffdb819b648c4f0931d9a3b9c5ad5e14af8
 - Create: `internal/app/scan_target_test.go` — 单目标工具顺序、参数、heartbeat、finding 和失败 artifact 测试。
 - Verify only: `cmd/anchorscan/main.go`, `internal/app/manager.go` — 调用方不得修改。
 
+archived-with: 2026-07-12-decompose-scan-runtime
 ---
 
 ### Task 1: 锁定尚未覆盖的生命周期和 worker 边界
@@ -153,6 +155,7 @@ rtk git add internal/app/scan_lifecycle_test.go internal/app/scan_targets_test.g
 rtk git commit -m "test: lock scan runtime boundaries"
 ```
 
+archived-with: 2026-07-12-decompose-scan-runtime
 ---
 
 ### Task 2: 原样移动单目标固定流水线
@@ -247,6 +250,7 @@ rtk git add internal/app/scan.go internal/app/scan_target.go internal/app/scan_t
 rtk git commit -m "refactor: isolate scan target pipeline"
 ```
 
+archived-with: 2026-07-12-decompose-scan-runtime
 ---
 
 ### Task 3: 提取存活探测和多目标调度
@@ -359,6 +363,7 @@ rtk git add internal/app/scan.go internal/app/scan_targets.go internal/app/scan_
 rtk git commit -m "refactor: isolate scan target scheduling"
 ```
 
+archived-with: 2026-07-12-decompose-scan-runtime
 ---
 
 ### Task 4: 收敛生命周期入口并完成测试归档
@@ -453,6 +458,7 @@ rtk git add internal/app/scan.go internal/app/scan_test.go internal/app/scan_lif
 rtk git commit -m "refactor: narrow scan lifecycle entrypoint"
 ```
 
+archived-with: 2026-07-12-decompose-scan-runtime
 ---
 
 ### Task 5: 全仓兼容性验证
@@ -519,3 +525,4 @@ rtk git commit -m "test: verify scan runtime decomposition"
 - Placeholder scan: 所有生产符号、文件、迁移函数清单、命令和预期结果均已明确；机械迁移只引用当前基线中的精确函数或精确行块，不引入未定义行为。
 - Type consistency: `scanTargets` 的签名在 Task 3 和 Task 4 一致；`scanTarget` 保持基线签名；两者都复用 `ScanOptions`、`tools.Runner`、`*store.Store`、fingerprint/report 类型。
 - Ponytail check: 只新增两个生产文件和三个按设计要求的测试文件；没有新增依赖、接口、子包、context 对象或通用 helper。
+
