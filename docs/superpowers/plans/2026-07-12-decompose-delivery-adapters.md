@@ -204,7 +204,7 @@ rtk git commit -m "test: lock delivery adapter contracts"
 - Consumes: `run` 调用的现有未导出函数签名；`cliDeps` 保持 `newRunner func() tools.Runner`、`openStore func(string) (*store.Store, error)`、`now func() time.Time`。
 - Produces: `runScan`、`runTool`、`runReport`、`runImportNmap`、`runDoctor`、`runWeb`、`runCancel`、`runTools` 的原签名和行为。
 
-- [ ] **Step 1: Move the scan symbols byte-for-byte**
+- [x] **Step 1: Move the scan symbols byte-for-byte**
 
 Move `runScan`, `logScan`, `logPreflight`, and `printScanHelp` to `scan_command.go`. Do not reorder statements. The resulting import set is:
 
@@ -232,7 +232,7 @@ Run: `rtk go test ./cmd/anchorscan -run 'TestExecuteScan'`
 
 Expected: PASS。
 
-- [ ] **Step 2: Move the tool symbols byte-for-byte**
+- [x] **Step 2: Move the tool symbols byte-for-byte**
 
 Move `runTool`, `applyToolExtraArgs`, `splitCSV`, and `printToolHelp` to `tool_command.go`; keep its calls to package-local `logScan` and `ensureParentDir` unchanged.
 
@@ -242,7 +242,7 @@ Run: `rtk go test ./cmd/anchorscan -run 'TestExecuteTool'`
 
 Expected: PASS。
 
-- [ ] **Step 3: Move report and import symbols byte-for-byte**
+- [x] **Step 3: Move report and import symbols byte-for-byte**
 
 Move `runReport`, `runImportNmap`, `printReportHelp`, and `printImportNmapHelp` to `report_command.go`.
 
@@ -252,7 +252,7 @@ Run: `rtk go test ./cmd/anchorscan -run 'TestExecute(Report|ImportNmap)'`
 
 Expected: PASS。
 
-- [ ] **Step 4: Move administration symbols byte-for-byte**
+- [x] **Step 4: Move administration symbols byte-for-byte**
 
 Move `runDoctor`, `runWeb`, `runCancel`, `runTools`, `checkToolPath`, `printDoctorHelp`, `printWebHelp`, `printToolsHelp`, and `printToolsCheckHelp` to `admin_command.go`.
 
@@ -264,7 +264,7 @@ Run: `rtk go test ./cmd/anchorscan`
 
 Expected: PASS，包括 root help、unknown command、version、doctor、web、cancel 和 tools checks。
 
-- [ ] **Step 5: Commit the production split**
+- [x] **Step 5: Commit the production split**
 
 ```bash
 rtk git add cmd/anchorscan/main.go cmd/anchorscan/scan_command.go cmd/anchorscan/tool_command.go cmd/anchorscan/report_command.go cmd/anchorscan/admin_command.go
