@@ -9,6 +9,7 @@ adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 →
 ### Fixed
 - Nuclei 漏洞记录优先采用其结构化返回的目标 IP 与端口，避免跨端口模板结果错误归属到发起扫描的服务。
 - URL 类型服务规则移除宽泛的 `default-login` 标签，并通过配置契约测试防止该标签重新进入 Web URL 扫描。
+- Release 工作流改为矩阵构建完成后统一发布，避免并发创建同一标签导致平台二进制缺失。
 
 ## [1.7.0] - 2026-07-12
 

@@ -46,6 +46,23 @@ jobs:
           fi
           go build -trimpath -ldflags="-s -w" -o "$BINARY" ./cmd/anchorscan
 
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchorscan-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: anchorscan-*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Detect prerelease
         id: pre
         run: |
@@ -55,9 +72,9 @@ jobs:
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload release asset
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: anchorscan-*
+          files: dist/anchorscan-*
           prerelease: ${{ steps.pre.outputs.is_prerelease }}
           generate_release_notes: true
