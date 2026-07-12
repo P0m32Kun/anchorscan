@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -729,16 +730,29 @@ func TestScanCreateLoadsConfigBeforeValidatingProject(t *testing.T) {
 		t.Fatal("config.Load returned nil error")
 	}
 
-	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/scan", nil))
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("status mismatch: got %d body=%s", res.Code, res.Body.String())
-	}
-	if !strings.Contains(res.Body.String(), wantErr.Error()) {
-		t.Fatalf("expected config error %q, got body=%s", wantErr, res.Body.String())
-	}
-	if strings.Contains(res.Body.String(), "project_id is required") {
-		t.Fatalf("expected config error before project validation, got body=%s", res.Body.String())
+	for _, tc := range []struct {
+		name       string
+		form       string
+		unexpected string
+	}{
+		{name: "missing project ID", unexpected: "project_id is required"},
+		{name: "unknown project ID", form: "project_id=does-not-exist", unexpected: sql.ErrNoRows.Error()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(tc.form))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != http.StatusBadRequest {
+				t.Fatalf("status mismatch: got %d body=%s", res.Code, res.Body.String())
+			}
+			if !strings.Contains(res.Body.String(), wantErr.Error()) {
+				t.Fatalf("expected config error %q, got body=%s", wantErr, res.Body.String())
+			}
+			if strings.Contains(res.Body.String(), tc.unexpected) {
+				t.Fatalf("expected config error before project validation, got body=%s", res.Body.String())
+			}
+		})
 	}
 }
 
