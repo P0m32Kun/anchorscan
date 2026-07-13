@@ -4,6 +4,15 @@ All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
 
+## [1.7.2] - 2026-07-13
+
+### Changed
+- 静态 HTML 报告模板改为编译进二进制，保持相同输入的报告字节输出不变。
+- 按页面职责拆分运行状态、工具表单和报告分布脚本，保留既有资源入口、加载顺序与视觉表现。
+
+### Fixed
+- 补强代表性报告、嵌入静态资源和报告页初始化的回归覆盖，防止结构整理引入发布物或页面行为回归。
+
 ## [1.7.1] - 2026-07-12
 
 ### Fixed
