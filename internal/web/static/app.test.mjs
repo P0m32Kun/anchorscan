@@ -6,6 +6,7 @@ const source = fs.readFileSync(new URL('./app.js', import.meta.url), 'utf8');
 const runStatusSource = fs.readFileSync(new URL('./run-status.js', import.meta.url), 'utf8');
 const toolFormSource = fs.readFileSync(new URL('./tool-form.js', import.meta.url), 'utf8');
 const reportUISource = fs.readFileSync(new URL('./report-ui.js', import.meta.url), 'utf8');
+const domContentLoadedCallbacks = [];
 const context = {
   window: {
     getComputedStyle: (el) => el.style || {}
@@ -13,7 +14,9 @@ const context = {
   document: {
     getElementById: () => null,
     querySelector: () => null,
-    addEventListener: () => {},
+    addEventListener: (event, callback) => {
+      if (event === 'DOMContentLoaded') domContentLoadedCallbacks.push(callback);
+    },
   },
   setInterval: () => {},
 };
@@ -21,6 +24,7 @@ vm.createContext(context);
 vm.runInContext(source, context);
 vm.runInContext(runStatusSource, context);
 vm.runInContext(reportUISource, context);
+assert.equal(domContentLoadedCallbacks.length, 2);
 
 assert.equal(
   context.formatEventTime('2026-07-09T03:16:55.614Z'),
@@ -89,8 +93,8 @@ context.document.querySelectorAll = (selector) => {
   return [];
 };
 
-// run renderVulnDistribution
-context.renderVulnDistribution();
+// Run the report page initializer registered by report-ui.js.
+domContentLoadedCallbacks.at(-1)();
 
 assert.equal(containerDisplay, 'block');
 assert.ok(barHTML.includes('vuln-bar-segment critical'));
@@ -1069,4 +1073,3 @@ assert.equal(mockLines[3].className, 'step-line completed');
   assert.equal(textSpan.textContent, '关键词: <img src=x onerror=alert(1)>');
   assert.equal(textSpan._innerHTML, ''); // should not set raw innerHTML of the text span!
 }
-

@@ -116,3 +116,30 @@ func TestNavIncludesImportNmapEntry(t *testing.T) {
 		t.Fatalf("expected import nav entry, got: %s", body)
 	}
 }
+
+func TestStaticAssetsServeLeafScripts(t *testing.T) {
+	dir := t.TempDir()
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	for _, asset := range []struct {
+		path string
+		want string
+	}{
+		{path: "/static/app.js", want: "copyReportData"},
+		{path: "/static/run-status.js", want: "refreshRunStatus"},
+		{path: "/static/tool-form.js", want: "setupToolForm"},
+		{path: "/static/report-ui.js", want: "renderVulnDistribution"},
+	} {
+		t.Run(asset.path, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, asset.path, nil))
+			if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), asset.want) {
+				t.Fatalf("unexpected response for %s: %d %s", asset.path, res.Code, res.Body.String())
+			}
+		})
+	}
+}
