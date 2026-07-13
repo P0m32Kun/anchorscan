@@ -6,44 +6,44 @@ mode: full
 status: pass
 ---
 
-# Decompose Delivery Adapters Verification Report
+# 交付适配器职责拆分验证报告
 
-## Summary
+## 摘要
 
-| Dimension | Result |
+| 维度 | 结果 |
 | --- | --- |
-| Completeness | 19/19 OpenSpec tasks and 38/38 plan steps completed |
-| Correctness | CLI, Web resource, report responsibilities, and their compatibility tests match the change requirements |
-| Coherence | Existing packages and call directions retained; no new framework, dependency, or abstraction layer |
+| 完整性 | OpenSpec 19/19 项任务和实施计划 38/38 个步骤均已完成 |
+| 正确性 | CLI、Web 资源、报告职责及兼容性测试均符合 Change 约束 |
+| 一致性 | 保持原有包和调用方向，未新增框架、依赖或抽象层 |
 
-## Requirement Evidence
+## 需求证据
 
-| Requirement | Evidence |
+| 需求 | 证据 |
 | --- | --- |
-| CLI adapters by command | `cmd/anchorscan/main.go` now keeps root assembly; command files and command-scoped tests retain all baseline cases plus the dispatch characterization test. |
-| Web adapters by resource | `internal/web/server.go` retains the sole, unchanged route table; resource handlers and tests are co-located in `projects`, `scans`, `tools`, `imports`, `runs`, `config`, and report files. |
-| Report delivery responsibilities | Filters, pagination, exports, and view assembly are in four concrete `internal/web/report_*.go` files; `reportDetail` remains an HTTP coordinator. |
-| Test structure mirrors adapters | Baseline delivery-layer tests were retained; five characterization tests were added for dispatch and report boundaries. |
-| No lower-level behavioral change | The dependency files, templates, static assets, app/store packages, and report core package are unchanged in the reviewed range. |
+| CLI 按命令拆分 | `cmd/anchorscan/main.go` 只保留根装配；各命令文件和命令测试保留基线场景，并增加根分派特征测试。 |
+| Web 按资源拆分 | `internal/web/server.go` 保留唯一且未变的路由表；项目、扫描、工具、导入、运行、配置和报告的 Handler/测试按资源就近组织。 |
+| 报告职责分离 | 筛选、分页、导出、视图组装位于四个具体的 `internal/web/report_*.go` 文件；`reportDetail` 仍只协调 HTTP 请求和响应。 |
+| 测试结构镜像适配器 | 保留全部交付层基线测试，并补充 5 个分派和报告边界的特征测试。 |
+| 底层行为不变 | 评审范围内的依赖文件、模板、静态资源、应用/存储包和报告核心包均未变更。 |
 
-## Verification Evidence
+## 验证证据
 
-| Check | Result |
+| 检查 | 结果 |
 | --- | --- |
-| `openspec validate decompose-delivery-adapters --strict` | Passed |
-| `go test ./...` | Passed: 218 tests across 14 packages |
-| `node --test internal/web/static/app.test.mjs` | Passed: 1 test, 0 failures |
-| `go vet ./...` | Passed |
-| `make package` | Passed: Darwin arm64 binary and tarball produced |
-| Route registration comparison against `5b10fb3` | No diff |
-| `git diff --exit-code 5b10fb3...HEAD -- go.mod go.sum internal/web/templates internal/web/static` | No diff |
-| `git diff --check 5b10fb3...HEAD` | Passed |
-| Focused review of `5b10fb3..161bf9a` | No CRITICAL, IMPORTANT, or MINOR findings |
+| `openspec validate decompose-delivery-adapters --strict` | 通过 |
+| `go test ./...` | 通过：14 个包共 218 项测试 |
+| `node --test internal/web/static/app.test.mjs` | 通过：1 项测试，0 失败 |
+| `go vet ./...` | 通过 |
+| `make package` | 通过：生成 Darwin arm64 二进制与 tarball |
+| 与 `5b10fb3` 比较路由注册 | 无差异 |
+| `git diff --exit-code 5b10fb3...HEAD -- go.mod go.sum internal/web/templates internal/web/static` | 无差异 |
+| `git diff --check 5b10fb3...HEAD` | 通过 |
+| `5b10fb3..161bf9a` 的聚焦审查 | 未发现 CRITICAL、IMPORTANT 或 MINOR 问题 |
 
-## Issues
+## 问题
 
-No CRITICAL, WARNING, or SUGGESTION issues were identified.
+未发现 CRITICAL、WARNING 或 SUGGESTION 问题。
 
-## Note
+## 说明
 
-The Comet guard does not infer Go build commands. The build-to-verify transition therefore used its one-shot skip flag only after the real project checks above had passed. No repository build configuration was altered.
+Comet 守卫无法自动识别 Go 的构建命令，因此仅在上述真实项目检查通过后，使用一次性跳过开关推进 build 到 verify；未修改任何仓库构建配置。
