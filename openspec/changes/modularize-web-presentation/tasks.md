@@ -1,14 +1,14 @@
 ## 1. 稳定性门槛与迁移基线
 
-- [ ] 1.1 确认当前 UI 工作已经稳定，且 `internal/web/templates/`、`internal/web/static/`、`internal/report/` 没有重叠的未完成改动；条件不满足时停止实施
-- [ ] 1.2 在修改前运行 `go test ./...`、`node --test internal/web/static/app.test.mjs` 和 `make package`，确认现有基线通过
+- [x] 1.1 确认当前 UI 工作已经稳定，且 `internal/web/templates/`、`internal/web/static/`、`internal/report/` 没有重叠的未完成改动；条件不满足时停止实施
+- [x] 1.2 在修改前运行 `go test ./...`、`node --test internal/web/static/app.test.mjs` 和 `make package`，确认现有基线通过
 - [ ] 1.3 使用固定 `ScanReport` 在旧实现上记录 HTML 输出 SHA-256，并保存代表性 Web 页面在固定浏览器与视口下的视觉及关键 DOM 基线
 
 ## 2. 静态报告模板迁移
 
-- [ ] 2.1 添加固定报告输入的字节哈希回归测试，使模板内容或首尾空白变化能够被检测
-- [ ] 2.2 将 `htmlTemplate` 正文不做格式化地迁移到 `internal/report/templates/report.html`，并用私有 `embed.FS`、`ParseFS` 和 `ExecuteTemplate` 保持 `WriteHTML` 边界
-- [ ] 2.3 验证固定输入的 HTML 哈希不变、无外部模板文件时仍可生成报告，并确认现有 `WriteHTML` 调用方无需修改
+- [x] 2.1 添加固定报告输入的字节哈希回归测试，使模板内容或首尾空白变化能够被检测
+- [x] 2.2 将 `htmlTemplate` 正文不做格式化地迁移到 `internal/report/templates/report.html`，并用私有 `embed.FS`、`ParseFS` 和 `ExecuteTemplate` 保持 `WriteHTML` 边界
+- [x] 2.3 验证固定输入的 HTML 哈希不变、无外部模板文件时仍可生成报告，并确认现有 `WriteHTML` 调用方无需修改
 
 ## 3. Web 表现资源按职责整理
 
