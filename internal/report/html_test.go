@@ -1,6 +1,8 @@
 package report
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,6 +10,24 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 )
+
+func TestWriteHTMLStableBytes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "report.html")
+	if err := WriteHTML(path, ScanReport{}); err != nil {
+		t.Fatalf("WriteHTML returned error: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := sha256.Sum256(data)
+	const want = "9596dd371a4a801b18ee379f932b2f1497a754c5149f4250501f84a713f8d499"
+	if actual := hex.EncodeToString(got[:]); actual != want {
+		t.Fatalf("unexpected HTML SHA-256: got %s, want %s", actual, want)
+	}
+}
 
 func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "report.html")
