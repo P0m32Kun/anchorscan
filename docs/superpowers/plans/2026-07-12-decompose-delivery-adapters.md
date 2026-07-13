@@ -491,7 +491,7 @@ rtk git commit -m "test: group CLI tests by command"
 - Consumes: `server` fields `opts ServerOptions`, `store *store.Store`, `manager *app.Manager`, `mux *http.ServeMux`。
 - Produces: 原有 Handler 方法名和签名；`NewServer(ServerOptions) (http.Handler, error)` 与路由注册顺序完全不变。
 
-- [ ] **Step 1: Freeze the route table in place**
+- [x] **Step 1: Freeze the route table in place**
 
 Do not edit the following registration order while moving dependent methods:
 
@@ -515,7 +515,7 @@ mux.HandleFunc("/import/nmap/run", s.importNmapRun)
 mux.HandleFunc("/", s.home)
 ```
 
-- [ ] **Step 2: Move project and scan symbols**
+- [x] **Step 2: Move project and scan symbols**
 
 Move the exact symbol groups from the Target File Map to `projects.go` and `scans.go`; do not split `projectDetail` internally even though it dispatches subpaths.
 
@@ -525,7 +525,7 @@ Run: `rtk go test ./internal/web -run 'Test(Home|CreateProject|NewScan|ScanCreat
 
 Expected: PASS。
 
-- [ ] **Step 3: Move tool and import symbols**
+- [x] **Step 3: Move tool and import symbols**
 
 Move the exact tool and import groups from the Target File Map. Keep tool presets as concrete slices/functions; do not introduce a registry.
 
@@ -535,7 +535,7 @@ Run: `rtk go test ./internal/web -run 'Test(Tool|ImportNmap|NavIncludesImport)'`
 
 Expected: PASS。
 
-- [ ] **Step 4: Move run, config, and report Handler symbols**
+- [x] **Step 4: Move run, config, and report Handler symbols**
 
 Move the exact groups to `runs.go`, `config.go`, and `report_handler.go`. Keep all response branches in `reportDetail` in their current order; pure report helpers move only in Task 7.
 
@@ -545,13 +545,13 @@ Run: `rtk go test ./internal/web -run 'Test(Run|Runs|DeleteScanRun|Config|Report
 
 Expected: PASS。
 
-- [ ] **Step 5: Verify `server.go` owns only shared assembly**
+- [x] **Step 5: Verify `server.go` owns only shared assembly**
 
 Run: `rtk rg -n '^func \(s \*server\)' internal/web/server.go`
 
 Expected: 只列出 `ServeHTTP` 和 `Close`；`NewServer`、managed path helpers、`render`、`newID` 仍可作为普通函数存在。
 
-- [ ] **Step 6: Commit the Handler split**
+- [x] **Step 6: Commit the Handler split**
 
 ```bash
 rtk git add internal/web/server.go internal/web/projects.go internal/web/scans.go internal/web/tools.go internal/web/imports.go internal/web/runs.go internal/web/config.go internal/web/report_handler.go
