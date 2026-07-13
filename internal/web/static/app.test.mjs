@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('./app.js', import.meta.url), 'utf8');
+const runStatusSource = fs.readFileSync(new URL('./run-status.js', import.meta.url), 'utf8');
 const context = {
   window: {
     getComputedStyle: (el) => el.style || {}
@@ -16,6 +17,7 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(source, context);
+vm.runInContext(runStatusSource, context);
 
 assert.equal(
   context.formatEventTime('2026-07-09T03:16:55.614Z'),
@@ -1041,7 +1043,6 @@ assert.equal(mockLines[3].className, 'step-line completed');
   assert.equal(textSpan.textContent, '关键词: <img src=x onerror=alert(1)>');
   assert.equal(textSpan._innerHTML, ''); // should not set raw innerHTML of the text span!
 }
-
 
 
 

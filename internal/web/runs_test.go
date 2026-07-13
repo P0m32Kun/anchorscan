@@ -219,16 +219,32 @@ func TestRunStatusAPI(t *testing.T) {
 }
 
 func TestRunPageLoadsStatusPolling(t *testing.T) {
-	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(t.TempDir(), "config.yaml"), DBPath: filepath.Join(t.TempDir(), "scan.db")})
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Status: "running", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
 	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/static/app.js", nil))
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/runs/run-1", nil))
 	if res.Code != http.StatusOK {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
-	if !strings.Contains(res.Body.String(), "/status") || !strings.Contains(res.Body.String(), "refreshRunStatus") {
-		t.Fatalf("expected run status polling script: %s", res.Body.String())
+	body := res.Body.String()
+	appScript := strings.Index(body, `<script src="/static/app.js"></script>`)
+	runStatusScript := strings.Index(body, `<script src="/static/run-status.js"></script>`)
+	if appScript == -1 || runStatusScript == -1 || appScript > runStatusScript {
+		t.Fatalf("expected app.js before run-status.js: %s", body)
 	}
 }
