@@ -692,7 +692,7 @@ rtk git commit -m "refactor: separate report delivery responsibilities"
 - Consumes: Tasks 1-7。
 - Produces: 可进入 Comet verify 的完整 change。
 
-- [ ] **Step 1: Format and run the full test suite**
+- [x] **Step 1: Format and run the full test suite**
 
 Run: `rtk gofmt -w cmd/anchorscan/*.go internal/web/*.go`
 
@@ -704,13 +704,13 @@ Run: `rtk node --test internal/web/static/app.test.mjs`
 
 Expected: PASS，失败数为 0。
 
-- [ ] **Step 2: Build the distributable artifact**
+- [x] **Step 2: Build the distributable artifact**
 
 Run: `rtk make package`
 
 Expected: exit 0，当前平台二进制和 tarball 正常生成。
 
-- [ ] **Step 3: Audit dependency and excluded-scope files**
+- [x] **Step 3: Audit dependency and excluded-scope files**
 
 Run: `rtk git diff --exit-code HEAD~6 -- go.mod go.sum internal/web/templates internal/web/static`
 
@@ -720,13 +720,13 @@ Run: `rtk git diff --check`
 
 Expected: exit 0、无 whitespace error。
 
-- [ ] **Step 4: Audit forbidden abstractions**
+- [x] **Step 4: Audit forbidden abstractions**
 
 Run: `rtk rg -n 'type .* interface|gorilla|chi|echo|gin|presenter|repository|service' cmd/anchorscan internal/web`
 
 Expected: 没有本 change 新增的接口、框架或抽象；已有业务文本命中需逐条与基线比较。
 
-- [ ] **Step 5: Inspect the final change set**
+- [x] **Step 5: Inspect the final change set**
 
 Run: `rtk git status --short`
 
