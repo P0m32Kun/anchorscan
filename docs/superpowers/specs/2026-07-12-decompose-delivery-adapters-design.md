@@ -2,6 +2,8 @@
 comet_change: decompose-delivery-adapters
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-13-decompose-delivery-adapters
+status: final
 ---
 
 # 交付适配器职责拆分技术设计
@@ -61,4 +63,5 @@ canonical_spec: openspec
 - 路由集合与注册顺序、HTTP 状态、重定向、表单字段和响应正文不变。
 - 报告默认筛选、排序、分页、导出和模板数据不变。
 - 不增加依赖、公共 API、单实现接口或通用交付框架。
+
 
