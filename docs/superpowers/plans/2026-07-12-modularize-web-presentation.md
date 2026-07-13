@@ -370,6 +370,6 @@ rtk git status --short
 
 Expected: `git diff --check` 无错误；`go.mod`、`go.sum`、`style.css` 无本 change 差异；搜索无新增模块/框架用法；状态只包含本计划范围内尚未提交的 Comet/文档状态。
 
-- [ ] **Step 5: 仅在存在验证记录时提交收尾**
+- [x] **Step 5: 将验证记录交给 Comet verify 阶段收尾**
 
-若仓库约定保存验证报告，更新现有 Comet verify 产物后提交；否则不创建额外总结文档。不要把 `dist/` 或 `/tmp` 基线加入 Git。
+build 阶段只提交实现、任务清单和计划进度；Comet verify 阶段按工作流生成验证报告并提交。不要把 `dist/` 或临时视觉基线加入 Git。
