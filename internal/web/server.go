@@ -27,8 +27,6 @@ type server struct {
 	mux     *http.ServeMux
 }
 
-const reportPageSize = 50
-
 func managedDataRoot(dbPath string) string {
 	return filepath.Dir(dbPath)
 }

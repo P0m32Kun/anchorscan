@@ -624,7 +624,7 @@ rtk git commit -m "test: group web tests by resource"
 - Consumes: `reportDetail` 使用的所有现有未导出 concrete types/functions。
 - Produces: 完全相同的函数名、参数和返回类型；不引入新的 wrapper、DSL 或接口。
 
-- [ ] **Step 1: Move filter symbols and their tests**
+- [x] **Step 1: Move filter symbols and their tests**
 
 Move `reportFilters`, `supportedSeverities`, `filterFingerprints`, `filterFindings`, `containsValue`, `findingMatchesService`, `fingerprintMatchesKeyword`, `findingMatchesKeyword`, and `parseSeverityFilters` to `report_filters.go`.
 
@@ -636,7 +636,7 @@ Run: `rtk go test ./internal/web -run 'Test(Filter|ParseSeverity)'`
 
 Expected: PASS。
 
-- [ ] **Step 2: Move pagination symbols and its characterization test**
+- [x] **Step 2: Move pagination symbols and its characterization test**
 
 Move `reportPageSize` from `server.go`, plus `reportPage`, `reportPageSizes`, `parsePage`, `parseSize`, `paginateFingerprints`, `paginateFindings`, `paginateHostAssets`, `paginate`, `cloneValues`, `pageURL`, `pageSizeURLs`, and `withQuery` to `report_pagination.go`.
 
@@ -648,7 +648,7 @@ Run: `rtk go test ./internal/web -run 'Test(Paginate|ReportPagePaginates)'`
 
 Expected: PASS。
 
-- [ ] **Step 3: Move export symbols and tests**
+- [x] **Step 3: Move export symbols and tests**
 
 Move `exportAssetsTXT`, `exportAssetsCSV`, and `exportFindingsCSV` to `report_exports.go`; move `TestExportAssetsTXTKeepsCurrentLineFormat` to `report_exports_test.go`. Handler-level export tests stay in `report_handler_test.go`.
 
@@ -658,7 +658,7 @@ Run: `rtk go test ./internal/web -run 'Test(Export|ReportAssetExport|ReportExpor
 
 Expected: PASS。
 
-- [ ] **Step 4: Move view symbols and tests**
+- [x] **Step 4: Move view symbols and tests**
 
 Move `runMetaSummaryLimit`, `hostAssetView`, `runMetaView`, `newRunMetaView`, `summarizeRunValue`, `groupFingerprintsByHost`, and `appendUnique` to `report_views.go`; move `TestNewRunMetaViewSummarizesByRune` to `report_views_test.go`.
 
@@ -670,7 +670,7 @@ Run: `rtk go test ./internal/web`
 
 Expected: PASS，无 duplicate/undefined symbol。
 
-- [ ] **Step 5: Commit the report split**
+- [x] **Step 5: Commit the report split**
 
 ```bash
 rtk git add internal/web/server.go internal/web/report_handler.go internal/web/report_filters.go internal/web/report_pagination.go internal/web/report_exports.go internal/web/report_views.go internal/web/*report*_test.go
