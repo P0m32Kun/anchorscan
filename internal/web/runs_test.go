@@ -1,0 +1,234 @@
+package web
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/report"
+	"github.com/P0m32Kun/anchorscan/internal/store"
+)
+
+func TestRunsPageShowsProjectID(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{
+		ID:        "p1",
+		Name:      "Local Lab",
+		CreatedAt: time.Unix(1, 0),
+		UpdatedAt: time.Unix(1, 0),
+	}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:     "run-1",
+		ProjectID: "p1",
+		Target:    "127.0.0.1",
+		Ports:     "80",
+		Profile:   "normal",
+		Status:    "completed",
+		StartedAt: time.Unix(1, 0),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/runs", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, `/projects/p1`) || !strings.Contains(body, "Local Lab") {
+		t.Fatalf("expected project name and link in runs page: %s", body)
+	}
+	if strings.Contains(body, `>p1</a>`) {
+		t.Fatalf("expected project name instead of project ID: %s", body)
+	}
+}
+
+func TestDeleteScanRunRemovesManagedFilesAndDatabaseRows(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	now := time.Unix(1, 0)
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "127.0.0.1",
+		Ports:          "6379",
+		Profile:        "normal",
+		Status:         "completed",
+		ArtifactDir:    filepath.Join(dir, "artifacts", "run-1"),
+		ConfigSnapshot: "profile: normal",
+		StartedAt:      now,
+		FinishedAt:     now.Add(time.Second),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "127.0.0.1", Port: 6379, Service: "redis", Product: "Redis", Normalized: "redis"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+	if err := scanStore.SaveFinding("run-1", report.Finding{IP: "127.0.0.1", Port: 6379, Source: "nuclei", ID: "redis-default-logins", Severity: "high", Summary: "Redis Default Login", Target: "127.0.0.1:6379"}); err != nil {
+		t.Fatalf("SaveFinding returned error: %v", err)
+	}
+	if err := scanStore.AppendScanEvent(store.ScanEvent{RunID: "run-1", Time: now.Add(2 * time.Second), Level: "info", Stage: "nmap", Message: "done"}); err != nil {
+		t.Fatalf("AppendScanEvent returned error: %v", err)
+	}
+	reportPath := filepath.Join(dir, "projects", "p1", "runs", "run-1", "report.json")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	artifactPath := filepath.Join(dir, "artifacts", "run-1", "nmap-127.0.0.1.xml")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(artifactPath, []byte("<nmaprun/>"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	form := strings.NewReader("_method=delete")
+	req := httptest.NewRequest(http.MethodPost, "/runs/run-1", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+
+	runs, err := scanStore.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs, got %#v", runs)
+	}
+	fps, err := scanStore.ListFingerprints("run-1")
+	if err != nil {
+		t.Fatalf("ListFingerprints returned error: %v", err)
+	}
+	if len(fps) != 0 {
+		t.Fatalf("expected no fingerprints, got %#v", fps)
+	}
+	findings, err := scanStore.ListFindings("run-1")
+	if err != nil {
+		t.Fatalf("ListFindings returned error: %v", err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected no findings, got %#v", findings)
+	}
+	events, err := scanStore.ListScanEvents("run-1", 10)
+	if err != nil {
+		t.Fatalf("ListScanEvents returned error: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("expected no events, got %#v", events)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "p1", "runs", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected run dir to be removed, got err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "artifacts", "run-1")); !os.IsNotExist(err) {
+		t.Fatalf("expected artifact dir to be removed, got err=%v", err)
+	}
+}
+
+func TestRunEventsAPI(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "8080", Profile: "normal", Status: "running", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.AppendScanEvent(store.ScanEvent{RunID: "run-1", Time: time.Unix(2, 0), Level: "info", Stage: "nmap", Message: "still running"}); err != nil {
+		t.Fatalf("AppendScanEvent returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/events", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "still running") {
+		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
+	}
+	var events []map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &events); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+	if len(events) != 1 || events[0]["time"] == nil || events[0]["stage"] == nil || events[0]["message"] == nil {
+		t.Fatalf("unexpected json fields: %#v", events)
+	}
+}
+
+func TestRunStatusAPI(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/status", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+	if body["status"] != "completed" {
+		t.Fatalf("unexpected status response: %#v", body)
+	}
+}
+
+func TestRunPageLoadsStatusPolling(t *testing.T) {
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(t.TempDir(), "config.yaml"), DBPath: filepath.Join(t.TempDir(), "scan.db")})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/static/app.js", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "/status") || !strings.Contains(res.Body.String(), "refreshRunStatus") {
+		t.Fatalf("expected run status polling script: %s", res.Body.String())
+	}
+}

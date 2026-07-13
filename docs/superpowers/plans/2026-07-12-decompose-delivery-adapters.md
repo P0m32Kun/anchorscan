@@ -574,7 +574,7 @@ rtk git commit -m "refactor: split web resource handlers"
 - Consumes: Task 5 Handler methods and the single shared test helper set in `server_test.go`。
 - Produces: 每个 Web 资源可独立运行的测试组，断言和场景总数不减少。
 
-- [ ] **Step 1: Move existing tests by route ownership**
+- [x] **Step 1: Move existing tests by route ownership**
 
 - `projects_test.go`: home/project creation/detail/deletion tests。
 - `scans_test.go`: new scan and every `TestScanCreate*` test。
@@ -587,7 +587,7 @@ rtk git commit -m "refactor: split web resource handlers"
 
 Move test functions byte-for-byte, then remove unused imports file by file.
 
-- [ ] **Step 2: Run resource groups independently**
+- [x] **Step 2: Run resource groups independently**
 
 Run: `rtk gofmt -w internal/web/*_test.go`
 
@@ -599,7 +599,7 @@ Run: `rtk go test ./internal/web`
 
 Expected: 全部 PASS；最终整包测试数量与 Task 1 基线一致或仅增加 Task 2 的特征测试。
 
-- [ ] **Step 3: Commit the Web test split**
+- [x] **Step 3: Commit the Web test split**
 
 ```bash
 rtk git add internal/web/*_test.go
