@@ -61,6 +61,11 @@ func TestToolDetailPageRendersNmapHelpAndPresets(t *testing.T) {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
+	appScript := strings.Index(body, `<script src="/static/app.js"></script>`)
+	toolFormScript := strings.Index(body, `<script src="/static/tool-form.js"></script>`)
+	if appScript == -1 || toolFormScript == -1 || appScript > toolFormScript {
+		t.Fatalf("expected app.js before tool-form.js: %s", body)
+	}
 	for _, want := range []string{
 		`name="tool" value="nmap"`,
 		`name="raw_args"`,

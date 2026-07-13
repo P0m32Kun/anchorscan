@@ -250,8 +250,10 @@ func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 	if !strings.Contains(body, "按主机聚合") || !strings.Contains(body, "复制 IP:PORT") || !strings.Contains(body, "/reports/run-1/assets.csv?q=redis") {
 		t.Fatalf("expected asset workbench controls: %s", body)
 	}
-	if !strings.Contains(body, `<script src="/static/app.js"></script>`) {
-		t.Fatalf("expected report page copy script: %s", body)
+	appScript := strings.Index(body, `<script src="/static/app.js"></script>`)
+	reportUIScript := strings.Index(body, `<script src="/static/report-ui.js"></script>`)
+	if appScript == -1 || reportUIScript == -1 || appScript > reportUIScript {
+		t.Fatalf("expected app.js before report-ui.js: %s", body)
 	}
 	if !strings.Contains(body, "127.0.0.1") || !strings.Contains(body, "6379,6380") {
 		t.Fatalf("expected grouped host row: %s", body)

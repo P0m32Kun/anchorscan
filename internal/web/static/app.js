@@ -1,53 +1,3 @@
-function setupToolForm(){
-  const form = document.querySelector('[data-tool-form]');
-  const terminal = document.getElementById('tool-output');
-  if(!form || !terminal) return;
-  const button = form.querySelector('button[type="submit"]');
-
-  const write = (text) => {
-    terminal.textContent = text;
-    terminal.scrollTop = terminal.scrollHeight;
-  };
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if(button) button.disabled = true;
-    const raw = (form.elements.raw_args?.value || '').trim();
-    write('$ ' + form.dataset.tool + (raw ? ' ' + raw : '') + '\n启动中...\n');
-    try {
-      const res = await fetch(form.action, {
-        method: 'POST',
-        body: new URLSearchParams(new FormData(form)),
-        headers: {'X-Requested-With': 'fetch'},
-      });
-      if(!res.ok) throw new Error((await res.text()).trim() || '启动失败');
-      const data = await res.json();
-      await pollToolOutput(data.run_id, write);
-    } catch (err) {
-      write(terminal.textContent + (err.message || String(err)) + '\n');
-    } finally {
-      if(button) button.disabled = false;
-    }
-  });
-}
-
-async function pollToolOutput(runID, write){
-  for(;;){
-    const eventsRes = await fetch('/api/runs/' + runID + '/events');
-    if(eventsRes.ok){
-      const events = await eventsRes.json();
-      const lines = events.filter(e => e.stage !== 'report').map(e => e.message);
-      if(lines.length) write(lines.join('\n') + '\n');
-    }
-    const statusRes = await fetch('/api/runs/' + runID + '/status');
-    if(statusRes.ok){
-      const data = await statusRes.json();
-      if((data.status || '').toLowerCase() !== 'running') return;
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-}
-
 async function copyReportData(button){
   let text = button.dataset.copyText || '';
   if(button.dataset.copyUrl){
@@ -118,68 +68,8 @@ document.addEventListener('click', async (event) => {
   }, 1200);
 });
 
-setupToolForm();
-
-function renderVulnDistribution() {
-  const container = document.getElementById('distribution-container');
-  const bar = document.getElementById('distribution-bar');
-  const legend = document.getElementById('distribution-legend');
-  if (!container || !bar || !legend) return;
-
-  const badges = document.querySelectorAll('.severity-badge');
-  if (badges.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  badges.forEach(badge => {
-    const text = badge.textContent.trim().toLowerCase();
-    if (counts.hasOwnProperty(text)) {
-      counts[text]++;
-    }
-  });
-
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
-  if (total === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-
-  let barHTML = '';
-  let legendHTML = '';
-
-  const labelMap = {
-    critical: '严重 (Critical)',
-    high: '高危 (High)',
-    medium: '中危 (Medium)',
-    low: '低危 (Low)',
-    info: '信息 (Info)'
-  };
-
-  Object.entries(counts).forEach(([sev, count]) => {
-    if (count > 0) {
-      const pct = ((count / total) * 100).toFixed(1);
-      barHTML += `<div class="vuln-bar-segment ${sev}" style="width: ${pct}%;" title="${labelMap[sev]}: ${count} (${pct}%)"></div>`;
-    }
-    legendHTML += `
-      <span class="legend-item">
-        <span class="legend-dot ${sev}"></span>
-        ${labelMap[sev]}: <span class="legend-count">${count}</span>
-      </span>
-    `;
-  });
-
-  bar.innerHTML = barHTML;
-  legend.innerHTML = legendHTML;
-}
-
 // 绑定 DOM 载入回调
 document.addEventListener('DOMContentLoaded', () => {
-  renderVulnDistribution();
-
   // 1. 高级过滤选项折叠/展开
   const toggleAdvBtn = document.getElementById('btn-toggle-advanced');
   const advPanel = document.getElementById('advanced-filter-panel');
