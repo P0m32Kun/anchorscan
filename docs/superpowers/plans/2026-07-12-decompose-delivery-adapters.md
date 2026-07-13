@@ -284,29 +284,191 @@ rtk git commit -m "refactor: split CLI command adapters"
 - Consumes: 同 package 测试可直接调用 Task 3 的未导出函数；共享 runner 和文件 helper 不复制。
 - Produces: 每个命令组可用 `rtk go test -run` 独立验证。
 
-- [ ] **Step 1: Move tests without changing assertions**
+- [x] **Step 1: Record the exact baseline before editing**
 
-Move tests by prefix/content:
+Run:
 
-- `scan_command_test.go`: all `TestExecuteScan*`.
-- `tool_command_test.go`: all `TestExecuteTool*`.
-- `report_command_test.go`: all `TestExecuteReport*` and `TestExecuteImportNmap*`.
-- `admin_command_test.go`: `TestExecuteToolsCheckReportsConfiguredTools`, `TestExecuteDoctorPrintsChecks`, `TestExecuteWebHelpShowsListen`, `TestExecuteCancelPostsToServer`.
-- Keep root help, unknown command, version, `sampleFingerprint`, runner types/methods, `writeFile`, and `writeExecutable` in `main_test.go`.
+```bash
+git status --short -- cmd/anchorscan
+go test ./cmd/anchorscan -list '^Test' | sed '/^ok[[:space:]]/d' | sort > /tmp/anchorscan-tests.before
+wc -l /tmp/anchorscan-tests.before
+go test ./cmd/anchorscan
+```
 
-Run: `rtk gofmt -w cmd/anchorscan/*_test.go`
+Expected: `cmd/anchorscan` 无未提交修改；测试清单为 23 行；package PASS。计划文档本身可以尚未提交。若任一条件不满足，停止，不继续移动。
 
-- [ ] **Step 2: Run each responsibility and the whole package**
+- [x] **Step 2: Move tests by exact name, without an extraction script**
 
-Run: `rtk go test ./cmd/anchorscan -run 'TestExecuteScan'`
+Use `apply_patch` to move complete `func Test...` declarations. Do not use line-number slicing, independent prefix predicates, regex extraction, or a temporary AST splitter. Do not alter any test body or assertion.
 
-Run: `rtk go test ./cmd/anchorscan -run 'TestExecute(Tool|Report|ImportNmap|Doctor|Web|Cancel|Tools)'`
+Create `scan_command_test.go` with exactly these eight tests:
 
-Run: `rtk go test ./cmd/anchorscan`
+```text
+TestExecuteScanHelpShowsFlags
+TestExecuteScanReturnsPortErrorBeforeProfileError
+TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails
+TestExecuteScanStoresArtifactDirUnderSelectedRoot
+TestExecuteScanPrintsPreflightSummary
+TestExecuteScanStopsOnPreflightError
+TestExecuteScanPassesProfileAndToolArgs
+TestExecuteScanWritesJSONAndHTML
+```
 
-Expected: 三次均 PASS，测试数量没有减少。
+Create `tool_command_test.go` with exactly these three tests:
 
-- [ ] **Step 3: Commit the test split**
+```text
+TestExecuteToolHelpShowsTools
+TestExecuteToolNucleiRejectsMissingTagsAndTemplate
+TestExecuteToolNmapAliveWritesRunOutput
+```
+
+Create `report_command_test.go` with exactly these five tests:
+
+```text
+TestExecuteReportWritesHTMLFromStoredRun
+TestExecuteImportNmapWritesRunAndReports
+TestExecuteImportNmapRejectsEmptyXML
+TestExecuteImportNmapRejectsNonNmaprun
+TestExecuteImportNmapHelpShowsFlags
+```
+
+Create `admin_command_test.go` with exactly these four tests:
+
+```text
+TestExecuteToolsCheckReportsConfiguredTools
+TestExecuteDoctorPrintsChecks
+TestExecuteWebHelpShowsListen
+TestExecuteCancelPostsToServer
+```
+
+`TestExecuteToolsCheckReportsConfiguredTools` belongs only to `admin_command_test.go`. Although its name starts with `TestExecuteTool`, it must never also be classified as a tool-command test.
+
+Use these import blocks after the moves; do not retain imports only needed by a test moved to another file:
+
+```go
+// cmd/anchorscan/scan_command_test.go
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/tools"
+)
+
+// cmd/anchorscan/tool_command_test.go
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/P0m32Kun/anchorscan/internal/tools"
+)
+
+// cmd/anchorscan/report_command_test.go
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/P0m32Kun/anchorscan/internal/store"
+)
+
+// cmd/anchorscan/admin_command_test.go
+import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+```
+
+Keep exactly these three tests in `main_test.go`:
+
+```text
+TestExecuteRootHelpShowsCommands
+TestRunUnknownCommandPreservesStderrAndError
+TestVersionCommandPrintsVersion
+```
+
+Also keep `sampleFingerprint`, `fakeRunner`, `recordingRunner`, `failRunner`, `writeFile`, and `writeExecutable` in `main_test.go`; package-level declarations remain visible to all five test files.
+
+Its final imports are:
+
+```go
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/version"
+)
+```
+
+- [x] **Step 3: Format and compile-check imports**
+
+Run:
+
+```bash
+gofmt -w cmd/anchorscan/main_test.go cmd/anchorscan/scan_command_test.go cmd/anchorscan/tool_command_test.go cmd/anchorscan/report_command_test.go cmd/anchorscan/admin_command_test.go
+go test ./cmd/anchorscan
+```
+
+Expected: the first `go test` may report only unused or missing imports. Adjust imports in the named file, run `gofmt` again, and repeat until PASS. Do not move helpers merely to avoid an import edit.
+
+- [x] **Step 4: Prove that no test was lost or duplicated**
+
+Run:
+
+```bash
+go test ./cmd/anchorscan -list '^Test' | sed '/^ok[[:space:]]/d' | sort > /tmp/anchorscan-tests.after
+diff -u /tmp/anchorscan-tests.before /tmp/anchorscan-tests.after
+test "$(wc -l < /tmp/anchorscan-tests.after | tr -d ' ')" = 23
+```
+
+Expected: `diff` has no output and both commands exit 0. This is the hard gate for the split.
+
+Then run each responsibility independently:
+
+```bash
+go test ./cmd/anchorscan -run '^TestExecuteScan'
+go test ./cmd/anchorscan -run '^TestExecuteTool(Help|Nuclei|Nmap)'
+go test ./cmd/anchorscan -run '^TestExecute(Report|ImportNmap)'
+go test ./cmd/anchorscan -run '^TestExecute(ToolsCheck|Doctor|Web|Cancel)'
+go test ./cmd/anchorscan -run '^(TestExecuteRootHelp|TestRunUnknownCommand|TestVersionCommand)'
+go test ./cmd/anchorscan
+```
+
+Expected: all six commands PASS. The tool regex deliberately excludes `TestExecuteToolsCheckReportsConfiguredTools`; the admin regex includes it exactly once.
+
+- [x] **Step 5: Review only the mechanical split**
+
+Run:
+
+```bash
+git diff --check
+git diff --stat
+git diff -- cmd/anchorscan/main_test.go cmd/anchorscan/scan_command_test.go cmd/anchorscan/tool_command_test.go cmd/anchorscan/report_command_test.go cmd/anchorscan/admin_command_test.go
+```
+
+Expected: only the five test files changed; test bodies and assertions are byte-for-byte equivalent apart from file position and `gofmt`-managed whitespace/imports. No production file changes.
+
+- [x] **Step 6: Commit the test split**
 
 ```bash
 rtk git add cmd/anchorscan/*_test.go
