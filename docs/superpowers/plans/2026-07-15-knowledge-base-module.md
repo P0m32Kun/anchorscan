@@ -35,7 +35,7 @@ base-ref: 264e77b8432e5cda5adbdaca87732a240294ae95
 - Produces: `Catalog`、`Entry`、`Commands`、`Observation`、`MatchResult`、`Status`、`Diagnostic`。
 - Consumes later: `Load(configPath, configuredPath string) *Catalog`（Task 2 实现）、`Search`、`Entry`、`Match`（Task 4 调用）。
 
-- [ ] **Step 1: 写出索引、排序、复制隔离与匹配的失败测试**
+- [x] **Step 1: 写出索引、排序、复制隔离与匹配的失败测试**
 
 ```go
 func TestCatalogSearchAndCopies(t *testing.T) {
@@ -53,13 +53,13 @@ func TestCatalogMatchNeverChoosesAmbiguousCandidate(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: 运行测试并确认失败**
+- [x] **Step 2: 运行测试并确认失败**
 
 Run: `go test ./internal/knowledgebase -run 'TestCatalog(SearchAndCopies|MatchNeverChoosesAmbiguousCandidate)' -count=1`
 
 Expected: FAIL，因为 package、模型或 `catalogFromEntries` 尚不存在。
 
-- [ ] **Step 3: 实现最小不可变模型与精确匹配**
+- [x] **Step 3: 实现最小不可变模型与精确匹配**
 
 ```go
 type Entry struct { ID, Name string; Severity Severity; Aliases []string; Match MatchKeys; Description string; Commands Commands; Remediation string }
@@ -73,13 +73,13 @@ func (c *Catalog) Match(o Observation) MatchResult {
 
 实现固定 severity/tool 枚举、诊断、私有多键索引、`Status`/`Diagnostics`/`Search`/`Entry`/`Match`。搜索以 ID、名称、别名、CVE 的小写包含匹配，按风险、名称、ID 稳定排序；工具 ID、CVE、名称/别名按优先级逐步缩小候选，绝不从自由文本推断，也绝不取第一个。
 
-- [ ] **Step 4: 运行包测试**
+- [x] **Step 4: 运行包测试**
 
 Run: `go test ./internal/knowledgebase -count=1`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交模型层**
+- [x] **Step 5: 提交模型层**
 
 Run: `git add internal/knowledgebase/catalog.go internal/knowledgebase/catalog_test.go && git commit -m "feat: add immutable knowledge catalog"`
 
