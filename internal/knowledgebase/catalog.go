@@ -129,20 +129,31 @@ func (c *Catalog) Entry(id string) (Entry, bool) {
 
 func (c *Catalog) Match(observation Observation) MatchResult {
 	candidates := c.entries
+	matchedEvidence := false
+	narrow := func(keep func(Entry) bool) {
+		matched := filterEntries(candidates, keep)
+		if len(matched) > 0 {
+			candidates = matched
+			matchedEvidence = true
+		}
+	}
 	if observation.ToolID != "" {
-		candidates = filterEntries(candidates, func(entry Entry) bool {
+		narrow(func(entry Entry) bool {
 			return toolIDMatches(entry, observation.Tool, observation.ToolID)
 		})
 	}
-	if len(candidates) > 1 && len(observation.CVEs) > 0 {
-		candidates = filterEntries(candidates, func(entry Entry) bool {
+	if len(observation.CVEs) > 0 {
+		narrow(func(entry Entry) bool {
 			return cveMatches(entry, observation.CVEs)
 		})
 	}
-	if len(candidates) > 1 && observation.Name != "" {
-		candidates = filterEntries(candidates, func(entry Entry) bool {
+	if observation.Name != "" {
+		narrow(func(entry Entry) bool {
 			return nameMatches(entry, observation.Name)
 		})
+	}
+	if !matchedEvidence {
+		return MatchResult{Status: MatchUnmatched}
 	}
 	switch len(candidates) {
 	case 0:
@@ -166,7 +177,7 @@ func entryContains(entry Entry, query string) bool {
 }
 
 func toolIDMatches(entry Entry, tool Tool, toolID string) bool {
-	if tool == ToolUnknown || tool == ToolManualReview {
+	if tool == ToolUnknown {
 		return false
 	}
 	var candidates []string
@@ -175,6 +186,8 @@ func toolIDMatches(entry Entry, tool Tool, toolID string) bool {
 		candidates = entry.Match.NucleiIDs
 	case ToolNSE:
 		candidates = entry.Match.NSEIDs
+	case ToolManualReview:
+		candidates = entry.Match.Names
 	default:
 		return false
 	}
