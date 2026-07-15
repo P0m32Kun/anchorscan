@@ -102,7 +102,12 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 		}
 	}
 	var meta entryMeta
-	decoder := yaml.NewDecoder(strings.NewReader(strings.Join(lines[metaStart:metaEnd], "\n")))
+	metadata := strings.Join(lines[metaStart:metaEnd], "\n")
+	var node yaml.Node
+	if err := yaml.Unmarshal([]byte(metadata), &node); err != nil || hasYAMLAnchor(&node) {
+		return Entry{}, diagnostic(line, "", "元数据无效")
+	}
+	decoder := yaml.NewDecoder(strings.NewReader(metadata))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&meta); err != nil || meta.ID == "" {
 		return Entry{}, diagnostic(line, meta.ID, "元数据无效")
@@ -142,6 +147,18 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 		return entry, diagnostic(line, meta.ID, "命令包含输出参数")
 	}
 	return entry, nil
+}
+
+func hasYAMLAnchor(node *yaml.Node) bool {
+	if node.Anchor != "" || node.Kind == yaml.AliasNode {
+		return true
+	}
+	for _, child := range node.Content {
+		if hasYAMLAnchor(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasRequiredSectionOrder(lines []string) bool {

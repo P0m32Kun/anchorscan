@@ -117,6 +117,14 @@ func TestLoadRejectsPlaceholderOutsideNucleiTarget(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsYAMLAnchor(t *testing.T) {
+	invalid := strings.Replace(handbook, "aliases: [SMB signing]", "aliases: &aliases [SMB signing]", 1)
+	configPath, handbookPath := writeHandbook(t, invalid)
+	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusUnavailable {
+		t.Fatalf("Status() = %q, want %q", got, StatusUnavailable)
+	}
+}
+
 func writeHandbook(t *testing.T, content string) (string, string) {
 	t.Helper()
 	dir := t.TempDir()
