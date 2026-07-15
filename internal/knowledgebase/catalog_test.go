@@ -82,8 +82,25 @@ func TestCatalogMatchUsesAliasAsNameEvidence(t *testing.T) {
 		{ID: "other", Name: "other finding"},
 	})
 
-	result := catalog.Match(Observation{Tool: ToolUnknown, Name: "smb 签名未启用"})
+	result := catalog.Match(Observation{Tool: ToolNuclei, ToolID: "missing-id", Name: "smb 签名未启用"})
 	if result.Status != MatchMatched || result.Entry.ID != "smb-signing" {
 		t.Fatalf("Match() = %#v, want smb-signing entry", result)
+	}
+}
+
+func TestCatalogMatchReturnsUnmatchedWhenAllEvidenceMisses(t *testing.T) {
+	catalog := newCatalog([]Entry{
+		{ID: "first", Match: MatchKeys{NucleiIDs: []string{"first-id"}, CVEs: []string{"CVE-2024-0001"}}, Name: "first finding"},
+		{ID: "second", Match: MatchKeys{NucleiIDs: []string{"second-id"}, CVEs: []string{"CVE-2024-0002"}}, Name: "second finding"},
+	})
+
+	result := catalog.Match(Observation{
+		Tool:   ToolNuclei,
+		ToolID: "missing-id",
+		CVEs:   []string{"CVE-2024-9999"},
+		Name:   "missing finding",
+	})
+	if result.Status != MatchUnmatched {
+		t.Fatalf("Match() = %#v, want unmatched", result)
 	}
 }
