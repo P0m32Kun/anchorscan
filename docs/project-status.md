@@ -91,7 +91,7 @@ These are generated locally and should not be treated as source:
 - `docs/testing-lab-checklist.md` - local lab validation checklist
 - `docs/testing-results-template.md` - reusable lab result record
 - `docs/troubleshooting-lab.md` - stage-by-stage lab troubleshooting
-- `docs/superpowers/specs/` - durable design notes worth keeping after implementation
+- `docs/plans/` - approved specifications and implementation plans that are still actionable
 
 ## Recommended Next Steps
 
