@@ -47,9 +47,10 @@ type Commands struct {
 }
 
 type MatchKeys struct {
-	ToolIDs []string
-	CVEs    []string
-	Names   []string
+	NucleiIDs []string
+	NSEIDs    []string
+	CVEs      []string
+	Names     []string
 }
 
 type Entry struct {
@@ -168,7 +169,16 @@ func toolIDMatches(entry Entry, tool Tool, toolID string) bool {
 	if tool == ToolUnknown || tool == ToolManualReview {
 		return false
 	}
-	for _, candidate := range entry.Match.ToolIDs {
+	var candidates []string
+	switch tool {
+	case ToolNuclei:
+		candidates = entry.Match.NucleiIDs
+	case ToolNSE:
+		candidates = entry.Match.NSEIDs
+	default:
+		return false
+	}
+	for _, candidate := range candidates {
 		if strings.EqualFold(candidate, toolID) {
 			return true
 		}
@@ -244,7 +254,8 @@ func copyEntries(entries []Entry) []Entry {
 
 func copyEntry(entry Entry) Entry {
 	entry.Aliases = append([]string(nil), entry.Aliases...)
-	entry.Match.ToolIDs = append([]string(nil), entry.Match.ToolIDs...)
+	entry.Match.NucleiIDs = append([]string(nil), entry.Match.NucleiIDs...)
+	entry.Match.NSEIDs = append([]string(nil), entry.Match.NSEIDs...)
 	entry.Match.CVEs = append([]string(nil), entry.Match.CVEs...)
 	entry.Match.Names = append([]string(nil), entry.Match.Names...)
 	return entry

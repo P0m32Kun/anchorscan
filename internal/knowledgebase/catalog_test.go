@@ -25,12 +25,20 @@ func TestCatalogSearchReturnsIndependentEntries(t *testing.T) {
 
 func TestCatalogMatchReturnsAmbiguousForSharedToolID(t *testing.T) {
 	catalog := newCatalog([]Entry{
-		{ID: "first", Match: MatchKeys{ToolIDs: []string{"shared"}}},
-		{ID: "second", Match: MatchKeys{ToolIDs: []string{"shared"}}},
+		{ID: "first", Match: MatchKeys{NucleiIDs: []string{"shared"}}},
+		{ID: "second", Match: MatchKeys{NucleiIDs: []string{"shared"}}},
 	})
 
 	result := catalog.Match(Observation{Tool: ToolNuclei, ToolID: "shared"})
 	if result.Status != MatchAmbiguous || len(result.Candidates) != 2 {
 		t.Fatalf("Match() = %#v, want two ambiguous candidates", result)
+	}
+}
+
+func TestCatalogMatchDoesNotCrossToolNamespaces(t *testing.T) {
+	catalog := newCatalog([]Entry{{ID: "nse-only", Match: MatchKeys{NSEIDs: []string{"shared"}}}})
+	result := catalog.Match(Observation{Tool: ToolNuclei, ToolID: "shared"})
+	if result.Status != MatchUnmatched {
+		t.Fatalf("Match() = %#v, want unmatched", result)
 	}
 }

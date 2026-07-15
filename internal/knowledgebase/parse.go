@@ -116,7 +116,7 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 	if !okDescription || !okCommands || !okRemediation || description == "" || remediation == "" {
 		return Entry{}, diagnostic(line, meta.ID, "缺少固定章节")
 	}
-	entry := Entry{ID: meta.ID, Name: name, Severity: parseSeverity(chineseSeverity), Aliases: meta.Aliases, Match: MatchKeys{ToolIDs: append(meta.Match.Nuclei, meta.Match.NSE...), CVEs: meta.Match.CVE, Names: append([]string(nil), meta.Match.Manual...)}, Description: description, Remediation: remediation}
+	entry := Entry{ID: meta.ID, Name: name, Severity: parseSeverity(chineseSeverity), Aliases: meta.Aliases, Match: MatchKeys{NucleiIDs: meta.Match.Nuclei, NSEIDs: meta.Match.NSE, CVEs: meta.Match.CVE, Names: append([]string(nil), meta.Match.Manual...)}, Description: description, Remediation: remediation}
 	if command, ok := commandBlock(lines, "Nuclei"); ok {
 		if validNuclei(command) {
 			entry.Commands.Nuclei = command
