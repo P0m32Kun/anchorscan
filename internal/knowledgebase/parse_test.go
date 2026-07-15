@@ -109,6 +109,14 @@ func TestLoadKeepsValidMSFCommand(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsPlaceholderOutsideNucleiTarget(t *testing.T) {
+	invalid := strings.Replace(handbook, "network/smb.yaml", "network/{{host}}.yaml", 1)
+	configPath, handbookPath := writeHandbook(t, invalid)
+	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusDegraded {
+		t.Fatalf("Status() = %q, want %q", got, StatusDegraded)
+	}
+}
+
 func writeHandbook(t *testing.T, content string) (string, string) {
 	t.Helper()
 	dir := t.TempDir()

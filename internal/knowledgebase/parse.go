@@ -198,7 +198,10 @@ func commandBlock(lines []string, tool string) (string, bool) {
 
 func validNuclei(command string) bool {
 	args, err := config.SplitArgs(command)
-	return err == nil && len(args) == 5 && args[0] == "nuclei" && args[1] == "-t" && args[3] == "-u" && (args[4] == "{{url}}" || args[4] == "{{host}}:{{port}}")
+	if err != nil || len(args) != 5 || args[0] != "nuclei" || args[1] != "-t" || args[3] != "-u" || (args[4] != "{{url}}" && args[4] != "{{host}}:{{port}}") {
+		return false
+	}
+	return !strings.Contains(strings.Join(args[:4], " "), "{{")
 }
 
 func validNmapNSE(command string) bool {
