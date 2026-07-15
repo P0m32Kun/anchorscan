@@ -27,8 +27,11 @@ type Profile struct {
 }
 
 type Config struct {
-	Tools ToolPaths `yaml:"tools"`
-	Scan  struct {
+	Tools         ToolPaths `yaml:"tools"`
+	KnowledgeBase struct {
+		Path string `yaml:"path"`
+	} `yaml:"knowledge_base"`
+	Scan struct {
 		Ports   string `yaml:"ports"`
 		Profile string `yaml:"profile"`
 	} `yaml:"scan"`

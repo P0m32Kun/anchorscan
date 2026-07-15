@@ -1,0 +1,6 @@
+{{define "content"}}
+<section class="page-header"><div><p class="eyebrow">漏洞知识库</p><h2>本地手册</h2></div></section>
+<section class="panel"><p>状态：{{.Status}}</p>{{range .Diagnostics}}<p class="alert alert-error">{{.Reason}}</p>{{end}}
+<form method="get" action="/kb"><input name="q" value="{{.Query}}" placeholder="搜索漏洞、别名、CVE 或 ID"><button class="button button-primary" type="submit">搜索</button></form>
+{{range .Entries}}<p><a href="/kb/{{.ID}}">{{.Name}}</a>（{{.Severity}}）</p>{{else}}<p class="meta-line">没有匹配的条目。</p>{{end}}</section>
+{{end}}

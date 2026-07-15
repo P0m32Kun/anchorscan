@@ -105,7 +105,7 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 	description, okDescription := section(lines, "漏洞描述")
 	_, okCommands := section(lines, "验证命令")
 	remediation, okRemediation := section(lines, "修复建议")
-	if !okDescription || !okCommands || !okRemediation {
+	if !okDescription || !okCommands || !okRemediation || description == "" || remediation == "" {
 		return Entry{}, diagnostic(line, meta.ID, "缺少固定章节")
 	}
 	entry := Entry{ID: meta.ID, Name: name, Severity: parseSeverity(chineseSeverity), Aliases: meta.Aliases, Match: MatchKeys{ToolIDs: append(meta.Match.Nuclei, meta.Match.NSE...), CVEs: meta.Match.CVE, Names: append([]string(nil), meta.Match.Manual...)}, Description: description, Remediation: remediation}
@@ -141,7 +141,7 @@ func section(lines []string, title string) (string, bool) {
 		}
 	}
 	value := strings.TrimSpace(strings.Join(lines[start:end], "\n"))
-	return value, value != ""
+	return value, true
 }
 
 func commandBlock(lines []string, tool string) (string, bool) {

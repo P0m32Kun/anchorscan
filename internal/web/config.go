@@ -15,6 +15,7 @@ type configPageData struct {
 	RawConfig     string
 	Error         string
 	HighriskPorts string
+	Saved         bool
 }
 
 func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +32,7 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts})
+		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts, Saved: r.URL.Query().Get("saved") == "1"})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -57,13 +58,14 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 		cfg.Tools.Nmap = r.FormValue("nmap")
 		cfg.Tools.Httpx = r.FormValue("httpx")
 		cfg.Tools.Nuclei = r.FormValue("nuclei")
+		cfg.KnowledgeBase.Path = r.FormValue("knowledge_base_path")
 		cfg.Scan.Ports = r.FormValue("ports")
 		cfg.Scan.Profile = r.FormValue("profile")
 		if _, err := config.SaveWithBackup(s.opts.ConfigPath, cfg, s.opts.Now()); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/config", http.StatusSeeOther)
+		http.Redirect(w, r, "/config?saved=1", http.StatusSeeOther)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}

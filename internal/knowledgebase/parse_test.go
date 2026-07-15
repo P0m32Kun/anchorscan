@@ -3,6 +3,7 @@ package knowledgebase
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -48,6 +49,13 @@ func TestLoadParsesThreeSections(t *testing.T) {
 	entry, ok := catalog.Entry("smb-signing")
 	if !ok || entry.Description != "描述。" || entry.Remediation != "启用签名。" || entry.Commands.Nuclei == "" {
 		t.Fatalf("Entry() = %#v, %t", entry, ok)
+	}
+}
+
+func TestLoadAcceptsEmptyVerificationCommands(t *testing.T) {
+	configPath, handbookPath := writeHandbook(t, strings.Replace(handbook, "##### Nuclei\n\n```bash\nnuclei -t network/smb.yaml -u {{host}}:{{port}}\n```\n\n", "", 1))
+	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusReady {
+		t.Fatalf("Status() = %q, want %q", got, StatusReady)
 	}
 }
 
