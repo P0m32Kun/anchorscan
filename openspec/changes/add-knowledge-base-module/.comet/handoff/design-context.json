@@ -1,0 +1,14 @@
+{
+  "change": "add-knowledge-base-module",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "389c54fd69af57ada25d69e9110930136ace81e02d751d84a9fc3eb2cc570cca",
+  "files": [
+    { "path": "openspec/changes/add-knowledge-base-module/proposal.md", "sha256": "0d68c297f655bf564aa869779016c3fb66df85aee891300bc104af4fa3858c36" },
+    { "path": "openspec/changes/add-knowledge-base-module/design.md", "sha256": "2d14342728a87c1a330f501eaff5f0abe580c0eb39e95ab1c936639750ff3bd4" },
+    { "path": "openspec/changes/add-knowledge-base-module/tasks.md", "sha256": "6830d01d7dadda00583d958292724aca36ff5c1aa6d29e59d8689032de723a7d" },
+    { "path": "openspec/changes/add-knowledge-base-module/specs/vulnerability-knowledge-base/spec.md", "sha256": "c1b984d975241c689ac32fb24ccf1a3dc6777ad9a95c1b716fcd2ac73ef90976" }
+  ]
+}
