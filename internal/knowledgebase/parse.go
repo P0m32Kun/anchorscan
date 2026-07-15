@@ -96,11 +96,19 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 	if metaStart < 0 || metaEnd < metaStart {
 		return Entry{}, diagnostic(line, "", "缺少条目元数据")
 	}
+	for _, value := range lines[:metaStart-1] {
+		if strings.TrimSpace(value) != "" {
+			return Entry{}, diagnostic(line, "", "标题与元数据之间只能包含空白行")
+		}
+	}
 	var meta entryMeta
 	decoder := yaml.NewDecoder(strings.NewReader(strings.Join(lines[metaStart:metaEnd], "\n")))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&meta); err != nil || meta.ID == "" {
 		return Entry{}, diagnostic(line, meta.ID, "元数据无效")
+	}
+	if !hasRequiredSectionOrder(lines[metaEnd+1:]) {
+		return Entry{}, diagnostic(line, meta.ID, "固定章节必须唯一且按顺序出现")
 	}
 	description, okDescription := section(lines, "漏洞描述")
 	_, okCommands := section(lines, "验证命令")
@@ -120,6 +128,17 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 		return entry, diagnostic(line, meta.ID, "命令包含输出参数")
 	}
 	return entry, nil
+}
+
+func hasRequiredSectionOrder(lines []string) bool {
+	var headings []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#### ") {
+			headings = append(headings, strings.TrimPrefix(line, "#### "))
+		}
+	}
+	return len(headings) == 3 && headings[0] == "漏洞描述" && headings[1] == "验证命令" && headings[2] == "修复建议"
 }
 
 func section(lines []string, title string) (string, bool) {

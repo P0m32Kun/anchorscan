@@ -75,6 +75,22 @@ func TestLoadDegradesInvalidOptionalCommand(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsTextBetweenTitleAndMetadata(t *testing.T) {
+	invalid := strings.Replace(handbook, "<!-- anchorscan-entry", "这不是元数据。\n\n<!-- anchorscan-entry", 1)
+	configPath, handbookPath := writeHandbook(t, invalid)
+	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusUnavailable {
+		t.Fatalf("Status() = %q, want %q", got, StatusUnavailable)
+	}
+}
+
+func TestLoadRejectsOutOfOrderSections(t *testing.T) {
+	invalid := strings.Replace(handbook, "#### 漏洞描述\n\n描述。\n\n#### 验证命令", "#### 验证命令\n\n#### 漏洞描述\n\n描述。", 1)
+	configPath, handbookPath := writeHandbook(t, invalid)
+	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusUnavailable {
+		t.Fatalf("Status() = %q, want %q", got, StatusUnavailable)
+	}
+}
+
 func writeHandbook(t *testing.T, content string) (string, string) {
 	t.Helper()
 	dir := t.TempDir()
