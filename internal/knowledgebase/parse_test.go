@@ -91,6 +91,15 @@ func TestLoadRejectsOutOfOrderSections(t *testing.T) {
 	}
 }
 
+func TestLoadKeepsValidNmapNSECommand(t *testing.T) {
+	withNmap := strings.Replace(handbook, "##### Nuclei\n\n```bash\nnuclei -t network/smb.yaml -u {{host}}:{{port}}\n```", "##### Nmap NSE\n\n```bash\nnmap --script smb2-security-mode -p {{port}} {{host}}\n```", 1)
+	configPath, handbookPath := writeHandbook(t, withNmap)
+	entry, ok := Load(configPath, filepath.Base(handbookPath)).Entry("smb-signing")
+	if !ok || entry.Commands.NmapNSE != "nmap --script smb2-security-mode -p {{port}} {{host}}" {
+		t.Fatalf("Entry() = %#v, %t", entry, ok)
+	}
+}
+
 func writeHandbook(t *testing.T, content string) (string, string) {
 	t.Helper()
 	dir := t.TempDir()

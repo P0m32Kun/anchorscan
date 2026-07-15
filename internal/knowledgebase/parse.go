@@ -124,6 +124,13 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 			return entry, diagnostic(line, meta.ID, "Nuclei 命令无效")
 		}
 	}
+	if command, ok := commandBlock(lines, "Nmap NSE"); ok {
+		if validNmapNSE(command) {
+			entry.Commands.NmapNSE = command
+		} else {
+			return entry, diagnostic(line, meta.ID, "Nmap NSE 命令无效")
+		}
+	}
 	if strings.Contains(strings.Join(lines, "\n"), "-oX") || strings.Contains(strings.Join(lines, "\n"), " -o ") {
 		return entry, diagnostic(line, meta.ID, "命令包含输出参数")
 	}
@@ -185,6 +192,26 @@ func commandBlock(lines []string, tool string) (string, bool) {
 func validNuclei(command string) bool {
 	args, err := config.SplitArgs(command)
 	return err == nil && len(args) == 5 && args[0] == "nuclei" && args[1] == "-t" && args[3] == "-u" && (args[4] == "{{url}}" || args[4] == "{{host}}:{{port}}")
+}
+
+func validNmapNSE(command string) bool {
+	args, err := config.SplitArgs(command)
+	if err != nil || len(args) < 5 || args[0] != "nmap" || args[len(args)-1] != "{{host}}" {
+		return false
+	}
+	ports := 0
+	for i, arg := range args {
+		if strings.HasPrefix(arg, "-o") || strings.Contains(arg, "{{host}}") && arg != "{{host}}" || strings.Contains(arg, "{{port}}") && arg != "{{port}}" {
+			return false
+		}
+		if arg == "-p" {
+			if i+1 >= len(args) || args[i+1] != "{{port}}" {
+				return false
+			}
+			ports++
+		}
+	}
+	return ports == 1
 }
 
 func parseSeverity(value string) Severity {
