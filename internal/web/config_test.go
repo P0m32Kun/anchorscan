@@ -40,6 +40,36 @@ func TestConfigPageUpdatesToolPath(t *testing.T) {
 	}
 }
 
+func TestConfigPageUpdatesKnowledgeBasePathAndShowsRestartNotice(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools: {}\nscan:\n  ports: top1000\n  profile: normal\nprofiles: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	form := strings.NewReader("rustscan=&nmap=&httpx=&nuclei=&ports=top1000&profile=normal&knowledge_base_path=../playbook/handbook.md")
+	req := httptest.NewRequest(http.MethodPost, "/config", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther || res.Header().Get("Location") != "/config?saved=1" {
+		t.Fatalf("redirect = %d %q", res.Code, res.Header().Get("Location"))
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil || cfg.KnowledgeBase.Path != "../playbook/handbook.md" {
+		t.Fatalf("config = %#v, err = %v", cfg, err)
+	}
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/config?saved=1", nil))
+	if !strings.Contains(res.Body.String(), "重启 AnchorScan 后生效") {
+		t.Fatalf("missing restart notice: %s", res.Body.String())
+	}
+}
+
 func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

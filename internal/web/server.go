@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/app"
+	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
@@ -24,6 +26,7 @@ type server struct {
 	opts    ServerOptions
 	store   *store.Store
 	manager *app.Manager
+	catalog *knowledgebase.Catalog
 	mux     *http.ServeMux
 }
 
@@ -62,7 +65,11 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 		return nil, err
 	}
 
-	s := &server{opts: opts, store: scanStore, manager: app.NewManager(opts.Runner, scanStore)}
+	catalog := knowledgebase.Load(opts.ConfigPath, "")
+	if cfg, err := config.Load(opts.ConfigPath); err == nil {
+		catalog = knowledgebase.Load(opts.ConfigPath, cfg.KnowledgeBase.Path)
+	}
+	s := &server{opts: opts, store: scanStore, manager: app.NewManager(opts.Runner, scanStore), catalog: catalog}
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServerFS(assets))
 	mux.HandleFunc("/projects", s.projects)
@@ -78,6 +85,8 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux.HandleFunc("/reports/", s.reportDetail)
 	mux.HandleFunc("/config", s.configPage)
 	mux.HandleFunc("/config/ports", s.configPorts)
+	mux.HandleFunc("/kb/", s.knowledgeBaseDetail)
+	mux.HandleFunc("/kb", s.knowledgeBaseList)
 	mux.HandleFunc("/import/nmap", s.importNmapForm)
 	mux.HandleFunc("/import/nmap/run", s.importNmapRun)
 	mux.HandleFunc("/", s.home)
