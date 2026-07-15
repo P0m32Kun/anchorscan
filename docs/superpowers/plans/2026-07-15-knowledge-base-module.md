@@ -2,6 +2,7 @@
 change: add-knowledge-base-module
 design-doc: docs/superpowers/specs/2026-07-15-knowledge-base-module-design.md
 base-ref: 264e77b8432e5cda5adbdaca87732a240294ae95
+archived-with: 2026-07-15-add-knowledge-base-module
 ---
 
 # 知识库模块 Implementation Plan
@@ -23,6 +24,7 @@ base-ref: 264e77b8432e5cda5adbdaca87732a240294ae95
 - 命令仅保存通过 v1 基础契约的原始模板，不执行、不替换目标；解析 token 时复用 `config.SplitArgs`。
 - 自动测试只使用仓库内 fixture；真实手册 smoke test 仅在收尾人工运行，记录外部 commit/blob 和统计，不把条目数作为阈值。
 
+archived-with: 2026-07-15-add-knowledge-base-module
 ---
 
 ### Task 1: 建立只读 Catalog 模型、索引与匹配
@@ -267,3 +269,4 @@ Run: `git add openspec/changes/add-knowledge-base-module/tasks.md && git commit 
 - Spec 覆盖：Task 1 覆盖 Catalog、搜索、匹配；Task 2 覆盖 v1 解析、状态和命令；Task 3 覆盖路径配置与重启语义；Task 4 覆盖浏览、诊断与安全展示；Task 5 覆盖回归和真实手册验证。
 - 无占位任务：每个任务给出文件、依赖接口、失败测试、命令和预期结果。
 - 类型一致性：Web 只依赖 `Load`、`Catalog.Search`、`Catalog.Entry`；不越界访问 Catalog 私有索引。
+

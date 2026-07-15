@@ -2,6 +2,8 @@
 comet_change: add-knowledge-base-module
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-15-add-knowledge-base-module
+status: final
 ---
 
 # AnchorScan 知识库模块技术设计
@@ -174,3 +176,4 @@ type Observation struct {
 - 手册降级可能隐藏部分条目：知识库页必须显示诊断数量和首批可定位错误。
 - 历史 run 使用当前启动 Catalog：这是首版明确语义，不宣称审计级知识快照。
 - 大手册搜索首版线性扫描；当前规模足够，只有测量到瓶颈后才增加搜索索引。
+

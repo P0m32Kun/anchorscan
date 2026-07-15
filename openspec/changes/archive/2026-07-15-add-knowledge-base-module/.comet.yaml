@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-07-15-add-knowledge-base-modu
 branch_status: handled
 created_at: 2026-07-15
 verified_at: 2026-07-15
-archived: false
+archived: true
 direct_override: null
 handoff_context: openspec/changes/add-knowledge-base-module/.comet/handoff/design-context.json
 handoff_hash: c517f0ca89f5b9b451d952d89d4bea208c0b8ab301847ae15cd94f3278e2a0e1
