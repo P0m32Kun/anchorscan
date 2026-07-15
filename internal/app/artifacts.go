@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -51,12 +50,4 @@ func writeArtifact(dir, name string, data []byte) (string, error) {
 	stem := strings.TrimSuffix(base, ext)
 	path = filepath.Join(dir, stem+"-"+hex.EncodeToString(sum[:])[:8]+ext)
 	return path, os.WriteFile(path, data, 0o644)
-}
-
-func joinIntParts(values []int) string {
-	parts := make([]string, 0, len(values))
-	for _, value := range values {
-		parts = append(parts, strconv.Itoa(value))
-	}
-	return strings.Join(parts, ",")
 }

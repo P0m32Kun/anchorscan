@@ -13,18 +13,20 @@ type HTTPResult struct {
 }
 
 type TagRule struct {
-	Name       string   `yaml:"name"`
-	Service    []string `yaml:"service"`
-	Product    []string `yaml:"product"`
-	Tech       []string `yaml:"tech"`
-	NucleiTags []string `yaml:"nuclei_tags"`
-	Target     string   `yaml:"target"`
+	Name        string   `yaml:"name"`
+	Service     []string `yaml:"service"`
+	Product     []string `yaml:"product"`
+	Tech        []string `yaml:"tech"`
+	NucleiTags  []string `yaml:"nuclei_tags"`
+	ExcludeTags []string `yaml:"exclude_tags"`
+	Target      string   `yaml:"target"`
 }
 
 type MatchResult struct {
-	Tags    []string
-	Target  string
-	Address string
+	Tags        []string
+	ExcludeTags []string
+	Target      string
+	Address     string
 }
 
 func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules []TagRule) MatchResult {
@@ -35,9 +37,10 @@ func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules [
 				address = http.URL
 			}
 			return MatchResult{
-				Tags:    append([]string(nil), rule.NucleiTags...),
-				Target:  rule.Target,
-				Address: address,
+				Tags:        append([]string(nil), rule.NucleiTags...),
+				ExcludeTags: append([]string(nil), rule.ExcludeTags...),
+				Target:      rule.Target,
+				Address:     address,
 			}
 		}
 	}

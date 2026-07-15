@@ -88,3 +88,65 @@ func TestBuildKeepsTCPAndUDPSamePortSeparate(t *testing.T) {
 		t.Fatalf("udp finding not attached to udp port: %#v", byProto["udp"].Findings)
 	}
 }
+
+func TestBuildWithScanDataIncludesAliveIPsAndOpenPorts(t *testing.T) {
+	rpt := BuildWithScanData(
+		[]fingerprint.ServiceFingerprint{
+			{IP: "10.0.0.1", Port: 80, Service: "http"},
+		},
+		nil,
+		ScanData{
+			// 10.0.0.2 is alive but has no fingerprints — must still appear.
+			// 10.0.0.3 has open ports nmap could not fingerprint.
+			AliveIPs:  []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"},
+			OpenPorts: map[string][]int{"10.0.0.1": {80, 443}, "10.0.0.3": {22, 8080}},
+		},
+	)
+
+	// Alive IP list must be complete, sorted, and deduplicated.
+	if len(rpt.AliveIPs) != 3 || rpt.AliveIPs[0] != "10.0.0.1" || rpt.AliveIPs[2] != "10.0.0.3" {
+		t.Fatalf("alive IPs = %#v", rpt.AliveIPs)
+	}
+
+	hostByIP := map[string]HostReport{}
+	for _, h := range rpt.Hosts {
+		hostByIP[h.IP] = h
+	}
+
+	// 10.0.0.2 alive but no ports at all.
+	if _, ok := hostByIP["10.0.0.2"]; !ok {
+		t.Fatalf("alive host 10.0.0.2 with no ports missing from report")
+	}
+	// 10.0.0.3 has open ports but no fingerprint details.
+	host3, ok := hostByIP["10.0.0.3"]
+	if !ok {
+		t.Fatalf("host 10.0.0.3 missing from report")
+	}
+	if len(host3.OpenPorts) != 2 || host3.OpenPorts[0] != 22 || host3.OpenPorts[1] != 8080 {
+		t.Fatalf("open ports for 10.0.0.3 = %#v", host3.OpenPorts)
+	}
+	if len(host3.Ports) != 0 {
+		t.Fatalf("host 10.0.0.3 should have no fingerprinted ports, got %#v", host3.Ports)
+	}
+	// 10.0.0.1 has both fingerprint details and raw open ports.
+	host1 := hostByIP["10.0.0.1"]
+	if len(host1.OpenPorts) != 2 || len(host1.Ports) != 1 {
+		t.Fatalf("host 10.0.0.1 openPorts=%#v ports=%#v", host1.OpenPorts, host1.Ports)
+	}
+}
+
+func TestBuildWithoutScanDataOmitsNewFields(t *testing.T) {
+	// The legacy Build entry point must not populate the new fields.
+	rpt := Build(
+		[]fingerprint.ServiceFingerprint{{IP: "10.0.0.1", Port: 80, Service: "http"}},
+		nil,
+	)
+	if len(rpt.AliveIPs) != 0 {
+		t.Fatalf("legacy Build should not set AliveIPs, got %#v", rpt.AliveIPs)
+	}
+	for _, h := range rpt.Hosts {
+		if len(h.OpenPorts) != 0 {
+			t.Fatalf("legacy Build should not set OpenPorts, host=%#v", h)
+		}
+	}
+}

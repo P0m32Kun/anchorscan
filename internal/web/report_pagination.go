@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/url"
+	"sort"
 	"strconv"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
@@ -18,9 +19,22 @@ type reportPage struct {
 	HasNext    bool
 	PrevURL    string
 	NextURL    string
+	PageURLs   []pageLink
 	Size       int
 	SizeStr    string
 	SizeURLs   map[int]string
+}
+
+// pageLink is a single entry in the numeric pagination control. Label carries
+// the display text (the page number, or "..." for a gap sentinel); URL is empty
+// for gap sentinels so the template can render them as non-clickable text.
+// IsCurrent is precomputed by the backend so the template avoids a cross-type
+// equality check between the loop variable and the page-number field.
+type pageLink struct {
+	Page      int
+	Label     string
+	URL       string
+	IsCurrent bool
 }
 
 var reportPageSizes = []int{10, 20, 50}
@@ -60,6 +74,7 @@ func paginateFingerprints(items []fingerprint.ServiceFingerprint, page int, base
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		PageURLs:   buildPageURLs(values, key, current, total),
 		Size:       size,
 		SizeStr:    strconv.Itoa(size),
 		SizeURLs:   pageSizeURLs(values, key, sizeKey),
@@ -77,6 +92,7 @@ func paginateFindings(items []report.Finding, page int, base url.Values, key, si
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		PageURLs:   buildPageURLs(values, key, current, total),
 		Size:       size,
 		SizeStr:    strconv.Itoa(size),
 		SizeURLs:   pageSizeURLs(values, key, sizeKey),
@@ -94,10 +110,59 @@ func paginateHostAssets(items []hostAssetView, page int, base url.Values, key, s
 		HasNext:    current < total,
 		PrevURL:    pageURL(values, key, current-1),
 		NextURL:    pageURL(values, key, current+1),
+		PageURLs:   buildPageURLs(values, key, current, total),
 		Size:       size,
 		SizeStr:    strconv.Itoa(size),
 		SizeURLs:   pageSizeURLs(values, key, sizeKey),
 	}
+}
+
+// buildPageURLs generates an ordered list of page links for the numeric
+// pagination control. It always includes the first and last page plus a window
+// of pages around the current page, inserting "..." gap sentinels (URL empty)
+// wherever pages are skipped so users can jump to any nearby or boundary page.
+func buildPageURLs(values url.Values, key string, current, total int) []pageLink {
+	if total <= 0 {
+		return nil
+	}
+	window := 2
+	start := current - window
+	if start < 1 {
+		start = 1
+	}
+	end := current + window
+	if end > total {
+		end = total
+	}
+
+	want := make(map[int]struct{}, end-start+3)
+	want[1] = struct{}{}
+	want[total] = struct{}{}
+	for p := start; p <= end; p++ {
+		want[p] = struct{}{}
+	}
+
+	pages := make([]int, 0, len(want))
+	for p := range want {
+		pages = append(pages, p)
+	}
+	sort.Ints(pages)
+
+	links := make([]pageLink, 0, len(pages)+2)
+	prev := 0
+	for _, p := range pages {
+		if prev != 0 && p > prev+1 {
+			links = append(links, pageLink{Page: 0, Label: "..."})
+		}
+		links = append(links, pageLink{
+			Page:      p,
+			Label:     strconv.Itoa(p),
+			URL:       pageURL(cloneValues(values), key, p),
+			IsCurrent: p == current,
+		})
+		prev = p
+	}
+	return links
 }
 
 func paginate[T any](items []T, page int, size int) ([]T, int, int) {

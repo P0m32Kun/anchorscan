@@ -59,7 +59,7 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 			"ssh": {"ssh2-enum-algos", "ssh-hostkey"},
 		},
 		TagRules: []TagRule{
-			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh", "default-login"}, Target: "hostport"},
+			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, ExcludeTags: []string{"default-login"}, Target: "hostport"},
 		},
 	}
 	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
@@ -70,9 +70,11 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos,ssh-hostkey", "-p", "22") {
 		t.Fatalf("expected nmap NSE invocation with ssh scripts, commands=%#v", runner.commands)
 	}
-	// Nuclei: must be invoked with -tags containing ssh, targeting IP:22, jsonl output.
-	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh,default-login", "-target", "192.168.1.10:22", "-jsonl") {
-		t.Fatalf("expected nuclei invocation with ssh tags, commands=%#v", runner.commands)
+	// Nuclei: must be invoked with -tags ssh and -etags default-login (exclude official
+	// brute-force templates; the mini-brute template carries ssh tag but not default-login),
+	// targeting IP:22, jsonl output.
+	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "default-login", "-target", "192.168.1.10:22", "-jsonl") {
+		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
 	}
 }
 
@@ -98,7 +100,7 @@ func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 			"redis": {"redis-info"},
 		},
 		TagRules: []TagRule{
-			{Name: "redis", Service: []string{"redis"}, NucleiTags: []string{"redis", "default-login"}, Target: "hostport"},
+			{Name: "redis", Service: []string{"redis"}, NucleiTags: []string{"redis"}, Target: "hostport"},
 		},
 	}
 	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
@@ -108,7 +110,7 @@ func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 	if !runner.hasArgs("/opt/nmap", "--script", "redis-info", "-p", "6379") {
 		t.Fatalf("expected nmap NSE invocation with redis-info, commands=%#v", runner.commands)
 	}
-	if !runner.hasArgs("/opt/nuclei", "-tags", "redis,default-login", "-target", "192.168.1.10:6379", "-jsonl") {
+	if !runner.hasArgs("/opt/nuclei", "-tags", "redis", "-target", "192.168.1.10:6379", "-jsonl") {
 		t.Fatalf("expected nuclei invocation with redis tags, commands=%#v", runner.commands)
 	}
 }

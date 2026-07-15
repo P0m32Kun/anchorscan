@@ -204,7 +204,12 @@
       {{if eq .AssetView "hosts"}}
       <span>主机第 {{.HostPage.Page}} / {{.HostPage.TotalPages}} 页</span>
       {{if .HostPage.HasPrev}}<a href="{{.HostPage.PrevURL}}">上一页</a>{{end}}
+      {{range .HostPage.PageURLs}}{{if .URL}}{{if .IsCurrent}}<span class="page-current">{{.Label}}</span>{{else}}<a href="{{.URL}}">{{.Label}}</a>{{end}}{{else}}<span class="page-gap">{{.Label}}</span>{{end}}{{end}}
       {{if .HostPage.HasNext}}<a href="{{.HostPage.NextURL}}">下一页</a>{{end}}
+      <form class="page-jump" method="get" action="">
+        <input type="number" name="assets_page" min="1" max="{{.HostPage.TotalPages}}" value="{{.HostPage.Page}}" aria-label="跳转到指定页">
+        <button type="submit" class="page-jump-btn">GO</button>
+      </form>
       <select class="page-size" onchange="location.href=this.value">
         <option value="{{index .HostPage.SizeURLs 10}}" {{if eq .HostPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
         <option value="{{index .HostPage.SizeURLs 20}}" {{if eq .HostPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
@@ -213,7 +218,12 @@
       {{else}}
       <span>资产第 {{.AssetPage.Page}} / {{.AssetPage.TotalPages}} 页</span>
       {{if .AssetPage.HasPrev}}<a href="{{.AssetPage.PrevURL}}">上一页</a>{{end}}
+      {{range .AssetPage.PageURLs}}{{if .URL}}{{if .IsCurrent}}<span class="page-current">{{.Label}}</span>{{else}}<a href="{{.URL}}">{{.Label}}</a>{{end}}{{else}}<span class="page-gap">{{.Label}}</span>{{end}}{{end}}
       {{if .AssetPage.HasNext}}<a href="{{.AssetPage.NextURL}}">下一页</a>{{end}}
+      <form class="page-jump" method="get" action="">
+        <input type="number" name="assets_page" min="1" max="{{.AssetPage.TotalPages}}" value="{{.AssetPage.Page}}" aria-label="跳转到指定页">
+        <button type="submit" class="page-jump-btn">GO</button>
+      </form>
       <select class="page-size" onchange="location.href=this.value">
         <option value="{{index .AssetPage.SizeURLs 10}}" {{if eq .AssetPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
         <option value="{{index .AssetPage.SizeURLs 20}}" {{if eq .AssetPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
@@ -340,7 +350,12 @@
     <div class="pagination">
       <span>漏洞第 {{.FindingPage.Page}} / {{.FindingPage.TotalPages}} 页</span>
       {{if .FindingPage.HasPrev}}<a href="{{.FindingPage.PrevURL}}">上一页</a>{{end}}
+      {{range .FindingPage.PageURLs}}{{if .URL}}{{if .IsCurrent}}<span class="page-current">{{.Label}}</span>{{else}}<a href="{{.URL}}">{{.Label}}</a>{{end}}{{else}}<span class="page-gap">{{.Label}}</span>{{end}}{{end}}
       {{if .FindingPage.HasNext}}<a href="{{.FindingPage.NextURL}}">下一页</a>{{end}}
+      <form class="page-jump" method="get" action="">
+        <input type="number" name="findings_page" min="1" max="{{.FindingPage.TotalPages}}" value="{{.FindingPage.Page}}" aria-label="跳转到指定页">
+        <button type="submit" class="page-jump-btn">GO</button>
+      </form>
       <select class="page-size" onchange="location.href=this.value">
         <option value="{{index .FindingPage.SizeURLs 10}}" {{if eq .FindingPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
         <option value="{{index .FindingPage.SizeURLs 20}}" {{if eq .FindingPage.SizeStr "20"}}selected{{end}}>20 / 页</option>

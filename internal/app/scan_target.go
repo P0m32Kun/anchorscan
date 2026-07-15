@@ -15,7 +15,7 @@ import (
 
 var nmapHeartbeatEvery = 30 * time.Second
 
-func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, error) {
+func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, []int, error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
 
@@ -23,15 +23,16 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 	emit(opts, scanStore, "info", "rustscan", "rustscan %s ports=%s", target, opts.Ports)
 	ports, out, err := tools.DiscoverPortsWithOutput(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
 	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("rustscan", target, "ports")+".txt", out); writeErr != nil {
-		return nil, nil, writeErr
+		return nil, nil, nil, writeErr
 	}
 	if err != nil {
-		return nil, nil, normalizeToolError(ctx, err)
+		return nil, nil, nil, normalizeToolError(ctx, err)
 	}
 	emit(opts, scanStore, "info", "rustscan", "rustscan %s open=%v", target, ports)
+	openPorts := append([]int(nil), ports...)
 	if len(ports) == 0 {
 		emit(opts, scanStore, "info", "target", "target %s has no open ports; skip fingerprint and vulnerability checks", target)
-		return nil, nil, nil
+		return nil, nil, openPorts, nil
 	}
 
 	emit(opts, scanStore, "info", "nmap", "nmap %s ports=%v (service detection may be slow)", target, ports)
@@ -51,11 +52,11 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 	}()
 	fingerprints, out, err := tools.FingerprintWithOutput(ctx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
 	close(done)
-	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nmap-service", target, joinIntParts(ports))+".xml", out); writeErr != nil {
-		return nil, nil, writeErr
+	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nmap-service", target)+".xml", out); writeErr != nil {
+		return nil, nil, openPorts, writeErr
 	}
 	if err != nil {
-		return nil, nil, normalizeToolError(ctx, err)
+		return nil, nil, openPorts, normalizeToolError(ctx, err)
 	}
 	emit(opts, scanStore, "info", "nmap", "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
 
@@ -65,10 +66,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 			emit(opts, scanStore, "info", "httpx", "httpx %s", fp.URL)
 			httpResult, out, err = tools.EnrichWebWithOutput(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("httpx", fp.IP, strconv.Itoa(fp.Port))+".jsonl", out); writeErr != nil {
-				return nil, nil, writeErr
+				return nil, nil, openPorts, writeErr
 			}
 			if err != nil {
-				return nil, nil, normalizeToolError(ctx, err)
+				return nil, nil, openPorts, normalizeToolError(ctx, err)
 			}
 			if httpResult.URL != "" {
 				fp.URL = httpResult.URL
@@ -76,13 +77,13 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		}
 
 		if err := scanStore.SaveFingerprint(opts.RunID, fp); err != nil {
-			return nil, nil, err
+			return nil, nil, openPorts, err
 		}
 		allFingerprints = append(allFingerprints, fp)
 
 		for _, finding := range ManualReviewFindings(fp) {
 			if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
-				return nil, nil, err
+				return nil, nil, openPorts, err
 			}
 			allFindings = append(allFindings, finding)
 		}
@@ -92,10 +93,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 			emit(opts, scanStore, "info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
 			nseResults, out, err := tools.RunNSEWithOutput(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nse", fp.IP, strconv.Itoa(fp.Port), strings.Join(scripts, ","))+".xml", out); writeErr != nil {
-				return nil, nil, writeErr
+				return nil, nil, openPorts, writeErr
 			}
 			if err != nil {
-				return nil, nil, normalizeToolError(ctx, err)
+				return nil, nil, openPorts, normalizeToolError(ctx, err)
 			}
 			for _, result := range nseResults {
 				finding := report.Finding{
@@ -110,7 +111,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 					Output:   result.Output,
 				}
 				if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
-					return nil, nil, err
+					return nil, nil, openPorts, err
 				}
 				allFindings = append(allFindings, finding)
 			}
@@ -119,28 +120,28 @@ func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store
 		match := vuln.MatchNucleiTags(fp, vuln.HTTPResult{URL: fp.URL, Tech: httpResult.Tech}, opts.TagRules)
 		if len(match.Tags) > 0 && opts.Tools.Nuclei != "" {
 			emit(opts, scanStore, "info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
-			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, opts.ExtraArgs.Nuclei)
+			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
-				return nil, nil, writeErr
+				return nil, nil, openPorts, writeErr
 			}
 			if err != nil {
-				return nil, nil, normalizeToolError(ctx, err)
+				return nil, nil, openPorts, normalizeToolError(ctx, err)
 			}
 			nucleiFindings, err := tools.ParseNucleiJSONL(out)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, openPorts, err
 			}
 			for _, result := range nucleiFindings {
 				finding := findingFromNuclei(result, fp, allFingerprints)
 				if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {
-					return nil, nil, err
+					return nil, nil, openPorts, err
 				}
 				allFindings = append(allFindings, finding)
 			}
 		}
 	}
 
-	return allFingerprints, allFindings, nil
+	return allFingerprints, allFindings, openPorts, nil
 }
 
 func formatNucleiEvidence(result tools.NucleiFinding) string {

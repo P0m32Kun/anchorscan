@@ -79,13 +79,16 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
 	}()
 
-	allFingerprints, allFindings, err := scanTargets(ctx, runner, scanStore, opts, artifactDir)
+	allFingerprints, allFindings, aliveIPs, openPorts, err := scanTargets(ctx, runner, scanStore, opts, artifactDir)
 	if err != nil {
 		return err
 	}
 
 	emit(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
-	return report.WriteJSON(opts.JSONReportPath, report.Build(allFingerprints, allFindings))
+	return report.WriteJSON(opts.JSONReportPath, report.BuildWithScanData(allFingerprints, allFindings, report.ScanData{
+		AliveIPs:  aliveIPs,
+		OpenPorts: openPorts,
+	}))
 }
 
 func logf(opts ScanOptions, format string, args ...any) {

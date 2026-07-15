@@ -33,8 +33,9 @@ type PortReport struct {
 }
 
 type HostReport struct {
-	IP    string       `json:"ip"`
-	Ports []PortReport `json:"ports"`
+	IP        string       `json:"ip"`
+	OpenPorts []int        `json:"open_ports,omitempty"`
+	Ports     []PortReport `json:"ports"`
 }
 
 type ScanMeta struct {
@@ -43,10 +44,28 @@ type ScanMeta struct {
 
 type ScanReport struct {
 	ScanMeta ScanMeta     `json:"scan_meta"`
+	AliveIPs []string     `json:"alive_ips,omitempty"`
 	Hosts    []HostReport `json:"hosts"`
 }
 
+// ScanData carries the supplementary scan results that the report should expose
+// alongside the fingerprint-driven port details: every alive IP discovered by
+// the host sweep (even those with no open ports) and the raw open ports per host
+// discovered by the port scan (even those nmap could not fingerprint).
+type ScanData struct {
+	AliveIPs  []string
+	OpenPorts map[string][]int // IP → raw open ports from rustscan
+}
+
 func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport {
+	return BuildWithScanData(fps, findings, ScanData{})
+}
+
+// BuildWithScanData assembles the report from fingerprints and findings, then
+// enriches it with the full alive-IP list and per-host raw open ports. Hosts
+// that are alive but yielded no fingerprints are still emitted (with empty
+// Ports) so the report reflects every live host on the network.
+func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding, data ScanData) ScanReport {
 	hostMap := map[string]*HostReport{}
 	findingsByPort := map[string][]Finding{}
 
@@ -76,6 +95,26 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 		host.Ports = append(host.Ports, port)
 	}
 
+	// Ensure every alive host appears in the report, even without fingerprints,
+	// and attach the raw open ports discovered by the port scan.
+	for _, ip := range data.AliveIPs {
+		if hostMap[ip] == nil {
+			hostMap[ip] = &HostReport{IP: ip}
+		}
+	}
+	for ip, ports := range data.OpenPorts {
+		host := hostMap[ip]
+		if host == nil {
+			host = &HostReport{IP: ip}
+			hostMap[ip] = host
+		}
+		if len(ports) > 0 {
+			open := append([]int(nil), ports...)
+			sort.Ints(open)
+			host.OpenPorts = dedupeInts(open)
+		}
+	}
+
 	hosts := make([]HostReport, 0, len(hostMap))
 	for _, host := range hostMap {
 		sort.Slice(host.Ports, func(i, j int) bool {
@@ -90,10 +129,49 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 		return hosts[i].IP < hosts[j].IP
 	})
 
+	aliveIPs := append([]string(nil), data.AliveIPs...)
+	if len(aliveIPs) > 0 {
+		sort.Strings(aliveIPs)
+		aliveIPs = dedupeStrings(aliveIPs)
+	}
+
 	return ScanReport{
 		ScanMeta: ScanMeta{Tool: "anchorscan"},
+		AliveIPs: aliveIPs,
 		Hosts:    hosts,
 	}
+}
+
+func dedupeInts(values []int) []int {
+	if len(values) <= 1 {
+		return values
+	}
+	seen := make(map[int]struct{}, len(values))
+	out := values[:0]
+	for _, v := range values {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) <= 1 {
+		return values
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := values[:0]
+	for _, v := range values {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }
 
 func portKey(ip string, port int, protocol string) string {
