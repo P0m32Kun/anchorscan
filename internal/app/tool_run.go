@@ -278,7 +278,7 @@ func runNucleiTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		if len(opts.Tags) == 0 {
 			return nil, errors.New("nuclei requires tags or template")
 		}
-		out, err = tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, opts.URL, opts.Tags, opts.ExtraArgs.Nuclei)
+		out, err = tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, opts.URL, opts.Tags, nil, opts.ExtraArgs.Nuclei)
 	}
 	if err != nil {
 		return nil, normalizeToolError(ctx, err)

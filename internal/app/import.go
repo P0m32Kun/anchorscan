@@ -66,8 +66,8 @@ func ImportNmap(ctx context.Context, scanStore *store.Store, opts ImportNmapOpti
 	}
 
 	configSnapshot, _ := json.Marshal(map[string]any{
-		"source":  "nmap-import",
-		"xml":     opts.XMLPath,
+		"source":      "nmap-import",
+		"xml":         opts.XMLPath,
 		"imported_at": now.UTC().Format(time.RFC3339Nano),
 	})
 

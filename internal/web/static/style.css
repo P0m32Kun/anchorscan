@@ -1355,6 +1355,60 @@ input[type="file"]::file-selector-button:hover {
   background-color: #17181c;
 }
 
+.pagination .page-current {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #fff;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.pagination .page-gap {
+  color: var(--muted);
+  padding: 0 0.15rem;
+  user-select: none;
+}
+
+.pagination form.page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: 0.2rem;
+}
+
+.pagination form.page-jump input[type="number"] {
+  width: 3.5rem;
+  background: #17181c;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.pagination form.page-jump input[type="number"]:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.pagination .page-jump-btn {
+  background: #17181c;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.pagination .page-jump-btn:hover {
+  border-color: var(--primary);
+  color: #fff;
+}
+
 /* Responsiveness */
 @media (max-width: 1024px) {
   .filter-grid {
@@ -1722,75 +1776,51 @@ input[type="file"]::file-selector-button:hover {
   font-family: var(--mono);
 }
 
-/* Stepper 进度条 */
-.scan-stepper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* 主机扫描进度条（IP 维度） */
+.scan-progress {
   background: var(--panel-strong);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 1.25rem 2rem;
   margin-bottom: 1.5rem;
 }
-.step {
+.scan-progress-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  z-index: 2;
-  flex: 1;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
 }
-.step-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #17181c;
-  border: 2px solid var(--border-strong);
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
+.scan-progress-title {
+  font-size: 0.9rem;
   font-weight: 700;
-  font-family: var(--mono);
-  transition: all 0.3s ease;
-}
-.step-label {
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-weight: 600;
-  text-align: center;
-  transition: all 0.3s ease;
-}
-.step-line {
-  flex-grow: 1;
-  height: 2px;
-  background: var(--border-strong);
-  margin: 0 -0.5rem;
-  margin-top: -18px;
-  z-index: 1;
-  transition: all 0.3s ease;
-}
-.step.active .step-icon {
-  border-color: var(--primary);
-  color: var(--primary);
-  box-shadow: 0 0 10px var(--primary-glow);
-  background: var(--primary-soft);
-}
-.step.active .step-label {
   color: var(--heading);
 }
-.step.completed .step-icon {
-  border-color: var(--success);
-  color: #000000;
-  background: var(--success);
+.scan-progress-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+  font-family: var(--mono);
 }
-.step.completed .step-label {
-  color: var(--success);
+.scan-progress-bar-wrap {
+  width: 100%;
+  height: 10px;
+  background: #17181c;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  overflow: hidden;
 }
-.step-line.completed {
-  background: var(--success);
+.scan-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  border-radius: 999px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.scan-progress-detail {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  min-height: 1.1rem;
 }
 
 /* 过滤布局折叠 */

@@ -46,11 +46,10 @@ async function refreshEvents(){
       return `<span style="color: #64748b;">${formatEventTime(e.time)}</span> <span style="color: #60a5fa; font-weight: 600;">[${e.stage}]</span> <span class="${cls}">${safeMsg}</span>`;
     });
     box.innerHTML = lines.join('\n') + '\n<span class="terminal-cursor">█</span>';
-    
-    // 触发 Stepper 更新
-    const statusText = document.getElementById('run-status')?.textContent || window.anchorRunStatus || '';
-    updateStepper(events, statusText);
-    
+
+    // 更新主机扫描进度
+    updateProgress(events);
+
     // Auto scroll if user is already near bottom
     const threshold = 50;
     const isNearBottom = box.scrollHeight - box.clientHeight - box.scrollTop < threshold;
@@ -74,64 +73,59 @@ async function refreshRunStatus(){
 setInterval(refreshRunStatus, 1500);
 refreshRunStatus();
 
-function updateStepper(events, runStatus) {
-  const steps = {
-    discover: document.getElementById('step-discover'),
-    portscan: document.getElementById('step-portscan'),
-    fingerprint: document.getElementById('step-fingerprint'),
-    vuln: document.getElementById('step-vuln'),
-    report: document.getElementById('step-report')
-  };
-  const lines = document.querySelectorAll('.step-line');
-  if (!steps.discover) return;
+// updateProgress parses the per-target "progress" events emitted by the scan
+// engine and renders an IP-dimension progress bar: how many hosts are done out
+// of the total alive set. This replaces the old fixed 5-stage cascade stepper,
+// which was meaningless because every IP walks the full pipeline sequentially —
+// only the final report is generated once for all hosts.
+function updateProgress(events) {
+  const bar = document.getElementById('scan-progress-bar');
+  const count = document.getElementById('scan-progress-count');
+  const detail = document.getElementById('scan-progress-detail');
+  if (!bar || !count) return;
 
-  if ((runStatus || '').toLowerCase() === 'completed') {
-    Object.values(steps).forEach(s => {
-      if (!s) return;
-      s.className = 'step completed';
-      s.querySelector('.step-icon').innerHTML = '✓';
-    });
-    lines.forEach(l => l.className = 'step-line completed');
+  // Find the last progress event to get the latest done/total counts.
+  let latest = null;
+  for (const e of events) {
+    if ((e.stage || '').toLowerCase() === 'progress') {
+      latest = e;
+    }
+  }
+
+  const statusText = (document.getElementById('run-status')?.textContent || window.anchorRunStatus || '').trim().toLowerCase();
+
+  if (!latest) {
+    count.textContent = '等待存活探测…';
+    bar.style.width = '0%';
+    if (detail) detail.textContent = '';
     return;
   }
-  
-  let currentStage = 'init';
-  events.forEach(e => {
-    const stage = (e.stage || '').toLowerCase();
-    const msg = (e.message || '').toLowerCase();
-    
-    if (stage === 'nmap' && msg.includes('alive')) {
-      currentStage = 'discover';
-    } else if (stage === 'rustscan') {
-      currentStage = 'portscan';
-    } else if (stage === 'nmap' && !msg.includes('alive')) {
-      currentStage = 'fingerprint';
-    } else if (stage === 'httpx' || stage === 'nse' || stage === 'nuclei') {
-      currentStage = 'vuln';
-    } else if (stage === 'report') {
-      currentStage = 'report';
-    }
-  });
 
-  const stageOrder = ['discover', 'portscan', 'fingerprint', 'vuln', 'report'];
-  const currentIndex = stageOrder.indexOf(currentStage);
+  const msg = latest.message || '';
+  const totalMatch = msg.match(/(\d+)\/(\d+)/);
+  const doneMatch = msg.match(/done=(\d+)/);
+  const failedMatch = msg.match(/failed=(\d+)/);
+  const currentMatch = msg.match(/current=(\S+)/);
 
-  stageOrder.forEach((stageName, idx) => {
-    const stepEl = steps[stageName];
-    if (!stepEl) return;
-    
-    if (idx < currentIndex) {
-      stepEl.className = 'step completed';
-      stepEl.querySelector('.step-icon').innerHTML = '✓';
-      if (lines[idx - 1]) lines[idx - 1].className = 'step-line completed';
-    } else if (idx === currentIndex) {
-      stepEl.className = 'step active';
-      stepEl.querySelector('.step-icon').innerHTML = idx + 1;
-      if (lines[idx - 1]) lines[idx - 1].className = 'step-line completed';
-    } else {
-      stepEl.className = 'step';
-      stepEl.querySelector('.step-icon').innerHTML = idx + 1;
-      if (lines[idx - 1]) lines[idx - 1].className = 'step-line';
+  const done = doneMatch ? parseInt(doneMatch[1], 10) : 0;
+  const total = totalMatch ? parseInt(totalMatch[2], 10) : 0;
+  const failed = failedMatch ? parseInt(failedMatch[1], 10) : 0;
+  const current = currentMatch ? currentMatch[1] : '';
+
+  if (total > 0) {
+    const pct = Math.min(100, Math.round((done / total) * 100));
+    bar.style.width = pct + '%';
+    count.textContent = `已完成 ${done} / ${total} 个主机` + (failed > 0 ? `（失败 ${failed}）` : '');
+    if (detail) {
+      if (statusText === 'completed') {
+        detail.textContent = failed > 0 ? `扫描结束，${failed} 个主机失败` : '扫描完成';
+      } else if (statusText === 'failed' || statusText === 'canceled') {
+        detail.textContent = statusText === 'canceled' ? '扫描已取消' : '扫描失败';
+      } else if (current) {
+        detail.textContent = `正在扫描 ${current}`;
+      } else {
+        detail.textContent = '';
+      }
     }
-  });
+  }
 }

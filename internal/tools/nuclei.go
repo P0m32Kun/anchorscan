@@ -28,8 +28,11 @@ type NucleiFinding struct {
 	Raw              string
 }
 
-func RunNuclei(ctx context.Context, runner Runner, binaryPath string, target string, tags []string, extraArgs []string) ([]byte, error) {
+func RunNuclei(ctx context.Context, runner Runner, binaryPath string, target string, tags []string, excludeTags []string, extraArgs []string) ([]byte, error) {
 	args := []string{"-target", target, "-tags", strings.Join(tags, ","), "-jsonl"}
+	if len(excludeTags) > 0 {
+		args = append(args, "-etags", strings.Join(excludeTags, ","))
+	}
 	args = append(args, extraArgs...)
 	out, err := runner.Run(ctx, binaryPath, args)
 	if err != nil {

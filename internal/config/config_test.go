@@ -200,20 +200,20 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 			t.Fatalf("expected nuclei tag rule for %s: %#v", service, tagRules)
 		}
 	}
-	// 双引擎覆盖矩阵契约：Web URL 规则不得携带宽泛 default-login 标签。
+	// 弱口令检测契约：nuclei_tags 不携带全局 default-login 标签。每个服务的
+	// default-login 模板本身都带服务名 tag（如 redis-default-logins 带 redis），
+	// 所以 -tags <service> 已能覆盖该服务的弱口令检测；追加全局 default-login
+	// 会加载 360 个无关爆破模板，既慢又易触发账户锁定。SSH 用 exclude_tags 单独排除。
 	for _, rule := range tagRules {
 		if len(rule.NucleiTags) == 0 {
 			t.Fatalf("rule %s has no nuclei_tags: %#v", rule.Name, rule)
 		}
-		if rule.Target == "url" {
-			for _, tag := range rule.NucleiTags {
-				if tag == "default-login" {
-					t.Fatalf("url rule %s must not include default-login: %#v", rule.Name, rule)
-				}
+		for _, tag := range rule.NucleiTags {
+			if tag == "default-login" {
+				t.Fatalf("rule %s must not include global default-login tag: %#v", rule.Name, rule)
 			}
-			continue
 		}
-		if rule.Target != "hostport" {
+		if rule.Target != "url" && rule.Target != "hostport" {
 			t.Fatalf("rule %s has unexpected target %q (want url or hostport)", rule.Name, rule.Target)
 		}
 	}

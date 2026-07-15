@@ -10,32 +10,41 @@
 #
 # 匹配逻辑（nuclei_tags.go:32）：service / product / tech 任一命中即生效。
 # 非服务可靠覆盖的引擎会在 nse.yaml 中缺位，自动跳过，无需在此声明。
-# 每条规则的 nuclei_tags 末尾统一追加 default-login（本机 338 个默认凭据模板），
-# 用于覆盖弱口令/默认凭据检测。
+#
+# 弱口令/默认凭据检测说明：
+#   - 各服务的 default-login 模板本身都携带服务名 tag（如 redis-default-logins
+#     带 redis tag），所以 -tags <service> 就能命中该服务的弱口令模板，无需额外
+#     追加全局 default-login tag（那会加载 360 个无关爆破模板，既慢又易触发锁定）。
+#   - SSH 例外：官方 ssh-default-logins 模板含 223 组账密，过于激进，用
+#     exclude_tags 排除它，改由 RBKD 的 ssh-mini-brute 模板（2 用户 × 2 密码）承担。
 
 # ===== 远程登录 =====
 - name: ssh
   service: ["ssh"]
-  nuclei_tags: ["ssh", "default-login"]
+  nuclei_tags: ["ssh"]
+  # 排除 nuclei 官方 default-login 爆破模板（账密组合巨大，且易触发账户锁定）。
+  # 弱口令检测改由 RBKD 自有的 ssh-mini-brute 模板（ssh tag、无 default-login tag）承担，
+  # 该模板最多 2 用户 × 2 密码、首次命中即停。
+  exclude_tags: ["default-login"]
   target: "hostport"
 - name: ftp
   service: ["ftp"]
-  nuclei_tags: ["ftp", "default-login"]
+  nuclei_tags: ["ftp"]
   target: "hostport"
 - name: telnet
   service: ["telnet"]
-  nuclei_tags: ["telnet", "default-login"]
+  nuclei_tags: ["telnet"]
   target: "hostport"
 
 # ===== 邮件 / 目录 =====
 - name: smtp
   service: ["smtp"]
   product: ["smtp"]
-  nuclei_tags: ["smtp", "default-login"]
+  nuclei_tags: ["smtp"]
   target: "hostport"
 - name: ldap
   service: ["ldap"]
-  nuclei_tags: ["ldap", "default-login"]
+  nuclei_tags: ["ldap"]
   target: "hostport"
 
 # ===== 基础设施 =====
@@ -53,76 +62,76 @@
 - name: rdp
   # ms-wbt-server -> rdp (normalize.go 别名)
   service: ["rdp"]
-  nuclei_tags: ["rdp", "default-login"]
+  nuclei_tags: ["rdp"]
   target: "hostport"
 - name: vnc
   service: ["vnc"]
-  nuclei_tags: ["vnc", "default-login"]
+  nuclei_tags: ["vnc"]
   target: "hostport"
 - name: winrm
   # nmap 无 NSE 脚本，仅走 nuclei
   service: ["winrm", "wsman"]
-  nuclei_tags: ["winrm", "default-login"]
+  nuclei_tags: ["winrm"]
   target: "hostport"
 
 # ===== 数据库 =====
 - name: redis
   service: ["redis"]
-  nuclei_tags: ["redis", "default-login"]
+  nuclei_tags: ["redis"]
   target: "hostport"
 - name: mysql
   # mariadb -> mysql (normalize.go 别名)
   service: ["mysql"]
-  nuclei_tags: ["mysql", "default-login"]
+  nuclei_tags: ["mysql"]
   target: "hostport"
 - name: postgres
   # nmap service 名为 postgresql；nuclei 同时有 postgres 和 postgresql 两个 tag
   service: ["postgres", "postgresql"]
   product: ["postgresql", "postgres"]
-  nuclei_tags: ["postgres", "postgresql", "default-login"]
+  nuclei_tags: ["postgres", "postgresql"]
   target: "hostport"
 - name: mssql
   # nmap service 名为 ms-sql 或 microsoft-sql
   service: ["mssql", "ms-sql", "microsoft-sql"]
   product: ["microsoft sql server", "sql server"]
-  nuclei_tags: ["mssql", "default-login"]
+  nuclei_tags: ["mssql"]
   target: "hostport"
 - name: mongodb
   service: ["mongodb"]
-  nuclei_tags: ["mongodb", "default-login"]
+  nuclei_tags: ["mongodb"]
   target: "hostport"
 - name: memcached
   service: ["memcached"]
-  nuclei_tags: ["memcached", "default-login"]
+  nuclei_tags: ["memcached"]
   target: "hostport"
 - name: elasticsearch
   # nmap 无 NSE 脚本，仅走 nuclei
   service: ["elasticsearch"]
   product: ["elasticsearch"]
-  nuclei_tags: ["elasticsearch", "default-login"]
+  nuclei_tags: ["elasticsearch"]
   target: "hostport"
 
 # ===== 消息队列 =====
 - name: rabbitmq
   # nmap NSE 脚本前缀为 amqp-，service 名常为 amqp 或 rabbitmq
   service: ["rabbitmq", "amqp"]
-  nuclei_tags: ["rabbitmq", "default-login"]
+  nuclei_tags: ["rabbitmq"]
   target: "hostport"
 - name: kafka
   # nmap 无 NSE 脚本，仅走 nuclei
   service: ["kafka"]
-  nuclei_tags: ["kafka", "default-login"]
+  nuclei_tags: ["kafka"]
   target: "hostport"
 - name: mqtt
   service: ["mqtt"]
-  nuclei_tags: ["mqtt", "default-login"]
+  nuclei_tags: ["mqtt"]
   target: "hostport"
 
 # ===== 文件 / 共享 =====
 - name: smb
   # microsoft-ds / netbios-ssn -> smb (normalize.go 别名)
   service: ["smb"]
-  nuclei_tags: ["smb", "default-login"]
+  nuclei_tags: ["smb"]
   target: "hostport"
 - name: nfs
   service: ["nfs"]
@@ -141,12 +150,12 @@
 # ===== 容器 / 编排 =====
 - name: docker
   service: ["docker"]
-  nuclei_tags: ["docker", "default-login"]
+  nuclei_tags: ["docker"]
   target: "hostport"
 - name: kubernetes
   # nmap 无 NSE 脚本，仅走 nuclei（多为 API/etcd/dashboard HTTP 探测）
   service: ["kubernetes", "k8s"]
-  nuclei_tags: ["kubernetes", "default-login"]
+  nuclei_tags: ["kubernetes"]
   target: "hostport"
 
 # ===== Web 产品指纹（target: url，依赖 httpx 识别技术栈） =====
