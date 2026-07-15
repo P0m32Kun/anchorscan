@@ -100,6 +100,15 @@ func TestLoadKeepsValidNmapNSECommand(t *testing.T) {
 	}
 }
 
+func TestLoadKeepsValidMSFCommand(t *testing.T) {
+	withMSF := strings.Replace(handbook, "##### Nuclei\n\n```bash\nnuclei -t network/smb.yaml -u {{host}}:{{port}}\n```", "##### MSF\n\n```text\nuse auxiliary/scanner/ssh/ssh_version\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```", 1)
+	configPath, handbookPath := writeHandbook(t, withMSF)
+	entry, ok := Load(configPath, filepath.Base(handbookPath)).Entry("smb-signing")
+	if !ok || !strings.Contains(entry.Commands.Metasploit, "set RPORT {{port}}") {
+		t.Fatalf("Entry() = %#v, %t", entry, ok)
+	}
+}
+
 func writeHandbook(t *testing.T, content string) (string, string) {
 	t.Helper()
 	dir := t.TempDir()

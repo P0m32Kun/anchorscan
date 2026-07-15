@@ -131,6 +131,13 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 			return entry, diagnostic(line, meta.ID, "Nmap NSE 命令无效")
 		}
 	}
+	if command, ok := commandBlock(lines, "MSF"); ok {
+		if validMSF(command) {
+			entry.Commands.Metasploit = command
+		} else {
+			return entry, diagnostic(line, meta.ID, "MSF 命令无效")
+		}
+	}
 	if strings.Contains(strings.Join(lines, "\n"), "-oX") || strings.Contains(strings.Join(lines, "\n"), " -o ") {
 		return entry, diagnostic(line, meta.ID, "命令包含输出参数")
 	}
@@ -176,7 +183,7 @@ func commandBlock(lines []string, tool string) (string, bool) {
 			continue
 		}
 		for j := i + 1; j < len(lines); j++ {
-			if strings.TrimSpace(lines[j]) != "```bash" {
+			if !strings.HasPrefix(strings.TrimSpace(lines[j]), "```") {
 				continue
 			}
 			for k := j + 1; k < len(lines); k++ {
@@ -212,6 +219,19 @@ func validNmapNSE(command string) bool {
 		}
 	}
 	return ports == 1
+}
+
+func validMSF(command string) bool {
+	lines := strings.FieldsFunc(command, func(r rune) bool { return r == '\n' || r == '\r' })
+	if len(lines) != 4 {
+		return false
+	}
+	module := strings.TrimSpace(strings.TrimPrefix(lines[0], "use "))
+	if module == lines[0] || strings.TrimSpace(lines[1]) != "set RHOSTS {{host}}" || strings.TrimSpace(lines[2]) != "set RPORT {{port}}" {
+		return false
+	}
+	action := strings.TrimSpace(lines[3])
+	return strings.HasPrefix(module, "auxiliary/scanner/") && action == "run" || strings.HasPrefix(module, "exploit/") && action == "check"
 }
 
 func parseSeverity(value string) Severity {
