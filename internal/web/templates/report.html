@@ -458,9 +458,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
-			{{if index $.NucleiCommandKeys (findingKey $finding)}}
-			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成 Nuclei 命令</button>
-			{{end}}
+			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成检测命令</button>
           </td>
         </tr>
         <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
@@ -547,7 +545,9 @@
       commandFull.textContent = '';
       commandDialog.showModal();
       try {
-        const response = await fetch('/reports/{{.Run.RunID}}/commands', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: 'nuclei'})});
+        const endpoint = new URL('/reports/{{.Run.RunID}}/commands', window.location.origin);
+        endpoint.search = window.location.search;
+        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: 'nuclei'})});
         if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
         const command = await response.json();
         commandMessage.textContent = '请人工确认后运行；此操作未启动扫描。';

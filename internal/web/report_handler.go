@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,15 +58,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	filters := reportFilters{
-		IP:         r.URL.Query().Get("ip"),
-		Port:       r.URL.Query().Get("port"),
-		Service:    r.URL.Query().Get("service"),
-		Keyword:    r.URL.Query().Get("q"),
-		Severity:   r.URL.Query().Get("severity"),
-		Severities: parseSeverityFilters(r.URL.Query()),
-		Source:     r.URL.Query().Get("source"),
-	}
+	filters := reportFiltersFromValues(r.URL.Query())
 	filteredFingerprints := filterFingerprints(fps, filters)
 	filteredFindings := filterFindings(findings, fps, filters)
 	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
@@ -158,7 +151,6 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"Filters":                filters,
 			"Fingerprints":           assetPage.Items,
 			"Findings":               findingPage.Items,
-			"NucleiCommandKeys":      s.nucleiCommandKeys(filteredFindings),
 			"AssetPage":              assetPage,
 			"FindingPage":            findingPage,
 			"HostPage":               hostPage,
@@ -176,24 +168,6 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"ExportCSV":              "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 		})
 	}
-}
-
-func (s *server) nucleiCommandKeys(findings []report.Finding) map[string]bool {
-	counts := map[string]int{}
-	for _, finding := range findings {
-		counts[report.FindingKey(finding)]++
-	}
-	available := map[string]bool{}
-	for _, finding := range findings {
-		key := report.FindingKey(finding)
-		if counts[key] != 1 {
-			continue
-		}
-		if _, err := report.BuildNucleiCommand(finding, s.catalog); err == nil {
-			available[key] = true
-		}
-	}
-	return available
 }
 
 func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, runID string) {
@@ -214,6 +188,12 @@ func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, run
 		http.NotFound(w, r)
 		return
 	}
+	fingerprints, err := s.store.ListFingerprints(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	findings = filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query()))
 	key := strings.TrimSpace(r.FormValue("finding_key"))
 	var matches []report.Finding
 	for _, finding := range findings {
@@ -232,4 +212,16 @@ func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, run
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(command)
+}
+
+func reportFiltersFromValues(values url.Values) reportFilters {
+	return reportFilters{
+		IP:         values.Get("ip"),
+		Port:       values.Get("port"),
+		Service:    values.Get("service"),
+		Keyword:    values.Get("q"),
+		Severity:   values.Get("severity"),
+		Severities: parseSeverityFilters(values),
+		Source:     values.Get("source"),
+	}
 }

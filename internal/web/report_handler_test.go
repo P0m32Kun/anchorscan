@@ -70,9 +70,16 @@ func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *tes
 	if len(runner.commands) != 0 {
 		t.Fatalf("command generation ran a tool: %#v", runner.commands)
 	}
+	filtered := httptest.NewRecorder()
+	filteredReq := httptest.NewRequest(http.MethodPost, "/reports/run-command/commands?source=nse", strings.NewReader(form))
+	filteredReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(filtered, filteredReq)
+	if filtered.Code != http.StatusBadRequest {
+		t.Fatalf("out-of-filter finding response = %d: %s", filtered.Code, filtered.Body.String())
+	}
 	page := httptest.NewRecorder()
 	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/reports/run-command", nil))
-	if !strings.Contains(page.Body.String(), `data-command-key="`+report.FindingKey(finding)+`"`) || !strings.Contains(page.Body.String(), "生成 Nuclei 命令") {
+	if !strings.Contains(page.Body.String(), `data-command-key="`+report.FindingKey(finding)+`"`) || !strings.Contains(page.Body.String(), "生成检测命令") {
 		t.Fatalf("report page has no command entry: %s", page.Body.String())
 	}
 	toolPage := httptest.NewRecorder()
