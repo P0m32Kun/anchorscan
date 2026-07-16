@@ -271,6 +271,72 @@ func TestReportCommandGenerationRejectsUnknownNmapPlaceholder(t *testing.T) {
 	}
 }
 
+func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nuclei\n\n```bash\nnuclei -t network/smb.yaml -u {{host}}:{{port}}\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-batch", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, ip := range []string{"192.0.2.21", "192.0.2.20", "192.0.2.21"} {
+		if err := st.SaveFinding("run-batch", report.Finding{IP: ip, Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-batch/commands/batch?findings_page=2", strings.NewReader("group_key="+report.VulnerabilityGroupKey("smb-signing")+"&tool=nuclei"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("batch command = %d: %s", res.Code, res.Body.String())
+	}
+	var got struct {
+		FullCommand string `json:"full_command"`
+		TargetFile  string `json:"target_file"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got.FullCommand, "nuclei -t network/smb.yaml -l ") || !filepath.IsAbs(got.TargetFile) {
+		t.Fatalf("batch command = %#v", got)
+	}
+	data, err := os.ReadFile(got.TargetFile)
+	if err != nil || string(data) != "192.0.2.20:445\n192.0.2.21:445\n" {
+		t.Fatalf("targets = %q, %v", data, err)
+	}
+	info, err := os.Stat(got.TargetFile)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("target file mode = %v, %v", info.Mode(), err)
+	}
+	reused := httptest.NewRecorder()
+	handler.ServeHTTP(reused, req)
+	var repeated struct {
+		TargetFile string `json:"target_file"`
+	}
+	if err := json.NewDecoder(reused.Body).Decode(&repeated); err != nil || repeated.TargetFile != got.TargetFile {
+		t.Fatalf("target file reuse = %#v, %v", repeated, err)
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("batch command ran a tool: %#v", runner.commands)
+	}
+}
+
 func TestReportPageRendersFindings(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

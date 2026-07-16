@@ -213,6 +213,7 @@
       <div class="header-actions">
         <button class="button button-secondary" type="button" data-copy-text="{{.Title}}">复制字段</button>
         <button class="button button-secondary" type="button" data-copy-text="{{.CopyText}}">复制本条</button>
+		{{if .CanBatchNuclei}}<button class="button button-primary batch-nuclei-btn" type="button" data-batch-group="{{.GroupKey}}">生成批量 Nuclei 命令</button>{{end}}
       </div>
     </div>
     <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
@@ -558,6 +559,26 @@
 		document.getElementById('command-dialog-title').textContent = '生成 ' + button.textContent.trim().replace('生成 ', '');
 		toolLink.hidden = button.dataset.commandTool === 'msf';
 		if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.commandTool + '?raw_args=' + encodeURIComponent(command.tool_args);
+        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
+      } catch (error) {
+        commandMessage.textContent = error.message || String(error);
+      }
+    }));
+    document.querySelectorAll('.batch-nuclei-btn').forEach(button => button.addEventListener('click', async () => {
+      commandMessage.textContent = '正在生成批量命令，不会启动扫描。';
+      commandFull.textContent = '';
+      commandDialog.showModal();
+      try {
+        const endpoint = new URL('/reports/{{.Run.RunID}}/commands/batch', window.location.origin);
+        endpoint.search = window.location.search;
+        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({group_key: button.dataset.batchGroup, tool: 'nuclei'})});
+        if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
+        const command = await response.json();
+        commandMessage.textContent = '目标文件：' + command.target_file + '；请人工确认后运行。';
+        commandFull.textContent = command.full_command;
+        const toolLink = document.getElementById('nuclei-command-tool');
+        toolLink.hidden = false;
+        toolLink.href = '/tools/nuclei?raw_args=' + encodeURIComponent(command.tool_args);
         document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
       } catch (error) {
         commandMessage.textContent = error.message || String(error);

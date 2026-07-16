@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
@@ -16,6 +18,10 @@ import (
 
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
+	if strings.HasSuffix(path, "/commands/batch") {
+		s.reportBatchNucleiCommand(w, r, strings.TrimSuffix(path, "/commands/batch"))
+		return
+	}
 	if strings.HasSuffix(path, "/commands") {
 		s.reportCommand(w, r, strings.TrimSuffix(path, "/commands"))
 		return
@@ -268,6 +274,82 @@ func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID str
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(command)
+}
+
+func (s *server) reportBatchNucleiCommand(w http.ResponseWriter, r *http.Request, runID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil || strings.TrimSpace(r.FormValue("tool")) != "nuclei" {
+		http.Error(w, "invalid batch command request", http.StatusBadRequest)
+		return
+	}
+	findings, err := s.store.ListFindings(runID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	fingerprints, err := s.store.ListFingerprints(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	batch, err := report.BuildBatchNucleiCommand(filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query())), s.catalog, strings.TrimSpace(r.FormValue("group_key")))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	contents := strings.Join(batch.Targets, "\n") + "\n"
+	sum := sha256.Sum256([]byte(contents))
+	dir := filepath.Dir(managedReportPath(s.opts.DBPath, "", runID))
+	if run, getErr := s.store.GetScanRun(runID); getErr == nil {
+		dir = filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, runID))
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	targetFile := filepath.Join(dir, "nuclei-targets-"+fmt.Sprintf("%x", sum[:])+".txt")
+	if err := writeBatchTargetFile(targetFile, []byte(contents)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	args := append([]string(nil), batch.Args...)
+	args[len(args)-2], args[len(args)-1] = "-l", targetFile
+	toolArgs := displayCommandArgs(args[1:])
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"full_command": displayCommandArgs(args), "tool_args": toolArgs, "target_file": targetFile})
+}
+
+func writeBatchTargetFile(path string, contents []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if os.IsExist(err) {
+		existing, readErr := os.ReadFile(path)
+		if readErr != nil || string(existing) != string(contents) {
+			return fmt.Errorf("目标文件内容不一致")
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(contents)
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	return err
+}
+
+func displayCommandArgs(args []string) string {
+	parts := make([]string, len(args))
+	for i, arg := range args {
+		if strings.ContainsAny(arg, " \t\n\"'\\") {
+			arg = strconv.Quote(arg)
+		}
+		parts[i] = arg
+	}
+	return strings.Join(parts, " ")
 }
 
 func (s *server) buildCommand(tool string, finding report.Finding) (report.DetectionCommand, error) {
