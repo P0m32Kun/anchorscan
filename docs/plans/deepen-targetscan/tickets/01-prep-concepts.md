@@ -1,6 +1,6 @@
 # Ticket 01 — 备料：引入 Progress 接口与 TargetScan 类型
 
-- 状态：`ready-for-agent` / frontier
+- 状态：`done`（实现 a2ad280，双轴 code-review 通过，无 blocker/major）
 - Blocked by：无
 - 所属 spec：`docs/plans/deepen-targetscan/spec.md`
 - Review fixed point：`8622e312748fbbad93701bfd2d7eb056bd238ef5`
@@ -26,6 +26,14 @@
 - `go test ./internal/app/...` 全绿（现有 16 个 `TestRunScan*` 行为不变，零修改即通过）。
 - `go vet ./...` 无新增告警。
 - 无行为变化：事件流、持久化、制品、报告输出均与 fixed point 一致（由现有测试覆盖）。
+
+## Review 结果（双轴）
+
+- **Spec: PASS** —— 6 项验收全过；residual：`emitTool` 统一后多了 RunID/store 守卫（spec 决策 4 既定的一致性修复，所有真实路径行为等价，非缺陷）。
+- **Standards: 2 NIT，无 blocker/major** ——
+  ① progress.go 导入分组：**误报**（文件本就正确，行 6 已有空行分隔 stdlib/internal 组）；
+  ② emit/emitTool 的 `storeProgress{...}` 字面量重复：**留**（段 2 重构掉这两个 wrapper，加构造器即被删，Ponytail）。
+- gofmt/build/vet/test/LSP 全绿。
 
 ## 不做（留给 Ticket 02）
 
