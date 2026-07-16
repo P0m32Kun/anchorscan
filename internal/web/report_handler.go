@@ -306,6 +306,11 @@ func (s *server) reportBatchNucleiCommand(w http.ResponseWriter, r *http.Request
 	if run, getErr := s.store.GetScanRun(runID); getErr == nil {
 		dir = filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, runID))
 	}
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

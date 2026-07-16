@@ -332,6 +332,27 @@ func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *te
 	if err := json.NewDecoder(reused.Body).Decode(&repeated); err != nil || repeated.TargetFile != got.TargetFile {
 		t.Fatalf("target file reuse = %#v, %v", repeated, err)
 	}
+	verify, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verify.SaveFinding("run-batch", report.Finding{IP: "192.0.2.22", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := verify.Close(); err != nil {
+		t.Fatal(err)
+	}
+	changed := httptest.NewRecorder()
+	handler.ServeHTTP(changed, req)
+	var changedResult struct {
+		TargetFile string `json:"target_file"`
+	}
+	if err := json.NewDecoder(changed.Body).Decode(&changedResult); err != nil || changedResult.TargetFile == got.TargetFile {
+		t.Fatalf("changed target file = %#v, %v", changedResult, err)
+	}
+	if _, err := os.Stat(got.TargetFile); err != nil {
+		t.Fatalf("old target file removed: %v", err)
+	}
 	if len(runner.commands) != 0 {
 		t.Fatalf("batch command ran a tool: %#v", runner.commands)
 	}
