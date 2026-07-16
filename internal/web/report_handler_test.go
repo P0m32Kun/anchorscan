@@ -370,10 +370,13 @@ func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SaveScanRun(store.ScanRun{RunID: "run-batch-tools", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+	if err := st.SaveProject(store.Project{ID: "p1", Name: "batch", DefaultTargets: "192.0.2.30", DefaultPorts: "445", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatal(err)
 	}
-	for _, finding := range []report.Finding{{IP: "192.0.2.30", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "192.0.2.31", Port: 139, Source: "nuclei", ID: "smb-signing", Severity: "high"}} {
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-batch-tools", ProjectID: "p1", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{{IP: "192.0.2.30", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "2001:0db8::1", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "2001:db8::1", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "192.0.2.31", Port: 139, Source: "nuclei", ID: "smb-signing", Severity: "high"}} {
 		if err := st.SaveFinding("run-batch-tools", finding); err != nil {
 			t.Fatal(err)
 		}
@@ -414,7 +417,7 @@ func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(command.FullCommand, " -iL ") || strings.Count(string(contents), "\n") != 1 {
+		if !strings.Contains(command.FullCommand, " -iL ") {
 			t.Fatalf("invalid nmap batch command=%q targets=%q", command.FullCommand, contents)
 		}
 		args, err := config.SplitArgs(command.ToolArgs)
@@ -423,7 +426,7 @@ func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
 		}
 		targetContents = append(targetContents, string(contents))
 	}
-	if targetContents[0] != "192.0.2.31\n" || targetContents[1] != "192.0.2.30\n" {
+	if targetContents[0] != "192.0.2.31\n" || targetContents[1] != "192.0.2.30\n2001:db8::1\n" {
 		t.Fatalf("nmap target grouping = %#v", targetContents)
 	}
 
@@ -440,19 +443,19 @@ func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
 	if err := json.NewDecoder(msf.Body).Decode(&msfResult); err != nil {
 		t.Fatal(err)
 	}
-	if len(msfResult.Commands) != 2 || !strings.Contains(msfResult.Commands[0], "192.0.2.31") || !strings.Contains(msfResult.Commands[1], "192.0.2.30") {
+	if len(msfResult.Commands) != 3 || !strings.Contains(msfResult.Commands[0], "192.0.2.31") || !strings.Contains(msfResult.Commands[1], "192.0.2.30") || !strings.Contains(msfResult.Commands[2], "2001:db8::1") {
 		t.Fatalf("MSF commands = %#v", msfResult.Commands)
 	}
-	deleteRun := httptest.NewRecorder()
-	deleteRequest := httptest.NewRequest(http.MethodPost, "/runs/run-batch-tools", strings.NewReader("_method=delete"))
+	deleteProject := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodPost, "/projects/p1", strings.NewReader("_method=delete"))
 	deleteRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(deleteRun, deleteRequest)
-	if deleteRun.Code != http.StatusSeeOther {
-		t.Fatalf("delete run = %d: %s", deleteRun.Code, deleteRun.Body.String())
+	handler.ServeHTTP(deleteProject, deleteRequest)
+	if deleteProject.Code != http.StatusSeeOther {
+		t.Fatalf("delete project = %d: %s", deleteProject.Code, deleteProject.Body.String())
 	}
 	for _, command := range nmapResult.Commands {
 		if _, err := os.Stat(command.TargetFile); !os.IsNotExist(err) {
-			t.Fatalf("target file survives run deletion: %s (%v)", command.TargetFile, err)
+			t.Fatalf("target file survives project deletion: %s (%v)", command.TargetFile, err)
 		}
 	}
 	if len(runner.commands) != 0 {

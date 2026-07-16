@@ -19,7 +19,7 @@ import (
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
 	if strings.HasSuffix(path, "/commands/batch") {
-		s.reportBatchNucleiCommand(w, r, strings.TrimSuffix(path, "/commands/batch"))
+		s.reportBatchCommand(w, r, strings.TrimSuffix(path, "/commands/batch"))
 		return
 	}
 	if strings.HasSuffix(path, "/commands") {
@@ -276,7 +276,7 @@ func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID str
 	_ = json.NewEncoder(w).Encode(command)
 }
 
-func (s *server) reportBatchNucleiCommand(w http.ResponseWriter, r *http.Request, runID string) {
+func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runID string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
