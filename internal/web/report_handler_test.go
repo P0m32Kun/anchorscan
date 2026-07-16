@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,125 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
+
+func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nuclei\n\n```bash\nnuclei -t http/technologies/redis.yaml -u {{url}}\n```\n\n#### 修复建议", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-command", Target: "192.0.2.10", Ports: "6379", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.10", Port: 6379, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high", Summary: "SMB signing", Target: "http://192.0.2.10:6379"}
+	if err := scanStore.SaveFinding("run-command", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	form := "finding_key=" + report.FindingKey(finding) + "&tool=nuclei&target=attacker.example&command=evil"
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-command/commands", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("command generation = %d: %s", res.Code, res.Body.String())
+	}
+	var got struct {
+		FullCommand string `json:"full_command"`
+		ToolArgs    string `json:"tool_args"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.FullCommand != "nuclei -t http/technologies/redis.yaml -u http://192.0.2.10:6379" || got.ToolArgs != "-t http/technologies/redis.yaml -u http://192.0.2.10:6379" {
+		t.Fatalf("generated command = %#v", got)
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("command generation ran a tool: %#v", runner.commands)
+	}
+	page := httptest.NewRecorder()
+	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/reports/run-command", nil))
+	if !strings.Contains(page.Body.String(), `data-command-key="`+report.FindingKey(finding)+`"`) || !strings.Contains(page.Body.String(), "生成 Nuclei 命令") {
+		t.Fatalf("report page has no command entry: %s", page.Body.String())
+	}
+	toolPage := httptest.NewRecorder()
+	handler.ServeHTTP(toolPage, httptest.NewRequest(http.MethodGet, "/tools/nuclei?raw_args=-t+http%2Ftechnologies%2Fredis.yaml+-u+http%3A%2F%2F192.0.2.10%3A6379", nil))
+	if !strings.Contains(toolPage.Body.String(), `>-t http/technologies/redis.yaml -u http://192.0.2.10:6379</textarea>`) {
+		t.Fatalf("tool page did not prefill generated arguments: %s", toolPage.Body.String())
+	}
+	verify, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer verify.Close()
+	run, err := verify.GetScanRun("run-command")
+	if err != nil || run.Status != "completed" {
+		t.Fatalf("run changed: %#v, %v", run, err)
+	}
+	findings, err := verify.ListFindings("run-command")
+	if err != nil || len(findings) != 1 || findings[0] != finding {
+		t.Fatalf("findings changed: %#v, %v", findings, err)
+	}
+}
+
+func TestReportNucleiCommandGenerationRejectsMismatchedURL(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nuclei\n\n```bash\nnuclei -t http/technologies/redis.yaml -u {{url}}\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-url", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.11", Port: 443, Source: "nuclei", ID: "smb-signing", Severity: "high", Target: "http://192.0.2.11:80"}
+	if err := scanStore.SaveFinding("run-url", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	form := "finding_key=" + report.FindingKey(finding) + "&tool=nuclei"
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-url/commands", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnprocessableEntity || !strings.Contains(res.Body.String(), "有效 URL") {
+		t.Fatalf("mismatched URL response = %d: %s", res.Code, res.Body.String())
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("mismatched URL ran a tool: %#v", runner.commands)
+	}
+}
 
 func TestReportPageRendersFindings(t *testing.T) {
 	dir := t.TempDir()

@@ -27,7 +27,7 @@
 
     <label class="full-width">
       <span>参数</span>
-      <textarea name="raw_args" class="tool-args-input" placeholder="例如 -sn 192.168.1.10 或 -u http://192.168.1.10:8080"></textarea>
+      <textarea name="raw_args" class="tool-args-input" placeholder="例如 -sn 192.168.1.10 或 -u http://192.168.1.10:8080">{{.RawArgs}}</textarea>
       {{if eq .Tool.Name "rustscan"}}
       <button class="link-button" type="button" data-insert-ports="--ports {{.HighriskPorts}}" data-insert-target="raw_args" data-insert-mode="append">
         ＋ 追加高危端口列表 (--ports)

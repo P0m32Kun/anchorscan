@@ -458,6 +458,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
+			{{if index $.NucleiCommandKeys (findingKey $finding)}}
+			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成 Nuclei 命令</button>
+			{{end}}
           </td>
         </tr>
         <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
@@ -505,6 +508,13 @@
       matched-at
     </details>
   </div>
+
+  <dialog id="nuclei-command-dialog" class="panel">
+    <div class="panel-heading"><h3>生成 Nuclei 检测命令</h3><button class="button button-secondary" type="button" data-command-close>关闭</button></div>
+    <p class="meta-line" id="nuclei-command-message"></p>
+    <pre id="nuclei-command-full"></pre>
+    <div class="header-actions"><button class="button button-secondary" type="button" id="nuclei-command-copy">复制完整命令</button><a class="button button-primary" id="nuclei-command-tool" href="/tools/nuclei">带参数打开工具页</a></div>
+  </dialog>
   
           <script src="/static/app.js"></script>
           <script src="/static/report-ui.js"></script>
@@ -527,6 +537,27 @@
         if (icon) icon.style.transform = 'rotate(0deg)';
       }
     }
+
+    const commandDialog = document.getElementById('nuclei-command-dialog');
+    const commandMessage = document.getElementById('nuclei-command-message');
+    const commandFull = document.getElementById('nuclei-command-full');
+    document.querySelector('[data-command-close]')?.addEventListener('click', () => commandDialog.close());
+    document.querySelectorAll('.command-generate-btn').forEach(button => button.addEventListener('click', async () => {
+      commandMessage.textContent = '正在生成，不会启动扫描。';
+      commandFull.textContent = '';
+      commandDialog.showModal();
+      try {
+        const response = await fetch('/reports/{{.Run.RunID}}/commands', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: 'nuclei'})});
+        if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
+        const command = await response.json();
+        commandMessage.textContent = '请人工确认后运行；此操作未启动扫描。';
+        commandFull.textContent = command.full_command;
+        document.getElementById('nuclei-command-tool').href = '/tools/nuclei?raw_args=' + encodeURIComponent(command.tool_args);
+        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
+      } catch (error) {
+        commandMessage.textContent = error.message || String(error);
+      }
+    }));
   </script>
 </section>
 {{end}}

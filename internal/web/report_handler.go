@@ -13,6 +13,10 @@ import (
 
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
+	if strings.HasSuffix(path, "/commands") {
+		s.reportNucleiCommand(w, r, strings.TrimSuffix(path, "/commands"))
+		return
+	}
 	format := ""
 	exportFormat := ""
 	assetExport := ""
@@ -154,6 +158,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"Filters":                filters,
 			"Fingerprints":           assetPage.Items,
 			"Findings":               findingPage.Items,
+			"NucleiCommandKeys":      s.nucleiCommandKeys(filteredFindings),
 			"AssetPage":              assetPage,
 			"FindingPage":            findingPage,
 			"HostPage":               hostPage,
@@ -171,4 +176,60 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"ExportCSV":              "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 		})
 	}
+}
+
+func (s *server) nucleiCommandKeys(findings []report.Finding) map[string]bool {
+	counts := map[string]int{}
+	for _, finding := range findings {
+		counts[report.FindingKey(finding)]++
+	}
+	available := map[string]bool{}
+	for _, finding := range findings {
+		key := report.FindingKey(finding)
+		if counts[key] != 1 {
+			continue
+		}
+		if _, err := report.BuildNucleiCommand(finding, s.catalog); err == nil {
+			available[key] = true
+		}
+	}
+	return available
+}
+
+func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, runID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(r.FormValue("tool")) != "nuclei" {
+		http.Error(w, "unsupported tool", http.StatusBadRequest)
+		return
+	}
+	findings, err := s.store.ListFindings(runID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	key := strings.TrimSpace(r.FormValue("finding_key"))
+	var matches []report.Finding
+	for _, finding := range findings {
+		if report.FindingKey(finding) == key {
+			matches = append(matches, finding)
+		}
+	}
+	if len(matches) != 1 {
+		http.Error(w, "finding unavailable or ambiguous", http.StatusBadRequest)
+		return
+	}
+	command, err := report.BuildNucleiCommand(matches[0], s.catalog)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(command)
 }
