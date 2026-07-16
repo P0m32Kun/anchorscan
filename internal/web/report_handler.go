@@ -70,6 +70,9 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	filteredFingerprints := filterFingerprints(fps, filters)
 	filteredFindings := filterFindings(findings, fps, filters)
 	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
+	if format == "html" || exportFormat == "html" {
+		filteredBuilt.Vulnerabilities = report.BuildMatchedVulnerabilityDeliveries(filteredFindings, s.catalog)
+	}
 	switch format {
 	case "json":
 		w.Header().Set("Content-Type", "application/json")

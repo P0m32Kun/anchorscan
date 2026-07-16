@@ -43,9 +43,10 @@ type ScanMeta struct {
 }
 
 type ScanReport struct {
-	ScanMeta ScanMeta     `json:"scan_meta"`
-	AliveIPs []string     `json:"alive_ips,omitempty"`
-	Hosts    []HostReport `json:"hosts"`
+	ScanMeta        ScanMeta                `json:"scan_meta"`
+	AliveIPs        []string                `json:"alive_ips,omitempty"`
+	Hosts           []HostReport            `json:"hosts"`
+	Vulnerabilities []VulnerabilityDelivery `json:"vulnerabilities,omitempty"`
 }
 
 // ScanData carries the supplementary scan results that the report should expose

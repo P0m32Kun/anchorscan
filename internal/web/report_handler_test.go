@@ -495,6 +495,9 @@ func TestReportPageRendersFindings(t *testing.T) {
 	if strings.Contains(res.Body.String(), "探测规则:") || strings.Contains(res.Body.String(), "危险指数:") {
 		t.Fatalf("expected details panel to avoid duplicated finding metadata: %s", res.Body.String())
 	}
+	if !strings.Contains(res.Body.String(), "v1.8.0") {
+		t.Fatalf("expected current version in footer: %s", res.Body.String())
+	}
 	if strings.Contains(res.Body.String(), "展开原始输出") || strings.Contains(res.Body.String(), `class="evidence-details"`) {
 		t.Fatalf("expected finding evidence to render directly after opening details: %s", res.Body.String())
 	}
@@ -580,6 +583,11 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	handler.ServeHTTP(export, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=json&view=vulnerabilities", nil))
 	if export.Code != http.StatusOK || !strings.Contains(export.Body.String(), "192.0.2.51") {
 		t.Fatalf("vulnerability view unexpectedly changed the existing export: %d %s", export.Code, export.Body.String())
+	}
+	htmlExport := httptest.NewRecorder()
+	handler.ServeHTTP(htmlExport, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=html", nil))
+	if htmlExport.Code != http.StatusOK || !strings.Contains(htmlExport.Body.String(), "描述。") || !strings.Contains(htmlExport.Body.String(), "启用签名。") {
+		t.Fatalf("HTML export missing vulnerability delivery: %d %s", htmlExport.Code, htmlExport.Body.String())
 	}
 }
 

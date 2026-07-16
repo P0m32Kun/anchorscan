@@ -576,6 +576,23 @@
         {{end}}
       </tbody>
     </table>
+
+    {{if .Vulnerabilities}}
+    <section class="filter-panel">
+      <div class="filter-header"><h3>漏洞详情与修复建议</h3></div>
+      {{range .Vulnerabilities}}
+      <div class="finding-item">
+        <h4>{{.Title}}</h4>
+        <div class="finding-meta">漏洞简介</div>
+        <p>{{.Description}}</p>
+        <div class="finding-meta">受影响资产</div>
+        <p>{{range .Assets}}{{.}}<br>{{end}}</p>
+        <div class="finding-meta">修复建议</div>
+        <p>{{.Remediation}}</p>
+      </div>
+      {{end}}
+    </section>
+    {{end}}
   </div>
 
   <script>
