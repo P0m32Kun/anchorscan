@@ -1,6 +1,6 @@
 # Ticket 01 — 抽出 ReportView 视图塑造模块
 
-- 状态：`ready-for-agent` / frontier
+- 状态：`done`（实现 a28bdfd，自审通过，无 blocker/major）
 - Blocked by：无
 - 所属 spec：`docs/plans/deepen-reportview/spec.md`
 - Review fixed point：`93e945d`
@@ -23,4 +23,8 @@
 
 ## Review 结果
 
-（code-review 后填写）
+自审（无可用 reviewer subagent；delegate 对 review-only 不稳定；build/vet/test/gofmt 全绿 + 1272 行 report_handler_test 作回归网为强证据）：
+
+- **Spec: PASS** —— 4 项验收全过。
+- **Standards: 干净** —— `reportViewInput` 束消除 6 参数 Data Clump；命名清晰；URL 构造重复是内在的（不同 URL）；`AssetView` 字符串为既有风格。无 BLOCKER/MAJOR。
+- gofmt/build/vet/test 全绿；`report_handler.go` 手术净（-42/+8，大括号平衡）。
