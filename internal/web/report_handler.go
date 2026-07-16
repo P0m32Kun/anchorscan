@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
 
@@ -176,33 +178,51 @@ type commandToolView struct {
 	Label string
 }
 
-func (s *server) commandTools(findings []report.Finding) map[string][]commandToolView {
+type commandToolsView struct {
+	Tools  []commandToolView
+	Reason string
+}
+
+func (s *server) commandTools(findings []report.Finding) map[string]commandToolsView {
 	counts := map[string]int{}
 	for _, finding := range findings {
 		counts[report.FindingKey(finding)]++
 	}
-	available := map[string][]commandToolView{}
+	available := map[string]commandToolsView{}
 	for _, finding := range findings {
 		key := report.FindingKey(finding)
 		if counts[key] != 1 {
 			continue
 		}
+		view := commandToolsView{}
 		for _, tool := range []commandToolView{{Name: "nuclei", Label: "Nuclei"}, {Name: "nmap", Label: "Nmap NSE"}, {Name: "msf", Label: "MSF"}} {
-			var err error
-			switch tool.Name {
-			case "nuclei":
-				_, err = report.BuildNucleiCommand(finding, s.catalog)
-			case "nmap":
-				_, err = report.BuildNmapCommand(finding, s.catalog)
-			case "msf":
-				_, err = report.BuildMSFCommand(finding, s.catalog)
-			}
+			_, err := s.buildCommand(tool.Name, finding)
 			if err == nil {
-				available[key] = append(available[key], tool)
+				view.Tools = append(view.Tools, tool)
 			}
 		}
+		if len(view.Tools) == 0 {
+			view.Reason = s.commandUnavailableReason(finding)
+		}
+		available[key] = view
 	}
 	return available
+}
+
+func (s *server) commandUnavailableReason(finding report.Finding) string {
+	match := s.catalog.Match(report.ObservationFromFinding(finding))
+	if match.Status != knowledgebase.MatchMatched {
+		return "知识库未匹配或匹配不唯一"
+	}
+	for _, diagnostic := range s.catalog.Diagnostics() {
+		if diagnostic.EntryID == match.Entry.ID && strings.Contains(diagnostic.Reason, "命令无效") {
+			return "知识库命令格式无效"
+		}
+	}
+	if match.Entry.Commands.Nuclei == "" && match.Entry.Commands.NmapNSE == "" && match.Entry.Commands.Metasploit == "" {
+		return "知识库未提供检测命令"
+	}
+	return "目标不可绑定"
 }
 
 func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID string) {
@@ -241,21 +261,25 @@ func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID str
 		http.Error(w, "finding unavailable or ambiguous", http.StatusBadRequest)
 		return
 	}
-	var command report.NucleiCommand
-	switch tool {
-	case "nuclei":
-		command, err = report.BuildNucleiCommand(matches[0], s.catalog)
-	case "nmap":
-		command, err = report.BuildNmapCommand(matches[0], s.catalog)
-	case "msf":
-		command, err = report.BuildMSFCommand(matches[0], s.catalog)
-	}
+	command, err := s.buildCommand(tool, matches[0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(command)
+}
+
+func (s *server) buildCommand(tool string, finding report.Finding) (report.DetectionCommand, error) {
+	switch tool {
+	case "nuclei":
+		return report.BuildNucleiCommand(finding, s.catalog)
+	case "nmap":
+		return report.BuildNmapCommand(finding, s.catalog)
+	case "msf":
+		return report.BuildMSFCommand(finding, s.catalog)
+	}
+	return report.DetectionCommand{}, fmt.Errorf("unsupported tool")
 }
 
 func reportFiltersFromValues(values url.Values) reportFilters {

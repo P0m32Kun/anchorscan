@@ -199,6 +199,43 @@ func TestReportCommandGenerationProducesNmapAndMSFWithoutRunningTool(t *testing.
 	}
 }
 
+func TestReportCommandGenerationRejectsUnsafeMSF(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### MSF\n\n```text\nuse auxiliary/scanner/smb/smb_version; exploit\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-unsafe-msf", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.13", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}
+	if err := scanStore.SaveFinding("run-unsafe-msf", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	form := "finding_key=" + report.FindingKey(finding) + "&tool=msf"
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-unsafe-msf/commands", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnprocessableEntity || len(runner.commands) != 0 {
+		t.Fatalf("unsafe MSF response = %d, calls = %#v", res.Code, runner.commands)
+	}
+}
+
 func TestReportPageRendersFindings(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

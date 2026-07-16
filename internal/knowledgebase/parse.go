@@ -230,7 +230,7 @@ func validNmapNSE(command string) bool {
 	if err != nil || len(args) < 5 || args[0] != "nmap" || args[len(args)-1] != "{{host}}" {
 		return false
 	}
-	ports := 0
+	ports, hosts := 0, 0
 	for i, arg := range args {
 		if strings.HasPrefix(arg, "-o") || strings.Contains(arg, "{{host}}") && arg != "{{host}}" || strings.Contains(arg, "{{port}}") && arg != "{{port}}" {
 			return false
@@ -241,8 +241,11 @@ func validNmapNSE(command string) bool {
 			}
 			ports++
 		}
+		if arg == "{{host}}" {
+			hosts++
+		}
 	}
-	return ports == 1
+	return ports == 1 && hosts == 1
 }
 
 func validMSF(command string) bool {
@@ -255,7 +258,11 @@ func validMSF(command string) bool {
 		return false
 	}
 	action := strings.TrimSpace(lines[3])
-	return strings.HasPrefix(module, "auxiliary/scanner/") && action == "run" || strings.HasPrefix(module, "exploit/") && action == "check"
+	return validMSFModule(module) && (strings.HasPrefix(module, "auxiliary/scanner/") && action == "run" || strings.HasPrefix(module, "exploit/") && action == "check")
+}
+
+func validMSFModule(module string) bool {
+	return module != "" && !strings.ContainsAny(module, " \t;|&$`<>()\\\"'")
 }
 
 func parseSeverity(value string) Severity {
