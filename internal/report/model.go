@@ -8,16 +8,18 @@ import (
 )
 
 type Finding struct {
-	IP       string `json:"ip"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocol,omitempty"`
-	Scope    string `json:"scope,omitempty"`
-	Source   string `json:"source"`
-	ID       string `json:"id"`
-	Severity string `json:"severity"`
-	Summary  string `json:"summary"`
-	Target   string `json:"target"`
-	Output   string `json:"output"`
+	IP          string `json:"ip"`
+	Port        int    `json:"port"`
+	Protocol    string `json:"protocol,omitempty"`
+	Scope       string `json:"scope,omitempty"`
+	Source      string `json:"source"`
+	ID          string `json:"id"`
+	Severity    string `json:"severity"`
+	Summary     string `json:"summary"`
+	Target      string `json:"target"`
+	Output      string `json:"output"`
+	Description string `json:"description,omitempty"`
+	Remediation string `json:"remediation,omitempty"`
 }
 
 type PortReport struct {
@@ -43,10 +45,9 @@ type ScanMeta struct {
 }
 
 type ScanReport struct {
-	ScanMeta        ScanMeta                `json:"scan_meta"`
-	AliveIPs        []string                `json:"alive_ips,omitempty"`
-	Hosts           []HostReport            `json:"hosts"`
-	Vulnerabilities []VulnerabilityDelivery `json:"vulnerabilities,omitempty"`
+	ScanMeta ScanMeta     `json:"scan_meta"`
+	AliveIPs []string     `json:"alive_ips,omitempty"`
+	Hosts    []HostReport `json:"hosts"`
 }
 
 // ScanData carries the supplementary scan results that the report should expose

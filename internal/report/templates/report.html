@@ -360,6 +360,21 @@
       transform: rotate(90deg);
     }
 
+    .finding-delivery {
+      margin-top: 0.7rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border-strong);
+      border-left: 3px solid var(--primary);
+      border-radius: var(--radius-sm);
+      background: rgba(249, 115, 22, 0.04);
+    }
+
+    .finding-delivery p {
+      margin: 0.25rem 0 0.65rem;
+      color: var(--text);
+      font-size: 0.82rem;
+    }
+
     .evidence-title {
       border-top: 1px dashed var(--border);
       color: var(--muted);
@@ -562,6 +577,14 @@
                 <div class="evidence-title">验证证据 / 原始输出</div>
                 <pre class="evidence-block">{{.Output}}</pre>
                 {{end}}
+                {{if .Description}}
+                <div class="finding-delivery">
+                  <div class="finding-meta">漏洞简介</div>
+                  <p>{{.Description}}</p>
+                  <div class="finding-meta">修复建议</div>
+                  <p>{{.Remediation}}</p>
+                </div>
+                {{end}}
               </details>
             </div>
             {{else}}
@@ -577,22 +600,6 @@
       </tbody>
     </table>
 
-    {{if .Vulnerabilities}}
-    <section class="filter-panel">
-      <div class="filter-header"><h3>漏洞详情与修复建议</h3></div>
-      {{range .Vulnerabilities}}
-      <div class="finding-item">
-        <h4>{{.Title}}</h4>
-        <div class="finding-meta">漏洞简介</div>
-        <p>{{.Description}}</p>
-        <div class="finding-meta">受影响资产</div>
-        <p>{{range .Assets}}{{.}}<br>{{end}}</p>
-        <div class="finding-meta">修复建议</div>
-        <p>{{.Remediation}}</p>
-      </div>
-      {{end}}
-    </section>
-    {{end}}
   </div>
 
   <script>

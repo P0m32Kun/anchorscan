@@ -534,7 +534,7 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-aggregate", Target: "192.0.2.0/24", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
 		t.Fatal(err)
 	}
-	if err := scanStore.SaveFingerprint("run-aggregate", fingerprint.ServiceFingerprint{IP: "192.0.2.51", Port: 445, Service: "smb"}); err != nil {
+	if err := scanStore.SaveFingerprint("run-aggregate", fingerprint.ServiceFingerprint{IP: "192.0.2.51", Port: 445, Protocol: "tcp", Service: "smb"}); err != nil {
 		t.Fatal(err)
 	}
 	for i := 1; i <= 51; i++ {

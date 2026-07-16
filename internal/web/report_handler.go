@@ -71,7 +71,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	filteredFindings := filterFindings(findings, fps, filters)
 	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
 	if format == "html" || exportFormat == "html" {
-		filteredBuilt.Vulnerabilities = report.BuildMatchedVulnerabilityDeliveries(filteredFindings, s.catalog)
+		report.EnrichFindingsWithVulnerabilityDetails(&filteredBuilt, s.catalog)
 	}
 	switch format {
 	case "json":

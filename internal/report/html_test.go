@@ -30,7 +30,7 @@ func TestWriteHTMLStableBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := sha256.Sum256(data)
-	const want = "d96399f2bada192e26884948ecada622af32088422193859e460185226dd4859"
+	const want = "0861de3879228a773a86a8eaf76767513384d4c880b2f58c024e3d1a46c72561"
 	if actual := hex.EncodeToString(got[:]); actual != want {
 		t.Fatalf("unexpected HTML SHA-256: got %s, want %s", actual, want)
 	}
@@ -68,12 +68,9 @@ func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 
 func TestWriteHTMLIncludesMatchedVulnerabilityDelivery(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "report.html")
-	input := Build(nil, nil)
-	input.Vulnerabilities = []VulnerabilityDelivery{{
-		Title:       "Redis 默认凭据（高危）",
-		Description: "Redis 未限制默认访问。",
-		Remediation: "设置强密码并限制访问来源。",
-	}}
+	input := Build([]fingerprint.ServiceFingerprint{{IP: "192.0.2.10", Port: 6379}}, []Finding{{
+		IP: "192.0.2.10", Port: 6379, Description: "Redis 未限制默认访问。", Remediation: "设置强密码并限制访问来源。",
+	}})
 
 	if err := WriteHTML(path, input); err != nil {
 		t.Fatal(err)
