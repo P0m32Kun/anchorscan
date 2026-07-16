@@ -18,26 +18,26 @@ type targetResult struct {
 
 func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, artifactDir string, progress Progress) ([]TargetScan, []string, error) {
 	var aliveIPs []string
-	scanTargets := opts.Targets
+	targets := opts.Targets
 
-	if opts.Tools.Nmap != "" && len(scanTargets) > 0 {
-		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", scanTargets)
-		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, scanTargets, nil)
+	if opts.Tools.Nmap != "" && len(targets) > 0 {
+		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", targets)
+		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, targets, nil)
 		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
 			return nil, nil, writeErr
 		}
 		if err != nil {
 			return nil, nil, normalizeToolError(ctx, err)
 		}
-		scanTargets = aliveTargets
-		aliveIPs = append([]string(nil), scanTargets...)
-		progress.Emit("info", "nmap", "nmap alive hosts=%v", scanTargets)
-		if len(scanTargets) == 0 {
+		targets = aliveTargets
+		aliveIPs = append([]string(nil), targets...)
+		progress.Emit("info", "nmap", "nmap alive hosts=%v", targets)
+		if len(targets) == 0 {
 			progress.Emit("info", "target", "no live hosts discovered; skip port scan")
 		}
 	}
 
-	totalTargets := len(scanTargets)
+	totalTargets := len(targets)
 	if totalTargets > 0 {
 		progress.Emit("info", "progress", "progress 0/%d done=0 failed=0", totalTargets)
 	}
@@ -46,14 +46,14 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 	if workers <= 0 {
 		workers = 1
 	}
-	if workers > len(scanTargets) {
-		workers = len(scanTargets)
+	if workers > len(targets) {
+		workers = len(targets)
 	}
 
 	var scans []TargetScan
 	if workers > 0 {
 		targetCh := make(chan string)
-		results := make(chan targetResult, len(scanTargets))
+		results := make(chan targetResult, len(targets))
 		var wg sync.WaitGroup
 
 		for range workers {
@@ -77,7 +77,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 
 		go func() {
 			defer close(targetCh)
-			for _, target := range scanTargets {
+			for _, target := range targets {
 				select {
 				case <-ctx.Done():
 					return
@@ -132,7 +132,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 		if canceledErr != nil {
 			return nil, nil, canceledErr
 		}
-		if failed == len(scanTargets) {
+		if failed == len(targets) {
 			return nil, nil, fmt.Errorf("all targets failed: %w", firstErr)
 		}
 	}
