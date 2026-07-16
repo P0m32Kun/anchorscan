@@ -417,6 +417,38 @@
     }
 
     @media (max-width: 720px) {
+      body { padding: 1.25rem 0.75rem; }
+      table, tbody, tr, td { display: block; width: 100%; }
+      thead { display: none; }
+      table { border: 0; background: transparent; box-shadow: none; }
+      tr[data-ip] {
+        margin-top: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--panel);
+        overflow: hidden;
+      }
+      tr[data-ip] td {
+        display: grid;
+        grid-template-columns: 5.5rem minmax(0, 1fr);
+        gap: 0.5rem;
+        padding: 0.65rem 0.8rem;
+      }
+      tr[data-ip] td::before {
+        color: var(--muted);
+        content: attr(data-label);
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      tr[data-ip] td:nth-child(1)::before { content: "主机"; }
+      tr[data-ip] td:nth-child(2)::before { content: "端口"; }
+      tr[data-ip] td:nth-child(3)::before { content: "服务"; }
+      tr[data-ip] td:nth-child(4)::before { content: "产品"; }
+      tr[data-ip] td:nth-child(5)::before { content: "Web"; }
+      tr[data-ip] td:nth-child(6)::before { content: "漏洞"; }
+      .finding-detail-row { margin-bottom: 0.75rem; }
       .finding-detail-row td { padding: 0 0.6rem 0.75rem; }
       .finding-details { padding: 0.7rem; }
       .finding-delivery { grid-template-columns: 1fr; gap: 0.75rem; }
@@ -711,6 +743,13 @@
         const product = row.dataset.product.toLowerCase();
         const url = row.dataset.url.toLowerCase();
         const severities = JSON.parse(row.dataset.severities || '[]');
+        const detailRows = [];
+        let nextRow = row.nextElementSibling;
+        while (nextRow && nextRow.classList.contains('finding-detail-row')) {
+          detailRows.push(nextRow);
+          nextRow = nextRow.nextElementSibling;
+        }
+        const findingText = detailRows.map(detailRow => detailRow.innerText.toLowerCase()).join(' ');
         
         const matchIp = !ipVal || ip.includes(ipVal);
         const matchPort = !portVal || port.includes(portVal);
@@ -720,7 +759,8 @@
                              service.includes(keywordVal) || 
                              product.includes(keywordVal) || 
                              url.includes(keywordVal) ||
-                             row.innerText.toLowerCase().includes(keywordVal);
+                             row.innerText.toLowerCase().includes(keywordVal) ||
+                             findingText.includes(keywordVal);
                              
         let matchSeverity = false;
         if (currentSeverity === 'all') {
@@ -735,10 +775,8 @@
         } else {
           row.style.display = 'none';
         }
-        let detailRow = row.nextElementSibling;
-        while (detailRow && detailRow.classList.contains('finding-detail-row')) {
+        for (const detailRow of detailRows) {
           detailRow.style.display = row.style.display;
-          detailRow = detailRow.nextElementSibling;
         }
       });
       
