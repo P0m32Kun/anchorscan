@@ -15,7 +15,7 @@ import (
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
 	if strings.HasSuffix(path, "/commands") {
-		s.reportNucleiCommand(w, r, strings.TrimSuffix(path, "/commands"))
+		s.reportCommand(w, r, strings.TrimSuffix(path, "/commands"))
 		return
 	}
 	format := ""
@@ -151,6 +151,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"Filters":                filters,
 			"Fingerprints":           assetPage.Items,
 			"Findings":               findingPage.Items,
+			"CommandTools":           s.commandTools(filteredFindings),
 			"AssetPage":              assetPage,
 			"FindingPage":            findingPage,
 			"HostPage":               hostPage,
@@ -170,7 +171,41 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, runID string) {
+type commandToolView struct {
+	Name  string
+	Label string
+}
+
+func (s *server) commandTools(findings []report.Finding) map[string][]commandToolView {
+	counts := map[string]int{}
+	for _, finding := range findings {
+		counts[report.FindingKey(finding)]++
+	}
+	available := map[string][]commandToolView{}
+	for _, finding := range findings {
+		key := report.FindingKey(finding)
+		if counts[key] != 1 {
+			continue
+		}
+		for _, tool := range []commandToolView{{Name: "nuclei", Label: "Nuclei"}, {Name: "nmap", Label: "Nmap NSE"}, {Name: "msf", Label: "MSF"}} {
+			var err error
+			switch tool.Name {
+			case "nuclei":
+				_, err = report.BuildNucleiCommand(finding, s.catalog)
+			case "nmap":
+				_, err = report.BuildNmapCommand(finding, s.catalog)
+			case "msf":
+				_, err = report.BuildMSFCommand(finding, s.catalog)
+			}
+			if err == nil {
+				available[key] = append(available[key], tool)
+			}
+		}
+	}
+	return available
+}
+
+func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -179,7 +214,8 @@ func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, run
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(r.FormValue("tool")) != "nuclei" {
+	tool := strings.TrimSpace(r.FormValue("tool"))
+	if tool != "nuclei" && tool != "nmap" && tool != "msf" {
 		http.Error(w, "unsupported tool", http.StatusBadRequest)
 		return
 	}
@@ -205,7 +241,15 @@ func (s *server) reportNucleiCommand(w http.ResponseWriter, r *http.Request, run
 		http.Error(w, "finding unavailable or ambiguous", http.StatusBadRequest)
 		return
 	}
-	command, err := report.BuildNucleiCommand(matches[0], s.catalog)
+	var command report.NucleiCommand
+	switch tool {
+	case "nuclei":
+		command, err = report.BuildNucleiCommand(matches[0], s.catalog)
+	case "nmap":
+		command, err = report.BuildNmapCommand(matches[0], s.catalog)
+	case "msf":
+		command, err = report.BuildMSFCommand(matches[0], s.catalog)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return

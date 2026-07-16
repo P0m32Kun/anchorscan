@@ -458,7 +458,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
-			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成检测命令</button>
+			{{with index $.CommandTools (findingKey $finding)}}{{range .}}
+			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" data-command-tool="{{.Name}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成 {{.Label}} 命令</button>
+			{{end}}{{else}}<span class="meta-line">知识库未提供可用命令</span>{{end}}
           </td>
         </tr>
         <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
@@ -508,7 +510,7 @@
   </div>
 
   <dialog id="nuclei-command-dialog" class="panel">
-    <div class="panel-heading"><h3>生成 Nuclei 检测命令</h3><button class="button button-secondary" type="button" data-command-close>关闭</button></div>
+	<div class="panel-heading"><h3 id="command-dialog-title">生成检测命令</h3><button class="button button-secondary" type="button" data-command-close>关闭</button></div>
     <p class="meta-line" id="nuclei-command-message"></p>
     <pre id="nuclei-command-full"></pre>
     <div class="header-actions"><button class="button button-secondary" type="button" id="nuclei-command-copy">复制完整命令</button><a class="button button-primary" id="nuclei-command-tool" href="/tools/nuclei">带参数打开工具页</a></div>
@@ -547,12 +549,15 @@
       try {
         const endpoint = new URL('/reports/{{.Run.RunID}}/commands', window.location.origin);
         endpoint.search = window.location.search;
-        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: 'nuclei'})});
+		const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: button.dataset.commandTool})});
         if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
         const command = await response.json();
         commandMessage.textContent = '请人工确认后运行；此操作未启动扫描。';
         commandFull.textContent = command.full_command;
-        document.getElementById('nuclei-command-tool').href = '/tools/nuclei?raw_args=' + encodeURIComponent(command.tool_args);
+		const toolLink = document.getElementById('nuclei-command-tool');
+		document.getElementById('command-dialog-title').textContent = '生成 ' + button.textContent.trim().replace('生成 ', '');
+		toolLink.hidden = button.dataset.commandTool === 'msf';
+		if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.commandTool + '?raw_args=' + encodeURIComponent(command.tool_args);
         document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
       } catch (error) {
         commandMessage.textContent = error.message || String(error);

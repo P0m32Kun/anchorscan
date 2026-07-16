@@ -79,7 +79,7 @@ func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *tes
 	}
 	page := httptest.NewRecorder()
 	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/reports/run-command", nil))
-	if !strings.Contains(page.Body.String(), `data-command-key="`+report.FindingKey(finding)+`"`) || !strings.Contains(page.Body.String(), "生成检测命令") {
+	if !strings.Contains(page.Body.String(), `data-command-key="`+report.FindingKey(finding)+`"`) || !strings.Contains(page.Body.String(), "生成 Nuclei 命令") {
 		t.Fatalf("report page has no command entry: %s", page.Body.String())
 	}
 	toolPage := httptest.NewRecorder()
@@ -140,6 +140,62 @@ func TestReportNucleiCommandGenerationRejectsMismatchedURL(t *testing.T) {
 	}
 	if len(runner.commands) != 0 {
 		t.Fatalf("mismatched URL ran a tool: %#v", runner.commands)
+	}
+}
+
+func TestReportCommandGenerationProducesNmapAndMSFWithoutRunningTool(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nmap NSE\n\n```bash\nnmap --script smb-security-mode -p {{port}} {{host}}\n```\n\n##### MSF\n\n```text\nuse auxiliary/scanner/smb/smb_version\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-nmap-msf", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.12", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"}
+	if err := scanStore.SaveFinding("run-nmap-msf", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	for tool, want := range map[string]struct{ full, args string }{
+		"nmap": {"nmap --script smb-security-mode -p 445 192.0.2.12", "--script smb-security-mode -p 445 192.0.2.12"},
+		"msf":  {"msfconsole -q -x \"use auxiliary/scanner/smb/smb_version; set RHOSTS 192.0.2.12; set RPORT 445; run; exit\"", ""},
+	} {
+		form := "finding_key=" + report.FindingKey(finding) + "&tool=" + tool
+		req := httptest.NewRequest(http.MethodPost, "/reports/run-nmap-msf/commands", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("%s command generation = %d: %s", tool, res.Code, res.Body.String())
+		}
+		var got struct {
+			FullCommand string `json:"full_command"`
+			ToolArgs    string `json:"tool_args"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got.FullCommand != want.full || got.ToolArgs != want.args {
+			t.Fatalf("%s command = %#v", tool, got)
+		}
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("command generation ran a tool: %#v", runner.commands)
 	}
 }
 
