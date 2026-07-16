@@ -135,8 +135,10 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			view = "ports"
 		}
 		var vulnerabilities []report.VulnerabilityDelivery
+		var pendingVulnerabilities []report.VulnerabilityDelivery
 		if view == "vulnerabilities" {
 			vulnerabilities = report.BuildMatchedVulnerabilityDeliveries(filteredFindings, s.catalog)
+			pendingVulnerabilities = report.BuildPendingVulnerabilityDeliveries(filteredFindings, s.catalog)
 		}
 		assetPage := paginateFingerprints(filteredFingerprints, parsePage(query.Get("assets_page")), query, "assets_page", "assets_size", parseSize(query.Get("assets_size")))
 		findingPage := paginateFindings(filteredFindings, parsePage(query.Get("findings_page")), query, "findings_page", "findings_size", parseSize(query.Get("findings_size")))
@@ -147,23 +149,26 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		copyBase.Del("assets_size")
 		copyBase.Del("findings_size")
 		render(w, "templates/report.html", map[string]any{
-			"Run":             run,
-			"RunMeta":         newRunMetaView(run),
-			"Filters":         filters,
-			"Fingerprints":    assetPage.Items,
-			"Findings":        findingPage.Items,
-			"AssetPage":       assetPage,
-			"FindingPage":     findingPage,
-			"HostPage":        hostPage,
-			"AssetView":       view,
-			"Vulnerabilities": vulnerabilities,
-			"AssetTXTIP":      "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
-			"AssetTXTIPPort":  "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
-			"AssetTXTURL":     "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
-			"AssetCSV":        "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
-			"ExportJSON":      "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "json"),
-			"ExportHTML":      "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
-			"ExportCSV":       "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
+			"Run":                    run,
+			"RunMeta":                newRunMetaView(run),
+			"Filters":                filters,
+			"Fingerprints":           assetPage.Items,
+			"Findings":               findingPage.Items,
+			"AssetPage":              assetPage,
+			"FindingPage":            findingPage,
+			"HostPage":               hostPage,
+			"AssetView":              view,
+			"Vulnerabilities":        vulnerabilities,
+			"PendingVulnerabilities": pendingVulnerabilities,
+			"CatalogStatus":          string(s.catalog.Status()),
+			"CatalogDiagnostics":     s.catalog.Diagnostics(),
+			"AssetTXTIP":             "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
+			"AssetTXTIPPort":         "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
+			"AssetTXTURL":            "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
+			"AssetCSV":               "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
+			"ExportJSON":             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "json"),
+			"ExportHTML":             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
+			"ExportCSV":              "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 		})
 	}
 }

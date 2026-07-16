@@ -169,6 +169,207 @@ func TestReportPageVulnerabilityAggregateMatchesConsecutiveCVEs(t *testing.T) {
 	}
 }
 
+func TestReportPageVulnerabilityAggregateRendersPendingFindings(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(knowledgeBaseFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-pending", Target: "192.0.2.3", Ports: "8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-pending", report.Finding{IP: "192.0.2.3", Port: 8080, Protocol: "tcp", Scope: "scope-secret", Source: "nuclei", ID: "unmatched-finding", Severity: "high", Summary: "待补充漏洞", Output: "output-secret"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-pending?view=vulnerabilities", nil))
+	body := res.Body.String()
+	for _, want := range []string{"待补充漏洞（高危）", "知识库未匹配，请人工补充", "192.0.2.3:8080/tcp"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("pending aggregate response missing %q: %s", want, body)
+		}
+	}
+	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
+		t.Fatalf("pending aggregate response has %d copy controls, want 5: %s", copies, body)
+	}
+	if strings.Contains(body, "scope-secret") || strings.Contains(body, "output-secret") {
+		t.Fatalf("pending aggregate leaked technical fields: %s", body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateExplainsDisabledCatalog(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-disabled", Target: "192.0.2.4", Ports: "80", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-disabled", report.Finding{IP: "192.0.2.4", Port: 80, Protocol: "tcp", Source: "nuclei", ID: "unmatched", Severity: "medium"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-disabled?view=vulnerabilities", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "未配置漏洞知识库路径") || !strings.Contains(res.Body.String(), "192.0.2.4:80/tcp") {
+		t.Fatalf("disabled catalog response does not retain facts with guidance: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateSortsPendingFindings(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-pending-sort", Target: "192.0.2.0/24", Ports: "80", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "192.0.2.8", Port: 80, Source: "nuclei", ID: "later", Severity: "high", Summary: "同名漏洞"},
+		{IP: "192.0.2.9", Port: 80, Source: "nuclei", ID: "first", Severity: "critical", Summary: "同名漏洞"},
+	} {
+		if err := scanStore.SaveFinding("run-pending-sort", finding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-pending-sort?view=vulnerabilities", nil))
+	body := res.Body.String()
+	first := strings.Index(body, "同名漏洞（严重）")
+	second := strings.Index(body, "同名漏洞（高危）")
+	if first < 0 || second < first {
+		t.Fatalf("pending findings are not stably sorted by severity: %s", body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateExplainsUnavailableCatalog(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("knowledge_base:\n  path: missing.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-unavailable", Target: "192.0.2.5", Ports: "443", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-unavailable", report.Finding{IP: "192.0.2.5", Port: 443, Protocol: "tcp", Source: "nuclei", ID: "unmatched", Severity: "medium"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-unavailable?view=vulnerabilities", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "漏洞知识库加载失败") || !strings.Contains(res.Body.String(), "192.0.2.5:443/tcp") {
+		t.Fatalf("unavailable catalog response does not retain facts with diagnostics: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateKeepsAmbiguousFindingPending(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "nuclei: [smb-signing]", "nuclei: [ambiguous-id]", 1) + "\n### 另一条目（低危）\n\n<!-- anchorscan-entry\nid: other-entry\naliases: []\nmatch:\n  nuclei: [ambiguous-id]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\n另一条描述。\n\n#### 验证命令\n\n#### 修复建议\n\n另一条修复。\n"
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-ambiguous", Target: "192.0.2.6", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-ambiguous", report.Finding{IP: "192.0.2.6", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "ambiguous-id", Severity: "high", Summary: "歧义漏洞"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-ambiguous?view=vulnerabilities", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "歧义漏洞（高危）") || !strings.Contains(body, "知识库未匹配，请人工补充") || strings.Contains(body, "另一条修复") {
+		t.Fatalf("ambiguous finding was not safely kept pending: %d %s", res.Code, body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateExplainsDegradedCatalog(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := knowledgeBaseFixture + "\n### 损坏条目（低危）\n\n<!-- anchorscan-entry\nid: \naliases: []\nmatch:\n  nuclei: []\n  nse: []\n  manual-review: []\n  cve: []\n-->\n"
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-degraded", Target: "192.0.2.7", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-degraded", report.Finding{IP: "192.0.2.7", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-degraded?view=vulnerabilities", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "漏洞知识库部分降级") || !strings.Contains(body, "SMB 签名未启用（中危）") {
+		t.Fatalf("degraded catalog response does not preserve matched delivery: %d %s", res.Code, body)
+	}
+}
+
 func TestReportPageVulnerabilityAggregateFormatsAssetsAndEscapesHTML(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

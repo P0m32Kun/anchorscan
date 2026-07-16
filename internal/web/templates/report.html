@@ -200,7 +200,10 @@
     <div>
       <p class="eyebrow">漏洞交付</p>
       <h3>按漏洞聚合</h3>
-      <p class="meta-line">仅包含当前筛选范围内已匹配且非 info 的漏洞。</p>
+      <p class="meta-line">仅包含当前筛选范围内非 info 的漏洞；待补充项需人工完善知识库内容。</p>
+      {{if eq .CatalogStatus "disabled"}}<p class="meta-line">未配置漏洞知识库路径，以下按扫描标识待补充。</p>{{end}}
+      {{if eq .CatalogStatus "unavailable"}}<p class="meta-line">漏洞知识库加载失败：{{range .CatalogDiagnostics}}{{.Reason}}{{end}}</p>{{end}}
+      {{if eq .CatalogStatus "degraded"}}<p class="meta-line">漏洞知识库部分降级，已跳过或禁用 {{len .CatalogDiagnostics}} 项内容。</p>{{end}}
     </div>
   </div>
   {{range .Vulnerabilities}}
@@ -221,8 +224,33 @@
     <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>
     <pre>{{.Remediation}}</pre>
   </article>
-  {{else}}
-  <p class="no-data">🛡️ 当前筛选范围没有已匹配的非 info 漏洞。</p>
+  {{end}}
+  {{if .PendingVulnerabilities}}
+  <div class="panel-heading" style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+    <div><p class="eyebrow">待补充</p><h3>知识库未匹配</h3></div>
+  </div>
+  {{range .PendingVulnerabilities}}
+  <article class="knowledgebase-content" style="padding: 1.25rem 0; border-top: 1px solid var(--border);">
+    <div class="panel-heading">
+      <h3>{{.Title}}</h3>
+      <div class="header-actions">
+        <button class="button button-secondary" type="button" data-copy-text="{{.Title}}">复制字段</button>
+        <button class="button button-secondary" type="button" data-copy-text="{{.CopyText}}">复制本条</button>
+      </div>
+    </div>
+    <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
+    <pre>{{.Description}}</pre>
+    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{range .Assets}}{{.}}
+{{end}}">复制字段</button></div>
+    <pre>{{range .Assets}}{{.}}
+{{end}}</pre>
+    <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>
+    <pre>{{.Remediation}}</pre>
+  </article>
+  {{end}}
+  {{end}}
+  {{if and (not .Vulnerabilities) (not .PendingVulnerabilities)}}
+  <p class="no-data">🛡️ 当前筛选范围没有非 info 漏洞。</p>
   {{end}}
 </section>
 {{else}}
