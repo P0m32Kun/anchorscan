@@ -1,7 +1,7 @@
 # Ticket 02 — 搬迁：scanTarget 纯流水线化 + fan-out 持久化
 
-- 状态：`blocked`
-- Blocked by：`01-prep-concepts.md`（须先 done）
+- 状态：`done`（实现 c248ffa + 修正 3315423，双轴 code-review 通过，无 blocker/major）
+- Blocked by：`01-prep-concepts.md`（已 done）
 - 所属 spec：`docs/plans/deepen-targetscan/spec.md`
 
 ## 目标
@@ -21,6 +21,15 @@
 - 现有 16 个 `TestRunScan*` 仍零修改通过（行为不变）。
 - 新增 `TestScanTarget*` 覆盖流水线分支（有/无开放端口、web→httpx、NSE、nuclei）且不依赖 SQLite。
 - `scanTarget` 签名不再含 `*store.Store`。
+
+## Review 结果（双轴）
+
+- **Spec: PASS** —— 6 项验收全过（scanTarget 甩 store、progress seam、fan-out 逐 target 持久化、`[]TargetScan` 返回、RunScan 展平、直接无 SQLite 测试）；行为等价已核实（fingerprints/findings 表无 FK，List 查询按 ip/port 排序而非插入顺序）。
+- **Standards: 1 MINOR（已修）+ 1 NIT（既有，留）** ——
+  ① `[MINOR]` 局部变量 `scanTargets` 遮蔽函数名且语义双关 → 已重命名为 `targets`（commit 3315423）；
+  ② `[NIT]` writeArtifact 错误检查模式重复 ~6×（既有、非本变更引入）→ 留待后续。
+- 残余风险：persist 时机从「逐发现交织」变「逐 target 批量」—— 已由 ip/port 稳定排序保证观测等价（spec 决策 2 既定）。
+- gofmt/build/vet/test/LSP 全绿；16 个 `TestRunScan*` 零修改通过。
 
 ## 完成后
 
