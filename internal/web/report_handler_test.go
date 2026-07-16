@@ -83,6 +83,9 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-aggregate", Target: "192.0.2.0/24", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
 		t.Fatal(err)
 	}
+	if err := scanStore.SaveFingerprint("run-aggregate", fingerprint.ServiceFingerprint{IP: "192.0.2.51", Port: 445, Service: "smb"}); err != nil {
+		t.Fatal(err)
+	}
 	for i := 1; i <= 51; i++ {
 		if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "192.0.2." + strconv.Itoa(i), Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high", Summary: "SMB signing"}); err != nil {
 			t.Fatal(err)
@@ -119,6 +122,50 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	handler.ServeHTTP(results, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?severity=info", nil))
 	if results.Code != http.StatusOK || !strings.Contains(results.Body.String(), "info-only") {
 		t.Fatalf("vulnerability view unexpectedly changed the existing results: %d %s", results.Code, results.Body.String())
+	}
+	filtered := httptest.NewRecorder()
+	handler.ServeHTTP(filtered, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&q=192.0.2.51", nil))
+	if filtered.Code != http.StatusOK || !strings.Contains(filtered.Body.String(), "192.0.2.51:445/tcp") || strings.Contains(filtered.Body.String(), "192.0.2.1:445/tcp") {
+		t.Fatalf("aggregate did not use the complete filtered finding set: %d %s", filtered.Code, filtered.Body.String())
+	}
+	export := httptest.NewRecorder()
+	handler.ServeHTTP(export, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=json&view=vulnerabilities", nil))
+	if export.Code != http.StatusOK || !strings.Contains(export.Body.String(), "192.0.2.51") {
+		t.Fatalf("vulnerability view unexpectedly changed the existing export: %d %s", export.Code, export.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateMatchesConsecutiveCVEs(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "cve: []", "cve: [CVE-2024-0002]", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-cve", Target: "192.0.2.2", Ports: "443", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-cve", report.Finding{IP: "192.0.2.2", Port: 443, Protocol: "tcp", Source: "nuclei", ID: "CVE-2024-0001,CVE-2024-0002", Severity: "high"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-cve?view=vulnerabilities", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "SMB 签名未启用（中危）") {
+		t.Fatalf("aggregate did not match the second consecutive CVE: %d %s", res.Code, res.Body.String())
 	}
 }
 
