@@ -70,6 +70,7 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding, data ScanData) ScanReport {
 	hostMap := map[string]*HostReport{}
 	findingsByPort := map[string][]Finding{}
+	attachedFindingPorts := map[string]bool{}
 
 	for _, finding := range dedupeFindings(findings) {
 		key := portKey(finding.IP, finding.Port, finding.Protocol)
@@ -95,6 +96,23 @@ func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding,
 			Findings:    append([]Finding(nil), findingsByPort[portKey(fp.IP, fp.Port, fp.Protocol)]...),
 		}
 		host.Ports = append(host.Ports, port)
+		attachedFindingPorts[portKey(fp.IP, fp.Port, fp.Protocol)] = true
+	}
+
+	// Keep findings visible even when their service fingerprint is unavailable.
+	for key, portFindings := range findingsByPort {
+		if attachedFindingPorts[key] || len(portFindings) == 0 {
+			continue
+		}
+		finding := portFindings[0]
+		host := hostMap[finding.IP]
+		if host == nil {
+			host = &HostReport{IP: finding.IP}
+			hostMap[finding.IP] = host
+		}
+		host.Ports = append(host.Ports, PortReport{
+			Port: finding.Port, Protocol: finding.Protocol, Findings: append([]Finding(nil), portFindings...),
+		})
 	}
 
 	// Ensure every alive host appears in the report, even without fingerprints,

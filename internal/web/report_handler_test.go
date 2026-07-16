@@ -586,8 +586,20 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	}
 	htmlExport := httptest.NewRecorder()
 	handler.ServeHTTP(htmlExport, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=html", nil))
-	if htmlExport.Code != http.StatusOK || !strings.Contains(htmlExport.Body.String(), "描述。") || !strings.Contains(htmlExport.Body.String(), "启用签名。") {
-		t.Fatalf("HTML export missing vulnerability delivery: %d %s", htmlExport.Code, htmlExport.Body.String())
+	htmlBody := htmlExport.Body.String()
+	if htmlExport.Code != http.StatusOK || !strings.Contains(htmlBody, "描述。") || !strings.Contains(htmlBody, "启用签名。") {
+		t.Fatalf("HTML export missing vulnerability delivery: %d %s", htmlExport.Code, htmlBody)
+	}
+	if count := strings.Count(htmlBody, "漏洞简介"); count != 51 {
+		t.Fatalf("HTML export has %d finding details, want 51: %s", count, htmlBody)
+	}
+	firstDetails := strings.Index(htmlBody, `<details class="finding-details">`)
+	if firstDetails < 0 {
+		t.Fatalf("HTML export missing finding details: %s", htmlBody)
+	}
+	firstDetailsEnd := firstDetails + strings.Index(htmlBody[firstDetails:], "</details>")
+	if !strings.Contains(htmlBody[firstDetails:firstDetailsEnd], "描述。") || !strings.Contains(htmlBody[firstDetails:firstDetailsEnd], "启用签名。") {
+		t.Fatalf("HTML export did not render guidance inside the finding details: %s", htmlBody)
 	}
 }
 
