@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
@@ -78,12 +79,14 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
 	}()
 
-	allFingerprints, allFindings, aliveIPs, openPorts, err := scanTargets(ctx, runner, scanStore, opts, artifactDir)
+	progress := storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}
+	scans, aliveIPs, err := scanTargets(ctx, runner, scanStore, opts, artifactDir, progress)
 	if err != nil {
 		return err
 	}
 
-	emit(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
+	allFingerprints, allFindings, openPorts := flattenScans(scans)
+	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)
 	return report.WriteJSON(opts.JSONReportPath, report.BuildWithScanData(allFingerprints, allFindings, report.ScanData{
 		AliveIPs:  aliveIPs,
 		OpenPorts: openPorts,
@@ -96,8 +99,21 @@ func logf(opts ScanOptions, format string, args ...any) {
 	}
 }
 
-func emit(opts ScanOptions, scanStore *store.Store, level string, stage string, format string, args ...any) {
-	storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}.Emit(level, stage, format, args...)
+// flattenScans reduces a slice of per-target TargetScans into the flat shape the
+// report builder expects: all fingerprints, all findings, and open ports keyed
+// by host. It mirrors the accumulation that previously lived inside scanTargets.
+func flattenScans(scans []TargetScan) ([]fingerprint.ServiceFingerprint, []report.Finding, map[string][]int) {
+	var allFingerprints []fingerprint.ServiceFingerprint
+	var allFindings []report.Finding
+	openPortsByHost := map[string][]int{}
+	for _, scan := range scans {
+		allFingerprints = append(allFingerprints, scan.Fingerprints...)
+		allFindings = append(allFindings, scan.Findings...)
+		if len(scan.OpenPorts) > 0 {
+			openPortsByHost[scan.Target] = scan.OpenPorts
+		}
+	}
+	return allFingerprints, allFindings, openPortsByHost
 }
 
 func normalizeToolError(ctx context.Context, err error) error {
