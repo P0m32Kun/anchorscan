@@ -309,13 +309,19 @@
       transition: all 0.2s ease;
     }
 
-    .finding-item {
-      padding: 0.25rem 0;
-      border-bottom: 1px dashed var(--border);
+    .finding-count {
+      color: var(--primary);
+      font-size: 0.78rem;
+      font-weight: 700;
     }
-    
-    .finding-item:last-child {
-      border-bottom: none;
+
+    .finding-detail-row td {
+      padding: 0 1.25rem 1rem;
+      background: rgba(255, 255, 255, 0.012);
+    }
+
+    .finding-detail-row:hover td {
+      background: rgba(255, 255, 255, 0.012);
     }
     
     .finding-summary {
@@ -331,7 +337,11 @@
     }
 
     .finding-details {
-      padding: 0.4rem 0;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      background: #0c0d10;
     }
 
     .finding-details summary {
@@ -362,7 +372,10 @@
 
     .finding-delivery {
       margin-top: 0.7rem;
-      padding: 0.75rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      padding: 0.9rem 1rem;
       border: 1px solid var(--border-strong);
       border-left: 3px solid var(--primary);
       border-radius: var(--radius-sm);
@@ -370,9 +383,10 @@
     }
 
     .finding-delivery p {
-      margin: 0.25rem 0 0.65rem;
+      margin: 0.25rem 0 0;
       color: var(--text);
       font-size: 0.82rem;
+      overflow-wrap: anywhere;
     }
 
     .evidence-title {
@@ -400,6 +414,12 @@
       font-family: 'JetBrains Mono', monospace;
       max-height: 350px;
       overflow-y: auto;
+    }
+
+    @media (max-width: 720px) {
+      .finding-detail-row td { padding: 0 0.6rem 0.75rem; }
+      .finding-details { padding: 0.7rem; }
+      .finding-delivery { grid-template-columns: 1fr; gap: 0.75rem; }
     }
     
     .web-badge {
@@ -564,29 +584,8 @@
             {{end}}
           </td>
           <td>
-            {{range .Findings}}
-            <div class="finding-item">
-              <details class="finding-details">
-                <summary>
-                  <span class="severity-badge sev-{{.Severity}}">{{.Severity}}</span>
-                  <span class="finding-summary">{{.Summary}}</span>
-                </summary>
-                <div class="finding-meta">来源: {{.Source}} | 规则: {{.ID}}</div>
-                {{if .Target}}<div class="finding-meta">目标: {{.Target}}</div>{{end}}
-                {{if .Output}}
-                <div class="evidence-title">验证证据 / 原始输出</div>
-                <pre class="evidence-block">{{.Output}}</pre>
-                {{end}}
-                {{if .Description}}
-                <div class="finding-delivery">
-                  <div class="finding-meta">漏洞简介</div>
-                  <p>{{.Description}}</p>
-                  <div class="finding-meta">修复建议</div>
-                  <p>{{.Remediation}}</p>
-                </div>
-                {{end}}
-              </details>
-            </div>
+            {{if .Findings}}
+            <span class="finding-count">{{len .Findings}} 条漏洞发现，展开查看详情</span>
             {{else}}
             <div style="color: var(--success); font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
               <span>🛡️</span>
@@ -595,6 +594,36 @@
             {{end}}
           </td>
         </tr>
+        {{range .Findings}}
+        <tr class="finding-detail-row">
+          <td colspan="6">
+            <details class="finding-details">
+              <summary>
+                <span class="severity-badge sev-{{.Severity}}">{{.Severity}}</span>
+                <span class="finding-summary">{{.Summary}}</span>
+              </summary>
+              <div class="finding-meta">来源: {{.Source}} | 规则: {{.ID}}</div>
+              {{if .Target}}<div class="finding-meta">目标: {{.Target}}</div>{{end}}
+              {{if .Description}}
+              <div class="finding-delivery">
+                <section>
+                  <div class="finding-meta">漏洞简介</div>
+                  <p>{{.Description}}</p>
+                </section>
+                <section>
+                  <div class="finding-meta">修复建议</div>
+                  <p>{{.Remediation}}</p>
+                </section>
+              </div>
+              {{end}}
+              {{if .Output}}
+              <div class="evidence-title">验证证据 / 原始输出</div>
+              <pre class="evidence-block">{{.Output}}</pre>
+              {{end}}
+            </details>
+          </td>
+        </tr>
+        {{end}}
         {{end}}
         {{end}}
       </tbody>
@@ -606,7 +635,7 @@
     let currentSeverity = 'all';
 
     document.addEventListener("DOMContentLoaded", function() {
-      const rows = document.querySelectorAll('tbody tr');
+      const rows = document.querySelectorAll('tbody tr[data-ip]');
       
       let hostSet = new Set();
       let portCount = 0;
@@ -672,7 +701,7 @@
       const portVal = document.getElementById('filter-port').value.toLowerCase().trim();
       const keywordVal = document.getElementById('filter-keyword').value.toLowerCase().trim();
       
-      const rows = document.querySelectorAll('tbody tr');
+      const rows = document.querySelectorAll('tbody tr[data-ip]');
       let visibleCount = 0;
       
       rows.forEach(row => {
@@ -705,6 +734,11 @@
           visibleCount++;
         } else {
           row.style.display = 'none';
+        }
+        let detailRow = row.nextElementSibling;
+        while (detailRow && detailRow.classList.contains('finding-detail-row')) {
+          detailRow.style.display = row.style.display;
+          detailRow = detailRow.nextElementSibling;
         }
       });
       
