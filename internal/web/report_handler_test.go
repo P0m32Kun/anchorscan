@@ -1,6 +1,7 @@
 package web
 
 import (
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -206,6 +207,10 @@ func TestReportPageVulnerabilityAggregateRendersPendingFindings(t *testing.T) {
 	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
 		t.Fatalf("pending aggregate response has %d copy controls, want 5: %s", copies, body)
 	}
+	wantCopy := "漏洞名\n待补充漏洞（高危）\n\n漏洞简介\n知识库未匹配，请人工补充\n\n漏洞资产\n192.0.2.3:8080/tcp\n\n修复建议\n知识库未匹配，请人工补充"
+	if !strings.Contains(body, `data-copy-text="`+html.EscapeString(wantCopy)+`"`) {
+		t.Fatalf("pending aggregate copy text is incomplete or out of order: %s", body)
+	}
 	if strings.Contains(body, "scope-secret") || strings.Contains(body, "output-secret") {
 		t.Fatalf("pending aggregate leaked technical fields: %s", body)
 	}
@@ -248,8 +253,9 @@ func TestReportPageVulnerabilityAggregateSortsPendingFindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, finding := range []report.Finding{
-		{IP: "192.0.2.8", Port: 80, Source: "nuclei", ID: "later", Severity: "high", Summary: "同名漏洞"},
-		{IP: "192.0.2.9", Port: 80, Source: "nuclei", ID: "first", Severity: "critical", Summary: "同名漏洞"},
+		{IP: "192.0.2.8", Port: 80, Source: "nuclei", ID: "later", Severity: "high", Summary: "另一漏洞"},
+		{IP: "192.0.2.9", Port: 80, Source: "nuclei", Severity: "critical", Summary: "同组 漏洞"},
+		{IP: "192.0.2.10", Port: 80, Source: "nuclei", Severity: "medium", Summary: " 同组   漏洞 "},
 	} {
 		if err := scanStore.SaveFinding("run-pending-sort", finding); err != nil {
 			t.Fatal(err)
@@ -264,10 +270,13 @@ func TestReportPageVulnerabilityAggregateSortsPendingFindings(t *testing.T) {
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-pending-sort?view=vulnerabilities", nil))
 	body := res.Body.String()
-	first := strings.Index(body, "同名漏洞（严重）")
-	second := strings.Index(body, "同名漏洞（高危）")
+	first := strings.Index(body, "同组 漏洞（严重）")
+	second := strings.Index(body, "另一漏洞（高危）")
 	if first < 0 || second < first {
 		t.Fatalf("pending findings are not stably sorted by severity: %s", body)
+	}
+	if copies := strings.Count(body, "data-copy-text="); copies != 10 {
+		t.Fatalf("empty-ID findings were not merged into one pending group: %d %s", copies, body)
 	}
 }
 
