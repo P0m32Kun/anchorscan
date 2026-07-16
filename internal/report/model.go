@@ -71,10 +71,18 @@ func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding,
 	hostMap := map[string]*HostReport{}
 	findingsByPort := map[string][]Finding{}
 	attachedFindingPorts := map[string]bool{}
+	fingerprintProtocols := map[string]map[string]bool{}
 
 	for _, finding := range dedupeFindings(findings) {
 		key := portKey(finding.IP, finding.Port, finding.Protocol)
 		findingsByPort[key] = append(findingsByPort[key], finding)
+	}
+	for _, fp := range fps {
+		key := portKey(fp.IP, fp.Port, "")
+		if fingerprintProtocols[key] == nil {
+			fingerprintProtocols[key] = map[string]bool{}
+		}
+		fingerprintProtocols[key][fp.Protocol] = true
 	}
 
 	for _, fp := range fps {
@@ -84,6 +92,14 @@ func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding,
 			hostMap[fp.IP] = host
 		}
 
+		key := portKey(fp.IP, fp.Port, fp.Protocol)
+		portFindings := append([]Finding(nil), findingsByPort[key]...)
+		hostPortKey := portKey(fp.IP, fp.Port, "")
+		if fp.Protocol != "" && len(fingerprintProtocols[hostPortKey]) == 1 {
+			emptyProtocolKey := portKey(fp.IP, fp.Port, "")
+			portFindings = append(portFindings, findingsByPort[emptyProtocolKey]...)
+			attachedFindingPorts[emptyProtocolKey] = true
+		}
 		port := PortReport{
 			Port:        fp.Port,
 			Protocol:    fp.Protocol,
@@ -93,10 +109,10 @@ func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding,
 			Fingerprint: fp.Normalized,
 			IsWeb:       fp.IsWeb,
 			URL:         fp.URL,
-			Findings:    append([]Finding(nil), findingsByPort[portKey(fp.IP, fp.Port, fp.Protocol)]...),
+			Findings:    portFindings,
 		}
 		host.Ports = append(host.Ports, port)
-		attachedFindingPorts[portKey(fp.IP, fp.Port, fp.Protocol)] = true
+		attachedFindingPorts[key] = true
 	}
 
 	// Keep findings visible even when their service fingerprint is unavailable.
