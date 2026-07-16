@@ -232,7 +232,7 @@ func validNmapNSE(command string) bool {
 	}
 	ports, hosts := 0, 0
 	for i, arg := range args {
-		if strings.HasPrefix(arg, "-o") || strings.Contains(arg, "{{host}}") && arg != "{{host}}" || strings.Contains(arg, "{{port}}") && arg != "{{port}}" {
+		if strings.HasPrefix(arg, "-o") || strings.Contains(arg, "{{host}}") && arg != "{{host}}" || strings.Contains(arg, "{{port}}") && arg != "{{port}}" || strings.Contains(arg, "{{") && arg != "{{host}}" && arg != "{{port}}" {
 			return false
 		}
 		if arg == "-p" {

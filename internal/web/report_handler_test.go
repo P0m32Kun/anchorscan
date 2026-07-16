@@ -236,6 +236,41 @@ func TestReportCommandGenerationRejectsUnsafeMSF(t *testing.T) {
 	}
 }
 
+func TestReportCommandGenerationRejectsUnknownNmapPlaceholder(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nmap NSE\n\n```bash\nnmap --script {{unknown}} -p {{port}} {{host}}\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-unknown-nmap", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.14", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}
+	if err := st.SaveFinding("run-unknown-nmap", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: &serverSequenceRunner{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-unknown-nmap/commands", strings.NewReader("finding_key="+report.FindingKey(finding)+"&tool=nmap"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown placeholder response = %d: %s", res.Code, res.Body.String())
+	}
+}
+
 func TestReportPageRendersFindings(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
