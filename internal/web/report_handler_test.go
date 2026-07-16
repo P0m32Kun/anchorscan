@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -355,6 +356,107 @@ func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *te
 	}
 	if len(runner.commands) != 0 {
 		t.Fatalf("batch command ran a tool: %#v", runner.commands)
+	}
+}
+
+func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nmap NSE\n\n```bash\nnmap --script smb-security-mode -p {{port}} {{host}}\n```\n\n##### MSF\n\n```text\nuse auxiliary/scanner/smb/smb_version\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-batch-tools", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{{IP: "192.0.2.30", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "192.0.2.31", Port: 139, Source: "nuclei", ID: "smb-signing", Severity: "high"}} {
+		if err := st.SaveFinding("run-batch-tools", finding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	group := report.VulnerabilityGroupKey("smb-signing")
+	nmap := httptest.NewRecorder()
+	nmapRequest := httptest.NewRequest(http.MethodPost, "/reports/run-batch-tools/commands/batch", strings.NewReader("group_key="+group+"&tool=nmap"))
+	nmapRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(nmap, nmapRequest)
+	if nmap.Code != http.StatusOK {
+		t.Fatalf("nmap batch = %d: %s", nmap.Code, nmap.Body.String())
+	}
+	var nmapResult struct {
+		Commands []struct {
+			FullCommand string `json:"full_command"`
+			ToolArgs    string `json:"tool_args"`
+			TargetFile  string `json:"target_file"`
+		} `json:"commands"`
+	}
+	if err := json.NewDecoder(nmap.Body).Decode(&nmapResult); err != nil {
+		t.Fatal(err)
+	}
+	if len(nmapResult.Commands) != 2 {
+		t.Fatalf("nmap command count = %#v", nmapResult.Commands)
+	}
+	targetContents := make([]string, 0, len(nmapResult.Commands))
+	for _, command := range nmapResult.Commands {
+		contents, err := os.ReadFile(command.TargetFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(command.FullCommand, " -iL ") || strings.Count(string(contents), "\n") != 1 {
+			t.Fatalf("invalid nmap batch command=%q targets=%q", command.FullCommand, contents)
+		}
+		args, err := config.SplitArgs(command.ToolArgs)
+		if err != nil || len(args) < 2 || args[len(args)-2] != "-iL" || args[len(args)-1] != command.TargetFile {
+			t.Fatalf("nmap tool args cannot round-trip: %q => %#v (%v)", command.ToolArgs, args, err)
+		}
+		targetContents = append(targetContents, string(contents))
+	}
+	if targetContents[0] != "192.0.2.31\n" || targetContents[1] != "192.0.2.30\n" {
+		t.Fatalf("nmap target grouping = %#v", targetContents)
+	}
+
+	msf := httptest.NewRecorder()
+	msfRequest := httptest.NewRequest(http.MethodPost, "/reports/run-batch-tools/commands/batch", strings.NewReader("group_key="+group+"&tool=msf"))
+	msfRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(msf, msfRequest)
+	if msf.Code != http.StatusOK {
+		t.Fatalf("msf batch = %d: %s", msf.Code, msf.Body.String())
+	}
+	var msfResult struct {
+		Commands []string `json:"commands"`
+	}
+	if err := json.NewDecoder(msf.Body).Decode(&msfResult); err != nil {
+		t.Fatal(err)
+	}
+	if len(msfResult.Commands) != 2 || !strings.Contains(msfResult.Commands[0], "192.0.2.31") || !strings.Contains(msfResult.Commands[1], "192.0.2.30") {
+		t.Fatalf("MSF commands = %#v", msfResult.Commands)
+	}
+	deleteRun := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodPost, "/runs/run-batch-tools", strings.NewReader("_method=delete"))
+	deleteRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(deleteRun, deleteRequest)
+	if deleteRun.Code != http.StatusSeeOther {
+		t.Fatalf("delete run = %d: %s", deleteRun.Code, deleteRun.Body.String())
+	}
+	for _, command := range nmapResult.Commands {
+		if _, err := os.Stat(command.TargetFile); !os.IsNotExist(err) {
+			t.Fatalf("target file survives run deletion: %s (%v)", command.TargetFile, err)
+		}
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("batch commands ran tool: %#v", runner.commands)
 	}
 }
 

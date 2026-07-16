@@ -213,7 +213,9 @@
       <div class="header-actions">
         <button class="button button-secondary" type="button" data-copy-text="{{.Title}}">复制字段</button>
         <button class="button button-secondary" type="button" data-copy-text="{{.CopyText}}">复制本条</button>
-		{{if .CanBatchNuclei}}<button class="button button-primary batch-nuclei-btn" type="button" data-batch-group="{{.GroupKey}}">生成批量 Nuclei 命令</button>{{end}}
+		{{if .CanBatchNuclei}}<button class="button button-primary batch-command-btn" type="button" data-batch-group="{{.GroupKey}}" data-batch-tool="nuclei">生成批量 Nuclei 命令</button>{{end}}
+		{{if .CanBatchNmap}}<button class="button button-primary batch-command-btn" type="button" data-batch-group="{{.GroupKey}}" data-batch-tool="nmap">生成批量 Nmap 命令</button>{{end}}
+		{{if .CanBatchMSF}}<button class="button button-primary batch-command-btn" type="button" data-batch-group="{{.GroupKey}}" data-batch-tool="msf">生成批量 MSF 命令</button>{{end}}
       </div>
     </div>
     <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
@@ -564,22 +566,24 @@
         commandMessage.textContent = error.message || String(error);
       }
     }));
-    document.querySelectorAll('.batch-nuclei-btn').forEach(button => button.addEventListener('click', async () => {
+    document.querySelectorAll('.batch-command-btn').forEach(button => button.addEventListener('click', async () => {
       commandMessage.textContent = '正在生成批量命令，不会启动扫描。';
       commandFull.textContent = '';
       commandDialog.showModal();
       try {
         const endpoint = new URL('/reports/{{.Run.RunID}}/commands/batch', window.location.origin);
         endpoint.search = window.location.search;
-        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({group_key: button.dataset.batchGroup, tool: 'nuclei'})});
-        if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
+        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({group_key: button.dataset.batchGroup, tool: button.dataset.batchTool})});
+		if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
         const command = await response.json();
-        commandMessage.textContent = '目标文件：' + command.target_file + '；请人工确认后运行。';
-        commandFull.textContent = command.full_command;
+        const commands = command.commands || [command];
+        const files = commands.map(item => item.target_file).filter(Boolean);
+        commandMessage.textContent = (command.warning ? command.warning + '；' : '') + '共 ' + commands.length + ' 条命令' + (files.length ? '；目标文件：' + files.join('、') : '') + '；请人工确认后运行。';
+        commandFull.textContent = commands.map(item => typeof item === 'string' ? item : item.full_command).join('\n');
         const toolLink = document.getElementById('nuclei-command-tool');
-        toolLink.hidden = false;
-        toolLink.href = '/tools/nuclei?raw_args=' + encodeURIComponent(command.tool_args);
-        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
+        toolLink.hidden = button.dataset.batchTool === 'msf' || commands.length !== 1;
+        if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.batchTool + '?raw_args=' + encodeURIComponent(commands[0].tool_args);
+        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(commandFull.textContent);
       } catch (error) {
         commandMessage.textContent = error.message || String(error);
       }

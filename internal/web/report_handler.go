@@ -281,7 +281,12 @@ func (s *server) reportBatchNucleiCommand(w http.ResponseWriter, r *http.Request
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseForm(); err != nil || strings.TrimSpace(r.FormValue("tool")) != "nuclei" {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid batch command request", http.StatusBadRequest)
+		return
+	}
+	tool := strings.TrimSpace(r.FormValue("tool"))
+	if tool != "nuclei" && tool != "nmap" && tool != "msf" {
 		http.Error(w, "invalid batch command request", http.StatusBadRequest)
 		return
 	}
@@ -295,7 +300,16 @@ func (s *server) reportBatchNucleiCommand(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	batch, err := report.BuildBatchNucleiCommand(filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query())), s.catalog, strings.TrimSpace(r.FormValue("group_key")))
+	filtered := filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query()))
+	if tool == "msf" {
+		s.reportBatchMSFCommand(w, filtered, strings.TrimSpace(r.FormValue("group_key")))
+		return
+	}
+	if tool == "nmap" {
+		s.reportBatchNmapCommand(w, runID, filtered, strings.TrimSpace(r.FormValue("group_key")))
+		return
+	}
+	batch, err := report.BuildBatchNucleiCommand(filtered, s.catalog, strings.TrimSpace(r.FormValue("group_key")))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
@@ -325,6 +339,53 @@ func (s *server) reportBatchNucleiCommand(w http.ResponseWriter, r *http.Request
 	toolArgs := displayCommandArgs(args[1:])
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"full_command": displayCommandArgs(args), "tool_args": toolArgs, "target_file": targetFile})
+}
+
+func (s *server) reportBatchMSFCommand(w http.ResponseWriter, findings []report.Finding, groupKey string) {
+	commands, err := report.BuildBatchMSFCommands(findings, s.catalog, groupKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"commands": commands, "warning": "MSF 命令在外部环境逐条执行，不使用服务端目标文件"})
+}
+
+func (s *server) reportBatchNmapCommand(w http.ResponseWriter, runID string, findings []report.Finding, groupKey string) {
+	batches, err := report.BuildBatchNmapCommands(findings, s.catalog, groupKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	run, err := s.store.GetScanRun(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	dir, err := filepath.Abs(filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, runID)))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	result := make([]map[string]string, 0, len(batches))
+	for _, batch := range batches {
+		contents := strings.Join(batch.Targets, "\n") + "\n"
+		sum := sha256.Sum256([]byte(contents))
+		path := filepath.Join(dir, "nmap-targets-"+strconv.Itoa(batch.Port)+"-"+fmt.Sprintf("%x", sum[:])+".txt")
+		if err := writeBatchTargetFile(path, []byte(contents)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		args := append([]string(nil), batch.Args[:len(batch.Args)-1]...)
+		args = append(args, "-iL", path)
+		result = append(result, map[string]string{"full_command": displayCommandArgs(args), "tool_args": displayCommandArgs(args[1:]), "target_file": path})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"commands": result, "warning": "Nmap 按实际端口分组，避免主机与端口组合扩大范围"})
 }
 
 func writeBatchTargetFile(path string, contents []byte) error {
