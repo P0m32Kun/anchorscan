@@ -352,15 +352,5 @@ func firstNonEmpty(values ...string) string {
 }
 
 func emitTool(opts ToolRunOptions, scanStore *store.Store, level string, stage string, format string, args ...any) {
-	message := fmt.Sprintf(format, args...)
-	if opts.Logf != nil {
-		opts.Logf("%s", message)
-	}
-	_ = scanStore.AppendScanEvent(store.ScanEvent{
-		RunID:   opts.RunID,
-		Time:    time.Now(),
-		Level:   level,
-		Stage:   stage,
-		Message: message,
-	})
+	storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}.Emit(level, stage, format, args...)
 }

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -98,18 +97,7 @@ func logf(opts ScanOptions, format string, args ...any) {
 }
 
 func emit(opts ScanOptions, scanStore *store.Store, level string, stage string, format string, args ...any) {
-	message := fmt.Sprintf(format, args...)
-	logf(opts, "%s", message)
-	if opts.RunID == "" || scanStore == nil {
-		return
-	}
-	_ = scanStore.AppendScanEvent(store.ScanEvent{
-		RunID:   opts.RunID,
-		Time:    time.Now(),
-		Level:   level,
-		Stage:   stage,
-		Message: message,
-	})
+	storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}.Emit(level, stage, format, args...)
 }
 
 func normalizeToolError(ctx context.Context, err error) error {

@@ -15,7 +15,25 @@ import (
 
 var nmapHeartbeatEvery = 30 * time.Second
 
-func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, []int, error) {
+// TargetScan is the result bundle produced by scanning a single Target: the
+// service fingerprints, derived findings, and discovered open ports. It is the
+// named shape behind what scanTarget returns (previously a positional 4-tuple).
+type TargetScan struct {
+	Target       string
+	Fingerprints []fingerprint.ServiceFingerprint
+	Findings     []report.Finding
+	OpenPorts    []int
+}
+
+func scanTarget(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) (TargetScan, error) {
+	fingerprints, findings, openPorts, err := scanTargetRaw(ctx, runner, scanStore, opts, target, artifactDir)
+	if err != nil {
+		return TargetScan{}, err
+	}
+	return TargetScan{Target: target, Fingerprints: fingerprints, Findings: findings, OpenPorts: openPorts}, nil
+}
+
+func scanTargetRaw(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, target string, artifactDir string) ([]fingerprint.ServiceFingerprint, []report.Finding, []int, error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
 

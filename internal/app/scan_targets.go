@@ -69,12 +69,12 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 					if ctx.Err() != nil {
 						return
 					}
-					fingerprints, findings, openPorts, err := scanTarget(ctx, runner, scanStore, opts, target, artifactDir)
+					ts, err := scanTarget(ctx, runner, scanStore, opts, target, artifactDir)
 					results <- targetResult{
 						target:       target,
-						fingerprints: fingerprints,
-						findings:     findings,
-						openPorts:    openPorts,
+						fingerprints: ts.Fingerprints,
+						findings:     ts.Findings,
+						openPorts:    ts.OpenPorts,
 						err:          err,
 					}
 				}
