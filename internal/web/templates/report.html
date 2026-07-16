@@ -172,6 +172,7 @@
               <select name="view" id="filter-view-select">
                 <option value="ports" {{if eq .AssetView "ports"}}selected{{end}}>按端口列表</option>
                 <option value="hosts" {{if eq .AssetView "hosts"}}selected{{end}}>按主机聚合</option>
+                <option value="vulnerabilities" {{if eq .AssetView "vulnerabilities"}}selected{{end}}>按漏洞聚合</option>
               </select>
             </div>
           </div>
@@ -193,6 +194,38 @@
   </form>
 </section>
 
+{{if eq .AssetView "vulnerabilities"}}
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">漏洞交付</p>
+      <h3>按漏洞聚合</h3>
+      <p class="meta-line">仅包含当前筛选范围内已匹配且非 info 的漏洞。</p>
+    </div>
+  </div>
+  {{range .Vulnerabilities}}
+  <article class="knowledgebase-content" style="padding: 1.25rem 0; border-top: 1px solid var(--border);">
+    <div class="panel-heading">
+      <h3>{{.Title}}</h3>
+      <div class="header-actions">
+        <button class="button button-secondary" type="button" data-copy-text="{{.Title}}">复制字段</button>
+        <button class="button button-secondary" type="button" data-copy-text="{{.CopyText}}">复制本条</button>
+      </div>
+    </div>
+    <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
+    <pre>{{.Description}}</pre>
+    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{range .Assets}}{{.}}
+{{end}}">复制字段</button></div>
+    <pre>{{range .Assets}}{{.}}
+{{end}}</pre>
+    <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>
+    <pre>{{.Remediation}}</pre>
+  </article>
+  {{else}}
+  <p class="no-data">🛡️ 当前筛选范围没有已匹配的非 info 漏洞。</p>
+  {{end}}
+</section>
+{{else}}
 <section class="panel">
   <div class="panel-heading">
     <div>
@@ -468,4 +501,5 @@
     }
   </script>
 </section>
+{{end}}
 {{end}}

@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +63,116 @@ func TestReportPageRendersFindings(t *testing.T) {
 		if !strings.Contains(res.Body.String(), want) {
 			t.Fatalf("expected %q in report page: %s", want, res.Body.String())
 		}
+	}
+}
+
+func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(knowledgeBaseFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-aggregate", Target: "192.0.2.0/24", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 51; i++ {
+		if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "192.0.2." + strconv.Itoa(i), Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high", Summary: "SMB signing"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "198.51.100.10", Port: 80, Source: "nuclei", ID: "smb-signing", Severity: "info", Summary: "info-only"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&findings_page=2", nil))
+	body := res.Body.String()
+	for _, want := range []string{"SMB 签名未启用（中危）", "描述。", "启用签名。", "192.0.2.1:445/tcp", "192.0.2.51:445/tcp"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("aggregate response missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "info-only") {
+		t.Fatalf("aggregate response included info finding: %s", body)
+	}
+	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
+		t.Fatalf("aggregate response has %d copy controls, want 5: %s", copies, body)
+	}
+	if !strings.Contains(body, `value="vulnerabilities" selected`) {
+		t.Fatalf("aggregate response did not keep the selected view: %s", body)
+	}
+
+	results := httptest.NewRecorder()
+	handler.ServeHTTP(results, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?severity=info", nil))
+	if results.Code != http.StatusOK || !strings.Contains(results.Body.String(), "info-only") {
+		t.Fatalf("vulnerability view unexpectedly changed the existing results: %d %s", results.Code, results.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateFormatsAssetsAndEscapesHTML(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "描述。", "<b>描述</b>", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-assets", Target: "192.0.2.0/24", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "192.0.2.1", Port: 445, Protocol: "TCP", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{IP: "192.0.2.1", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{IP: "2001:0db8:0:0:0:0:0:1", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{IP: "192.0.2.2", Protocol: "UDP", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{Port: 8443, Protocol: "tcp", Target: "target.example", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+	} {
+		if err := scanStore.SaveFinding("run-assets", finding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-assets?view=vulnerabilities", nil))
+	body := res.Body.String()
+	for _, want := range []string{"192.0.2.1:445/tcp", "192.0.2.2/udp", "[2001:db8::1]:445/tcp", "target.example:8443/tcp", "&lt;b&gt;描述&lt;/b&gt;"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("aggregate response missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `<pre><b>描述</b></pre>`) {
+		t.Fatalf("aggregate response rendered unescaped description: %s", body)
+	}
+	if strings.Contains(body, "<pre>192.0.2.1:445/tcp\n192.0.2.1:445/tcp") {
+		t.Fatalf("aggregate response did not deduplicate assets: %s", body)
+	}
+	if first, second := strings.Index(body, "192.0.2.1:445/tcp"), strings.Index(body, "192.0.2.2/udp"); first < 0 || second < first {
+		t.Fatalf("aggregate assets are not stably sorted: %s", body)
 	}
 }
 
