@@ -1,18 +1,467 @@
 package web
 
 import (
+	"encoding/json"
+	"html"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
+
+func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nuclei\n\n```bash\nnuclei -t http/technologies/redis.yaml -u {{url}}\n```\n\n#### 修复建议", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-command", Target: "192.0.2.10", Ports: "6379", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.10", Port: 6379, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high", Summary: "SMB signing", Target: "http://192.0.2.10:6379"}
+	if err := scanStore.SaveFinding("run-command", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	form := "finding_key=" + report.FindingKey(finding) + "&tool=nuclei&target=attacker.example&command=evil"
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-command/commands", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("command generation = %d: %s", res.Code, res.Body.String())
+	}
+	var got struct {
+		FullCommand string `json:"full_command"`
+		ToolArgs    string `json:"tool_args"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.FullCommand != "nuclei -t http/technologies/redis.yaml -u http://192.0.2.10:6379" || got.ToolArgs != "-t http/technologies/redis.yaml -u http://192.0.2.10:6379" {
+		t.Fatalf("generated command = %#v", got)
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("command generation ran a tool: %#v", runner.commands)
+	}
+	filtered := httptest.NewRecorder()
+	filteredReq := httptest.NewRequest(http.MethodPost, "/reports/run-command/commands?source=nse", strings.NewReader(form))
+	filteredReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(filtered, filteredReq)
+	if filtered.Code != http.StatusBadRequest {
+		t.Fatalf("out-of-filter finding response = %d: %s", filtered.Code, filtered.Body.String())
+	}
+	page := httptest.NewRecorder()
+	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/reports/run-command", nil))
+	if !strings.Contains(page.Body.String(), `data-command-key="`+report.FindingKey(finding)+`"`) || !strings.Contains(page.Body.String(), "生成 Nuclei 命令") {
+		t.Fatalf("report page has no command entry: %s", page.Body.String())
+	}
+	toolPage := httptest.NewRecorder()
+	handler.ServeHTTP(toolPage, httptest.NewRequest(http.MethodGet, "/tools/nuclei?raw_args=-t+http%2Ftechnologies%2Fredis.yaml+-u+http%3A%2F%2F192.0.2.10%3A6379", nil))
+	if !strings.Contains(toolPage.Body.String(), `>-t http/technologies/redis.yaml -u http://192.0.2.10:6379</textarea>`) {
+		t.Fatalf("tool page did not prefill generated arguments: %s", toolPage.Body.String())
+	}
+	verify, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer verify.Close()
+	run, err := verify.GetScanRun("run-command")
+	if err != nil || run.Status != "completed" {
+		t.Fatalf("run changed: %#v, %v", run, err)
+	}
+	findings, err := verify.ListFindings("run-command")
+	if err != nil || len(findings) != 1 || findings[0] != finding {
+		t.Fatalf("findings changed: %#v, %v", findings, err)
+	}
+}
+
+func TestReportNucleiCommandGenerationRejectsMismatchedURL(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nuclei\n\n```bash\nnuclei -t http/technologies/redis.yaml -u {{url}}\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-url", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.11", Port: 443, Source: "nuclei", ID: "smb-signing", Severity: "high", Target: "http://192.0.2.11:80"}
+	if err := scanStore.SaveFinding("run-url", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	form := "finding_key=" + report.FindingKey(finding) + "&tool=nuclei"
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-url/commands", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnprocessableEntity || !strings.Contains(res.Body.String(), "有效 URL") {
+		t.Fatalf("mismatched URL response = %d: %s", res.Code, res.Body.String())
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("mismatched URL ran a tool: %#v", runner.commands)
+	}
+}
+
+func TestReportCommandGenerationProducesNmapAndMSFWithoutRunningTool(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nmap NSE\n\n```bash\nnmap --script smb-security-mode -p {{port}} {{host}}\n```\n\n##### MSF\n\n```text\nuse auxiliary/scanner/smb/smb_version\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-nmap-msf", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.12", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"}
+	if err := scanStore.SaveFinding("run-nmap-msf", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	for tool, want := range map[string]struct{ full, args string }{
+		"nmap": {"nmap --script smb-security-mode -p 445 192.0.2.12", "--script smb-security-mode -p 445 192.0.2.12"},
+		"msf":  {"msfconsole -q -x \"use auxiliary/scanner/smb/smb_version; set RHOSTS 192.0.2.12; set RPORT 445; run; exit\"", ""},
+	} {
+		form := "finding_key=" + report.FindingKey(finding) + "&tool=" + tool
+		req := httptest.NewRequest(http.MethodPost, "/reports/run-nmap-msf/commands", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("%s command generation = %d: %s", tool, res.Code, res.Body.String())
+		}
+		var got struct {
+			FullCommand string `json:"full_command"`
+			ToolArgs    string `json:"tool_args"`
+		}
+		if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got.FullCommand != want.full || got.ToolArgs != want.args {
+			t.Fatalf("%s command = %#v", tool, got)
+		}
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("command generation ran a tool: %#v", runner.commands)
+	}
+}
+
+func TestReportCommandGenerationRejectsUnsafeMSF(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### MSF\n\n```text\nuse auxiliary/scanner/smb/smb_version; exploit\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-unsafe-msf", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.13", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}
+	if err := scanStore.SaveFinding("run-unsafe-msf", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	form := "finding_key=" + report.FindingKey(finding) + "&tool=msf"
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-unsafe-msf/commands", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnprocessableEntity || len(runner.commands) != 0 {
+		t.Fatalf("unsafe MSF response = %d, calls = %#v", res.Code, runner.commands)
+	}
+}
+
+func TestReportCommandGenerationRejectsUnknownNmapPlaceholder(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nmap NSE\n\n```bash\nnmap --script {{unknown}} -p {{port}} {{host}}\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-unknown-nmap", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	finding := report.Finding{IP: "192.0.2.14", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}
+	if err := st.SaveFinding("run-unknown-nmap", finding); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: &serverSequenceRunner{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-unknown-nmap/commands", strings.NewReader("finding_key="+report.FindingKey(finding)+"&tool=nmap"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown placeholder response = %d: %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nuclei\n\n```bash\nnuclei -t network/smb.yaml -u {{host}}:{{port}}\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-batch", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, ip := range []string{"192.0.2.21", "192.0.2.20", "192.0.2.21"} {
+		if err := st.SaveFinding("run-batch", report.Finding{IP: ip, Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	req := httptest.NewRequest(http.MethodPost, "/reports/run-batch/commands/batch?findings_page=2", strings.NewReader("group_key="+report.VulnerabilityGroupKey("smb-signing")+"&tool=nuclei"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("batch command = %d: %s", res.Code, res.Body.String())
+	}
+	var got struct {
+		FullCommand string `json:"full_command"`
+		TargetFile  string `json:"target_file"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got.FullCommand, "nuclei -t network/smb.yaml -l ") || !filepath.IsAbs(got.TargetFile) {
+		t.Fatalf("batch command = %#v", got)
+	}
+	data, err := os.ReadFile(got.TargetFile)
+	if err != nil || string(data) != "192.0.2.20:445\n192.0.2.21:445\n" {
+		t.Fatalf("targets = %q, %v", data, err)
+	}
+	info, err := os.Stat(got.TargetFile)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("target file mode = %v, %v", info.Mode(), err)
+	}
+	reused := httptest.NewRecorder()
+	handler.ServeHTTP(reused, req)
+	var repeated struct {
+		TargetFile string `json:"target_file"`
+	}
+	if err := json.NewDecoder(reused.Body).Decode(&repeated); err != nil || repeated.TargetFile != got.TargetFile {
+		t.Fatalf("target file reuse = %#v, %v", repeated, err)
+	}
+	verify, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verify.SaveFinding("run-batch", report.Finding{IP: "192.0.2.22", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := verify.Close(); err != nil {
+		t.Fatal(err)
+	}
+	changed := httptest.NewRecorder()
+	handler.ServeHTTP(changed, req)
+	var changedResult struct {
+		TargetFile string `json:"target_file"`
+	}
+	if err := json.NewDecoder(changed.Body).Decode(&changedResult); err != nil || changedResult.TargetFile == got.TargetFile {
+		t.Fatalf("changed target file = %#v, %v", changedResult, err)
+	}
+	if _, err := os.Stat(got.TargetFile); err != nil {
+		t.Fatalf("old target file removed: %v", err)
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("batch command ran a tool: %#v", runner.commands)
+	}
+}
+
+func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "#### 修复建议", "##### Nmap NSE\n\n```bash\nnmap --script smb-security-mode -p {{port}} {{host}}\n```\n\n##### MSF\n\n```text\nuse auxiliary/scanner/smb/smb_version\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun\n```\n\n#### 修复建议", 1)
+	writeFile(t, filepath.Join(dir, "handbook.md"), handbook)
+	writeFile(t, configPath, "knowledge_base:\n  path: handbook.md\n")
+	st, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveProject(store.Project{ID: "p1", Name: "batch", DefaultTargets: "192.0.2.30", DefaultPorts: "445", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveScanRun(store.ScanRun{RunID: "run-batch-tools", ProjectID: "p1", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{{IP: "192.0.2.30", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "2001:0db8::1", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "2001:db8::1", Port: 445, Source: "nuclei", ID: "smb-signing", Severity: "high"}, {IP: "192.0.2.31", Port: 139, Source: "nuclei", ID: "smb-signing", Severity: "high"}} {
+		if err := st.SaveFinding("run-batch-tools", finding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	runner := &serverSequenceRunner{}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	group := report.VulnerabilityGroupKey("smb-signing")
+	nmap := httptest.NewRecorder()
+	nmapRequest := httptest.NewRequest(http.MethodPost, "/reports/run-batch-tools/commands/batch", strings.NewReader("group_key="+group+"&tool=nmap"))
+	nmapRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(nmap, nmapRequest)
+	if nmap.Code != http.StatusOK {
+		t.Fatalf("nmap batch = %d: %s", nmap.Code, nmap.Body.String())
+	}
+	var nmapResult struct {
+		Commands []struct {
+			FullCommand string `json:"full_command"`
+			ToolArgs    string `json:"tool_args"`
+			TargetFile  string `json:"target_file"`
+		} `json:"commands"`
+	}
+	if err := json.NewDecoder(nmap.Body).Decode(&nmapResult); err != nil {
+		t.Fatal(err)
+	}
+	if len(nmapResult.Commands) != 2 {
+		t.Fatalf("nmap command count = %#v", nmapResult.Commands)
+	}
+	targetContents := make([]string, 0, len(nmapResult.Commands))
+	for _, command := range nmapResult.Commands {
+		contents, err := os.ReadFile(command.TargetFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(command.FullCommand, " -iL ") {
+			t.Fatalf("invalid nmap batch command=%q targets=%q", command.FullCommand, contents)
+		}
+		args, err := config.SplitArgs(command.ToolArgs)
+		if err != nil || len(args) < 2 || args[len(args)-2] != "-iL" || args[len(args)-1] != command.TargetFile {
+			t.Fatalf("nmap tool args cannot round-trip: %q => %#v (%v)", command.ToolArgs, args, err)
+		}
+		targetContents = append(targetContents, string(contents))
+	}
+	if targetContents[0] != "192.0.2.31\n" || targetContents[1] != "192.0.2.30\n2001:db8::1\n" {
+		t.Fatalf("nmap target grouping = %#v", targetContents)
+	}
+
+	msf := httptest.NewRecorder()
+	msfRequest := httptest.NewRequest(http.MethodPost, "/reports/run-batch-tools/commands/batch", strings.NewReader("group_key="+group+"&tool=msf"))
+	msfRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(msf, msfRequest)
+	if msf.Code != http.StatusOK {
+		t.Fatalf("msf batch = %d: %s", msf.Code, msf.Body.String())
+	}
+	var msfResult struct {
+		Commands []string `json:"commands"`
+	}
+	if err := json.NewDecoder(msf.Body).Decode(&msfResult); err != nil {
+		t.Fatal(err)
+	}
+	if len(msfResult.Commands) != 3 || !strings.Contains(msfResult.Commands[0], "192.0.2.31") || !strings.Contains(msfResult.Commands[1], "192.0.2.30") || !strings.Contains(msfResult.Commands[2], "2001:db8::1") {
+		t.Fatalf("MSF commands = %#v", msfResult.Commands)
+	}
+	deleteProject := httptest.NewRecorder()
+	deleteRequest := httptest.NewRequest(http.MethodPost, "/projects/p1", strings.NewReader("_method=delete"))
+	deleteRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	handler.ServeHTTP(deleteProject, deleteRequest)
+	if deleteProject.Code != http.StatusSeeOther {
+		t.Fatalf("delete project = %d: %s", deleteProject.Code, deleteProject.Body.String())
+	}
+	for _, command := range nmapResult.Commands {
+		if _, err := os.Stat(command.TargetFile); !os.IsNotExist(err) {
+			t.Fatalf("target file survives project deletion: %s (%v)", command.TargetFile, err)
+		}
+	}
+	if len(runner.commands) != 0 {
+		t.Fatalf("batch commands ran tool: %#v", runner.commands)
+	}
+}
 
 func TestReportPageRendersFindings(t *testing.T) {
 	dir := t.TempDir()
@@ -62,6 +511,372 @@ func TestReportPageRendersFindings(t *testing.T) {
 		if !strings.Contains(res.Body.String(), want) {
 			t.Fatalf("expected %q in report page: %s", want, res.Body.String())
 		}
+	}
+}
+
+func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(knowledgeBaseFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-aggregate", Target: "192.0.2.0/24", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFingerprint("run-aggregate", fingerprint.ServiceFingerprint{IP: "192.0.2.51", Port: 445, Service: "smb"}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 51; i++ {
+		if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "192.0.2." + strconv.Itoa(i), Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high", Summary: "SMB signing"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "198.51.100.10", Port: 80, Source: "nuclei", ID: "smb-signing", Severity: "info", Summary: "info-only"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&findings_page=2", nil))
+	body := res.Body.String()
+	for _, want := range []string{"SMB 签名未启用（中危）", "描述。", "启用签名。", "192.0.2.1:445/tcp", "192.0.2.51:445/tcp"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("aggregate response missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "info-only") {
+		t.Fatalf("aggregate response included info finding: %s", body)
+	}
+	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
+		t.Fatalf("aggregate response has %d copy controls, want 5: %s", copies, body)
+	}
+	if !strings.Contains(body, `value="vulnerabilities" selected`) {
+		t.Fatalf("aggregate response did not keep the selected view: %s", body)
+	}
+
+	results := httptest.NewRecorder()
+	handler.ServeHTTP(results, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?severity=info", nil))
+	if results.Code != http.StatusOK || !strings.Contains(results.Body.String(), "info-only") {
+		t.Fatalf("vulnerability view unexpectedly changed the existing results: %d %s", results.Code, results.Body.String())
+	}
+	filtered := httptest.NewRecorder()
+	handler.ServeHTTP(filtered, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&q=192.0.2.51", nil))
+	if filtered.Code != http.StatusOK || !strings.Contains(filtered.Body.String(), "192.0.2.51:445/tcp") || strings.Contains(filtered.Body.String(), "192.0.2.1:445/tcp") {
+		t.Fatalf("aggregate did not use the complete filtered finding set: %d %s", filtered.Code, filtered.Body.String())
+	}
+	export := httptest.NewRecorder()
+	handler.ServeHTTP(export, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=json&view=vulnerabilities", nil))
+	if export.Code != http.StatusOK || !strings.Contains(export.Body.String(), "192.0.2.51") {
+		t.Fatalf("vulnerability view unexpectedly changed the existing export: %d %s", export.Code, export.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateMatchesConsecutiveCVEs(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "cve: []", "cve: [CVE-2024-0002]", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-cve", Target: "192.0.2.2", Ports: "443", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-cve", report.Finding{IP: "192.0.2.2", Port: 443, Protocol: "tcp", Source: "nuclei", ID: "CVE-2024-0001,CVE-2024-0002", Severity: "high"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-cve?view=vulnerabilities", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "SMB 签名未启用（中危）") {
+		t.Fatalf("aggregate did not match the second consecutive CVE: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateRendersPendingFindings(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(knowledgeBaseFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-pending", Target: "192.0.2.3", Ports: "8080", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-pending", report.Finding{IP: "192.0.2.3", Port: 8080, Protocol: "tcp", Scope: "scope-secret", Source: "nuclei", ID: "unmatched-finding", Severity: "high", Summary: "待补充漏洞", Output: "output-secret"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-pending?view=vulnerabilities", nil))
+	body := res.Body.String()
+	for _, want := range []string{"待补充漏洞（高危）", "知识库未匹配，请人工补充", "192.0.2.3:8080/tcp"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("pending aggregate response missing %q: %s", want, body)
+		}
+	}
+	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
+		t.Fatalf("pending aggregate response has %d copy controls, want 5: %s", copies, body)
+	}
+	wantCopy := "漏洞名\n待补充漏洞（高危）\n\n漏洞简介\n知识库未匹配，请人工补充\n\n漏洞资产\n192.0.2.3:8080/tcp\n\n修复建议\n知识库未匹配，请人工补充"
+	if !strings.Contains(body, `data-copy-text="`+html.EscapeString(wantCopy)+`"`) {
+		t.Fatalf("pending aggregate copy text is incomplete or out of order: %s", body)
+	}
+	if strings.Contains(body, "scope-secret") || strings.Contains(body, "output-secret") {
+		t.Fatalf("pending aggregate leaked technical fields: %s", body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateExplainsDisabledCatalog(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-disabled", Target: "192.0.2.4", Ports: "80", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-disabled", report.Finding{IP: "192.0.2.4", Port: 80, Protocol: "tcp", Source: "nuclei", ID: "unmatched", Severity: "medium"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-disabled?view=vulnerabilities", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "未配置漏洞知识库路径") || !strings.Contains(res.Body.String(), "192.0.2.4:80/tcp") {
+		t.Fatalf("disabled catalog response does not retain facts with guidance: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateSortsPendingFindings(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-pending-sort", Target: "192.0.2.0/24", Ports: "80", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "192.0.2.8", Port: 80, Source: "nuclei", ID: "later", Severity: "high", Summary: "另一漏洞"},
+		{IP: "192.0.2.9", Port: 80, Source: "nuclei", Severity: "critical", Summary: "同组 漏洞"},
+		{IP: "192.0.2.10", Port: 80, Source: "nuclei", Severity: "medium", Summary: " 同组   漏洞 "},
+	} {
+		if err := scanStore.SaveFinding("run-pending-sort", finding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-pending-sort?view=vulnerabilities", nil))
+	body := res.Body.String()
+	first := strings.Index(body, "同组 漏洞（严重）")
+	second := strings.Index(body, "另一漏洞（高危）")
+	if first < 0 || second < first {
+		t.Fatalf("pending findings are not stably sorted by severity: %s", body)
+	}
+	if copies := strings.Count(body, "data-copy-text="); copies != 10 {
+		t.Fatalf("empty-ID findings were not merged into one pending group: %d %s", copies, body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateExplainsUnavailableCatalog(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("knowledge_base:\n  path: missing.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-unavailable", Target: "192.0.2.5", Ports: "443", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-unavailable", report.Finding{IP: "192.0.2.5", Port: 443, Protocol: "tcp", Source: "nuclei", ID: "unmatched", Severity: "medium"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-unavailable?view=vulnerabilities", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "漏洞知识库加载失败") || !strings.Contains(res.Body.String(), "192.0.2.5:443/tcp") {
+		t.Fatalf("unavailable catalog response does not retain facts with diagnostics: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportPageVulnerabilityAggregateKeepsAmbiguousFindingPending(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "nuclei: [smb-signing]", "nuclei: [ambiguous-id]", 1) + "\n### 另一条目（低危）\n\n<!-- anchorscan-entry\nid: other-entry\naliases: []\nmatch:\n  nuclei: [ambiguous-id]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\n另一条描述。\n\n#### 验证命令\n\n#### 修复建议\n\n另一条修复。\n"
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-ambiguous", Target: "192.0.2.6", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-ambiguous", report.Finding{IP: "192.0.2.6", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "ambiguous-id", Severity: "high", Summary: "歧义漏洞"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-ambiguous?view=vulnerabilities", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "歧义漏洞（高危）") || !strings.Contains(body, "知识库未匹配，请人工补充") || strings.Contains(body, "另一条修复") {
+		t.Fatalf("ambiguous finding was not safely kept pending: %d %s", res.Code, body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateExplainsDegradedCatalog(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := knowledgeBaseFixture + "\n### 损坏条目（低危）\n\n<!-- anchorscan-entry\nid: \naliases: []\nmatch:\n  nuclei: []\n  nse: []\n  manual-review: []\n  cve: []\n-->\n"
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-degraded", Target: "192.0.2.7", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-degraded", report.Finding{IP: "192.0.2.7", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-degraded?view=vulnerabilities", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "漏洞知识库部分降级") || !strings.Contains(body, "SMB 签名未启用（中危）") {
+		t.Fatalf("degraded catalog response does not preserve matched delivery: %d %s", res.Code, body)
+	}
+}
+
+func TestReportPageVulnerabilityAggregateFormatsAssetsAndEscapesHTML(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	handbook := strings.Replace(knowledgeBaseFixture, "描述。", "<b>描述</b>", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-assets", Target: "192.0.2.0/24", Ports: "445", Profile: "normal", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, finding := range []report.Finding{
+		{IP: "192.0.2.1", Port: 445, Protocol: "TCP", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{IP: "192.0.2.1", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{IP: "2001:0db8:0:0:0:0:0:1", Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{IP: "192.0.2.2", Protocol: "UDP", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+		{Port: 8443, Protocol: "tcp", Target: "target.example", Source: "nuclei", ID: "smb-signing", Severity: "high"},
+	} {
+		if err := scanStore.SaveFinding("run-assets", finding); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-assets?view=vulnerabilities", nil))
+	body := res.Body.String()
+	for _, want := range []string{"192.0.2.1:445/tcp", "192.0.2.2/udp", "[2001:db8::1]:445/tcp", "target.example:8443/tcp", "&lt;b&gt;描述&lt;/b&gt;"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("aggregate response missing %q: %s", want, body)
+		}
+	}
+	if strings.Contains(body, `<pre><b>描述</b></pre>`) {
+		t.Fatalf("aggregate response rendered unescaped description: %s", body)
+	}
+	if strings.Contains(body, "<pre>192.0.2.1:445/tcp\n192.0.2.1:445/tcp") {
+		t.Fatalf("aggregate response did not deduplicate assets: %s", body)
+	}
+	if first, second := strings.Index(body, "192.0.2.1:445/tcp"), strings.Index(body, "192.0.2.2/udp"); first < 0 || second < first {
+		t.Fatalf("aggregate assets are not stably sorted: %s", body)
 	}
 }
 

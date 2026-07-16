@@ -1,18 +1,31 @@
 package web
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
 
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/reports/")
+	if strings.HasSuffix(path, "/commands/batch") {
+		s.reportBatchCommand(w, r, strings.TrimSuffix(path, "/commands/batch"))
+		return
+	}
+	if strings.HasSuffix(path, "/commands") {
+		s.reportCommand(w, r, strings.TrimSuffix(path, "/commands"))
+		return
+	}
 	format := ""
 	exportFormat := ""
 	assetExport := ""
@@ -53,15 +66,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	filters := reportFilters{
-		IP:         r.URL.Query().Get("ip"),
-		Port:       r.URL.Query().Get("port"),
-		Service:    r.URL.Query().Get("service"),
-		Keyword:    r.URL.Query().Get("q"),
-		Severity:   r.URL.Query().Get("severity"),
-		Severities: parseSeverityFilters(r.URL.Query()),
-		Source:     r.URL.Query().Get("source"),
-	}
+	filters := reportFiltersFromValues(r.URL.Query())
 	filteredFingerprints := filterFingerprints(fps, filters)
 	filteredFindings := filterFindings(findings, fps, filters)
 	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
@@ -131,8 +136,14 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		query := r.URL.Query()
 		view := query.Get("view")
-		if view == "" {
+		if view != "hosts" && view != "vulnerabilities" {
 			view = "ports"
+		}
+		var vulnerabilities []report.VulnerabilityDelivery
+		var pendingVulnerabilities []report.VulnerabilityDelivery
+		if view == "vulnerabilities" {
+			vulnerabilities = report.BuildMatchedVulnerabilityDeliveries(filteredFindings, s.catalog)
+			pendingVulnerabilities = report.BuildPendingVulnerabilityDeliveries(filteredFindings, s.catalog)
 		}
 		assetPage := paginateFingerprints(filteredFingerprints, parsePage(query.Get("assets_page")), query, "assets_page", "assets_size", parseSize(query.Get("assets_size")))
 		findingPage := paginateFindings(filteredFindings, parsePage(query.Get("findings_page")), query, "findings_page", "findings_size", parseSize(query.Get("findings_size")))
@@ -143,22 +154,290 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		copyBase.Del("assets_size")
 		copyBase.Del("findings_size")
 		render(w, "templates/report.html", map[string]any{
-			"Run":            run,
-			"RunMeta":        newRunMetaView(run),
-			"Filters":        filters,
-			"Fingerprints":   assetPage.Items,
-			"Findings":       findingPage.Items,
-			"AssetPage":      assetPage,
-			"FindingPage":    findingPage,
-			"HostPage":       hostPage,
-			"AssetView":      view,
-			"AssetTXTIP":     "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
-			"AssetTXTIPPort": "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
-			"AssetTXTURL":    "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
-			"AssetCSV":       "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
-			"ExportJSON":     "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "json"),
-			"ExportHTML":     "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
-			"ExportCSV":      "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
+			"Run":                    run,
+			"RunMeta":                newRunMetaView(run),
+			"Filters":                filters,
+			"Fingerprints":           assetPage.Items,
+			"Findings":               findingPage.Items,
+			"CommandTools":           s.commandTools(filteredFindings),
+			"AssetPage":              assetPage,
+			"FindingPage":            findingPage,
+			"HostPage":               hostPage,
+			"AssetView":              view,
+			"Vulnerabilities":        vulnerabilities,
+			"PendingVulnerabilities": pendingVulnerabilities,
+			"CatalogStatus":          string(s.catalog.Status()),
+			"CatalogDiagnostics":     s.catalog.Diagnostics(),
+			"AssetTXTIP":             "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
+			"AssetTXTIPPort":         "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
+			"AssetTXTURL":            "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
+			"AssetCSV":               "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
+			"ExportJSON":             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "json"),
+			"ExportHTML":             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
+			"ExportCSV":              "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 		})
+	}
+}
+
+type commandToolView struct {
+	Name  string
+	Label string
+}
+
+type commandToolsView struct {
+	Tools  []commandToolView
+	Reason string
+}
+
+func (s *server) commandTools(findings []report.Finding) map[string]commandToolsView {
+	counts := map[string]int{}
+	for _, finding := range findings {
+		counts[report.FindingKey(finding)]++
+	}
+	available := map[string]commandToolsView{}
+	for _, finding := range findings {
+		key := report.FindingKey(finding)
+		if counts[key] != 1 {
+			continue
+		}
+		view := commandToolsView{}
+		for _, tool := range []commandToolView{{Name: "nuclei", Label: "Nuclei"}, {Name: "nmap", Label: "Nmap NSE"}, {Name: "msf", Label: "MSF"}} {
+			_, err := s.buildCommand(tool.Name, finding)
+			if err == nil {
+				view.Tools = append(view.Tools, tool)
+			}
+		}
+		if len(view.Tools) == 0 {
+			view.Reason = s.commandUnavailableReason(finding)
+		}
+		available[key] = view
+	}
+	return available
+}
+
+func (s *server) commandUnavailableReason(finding report.Finding) string {
+	match := s.catalog.Match(report.ObservationFromFinding(finding))
+	if match.Status != knowledgebase.MatchMatched {
+		return "知识库未匹配或匹配不唯一"
+	}
+	for _, diagnostic := range s.catalog.Diagnostics() {
+		if diagnostic.EntryID == match.Entry.ID && strings.Contains(diagnostic.Reason, "命令无效") {
+			return "知识库命令格式无效"
+		}
+	}
+	if match.Entry.Commands.Nuclei == "" && match.Entry.Commands.NmapNSE == "" && match.Entry.Commands.Metasploit == "" {
+		return "知识库未提供检测命令"
+	}
+	return "目标不可绑定"
+}
+
+func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	tool := strings.TrimSpace(r.FormValue("tool"))
+	if tool != "nuclei" && tool != "nmap" && tool != "msf" {
+		http.Error(w, "unsupported tool", http.StatusBadRequest)
+		return
+	}
+	findings, err := s.store.ListFindings(runID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	fingerprints, err := s.store.ListFingerprints(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	findings = filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query()))
+	key := strings.TrimSpace(r.FormValue("finding_key"))
+	var matches []report.Finding
+	for _, finding := range findings {
+		if report.FindingKey(finding) == key {
+			matches = append(matches, finding)
+		}
+	}
+	if len(matches) != 1 {
+		http.Error(w, "finding unavailable or ambiguous", http.StatusBadRequest)
+		return
+	}
+	command, err := s.buildCommand(tool, matches[0])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(command)
+}
+
+func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid batch command request", http.StatusBadRequest)
+		return
+	}
+	tool := strings.TrimSpace(r.FormValue("tool"))
+	if tool != "nuclei" && tool != "nmap" && tool != "msf" {
+		http.Error(w, "invalid batch command request", http.StatusBadRequest)
+		return
+	}
+	findings, err := s.store.ListFindings(runID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	fingerprints, err := s.store.ListFingerprints(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	filtered := filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query()))
+	if tool == "msf" {
+		s.reportBatchMSFCommand(w, filtered, strings.TrimSpace(r.FormValue("group_key")))
+		return
+	}
+	if tool == "nmap" {
+		s.reportBatchNmapCommand(w, runID, filtered, strings.TrimSpace(r.FormValue("group_key")))
+		return
+	}
+	batch, err := report.BuildBatchNucleiCommand(filtered, s.catalog, strings.TrimSpace(r.FormValue("group_key")))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	contents := strings.Join(batch.Targets, "\n") + "\n"
+	sum := sha256.Sum256([]byte(contents))
+	dir := filepath.Dir(managedReportPath(s.opts.DBPath, "", runID))
+	if run, getErr := s.store.GetScanRun(runID); getErr == nil {
+		dir = filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, runID))
+	}
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	targetFile := filepath.Join(dir, "nuclei-targets-"+fmt.Sprintf("%x", sum[:])+".txt")
+	if err := writeBatchTargetFile(targetFile, []byte(contents)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	args := append([]string(nil), batch.Args...)
+	args[len(args)-2], args[len(args)-1] = "-l", targetFile
+	toolArgs := displayCommandArgs(args[1:])
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"full_command": displayCommandArgs(args), "tool_args": toolArgs, "target_file": targetFile})
+}
+
+func (s *server) reportBatchMSFCommand(w http.ResponseWriter, findings []report.Finding, groupKey string) {
+	commands, err := report.BuildBatchMSFCommands(findings, s.catalog, groupKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"commands": commands, "warning": "MSF 命令在外部环境逐条执行，不使用服务端目标文件"})
+}
+
+func (s *server) reportBatchNmapCommand(w http.ResponseWriter, runID string, findings []report.Finding, groupKey string) {
+	batches, err := report.BuildBatchNmapCommands(findings, s.catalog, groupKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	run, err := s.store.GetScanRun(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	dir, err := filepath.Abs(filepath.Dir(managedReportPath(s.opts.DBPath, run.ProjectID, runID)))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	result := make([]map[string]string, 0, len(batches))
+	for _, batch := range batches {
+		contents := strings.Join(batch.Targets, "\n") + "\n"
+		sum := sha256.Sum256([]byte(contents))
+		path := filepath.Join(dir, "nmap-targets-"+strconv.Itoa(batch.Port)+"-"+fmt.Sprintf("%x", sum[:])+".txt")
+		if err := writeBatchTargetFile(path, []byte(contents)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		args := append([]string(nil), batch.Args[:len(batch.Args)-1]...)
+		args = append(args, "-iL", path)
+		result = append(result, map[string]string{"full_command": displayCommandArgs(args), "tool_args": displayCommandArgs(args[1:]), "target_file": path})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"commands": result, "warning": "Nmap 按实际端口分组，避免主机与端口组合扩大范围"})
+}
+
+func writeBatchTargetFile(path string, contents []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if os.IsExist(err) {
+		existing, readErr := os.ReadFile(path)
+		if readErr != nil || string(existing) != string(contents) {
+			return fmt.Errorf("目标文件内容不一致")
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(contents)
+	if closeErr := file.Close(); err == nil {
+		err = closeErr
+	}
+	return err
+}
+
+func displayCommandArgs(args []string) string {
+	parts := make([]string, len(args))
+	for i, arg := range args {
+		if strings.ContainsAny(arg, " \t\n\"'\\") {
+			arg = strconv.Quote(arg)
+		}
+		parts[i] = arg
+	}
+	return strings.Join(parts, " ")
+}
+
+func (s *server) buildCommand(tool string, finding report.Finding) (report.DetectionCommand, error) {
+	switch tool {
+	case "nuclei":
+		return report.BuildNucleiCommand(finding, s.catalog)
+	case "nmap":
+		return report.BuildNmapCommand(finding, s.catalog)
+	case "msf":
+		return report.BuildMSFCommand(finding, s.catalog)
+	}
+	return report.DetectionCommand{}, fmt.Errorf("unsupported tool")
+}
+
+func reportFiltersFromValues(values url.Values) reportFilters {
+	return reportFilters{
+		IP:         values.Get("ip"),
+		Port:       values.Get("port"),
+		Service:    values.Get("service"),
+		Keyword:    values.Get("q"),
+		Severity:   values.Get("severity"),
+		Severities: parseSeverityFilters(values),
+		Source:     values.Get("source"),
 	}
 }

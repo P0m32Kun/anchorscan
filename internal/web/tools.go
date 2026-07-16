@@ -19,6 +19,7 @@ type toolPageData struct {
 	Tools         []manualTool
 	Tool          manualTool
 	HighriskPorts string
+	RawArgs       string
 }
 
 type manualTool struct {
@@ -65,7 +66,7 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool, HighriskPorts: highriskPorts})
+	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool, HighriskPorts: highriskPorts, RawArgs: strings.TrimSpace(r.URL.Query().Get("raw_args"))})
 }
 
 func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {

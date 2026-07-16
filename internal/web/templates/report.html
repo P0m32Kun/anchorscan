@@ -172,6 +172,7 @@
               <select name="view" id="filter-view-select">
                 <option value="ports" {{if eq .AssetView "ports"}}selected{{end}}>按端口列表</option>
                 <option value="hosts" {{if eq .AssetView "hosts"}}selected{{end}}>按主机聚合</option>
+                <option value="vulnerabilities" {{if eq .AssetView "vulnerabilities"}}selected{{end}}>按漏洞聚合</option>
               </select>
             </div>
           </div>
@@ -193,6 +194,69 @@
   </form>
 </section>
 
+{{if eq .AssetView "vulnerabilities"}}
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">漏洞交付</p>
+      <h3>按漏洞聚合</h3>
+      <p class="meta-line">仅包含当前筛选范围内非 info 的漏洞；待补充项需人工完善知识库内容。</p>
+      {{if eq .CatalogStatus "disabled"}}<p class="meta-line">未配置漏洞知识库路径，以下按扫描标识待补充。</p>{{end}}
+      {{if eq .CatalogStatus "unavailable"}}<p class="meta-line">漏洞知识库加载失败：{{range .CatalogDiagnostics}}{{.Reason}}{{end}}</p>{{end}}
+      {{if eq .CatalogStatus "degraded"}}<p class="meta-line">漏洞知识库部分降级，已跳过或禁用 {{len .CatalogDiagnostics}} 项内容。</p>{{end}}
+    </div>
+  </div>
+  {{range .Vulnerabilities}}
+  <article class="knowledgebase-content" style="padding: 1.25rem 0; border-top: 1px solid var(--border);">
+    <div class="panel-heading">
+      <h3>{{.Title}}</h3>
+      <div class="header-actions">
+        <button class="button button-secondary" type="button" data-copy-text="{{.Title}}">复制字段</button>
+        <button class="button button-secondary" type="button" data-copy-text="{{.CopyText}}">复制本条</button>
+		{{if .CanBatchNuclei}}<button class="button button-primary batch-command-btn" type="button" data-batch-group="{{.GroupKey}}" data-batch-tool="nuclei">生成批量 Nuclei 命令</button>{{end}}
+		{{if .CanBatchNmap}}<button class="button button-primary batch-command-btn" type="button" data-batch-group="{{.GroupKey}}" data-batch-tool="nmap">生成批量 Nmap 命令</button>{{end}}
+		{{if .CanBatchMSF}}<button class="button button-primary batch-command-btn" type="button" data-batch-group="{{.GroupKey}}" data-batch-tool="msf">生成批量 MSF 命令</button>{{end}}
+      </div>
+    </div>
+    <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
+    <pre>{{.Description}}</pre>
+    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{range .Assets}}{{.}}
+{{end}}">复制字段</button></div>
+    <pre>{{range .Assets}}{{.}}
+{{end}}</pre>
+    <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>
+    <pre>{{.Remediation}}</pre>
+  </article>
+  {{end}}
+  {{if .PendingVulnerabilities}}
+  <div class="panel-heading" style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+    <div><p class="eyebrow">待补充</p><h3>知识库未匹配</h3></div>
+  </div>
+  {{range .PendingVulnerabilities}}
+  <article class="knowledgebase-content" style="padding: 1.25rem 0; border-top: 1px solid var(--border);">
+    <div class="panel-heading">
+      <h3>{{.Title}}</h3>
+      <div class="header-actions">
+        <button class="button button-secondary" type="button" data-copy-text="{{.Title}}">复制字段</button>
+        <button class="button button-secondary" type="button" data-copy-text="{{.CopyText}}">复制本条</button>
+      </div>
+    </div>
+    <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
+    <pre>{{.Description}}</pre>
+    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{range .Assets}}{{.}}
+{{end}}">复制字段</button></div>
+    <pre>{{range .Assets}}{{.}}
+{{end}}</pre>
+    <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>
+    <pre>{{.Remediation}}</pre>
+  </article>
+  {{end}}
+  {{end}}
+  {{if and (not .Vulnerabilities) (not .PendingVulnerabilities)}}
+  <p class="no-data">🛡️ 当前筛选范围没有非 info 漏洞。</p>
+  {{end}}
+</section>
+{{else}}
 <section class="panel">
   <div class="panel-heading">
     <div>
@@ -397,6 +461,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
+			{{with index $.CommandTools (findingKey $finding)}}{{range .Tools}}
+			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" data-command-tool="{{.Name}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成 {{.Label}} 命令</button>
+			{{end}}{{if .Reason}}<span class="meta-line">{{.Reason}}</span>{{end}}{{else}}<span class="meta-line">知识库未匹配或匹配不唯一</span>{{end}}
           </td>
         </tr>
         <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
@@ -444,6 +511,13 @@
       matched-at
     </details>
   </div>
+
+  <dialog id="nuclei-command-dialog" class="panel">
+	<div class="panel-heading"><h3 id="command-dialog-title">生成检测命令</h3><button class="button button-secondary" type="button" data-command-close>关闭</button></div>
+    <p class="meta-line" id="nuclei-command-message"></p>
+    <pre id="nuclei-command-full"></pre>
+    <div class="header-actions"><button class="button button-secondary" type="button" id="nuclei-command-copy">复制完整命令</button><a class="button button-primary" id="nuclei-command-tool" href="/tools/nuclei">带参数打开工具页</a></div>
+  </dialog>
   
           <script src="/static/app.js"></script>
           <script src="/static/report-ui.js"></script>
@@ -466,6 +540,55 @@
         if (icon) icon.style.transform = 'rotate(0deg)';
       }
     }
+
+    const commandDialog = document.getElementById('nuclei-command-dialog');
+    const commandMessage = document.getElementById('nuclei-command-message');
+    const commandFull = document.getElementById('nuclei-command-full');
+    document.querySelector('[data-command-close]')?.addEventListener('click', () => commandDialog.close());
+    document.querySelectorAll('.command-generate-btn').forEach(button => button.addEventListener('click', async () => {
+      commandMessage.textContent = '正在生成，不会启动扫描。';
+      commandFull.textContent = '';
+      commandDialog.showModal();
+      try {
+        const endpoint = new URL('/reports/{{.Run.RunID}}/commands', window.location.origin);
+        endpoint.search = window.location.search;
+		const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: button.dataset.commandTool})});
+        if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
+        const command = await response.json();
+        commandMessage.textContent = '请人工确认后运行；此操作未启动扫描。';
+        commandFull.textContent = command.full_command;
+		const toolLink = document.getElementById('nuclei-command-tool');
+		document.getElementById('command-dialog-title').textContent = '生成 ' + button.textContent.trim().replace('生成 ', '');
+		toolLink.hidden = button.dataset.commandTool === 'msf';
+		if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.commandTool + '?raw_args=' + encodeURIComponent(command.tool_args);
+        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
+      } catch (error) {
+        commandMessage.textContent = error.message || String(error);
+      }
+    }));
+    document.querySelectorAll('.batch-command-btn').forEach(button => button.addEventListener('click', async () => {
+      commandMessage.textContent = '正在生成批量命令，不会启动扫描。';
+      commandFull.textContent = '';
+      commandDialog.showModal();
+      try {
+        const endpoint = new URL('/reports/{{.Run.RunID}}/commands/batch', window.location.origin);
+        endpoint.search = window.location.search;
+        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({group_key: button.dataset.batchGroup, tool: button.dataset.batchTool})});
+		if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
+        const command = await response.json();
+        const commands = command.commands || [command];
+        const files = commands.map(item => item.target_file).filter(Boolean);
+        commandMessage.textContent = (command.warning ? command.warning + '；' : '') + '共 ' + commands.length + ' 条命令' + (files.length ? '；目标文件：' + files.join('、') : '') + '；请人工确认后运行。';
+        commandFull.textContent = commands.map(item => typeof item === 'string' ? item : item.full_command).join('\n');
+        const toolLink = document.getElementById('nuclei-command-tool');
+        toolLink.hidden = button.dataset.batchTool === 'msf' || commands.length !== 1;
+        if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.batchTool + '?raw_args=' + encodeURIComponent(commands[0].tool_args);
+        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(commandFull.textContent);
+      } catch (error) {
+        commandMessage.textContent = error.message || String(error);
+      }
+    }));
   </script>
 </section>
+{{end}}
 {{end}}
