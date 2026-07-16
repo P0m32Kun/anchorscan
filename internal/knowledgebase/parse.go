@@ -118,6 +118,7 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 	description, okDescription := section(lines, "漏洞描述")
 	_, okCommands := section(lines, "验证命令")
 	remediation, okRemediation := section(lines, "修复建议")
+	remediation = strings.TrimSpace(strings.TrimSuffix(remediation, "\n---"))
 	if !okDescription || !okCommands || !okRemediation || description == "" || remediation == "" {
 		return Entry{}, diagnostic(line, meta.ID, "缺少固定章节")
 	}
@@ -189,6 +190,9 @@ func section(lines []string, title string) (string, bool) {
 			end = i
 			break
 		}
+	}
+	for end > start && strings.TrimSpace(lines[end-1]) == "" {
+		end--
 	}
 	value := strings.TrimSpace(strings.Join(lines[start:end], "\n"))
 	return value, true

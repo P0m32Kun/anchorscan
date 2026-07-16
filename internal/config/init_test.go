@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -31,6 +32,24 @@ func TestInitCreatesDefaultConfig(t *testing.T) {
 		if _, ok := cfg.Profiles[name]; !ok {
 			t.Fatalf("missing built-in profile %q", name)
 		}
+	}
+}
+
+func TestInitProfilesMatchShippedExample(t *testing.T) {
+	generatedPath := filepath.Join(t.TempDir(), "default.yaml")
+	if err := Init(generatedPath); err != nil {
+		t.Fatal(err)
+	}
+	generated, err := Load(generatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	example, err := Load(filepath.Join("..", "..", "config", "default.yaml.example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(generated.Profiles, example.Profiles) {
+		t.Fatalf("generated profiles = %#v, example profiles = %#v", generated.Profiles, example.Profiles)
 	}
 }
 

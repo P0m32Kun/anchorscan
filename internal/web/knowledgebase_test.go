@@ -33,3 +33,35 @@ func TestKnowledgeBaseListAndDetail(t *testing.T) {
 		}
 	}
 }
+
+func TestKnowledgeBaseDetailWrapsLongTextAndNavHasIcon(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(knowledgeBaseFixture), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	detail := httptest.NewRecorder()
+	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/kb/smb-signing", nil))
+	body := detail.Body.String()
+	if !strings.Contains(body, `class="panel knowledgebase-content"`) {
+		t.Fatalf("knowledgebase detail missing wrapping container: %s", body)
+	}
+	if !strings.Contains(body, `id="nav-kb"><svg`) {
+		t.Fatalf("knowledgebase nav missing icon: %s", body)
+	}
+
+	css := httptest.NewRecorder()
+	handler.ServeHTTP(css, httptest.NewRequest(http.MethodGet, "/static/style.css", nil))
+	if !strings.Contains(css.Body.String(), ".knowledgebase-content pre") || !strings.Contains(css.Body.String(), "overflow-wrap: anywhere") {
+		t.Fatalf("knowledgebase wrapping styles missing: %s", css.Body.String())
+	}
+}

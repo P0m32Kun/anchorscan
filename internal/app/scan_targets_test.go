@@ -88,6 +88,45 @@ func TestRunScanUsesAliveSweepResultsAsTargets(t *testing.T) {
 	}
 }
 
+func TestRunScanFastProfileDoesNotReduceAliveSweep(t *testing.T) {
+	runner := &profileSensitiveAliveRunner{}
+	err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
+		RunID:          "run-fast-alive",
+		ProfileName:    "fast",
+		HostWorkers:    2,
+		Targets:        []string{"172.22.0.0/30"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		ExtraArgs:      ToolExtraArgs{Nmap: []string{"-T4", "--max-retries", "1"}},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.rustscanCalls != 2 {
+		t.Fatalf("fast profile scanned %d alive hosts, want 2", runner.rustscanCalls)
+	}
+}
+
+type profileSensitiveAliveRunner struct {
+	rustscanCalls int
+}
+
+func (r *profileSensitiveAliveRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, "-sn") {
+		if strings.Contains(joined, "-T4") || strings.Contains(joined, "--max-retries") {
+			return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1"/></host></nmaprun>`), nil
+		}
+		return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1"/></host><host><status state="up"/><address addr="172.22.0.2"/></host></nmaprun>`), nil
+	}
+	if binary == "/opt/rustscan" {
+		r.rustscanCalls++
+		return nil, nil
+	}
+	return nil, fmt.Errorf("unexpected command: %s %s", binary, joined)
+}
+
 func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := &cancelAfterFirstTargetRunner{cancel: cancel}

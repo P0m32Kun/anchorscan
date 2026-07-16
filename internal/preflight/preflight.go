@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -125,17 +126,8 @@ func executablePath(path string) error {
 	if strings.TrimSpace(path) == "" {
 		return errors.New("path is empty")
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
-		return errors.New("path is a directory")
-	}
-	if info.Mode()&0o111 == 0 {
-		return errors.New("not executable")
-	}
-	return nil
+	_, err := exec.LookPath(path)
+	return err
 }
 
 func checkWritableParent(result *Result, name string, path string) {

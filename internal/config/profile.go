@@ -80,7 +80,7 @@ func builtInProfiles() map[string]Profile {
 		"slow": {
 			HostWorkers: 1,
 			ToolArgs: ToolArgs{
-				Rustscan: []string{"--batch-size", "100", "--timeout", "3000", "--tries", "2"},
+				Rustscan: []string{"--batch-size", "500", "--timeout", "3000", "--tries", "2", "--ulimit", "5000"},
 				Nmap:     []string{"-T2", "--max-retries", "3", "--scan-delay", "100ms"},
 				Httpx:    []string{"-rate-limit", "20", "-threads", "5"},
 				Nuclei:   []string{"-rate-limit", "10", "-c", "5", "-retries", "2"},
@@ -89,7 +89,7 @@ func builtInProfiles() map[string]Profile {
 		"normal": {
 			HostWorkers: 3,
 			ToolArgs: ToolArgs{
-				Rustscan: []string{"--batch-size", "300", "--tries", "2"},
+				Rustscan: []string{"--batch-size", "1000", "--tries", "2", "--ulimit", "5000"},
 				Nmap:     []string{"-T3", "--max-retries", "2"},
 				Httpx:    []string{"-rate-limit", "100", "-threads", "20"},
 				Nuclei:   []string{"-rate-limit", "50", "-c", "20"},
@@ -98,7 +98,7 @@ func builtInProfiles() map[string]Profile {
 		"fast": {
 			HostWorkers: 8,
 			ToolArgs: ToolArgs{
-				Rustscan: []string{"--batch-size", "500", "--tries", "2"},
+				Rustscan: []string{"--batch-size", "1500", "--tries", "2", "--ulimit", "5000"},
 				Nmap:     []string{"-T4", "--max-retries", "1"},
 				Httpx:    []string{"-rate-limit", "300", "-threads", "50"},
 				Nuclei:   []string{"-rate-limit", "150", "-c", "50"},

@@ -358,6 +358,17 @@ a:hover {
   margin-bottom: 1.25rem;
 }
 
+.knowledgebase-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.knowledgebase-content pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .panel-heading {
   display: flex;
   align-items: flex-start;
@@ -1697,6 +1708,7 @@ input[type="file"]::file-selector-button:hover {
     align-items: center;
   }
   .sidebar {
+    width: 240px;
     position: fixed;
     left: -240px;
     top: 0;

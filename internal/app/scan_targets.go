@@ -29,7 +29,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 
 	if opts.Tools.Nmap != "" && len(scanTargets) > 0 {
 		emit(opts, scanStore, "info", "nmap", "nmap alive sweep targets=%v", scanTargets)
-		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, scanTargets, opts.ExtraArgs.Nmap)
+		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, scanTargets, nil)
 		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
 			return nil, nil, nil, nil, writeErr
 		}

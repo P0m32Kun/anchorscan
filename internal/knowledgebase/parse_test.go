@@ -52,6 +52,23 @@ func TestLoadParsesThreeSections(t *testing.T) {
 	}
 }
 
+func TestLoadDropsTrailingEntrySeparator(t *testing.T) {
+	configPath, handbookPath := writeHandbook(t, handbook+"\n---\n")
+	entry, ok := Load(configPath, filepath.Base(handbookPath)).Entry("smb-signing")
+	if !ok || entry.Remediation != "启用签名。" {
+		t.Fatalf("Entry() = %#v, %t", entry, ok)
+	}
+}
+
+func TestLoadPreservesSeparatorInDescription(t *testing.T) {
+	withSeparator := strings.Replace(handbook, "描述。\n\n#### 验证命令", "描述。\n\n---\n\n#### 验证命令", 1)
+	configPath, handbookPath := writeHandbook(t, withSeparator)
+	entry, ok := Load(configPath, filepath.Base(handbookPath)).Entry("smb-signing")
+	if !ok || entry.Description != "描述。\n\n---" {
+		t.Fatalf("Entry() = %#v, %t", entry, ok)
+	}
+}
+
 func TestLoadAcceptsEmptyVerificationCommands(t *testing.T) {
 	configPath, handbookPath := writeHandbook(t, strings.Replace(handbook, "##### Nuclei\n\n```bash\nnuclei -t network/smb.yaml -u {{host}}:{{port}}\n```\n\n", "", 1))
 	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusReady {

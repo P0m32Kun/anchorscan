@@ -1,4 +1,4 @@
 {{define "content"}}
 <section class="page-header"><div><p class="eyebrow">漏洞知识库</p><h2>{{.Entry.Name}}（{{.Entry.Severity}}）</h2></div><a class="button button-secondary" href="/kb">返回列表</a></section>
-<section class="panel"><h3>漏洞描述</h3><pre>{{.Entry.Description}}</pre><h3>验证命令</h3>{{if .Entry.Commands.Nuclei}}<pre><code>{{.Entry.Commands.Nuclei}}</code></pre>{{end}}{{if .Entry.Commands.NmapNSE}}<pre><code>{{.Entry.Commands.NmapNSE}}</code></pre>{{end}}<h3>修复建议</h3><pre>{{.Entry.Remediation}}</pre></section>
+<section class="panel knowledgebase-content"><h3>漏洞描述</h3><pre>{{.Entry.Description}}</pre><h3>验证命令</h3>{{if .Entry.Commands.Nuclei}}<pre><code>{{.Entry.Commands.Nuclei}}</code></pre>{{end}}{{if .Entry.Commands.NmapNSE}}<pre><code>{{.Entry.Commands.NmapNSE}}</code></pre>{{end}}<h3>修复建议</h3><pre>{{.Entry.Remediation}}</pre></section>
 {{end}}

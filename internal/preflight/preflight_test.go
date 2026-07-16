@@ -82,6 +82,25 @@ func TestRunSummarizesScanAndWarnsForFullRange(t *testing.T) {
 	}
 }
 
+func TestRunAcceptsToolNamesFromPATH(t *testing.T) {
+	dir := t.TempDir()
+	executable(t, dir, "rustscan")
+	executable(t, dir, "nmap")
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	result := Run(Options{
+		ConfigDir: dir,
+		DBPath:    filepath.Join(dir, "scan.db"),
+		JSONPath:  filepath.Join(dir, "scan.json"),
+		Targets:   []string{"127.0.0.1"},
+		PortSpec:  "22",
+		Tools:     config.ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+	})
+	if result.HasErrors() {
+		t.Fatalf("PATH tool names rejected: %#v", result.Errors)
+	}
+}
+
 func executable(t *testing.T, dir string, name string) string {
 	t.Helper()
 	path := filepath.Join(dir, name)
