@@ -30,7 +30,7 @@ func TestWriteHTMLStableBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := sha256.Sum256(data)
-	const want = "bb5dd66b02f8e64a5f85fdbea749f8de145f85e2666e7c2f6ad66635c981771f"
+	const want = "3dcf7c9a9cd38b69fe6caaba9e8e90cc2ab37c731ba22a1a5e160094c648c91f"
 	if actual := hex.EncodeToString(got[:]); actual != want {
 		t.Fatalf("unexpected HTML SHA-256: got %s, want %s", actual, want)
 	}
@@ -90,5 +90,23 @@ func TestWriteHTMLIncludesMatchedVulnerabilityDelivery(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "Redis 未限制默认访问。") || !strings.Contains(string(data), "设置强密码并限制访问来源。") {
 		t.Fatalf("expected matched vulnerability delivery in html: %s", data)
+	}
+}
+
+func TestWriteHTMLUsesSelfContainedLightTheme(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "report.html")
+	if err := WriteHTML(path, Build(nil, nil)); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(data)
+	if !strings.Contains(html, "--canvas: #f5f5f7") {
+		t.Fatalf("expected approved light canvas in exported report")
+	}
+	if strings.Contains(html, "fonts.googleapis.com") || strings.Contains(html, "fonts.gstatic.com") || strings.Contains(html, "href=\"/static/") {
+		t.Fatalf("exported report must not depend on external resources")
 	}
 }

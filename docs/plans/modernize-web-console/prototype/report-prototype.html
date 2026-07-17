@@ -1,0 +1,217 @@
+<!doctype html>
+<!--
+  PROTOTYPE ONLY - not production code.
+  Question: which 1440px report layout best fits a compact, Apple-inspired AnchorScan console?
+  Three variants switch with ?variant=a|b|c or the floating bottom control.
+  Run: python3 -m http.server 8099 --directory docs/plans/modernize-web-console/prototype
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AnchorScan Report Prototype</title>
+  <style>
+    :root {
+      --canvas: #f5f5f7;
+      --surface: #ffffff;
+      --surface-muted: #f9f9fb;
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --faint: #9a9aa0;
+      --line: rgba(60, 60, 67, .18);
+      --blue: #0071e3;
+      --blue-soft: #eaf4ff;
+      --red: #d70015;
+      --orange: #e86f00;
+      --yellow: #aa6f00;
+      --shadow: 0 16px 38px rgba(25, 25, 30, .08);
+      --radius: 14px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 1280px; background: var(--canvas); }
+    body { margin: 0; color: var(--text); background: var(--canvas); font: 14px/1.45 var(--font); }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .app { display: grid; grid-template-columns: 228px minmax(0, 1fr); min-height: 100vh; }
+    .sidebar { padding: 24px 14px; border-right: 1px solid var(--line); background: rgba(255,255,255,.72); backdrop-filter: blur(20px); }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px 26px; font-size: 17px; font-weight: 720; letter-spacing: -.02em; }
+    .mark { display: grid; place-items: center; width: 29px; height: 29px; color: var(--blue); border-radius: 9px; background: var(--blue-soft); }
+    .nav-label { margin: 22px 10px 7px; color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .nav { display: grid; gap: 3px; }
+    .nav a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; color: var(--muted); border-radius: 9px; font-weight: 550; text-decoration: none; }
+    .nav a.active { color: #005bb7; background: var(--blue-soft); }
+    .nav a svg { width: 17px; height: 17px; }
+    .nav-foot { position: fixed; bottom: 24px; left: 24px; color: var(--faint); font-size: 11px; }
+    .main { min-width: 0; padding: 28px 38px 70px; }
+    .page { max-width: 1540px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; }
+    .crumb { color: var(--muted); font-size: 13px; }
+    .crumb strong { color: var(--text); font-weight: 600; }
+    .actions, .view-switch, .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 0 12px; color: var(--text); border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.8); font-size: 13px; font-weight: 600; }
+    .button.primary { color: #fff; border-color: var(--blue); background: var(--blue); }
+    .button.primary:hover { background: #0077ed; }
+    .button svg { width: 15px; height: 15px; }
+    .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 12px; font-weight: 650; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 7px; font-size: 27px; letter-spacing: -.045em; }
+    h2 { margin-bottom: 0; font-size: 16px; letter-spacing: -.02em; }
+    h3 { margin-bottom: 0; font-size: 14px; }
+    .subtext { color: var(--muted); }
+    .run-id { font-family: var(--mono); font-size: 12px; }
+    .status { display: inline-flex; align-items: center; gap: 6px; color: #167546; font-size: 12px; font-weight: 700; }
+    .status::before { width: 7px; height: 7px; border-radius: 999px; background: #34c759; content: ""; }
+    .metric { padding: 16px 0; border-top: 1px solid var(--line); }
+    .metric:first-child { border-top: 0; }
+    .metric-value { display: block; margin-top: 3px; font-size: 25px; font-weight: 700; letter-spacing: -.045em; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .riskbar { display: flex; height: 7px; overflow: hidden; margin: 12px 0 9px; border-radius: 999px; background: #e8e8ed; }
+    .riskbar span:nth-child(1) { width: 15%; background: var(--red); }
+    .riskbar span:nth-child(2) { width: 33%; background: var(--orange); }
+    .riskbar span:nth-child(3) { width: 36%; background: #f1bd32; }
+    .riskbar span:nth-child(4) { width: 16%; background: #7cb6e8; }
+    .risk-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 11px; }
+    .dot { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 999px; }
+    .dot.critical { background: var(--red); }.dot.high { background: var(--orange); }.dot.medium { background: #f1bd32; }.dot.low { background: #7cb6e8; }
+    .toolbar { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.82); box-shadow: 0 8px 24px rgba(25,25,30,.04); }
+    .search { display: flex; flex: 1; align-items: center; gap: 8px; min-width: 260px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-muted); }
+    .search input { width: 100%; height: 32px; border: 0; outline: 0; background: transparent; color: var(--text); }
+    .chip { min-height: 32px; padding: 0 10px; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 12px; }
+    .chip.active { color: #005bb7; border-color: #b6d8f8; background: var(--blue-soft); }
+    .segment { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); }
+    .segment button { padding: 5px 10px; color: var(--muted); border: 0; border-radius: 6px; background: transparent; font-size: 12px; }
+    .segment button.active { color: var(--text); background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .table-wrap { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 4px 14px rgba(25,25,30,.025); }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 11px 14px; color: var(--faint); border-bottom: 1px solid var(--line); background: var(--surface-muted); font-size: 10px; font-weight: 750; letter-spacing: .055em; text-transform: uppercase; }
+    td { padding: 13px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    .host { font-family: var(--mono); font-size: 12px; font-weight: 650; }
+    .secondary { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .severity { display: inline-flex; align-items: center; min-width: 48px; justify-content: center; padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .severity.critical { color: #b30013; background: #fff0f1; }.severity.high { color: #af5100; background: #fff4e8; }.severity.medium { color: #7c5600; background: #fff9e9; }.severity.low { color: #0063a8; background: #edf7ff; }
+    .small-link { color: var(--blue); font-size: 12px; font-weight: 650; text-decoration: none; }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 4px 14px rgba(25,25,30,.025); }
+    .card.pad { padding: 18px; }
+    .variant-a .hero { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; padding-bottom: 18px; }
+    .variant-a .report-intro { padding: 22px; }
+    .variant-a .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 22px; border-top: 1px solid var(--line); }
+    .variant-a .summary > div { padding: 15px 16px 0 0; }
+    .variant-a .summary > div + div { padding-left: 16px; border-left: 1px solid var(--line); }
+    .variant-a .toolbar { position: sticky; top: 14px; z-index: 2; margin: 4px 0 14px; }
+    .layout-b { display: grid; grid-template-columns: 285px minmax(0, 1fr); gap: 18px; }
+    .layout-b .case-file { padding: 21px; }
+    .layout-b .case-file h1 { font-size: 23px; }
+    .layout-b .main-workspace { min-width: 0; }
+    .layout-b .workspace-heading { display: flex; align-items: end; justify-content: space-between; margin: 5px 0 16px; }
+    .layout-b .toolbar { margin-bottom: 14px; }
+    .layout-b .finding-strip { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; margin-bottom: 14px; border: 1px solid #bdddf9; border-radius: 11px; background: #f4f9ff; }
+    .variant-c .briefing { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+    .variant-c .brief-title { grid-column: span 2; padding: 24px; }
+    .variant-c .brief-title h1 { font-size: 30px; }
+    .variant-c .risk-panel { padding: 18px; }
+    .variant-c .review-grid { display: grid; grid-template-columns: .9fr 1.6fr; gap: 18px; }
+    .variant-c .priority-list { padding: 8px 0; }
+    .priority { display: flex; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+    .priority:last-child { border-bottom: 0; }
+    .priority-num { display: grid; flex: 0 0 22px; place-items: center; width: 22px; height: 22px; color: #a34200; border-radius: 999px; background: #fff2e4; font-size: 11px; font-weight: 750; }
+    .switcher { position: fixed; right: 50%; bottom: 22px; z-index: 10; display: flex; align-items: center; gap: 8px; padding: 5px; transform: translateX(50%); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; background: rgba(29,29,31,.92); box-shadow: 0 12px 28px rgba(0,0,0,.22); }
+    .switcher button { display: grid; place-items: center; width: 30px; height: 30px; color: #fff; border: 0; border-radius: 999px; background: transparent; }
+    .switcher button:hover { background: rgba(255,255,255,.16); }
+    .switcher-label { min-width: 168px; text-align: center; font-size: 12px; font-weight: 650; }
+    .prototype-note { margin: 18px 0 0; color: var(--faint); font-size: 11px; text-align: right; }
+    @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="mark"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.4-7 10-4-1.6-7-5.5-7-10V6l7-3z"/><path d="m8.5 12 2.2 2.2 4.7-5"/></svg></span>AnchorScan</div>
+      <div class="nav-label">工作区</div>
+      <nav class="nav">
+        <a href="#"><svg viewBox="0 0 24 24"><path d="m3 11 9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></svg>控制面板</a>
+        <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>项目管理</a>
+        <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h7M7 16h4"/></svg>扫描历史</a>
+        <a class="active" href="#"><svg viewBox="0 0 24 24"><path d="M4 19V5m0 14h16"/><path d="m7 15 4-4 3 2 4-6"/></svg>扫描报告</a>
+      </nav>
+      <div class="nav-label">资源</div>
+      <nav class="nav">
+        <a href="#"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>漏洞知识库</a>
+        <a href="#"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-3v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1L6.6 17l.1-.1A1.7 1.7 0 0 0 7 15a1.7 1.7 0 0 0-1.5-1H5.3v-3h.2A1.7 1.7 0 0 0 7 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.1-2.1.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5v-.2h3v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2v3h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>全局配置</a>
+      </nav>
+      <div class="nav-foot">Prototype · ticket 01</div>
+    </aside>
+    <main class="main"><div id="prototype-root" class="page"></div></main>
+  </div>
+  <div class="switcher" aria-label="原型布局切换">
+    <button id="prev" aria-label="上一个布局">←</button>
+    <span id="variant-label" class="switcher-label"></span>
+    <button id="next" aria-label="下一个布局">→</button>
+  </div>
+  <script>
+    const rows = [
+      ['10.18.4.21', '445', 'tcp', 'SMB signing not required', 'critical'],
+      ['10.18.4.34', '6379', 'tcp', 'Redis unauthenticated access', 'high'],
+      ['10.18.4.18', '80', 'tcp', 'nginx version disclosure', 'medium'],
+      ['10.18.4.16', '3389', 'tcp', 'RDP certificate mismatch', 'medium'],
+      ['10.18.4.47', '22', 'tcp', 'OpenSSH banner detected', 'low']
+    ];
+
+    const table = () => `<div class="table-wrap"><table><thead><tr><th>资产</th><th>服务</th><th>风险</th><th>发现</th><th></th></tr></thead><tbody>${rows.map(([host, port, protocol, finding, severity]) => `<tr><td><span class="host">${host}:${port}</span><span class="secondary">办公网区 · 华北节点</span></td><td><strong>${protocol}</strong><span class="secondary">${port}/tcp</span></td><td><span class="severity ${severity}">${severity}</span></td><td><strong>${finding}</strong><span class="secondary">来自 nuclei · 2 个可用检测命令</span></td><td><a class="small-link" href="#">查看</a></td></tr>`).join('')}</tbody></table></div>`;
+
+    const toolbar = () => `<div class="toolbar"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg><input aria-label="搜索报告" placeholder="搜索 IP、网段或漏洞关键词" value="10.18.4"></label><button class="chip active">严重性 · 3</button><button class="chip">端口与服务</button><button class="chip">数据源</button><span class="segment"><button class="active">端口</button><button>主机</button><button>漏洞</button></span><button class="button primary">应用筛选</button></div>`;
+
+    const risk = () => `<div class="riskbar"><span></span><span></span><span></span><span></span></div><div class="risk-legend"><span><i class="dot critical"></i>严重 2</span><span><i class="dot high"></i>高危 4</span><span><i class="dot medium"></i>中危 5</span><span><i class="dot low"></i>低危 2</span></div>`;
+
+    const sharedActions = () => `<div class="actions"><button class="button">导出 CSV</button><button class="button">复制摘要</button><button class="button primary"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>导出报告</button></div>`;
+
+    const variants = {
+      a: {
+        label: 'A — 聚焦工作台',
+        html: () => `<section class="variant-a"><div class="topbar"><p class="crumb">扫描报告 / <strong>甘肃-新一代-1区-50</strong></p>${sharedActions()}</div><div class="hero"><article class="card report-intro"><p class="eyebrow">已完成扫描 <span class="status">完成</span></p><h1>内网资产与漏洞报告</h1><p class="subtext run-id">run-20260716-160711.085804000 · 完成于今天 16:10</p><div class="summary"><div><span class="metric-label">已识别资产</span><span class="metric-value">48</span></div><div><span class="metric-label">开放服务</span><span class="metric-value">126</span></div><div><span class="metric-label">非信息级发现</span><span class="metric-value">13</span></div></div></article><aside class="card pad"><p class="eyebrow">风险概览</p><h2>13 个需要处理的发现</h2>${risk()}<p class="subtext" style="margin:16px 0 0;font-size:12px">优先处理 SMB 与 Redis 相关问题。</p></aside></div>${toolbar()}${table()}<p class="prototype-note">布局 A：将摘要、筛选和结果放在一个连续工作台内。</p></section>`
+      },
+      b: {
+        label: 'B — 调查双栏',
+        html: () => `<section class="layout-b"><aside class="card case-file"><p class="eyebrow">当前案件</p><h1>甘肃-新一代-1区-50</h1><p class="run-id subtext">run-20260716-160711.085804000</p><div class="metric"><span class="metric-label">扫描状态</span><span class="status">完成</span></div><div class="metric"><span class="metric-label">资产范围</span><span class="metric-value">48</span><span class="metric-label">主机 · 126 个服务</span></div><div class="metric"><span class="metric-label">风险分布</span>${risk()}</div><div class="metric"><span class="metric-label">下一步</span><p style="margin:6px 0 0;font-size:13px">先核验 2 个严重风险的受影响资产。</p></div></aside><div class="main-workspace"><div class="topbar"><p class="crumb">扫描报告 / <strong>结果调查</strong></p>${sharedActions()}</div><div class="workspace-heading"><div><p class="eyebrow">筛选后的发现</p><h1>13 个风险项</h1></div><span class="subtext">已过滤：10.18.4 · 仅显示非 info</span></div>${toolbar()}<div class="finding-strip"><span><strong>优先队列：</strong>SMB signing not required 影响 6 个资产</span><a class="small-link" href="#">在漏洞视图中查看</a></div>${table()}<p class="prototype-note">布局 B：将 run 上下文固定在左侧，主区专注调查与筛选。</p></div></section>`
+      },
+      c: {
+        label: 'C — 简报画布',
+        html: () => `<section class="variant-c"><div class="topbar"><p class="crumb">扫描历史 / <strong>报告简报</strong></p>${sharedActions()}</div><div class="briefing"><article class="card brief-title"><p class="eyebrow">完成扫描 · <span class="status">完成</span></p><h1>48 个资产，13 项需要处理的风险</h1><p class="subtext">甘肃-新一代-1区-50 · <span class="run-id">run-20260716-160711.085804000</span></p><div class="view-switch" style="margin-top:20px"><button class="button primary">查看结果</button><button class="button">查看漏洞交付</button></div></article><article class="card risk-panel"><p class="eyebrow">风险平衡</p><h2>从最高影响开始</h2>${risk()}<a class="small-link" style="display:inline-block;margin-top:13px" href="#">跳转到严重风险</a></article></div><div class="review-grid"><article class="card"><div class="card pad" style="border:0;border-bottom:1px solid var(--line);border-radius:14px 14px 0 0"><p class="eyebrow">处理优先级</p><h2>建议先处理</h2></div><div class="priority-list"><div class="priority"><span class="priority-num">1</span><div><strong>SMB signing not required</strong><span class="secondary">6 个资产 · 严重</span></div></div><div class="priority"><span class="priority-num">2</span><div><strong>Redis unauthenticated access</strong><span class="secondary">2 个资产 · 高危</span></div></div><div class="priority"><span class="priority-num">3</span><div><strong>RDP certificate mismatch</strong><span class="secondary">4 个资产 · 中危</span></div></div></div></article><section><div style="display:flex;align-items:end;justify-content:space-between;margin:0 0 10px"><div><p class="eyebrow">全部资产结果</p><h2>按端口查看</h2></div><span class="subtext">48 个资产 · 126 个服务</span></div>${toolbar()}${table()}</section></div><p class="prototype-note">布局 C：将风险优先级作为首屏主叙事，结果列表位于下方。</p></section>`
+      }
+    };
+
+    const order = ['a', 'b', 'c'];
+    const params = new URLSearchParams(location.search);
+    let current = variants[params.get('variant')] ? params.get('variant') : 'a';
+    const root = document.getElementById('prototype-root');
+    const label = document.getElementById('variant-label');
+
+    function render() {
+      root.className = `page variant-${current}`;
+      root.innerHTML = variants[current].html();
+      label.textContent = variants[current].label;
+      const url = new URL(location.href);
+      url.searchParams.set('variant', current);
+      history.replaceState({}, '', url);
+    }
+
+    function move(delta) {
+      current = order[(order.indexOf(current) + delta + order.length) % order.length];
+      render();
+    }
+
+    document.getElementById('prev').addEventListener('click', () => move(-1));
+    document.getElementById('next').addEventListener('click', () => move(1));
+    document.addEventListener('keydown', event => {
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName) || document.activeElement.isContentEditable) return;
+      if (event.key === 'ArrowLeft') move(-1);
+      if (event.key === 'ArrowRight') move(1);
+    });
+    render();
+  </script>
+</body>
+</html>

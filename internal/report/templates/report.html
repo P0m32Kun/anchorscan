@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <title>AnchorScan 扫描安全报告</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0b0c10;
@@ -487,6 +484,93 @@
       th, td, table { border-color: #ccc; }
       .meta-card, .stat-card, .filter-panel { background: #f5f5f5; border-color: #ccc; color: #000; box-shadow: none; }
       .port-badge { border-color: #ccc; color: #000; }
+    }
+
+    /* Keep the export self-contained while matching the console's approved light system. */
+    :root {
+      --canvas: #f5f5f7;
+      --surface: #ffffff;
+      --raised-surface: rgba(255, 255, 255, 0.82);
+      --text-primary: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --separator: rgba(60, 60, 67, 0.18);
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --bg: var(--canvas);
+      --bg-dots: transparent;
+      --panel: var(--surface);
+      --panel-light: #fbfbfd;
+      --border: var(--separator);
+      --border-strong: rgba(60, 60, 67, 0.28);
+      --text: var(--text-primary);
+      --muted: var(--text-secondary);
+      --heading: var(--text-primary);
+      --primary: var(--accent);
+      --primary-hover: var(--accent-hover);
+      --primary-glow: rgba(0, 113, 227, 0.18);
+      --sev-critical: #d70015;
+      --sev-critical-soft: #fff2f3;
+      --sev-critical-border: #f2b8bd;
+      --sev-high: #a84600;
+      --sev-high-soft: #fff4e8;
+      --sev-high-border: #f2c79e;
+      --sev-medium: #735c00;
+      --sev-medium-soft: #fff9db;
+      --sev-medium-border: #e8d68a;
+      --sev-low: #0066cc;
+      --sev-low-soft: #eef6ff;
+      --sev-low-border: #b8d8f7;
+      --sev-info: #59636e;
+      --sev-info-soft: #f2f4f5;
+      --sev-info-border: #d1d6da;
+    }
+
+    body {
+      padding: 2.5rem 2rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--canvas);
+      color: var(--text-primary);
+    }
+    header { align-items: flex-start; border-color: var(--separator); margin-bottom: 2rem; }
+    h1 { font-family: inherit; font-size: 1.8rem; font-weight: 700; background: none; -webkit-text-fill-color: initial; }
+    .brand-tag, .stat-label, .showing-badge, .finding-meta, .evidence-title { font-family: inherit; }
+    .brand-tag { color: var(--accent); letter-spacing: 0.06em; }
+    .stats-grid { gap: 0.75rem; }
+    .stat-card, .filter-panel, table {
+      border-color: var(--separator);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    .stat-card { padding: 1rem 1.15rem; border-radius: 10px; }
+    .clickable-stat:hover { background: #fbfbfd; border-color: rgba(0, 113, 227, 0.4); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06); }
+    .clickable-stat.active { border-color: var(--accent); background: #eef6ff; box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.08); }
+    .stat-value, .ip-cell, .finding-summary { color: var(--text-primary); }
+    .filter-panel { padding: 1.15rem; border-radius: 10px; margin-bottom: 1.5rem; }
+    .filter-header { border-color: var(--separator); margin-bottom: 1rem; }
+    .showing-badge, .port-badge, .finding-details, .evidence-block {
+      background: #f5f5f7;
+      border-color: var(--separator);
+      color: var(--text-primary);
+    }
+    .filter-input-group input { background: var(--surface); border-color: var(--separator); color: var(--text-primary); }
+    .filter-input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--primary-glow); }
+    th { background: #f5f5f7; color: var(--text-secondary); border-color: var(--separator); }
+    th, td { border-color: var(--separator); }
+    tr:hover td, .finding-detail-row td, .finding-detail-row:hover td { background: #fbfbfd; }
+    .finding-details { border-radius: 8px; }
+    .finding-details summary:focus-visible, .clickable-stat:focus-visible, input:focus-visible, a:focus-visible {
+      outline: 3px solid rgba(0, 113, 227, 0.35);
+      outline-offset: 2px;
+    }
+    .finding-details summary::before { color: var(--accent); }
+    .finding-delivery { border-color: var(--separator); border-left-color: var(--accent); background: #f7fbff; }
+    .evidence-block { color: #1d1d1f; max-height: 350px; }
+    .web-badge { background: #eef6ff; border-color: #b8d8f7; color: #0066cc; }
+    .web-url-link { color: var(--accent); }
+    .web-url-link:hover { color: var(--accent-hover); }
+    @media print {
+      body { padding: 0; background: #fff; color: #000; }
+      .stat-card, .filter-panel, table, .finding-details, .evidence-block { box-shadow: none; }
+      .filter-panel { break-inside: avoid; }
     }
   </style>
 </head>
