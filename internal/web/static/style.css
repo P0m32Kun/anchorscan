@@ -547,6 +547,10 @@ button[type="submit"]:hover {
   grid-column: span 2;
 }
 
+.form-grid > .full-width {
+  grid-column: span 2;
+}
+
 .form-grid label span,
 .details-block label span {
   font-size: 0.8rem;
@@ -2176,3 +2180,18 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .import-nmap-project-field { max-width: 32rem; }
 .import-nmap-actions { margin-top: 0.25rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 .import-nmap-primary-icon { width: 1.2rem; height: 1.2rem; }
+
+/* Ticket 10: global configuration workspace. */
+.config-intro { margin-top: 0.25rem; }
+.alert-icon { width: 1.2rem; height: 1.2rem; margin-right: 0.5rem; vertical-align: middle; }
+.alert-success { background: var(--success-soft); border-color: var(--success-border); color: #167546; }
+.config-workspace { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+.config-panel { margin-bottom: 0; }
+.config-field-help { margin-top: 0.35rem; }
+.config-actions { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.config-save-button { width: 100%; }
+.config-save-icon { width: 1.1rem; height: 1.1rem; }
+.config-raw-form { display: flex; flex-direction: column; gap: 1.25rem; height: calc(100% - 3.5rem); }
+.config-raw-editor { flex-grow: 1; min-height: 23rem; }
+.config-raw-actions { margin-top: auto; }
+.config-ports-panel { margin-top: 1.5rem; }
