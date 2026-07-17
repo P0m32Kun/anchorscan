@@ -2078,3 +2078,28 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .details-toggle-btn.active-toggle { color: #fff; }
 .report-knowledge-entry { padding: 1.25rem 0; border-top: 1px solid var(--border); }
 .report-pending-heading { border-top: 1px solid var(--border); padding-top: 1.25rem; }
+
+/* Ticket 04: scan history workspace. */
+.runs-table-panel { padding: 0; overflow: hidden; }
+.run-history-table { border: 0; border-radius: 0; }
+.run-col-id { width: 25%; }
+.run-col-status { width: 15%; }
+.run-col-target { width: 20%; }
+.run-col-project { width: 10%; }
+.run-col-profile { width: 15%; }
+.run-col-actions { width: 15%; text-align: right; }
+.run-id-link { font-family: var(--mono); font-size: 0.9rem; font-weight: 700; }
+.run-target { max-width: 280px; overflow: hidden; font-family: var(--mono); font-size: 0.85rem; text-overflow: ellipsis; white-space: nowrap; word-break: break-all; }
+.run-profile { padding: 0.2rem 0.5rem; border: 1px solid var(--border); background: var(--bg-accent); color: var(--text); font-size: 0.7rem; }
+.run-actions { text-align: right; white-space: nowrap; }
+.run-report-action, .run-monitor-action, .run-delete-action { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+.run-report-action { border-color: var(--success-border); background: var(--success-soft); color: #167546; }
+.run-report-action:hover { border-color: #6bbf91; background: #eefaf3; color: #11663c; }
+.run-monitor-action { border-color: var(--primary-glow); background: var(--primary-soft); color: var(--primary); }
+.run-no-action { padding-right: 0.5rem; color: var(--muted); font-size: 0.85rem; }
+.run-delete-form { display: inline; }
+.runs-empty-state { padding: 3rem 1rem; text-align: center; }
+.runs-empty-state strong, .runs-empty-state span { display: block; }
+.runs-empty-state strong { margin-bottom: 0.4rem; color: var(--heading); font-size: 1rem; }
+.is-running { animation: spin 2s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
