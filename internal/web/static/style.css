@@ -2134,3 +2134,21 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .project-scan-details summary { padding: 0.5rem 0; font-size: 0.95rem; font-weight: 600; }
 .project-scan-detail-body { margin-top: 0.5rem; padding-top: 1rem; border-top: 1px dashed rgba(0, 113, 227, 0.16); }
 .project-scan-primary-icon { width: 1.2rem; height: 1.2rem; }
+
+/* Ticket 07: project detail workspace. */
+.project-detail-meta { margin-top: 0.25rem; }
+.project-detail-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.project-detail-primary-icon { width: 1.2rem; height: 1.2rem; }
+.config-title-icon { width: 1.1rem; height: 1.1rem; color: var(--primary); }
+.config-title-icon-danger { color: #c5221f; }
+.config-title-icon-success { color: #167546; }
+.copy-icon { width: 0.9rem; height: 0.9rem; }
+.copy-success-icon { width: 0.9rem; height: 0.9rem; margin-right: 0.2rem; color: #167546; }
+.copy-success-label { color: #167546; font-weight: 700; }
+.project-port-summary, .project-profile-summary { min-height: 2rem; }
+.project-profile-summary { display: flex; align-items: center; }
+.project-runs-panel { margin-top: 1.5rem; padding: 0; overflow: hidden; }
+.project-runs-heading { padding: 1.5rem 1.5rem 1rem; }
+.project-run-col-id { width: 30%; }
+.project-run-col-target { width: 25%; }
+.project-run-detail { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
