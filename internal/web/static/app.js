@@ -1,3 +1,17 @@
+function setActiveNavigation(path, items = document.querySelectorAll('.nav-item')) {
+  const activeID = path === '/' || path === '' ? 'nav-home'
+    : path.startsWith('/projects') ? 'nav-projects'
+    : path.startsWith('/runs') || path.startsWith('/scan') || path.startsWith('/reports') ? 'nav-runs'
+    : path.startsWith('/import') ? 'nav-import'
+    : path.startsWith('/tools') ? 'nav-tools'
+    : path.startsWith('/kb') ? 'nav-kb'
+    : path.startsWith('/config') ? 'nav-config'
+    : '';
+  items.forEach(item => item.classList.toggle('active', item.id === activeID));
+}
+
+document.addEventListener('DOMContentLoaded', () => setActiveNavigation(window.location.pathname));
+
 async function copyReportData(button){
   let text = button.dataset.copyText || '';
   if(button.dataset.copyUrl){

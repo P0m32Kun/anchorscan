@@ -242,8 +242,8 @@ func TestRunPageLoadsStatusPolling(t *testing.T) {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	appScript := strings.Index(body, `<script src="/static/app.js"></script>`)
-	runStatusScript := strings.Index(body, `<script src="/static/run-status.js"></script>`)
+	appScript := strings.Index(body, `<script src="/static/app.js" defer></script>`)
+	runStatusScript := strings.Index(body, `<script src="/static/run-status.js" defer></script>`)
 	if appScript == -1 || runStatusScript == -1 || appScript > runStatusScript {
 		t.Fatalf("expected app.js before run-status.js: %s", body)
 	}

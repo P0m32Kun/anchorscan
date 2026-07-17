@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
+for (const name of fs.readdirSync(new URL('../templates/', import.meta.url))) {
+  const template = fs.readFileSync(new URL(`../templates/${name}`, import.meta.url), 'utf8');
+  assert.equal(template.includes('/static/app.js'), name === 'base.html', `${name} must not load app.js`);
+}
+
 const source = fs.readFileSync(new URL('./app.js', import.meta.url), 'utf8');
 const runStatusSource = fs.readFileSync(new URL('./run-status.js', import.meta.url), 'utf8');
 const toolFormSource = fs.readFileSync(new URL('./tool-form.js', import.meta.url), 'utf8');
@@ -24,7 +29,17 @@ vm.createContext(context);
 vm.runInContext(source, context);
 vm.runInContext(runStatusSource, context);
 vm.runInContext(reportUISource, context);
-assert.equal(domContentLoadedCallbacks.length, 2);
+assert.equal(domContentLoadedCallbacks.length, 3);
+
+const navItems = [
+  { id: 'nav-home', classList: { active: false, toggle(_, value) { this.active = value; } } },
+  { id: 'nav-projects', classList: { active: false, toggle(_, value) { this.active = value; } } },
+  { id: 'nav-runs', classList: { active: false, toggle(_, value) { this.active = value; } } },
+];
+context.setActiveNavigation('/projects/demo', navItems);
+assert.equal(navItems[0].classList.active, false);
+assert.equal(navItems[1].classList.active, true);
+assert.equal(navItems[2].classList.active, false);
 
 assert.equal(
   context.formatEventTime('2026-07-09T03:16:55.614Z'),

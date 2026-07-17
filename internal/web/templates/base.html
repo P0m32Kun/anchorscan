@@ -6,17 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AnchorScan - 内网安全扫描控制台</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
 </head>
 <body class="app-shell">
-  <header class="mobile-header">
-    <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="打开侧边栏">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 1.5rem; height: 1.5rem;">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-      </svg>
-    </button>
-    <div class="mobile-title">AnchorScan</div>
-  </header>
-  <div class="sidebar-overlay" id="sidebar-overlay"></div>
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="logo-icon">
@@ -77,46 +69,6 @@
     {{template "content" .}}
   </main>
   
-  <script>
-    document.addEventListener("DOMContentLoaded", function() {
-      const path = window.location.pathname;
-      document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
-      if (path === "/" || path === "") {
-        document.getElementById("nav-home").classList.add("active");
-      } else if (path.startsWith("/projects")) {
-        document.getElementById("nav-projects").classList.add("active");
-      } else if (path.startsWith("/runs") || path.startsWith("/scan") || path.startsWith("/reports")) {
-        document.getElementById("nav-runs").classList.add("active");
-      } else if (path.startsWith("/import")) {
-        document.getElementById("nav-import").classList.add("active");
-      } else if (path.startsWith("/tools")) {
-        document.getElementById("nav-tools").classList.add("active");
-      } else if (path.startsWith("/kb")) {
-        document.getElementById("nav-kb").classList.add("active");
-      } else if (path.startsWith("/config")) {
-        document.getElementById("nav-config").classList.add("active");
-      }
-
-      // 侧边栏折叠与遮罩控制
-      const toggleBtn = document.getElementById("sidebar-toggle");
-      const sidebar = document.querySelector(".sidebar");
-      const overlay = document.getElementById("sidebar-overlay");
-      if (toggleBtn && sidebar && overlay) {
-        const toggleSidebar = () => {
-          sidebar.classList.toggle("open");
-          overlay.classList.toggle("active");
-        };
-        toggleBtn.addEventListener("click", toggleSidebar);
-        overlay.addEventListener("click", toggleSidebar);
-        document.querySelectorAll(".nav-item").forEach(item => {
-          item.addEventListener("click", () => {
-            sidebar.classList.remove("open");
-            overlay.classList.remove("active");
-          });
-        });
-      }
-    });
-  </script>
 </body>
 </html>
 {{end}}
