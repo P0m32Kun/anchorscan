@@ -2123,3 +2123,14 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .projects-empty-state strong, .projects-empty-state span { display: block; }
 .projects-empty-state strong { margin-bottom: 0.4rem; color: var(--heading); font-size: 1rem; }
 .runs-primary-icon, .projects-primary-icon { width: 1.2rem; height: 1.2rem; }
+
+/* Ticket 06: project scan form. */
+.project-scan-intro { margin-top: 0.25rem; }
+.project-defaults { padding: 0.75rem 1rem; border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--bg-accent); }
+.project-defaults .meta-line { margin: 0; }
+.project-defaults code { font-family: var(--mono); }
+.project-scan-help { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.project-scan-details { margin-top: 1rem; }
+.project-scan-details summary { padding: 0.5rem 0; font-size: 0.95rem; font-weight: 600; }
+.project-scan-detail-body { margin-top: 0.5rem; padding-top: 1rem; border-top: 1px dashed rgba(0, 113, 227, 0.16); }
+.project-scan-primary-icon { width: 1.2rem; height: 1.2rem; }

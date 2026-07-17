@@ -3,7 +3,7 @@
   <div>
     <p class="eyebrow">项目扫描</p>
     <h2>{{.Project.Name}} · 发起扫描</h2>
-    <p class="meta-line" style="margin-top: 0.25rem;">扫描将归属本项目并自动使用项目默认配置。</p>
+    <p class="meta-line project-scan-intro">扫描将归属本项目并自动使用项目默认配置。</p>
   </div>
   <a class="button button-secondary" href="/projects/{{.Project.ID}}">返回项目</a>
 </section>
@@ -28,19 +28,19 @@
   <form class="form-grid" method="post" action="/scan">
     <input type="hidden" name="project_id" value="{{.Project.ID}}">
 
-    <div class="full-width" style="background: var(--bg-accent); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border-left: 3px solid var(--primary);">
-      <p class="meta-line" style="margin: 0;">
-        <strong>项目默认值</strong> · 目标: {{if .Project.DefaultTargets}}<code style="font-family: var(--mono);">{{.Project.DefaultTargets}}</code>{{else}}<span class="muted">未设置</span>{{end}} · 端口: {{if .Project.DefaultPorts}}<code style="font-family: var(--mono);">{{.Project.DefaultPorts}}</code>{{else}}<span class="muted">全局默认</span>{{end}} · 档位: {{if .Project.DefaultProfile}}{{.Project.DefaultProfile}}{{else}}<span class="muted">全局默认</span>{{end}}
+    <div class="full-width project-defaults">
+      <p class="meta-line">
+        <strong>项目默认值</strong> · 目标: {{if .Project.DefaultTargets}}<code>{{.Project.DefaultTargets}}</code>{{else}}<span class="muted">未设置</span>{{end}} · 端口: {{if .Project.DefaultPorts}}<code>{{.Project.DefaultPorts}}</code>{{else}}<span class="muted">全局默认</span>{{end}} · 档位: {{if .Project.DefaultProfile}}{{.Project.DefaultProfile}}{{else}}<span class="muted">全局默认</span>{{end}}
       </p>
     </div>
 
-    <p class="full-width" style="margin: 0; color: var(--muted); font-size: 0.9rem;">
+    <p class="full-width project-scan-help">
       下方覆盖项留空即使用项目默认值；仅在本次扫描需要临时调整时填写。
     </p>
 
-    <details class="details-block full-width" style="margin-top: 1rem;">
-      <summary style="font-size: 0.95rem; font-weight: 600; padding: 0.5rem 0;">本次扫描覆盖设置</summary>
-      <div class="form-grid" style="padding-top: 1rem; border-top: 1px dashed rgba(59, 130, 246, 0.1); margin-top: 0.5rem;">
+    <details class="details-block full-width project-scan-details">
+      <summary>本次扫描覆盖设置</summary>
+      <div class="form-grid project-scan-detail-body">
         <label>
           <span>临时覆盖档位</span>
           <select name="profile">
@@ -59,7 +59,7 @@
         <label class="full-width">
           <span>临时覆盖端口</span>
           <textarea name="ports" rows="3" placeholder="留空使用项目默认端口。支持: top1000、100-1000 或 80,443,8080"></textarea>
-          <p class="meta-line" style="margin-top: 0.35rem;">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
+          <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
           <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="ports">
             ＋ 插入高危端口列表
           </button>
@@ -72,9 +72,9 @@
       </div>
     </details>
 
-    <details class="details-block full-width" style="margin-top: 1rem;">
-      <summary style="font-size: 0.95rem; font-weight: 600; padding: 0.5rem 0;">高级自定义参数 (自定义引擎命令行参数)</summary>
-      <div class="form-grid" style="padding-top: 1rem; border-top: 1px dashed rgba(59, 130, 246, 0.1); margin-top: 0.5rem;">
+    <details class="details-block full-width project-scan-details">
+      <summary>高级自定义参数 (自定义引擎命令行参数)</summary>
+      <div class="form-grid project-scan-detail-body">
         <label>
           <span>Rustscan 参数</span>
           <input name="rustscan_args" placeholder="例如: --ulimit 5000">
@@ -96,7 +96,7 @@
 
     <div class="form-actions form-submit-row full-width">
       <button class="button button-primary primary-submit" type="submit">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+        <svg class="button-icon project-scan-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699-2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
         </svg>
         <span>立即启动引擎扫描</span>
