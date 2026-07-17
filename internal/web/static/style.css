@@ -2239,3 +2239,9 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .dashboard-primary-icon { width: 1.2rem; height: 1.2rem; }
 .dashboard-project-profile { font-size: 0.8rem; }
 .dashboard-run-link { font-family: var(--mono); font-size: 0.9rem; }
+
+/* Ticket 14: presentation cleanup. */
+.logo-mark-icon { width: 1.25rem; height: 1.25rem; }
+.copy-feedback-icon { width: 0.85rem; height: 0.85rem; color: var(--success); }
+.copy-feedback-success { color: var(--success); font-weight: 700; }
+.copy-feedback-error { color: var(--danger); }
