@@ -3,9 +3,10 @@
   <div>
     <p class="eyebrow">总览</p>
     <h2>仪表盘</h2>
+    <p class="meta-line dashboard-intro">项目范围、最近执行与系统状态一览。</p>
   </div>
   <a class="button button-primary" href="/projects">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+    <svg class="button-icon dashboard-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-19.5 0A2.25 2.25 0 002.25 15v4.5a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V15a2.25 2.25 0 00-2.25-2.25m-19.5 0h19.5" />
     </svg>
     <span>进入项目扫描</span>
@@ -38,7 +39,7 @@
       {{range .Projects}}
       <li>
         <a href="/projects/{{.ID}}">{{.Name}}</a>
-        <span class="meta-line" style="font-size: 0.8rem;">{{.DefaultProfile}}</span>
+        <span class="meta-line dashboard-project-profile">{{.DefaultProfile}}</span>
       </li>
       {{else}}
       <li class="muted">暂无项目。</li>
@@ -57,7 +58,7 @@
     <ul class="run-list">
       {{range .Runs}}
       <li>
-        <a href="/runs/{{.RunID}}" style="font-family: var(--mono); font-size: 0.9rem;">{{.RunID}}</a>
+        <a class="dashboard-run-link" href="/runs/{{.RunID}}">{{.RunID}}</a>
         <span class="status-badge status-{{.Status}}">{{.Status}}</span>
       </li>
       {{else}}

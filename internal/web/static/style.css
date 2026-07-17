@@ -2233,3 +2233,9 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .knowledgebase-detail-section h3 { margin: 0.2rem 0 0.75rem; color: var(--heading); font-size: 1.05rem; }
 .knowledgebase-detail-section pre { margin: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-accent); color: var(--text); }
 .knowledgebase-command { color: var(--primary); font-family: var(--mono); }
+
+/* Ticket 13: dashboard finishing pass. */
+.dashboard-intro { margin-top: 0.25rem; }
+.dashboard-primary-icon { width: 1.2rem; height: 1.2rem; }
+.dashboard-project-profile { font-size: 0.8rem; }
+.dashboard-run-link { font-family: var(--mono); font-size: 0.9rem; }
