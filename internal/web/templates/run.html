@@ -2,8 +2,8 @@
 <section class="page-header">
   <div>
     <p class="eyebrow">任务控制台</p>
-    <h2 class="mono-heading" style="display: flex; align-items: center; gap: 0.75rem;">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 1.5rem; height: 1.5rem; color: var(--primary);">
+    <h2 class="mono-heading run-title">
+      <svg class="run-title-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
       </svg>
       <span>{{.Run.RunID}}</span>
@@ -26,19 +26,19 @@
   </div>
   
   <div class="header-actions">
-    <span class="status-badge status-{{.Run.Status}}" id="run-status" style="margin-right: 0.5rem;">{{.Run.Status}}</span>
+    <span class="status-badge status-{{.Run.Status}} run-status-badge" id="run-status">{{.Run.Status}}</span>
     {{if eq .Run.Status "running"}}
-    <form method="post" action="/runs/{{.Run.RunID}}/cancel" style="margin: 0;">
+    <form class="run-cancel-form" method="post" action="/runs/{{.Run.RunID}}/cancel">
       <button class="button button-danger" type="submit">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+        <svg class="button-icon run-action-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span>中止扫描</span>
       </button>
     </form>
     {{else}}
-    <a class="button button-primary" href="/reports/{{.Run.RunID}}">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+    <a class="button button-primary run-report-button" href="/reports/{{.Run.RunID}}">
+      <svg class="button-icon run-action-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
       </svg>
       <span>查看扫描报告</span>
@@ -47,11 +47,11 @@
   </div>
 </section>
 
-<section class="panel" style="padding: 1.25rem;">
-  <div class="panel-heading" style="margin-bottom: 0.75rem;">
+<section class="panel run-monitor-panel">
+  <div class="panel-heading run-monitor-heading">
     <div>
       <p class="eyebrow">进程输出</p>
-      <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+      <h3 class="run-monitor-title">
         <span>引擎级联流水线实时监控</span>
       </h3>
     </div>
@@ -63,7 +63,7 @@
       <span class="scan-progress-count" id="scan-progress-count">等待存活探测…</span>
     </div>
     <div class="scan-progress-bar-wrap">
-      <div class="scan-progress-bar" id="scan-progress-bar" style="width: 0%;"></div>
+      <div class="scan-progress-bar" id="scan-progress-bar"></div>
     </div>
     <div class="scan-progress-detail" id="scan-progress-detail"></div>
   </div>

@@ -46,6 +46,16 @@ assert.equal(
   '2026-07-09 11:16:55',
 );
 
+const mockEventBox = { innerHTML: '', scrollTop: 0, scrollHeight: 100, clientHeight: 100 };
+context.document.getElementById = (id) => id === 'events' ? mockEventBox : null;
+context.window.anchorRunID = 'run-test';
+context.fetch = async () => ({
+  ok: true,
+  json: async () => [{ time: '2026-07-09T03:16:55.614Z', stage: '<img>', message: 'ok' }],
+});
+await context.refreshEvents();
+assert.ok(mockEventBox.innerHTML.includes('[&lt;img&gt;]'));
+
 let toolSubmitHandler;
 const toolContext = {
   window: {},

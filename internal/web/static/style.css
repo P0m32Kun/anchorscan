@@ -2195,3 +2195,15 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .config-raw-editor { flex-grow: 1; min-height: 23rem; }
 .config-raw-actions { margin-top: auto; }
 .config-ports-panel { margin-top: 1.5rem; }
+
+/* Ticket 11: scan run monitor workspace. */
+.run-title { display: flex; align-items: center; gap: 0.75rem; }
+.run-title-icon { width: 1.5rem; height: 1.5rem; color: var(--primary); }
+.run-status-badge { margin-right: 0.5rem; }
+.run-cancel-form { margin: 0; }
+.run-action-icon { width: 1.1rem; height: 1.1rem; }
+.run-monitor-panel { padding: 1.25rem; }
+.run-monitor-heading { margin-bottom: 0.75rem; }
+.run-monitor-title { display: flex; align-items: center; gap: 0.5rem; }
+.event-time { color: var(--muted); }
+.event-stage { color: var(--primary); font-weight: 600; }
