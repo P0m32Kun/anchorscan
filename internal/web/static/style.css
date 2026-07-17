@@ -2165,3 +2165,14 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .project-form-actions { justify-content: space-between; margin-top: 0.25rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 .project-form-primary-icon { width: 1.2rem; height: 1.2rem; }
 .project-delete-form { display: none; }
+
+/* Ticket 09: Nmap import workspace. */
+.import-nmap-intro { margin-top: 0.25rem; }
+.import-nmap-error { border-color: var(--danger-border); background: var(--danger-soft); }
+.import-nmap-error p { margin: 0; color: var(--danger); font-weight: 600; }
+.import-nmap-form { gap: 1.5rem; }
+.import-nmap-file-field { padding: 1rem; border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--bg-accent); }
+.import-nmap-file-help { margin: 0.25rem 0 0.5rem; color: var(--muted); font-size: 0.75rem; font-weight: 400; }
+.import-nmap-project-field { max-width: 32rem; }
+.import-nmap-actions { margin-top: 0.25rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.import-nmap-primary-icon { width: 1.2rem; height: 1.2rem; }
