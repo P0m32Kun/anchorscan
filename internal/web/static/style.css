@@ -2152,3 +2152,16 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .project-run-col-id { width: 30%; }
 .project-run-col-target { width: 25%; }
 .project-run-detail { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+
+/* Ticket 08: project form workspace. */
+.project-form-intro { margin-top: 0.25rem; }
+.project-form-grid { gap: 1.5rem; }
+.project-form-targets textarea { min-height: 14rem; }
+.project-form-support { justify-content: space-between; padding: 1rem; border-left: 3px solid var(--primary); border-radius: var(--radius-sm); background: var(--bg-accent); }
+.project-form-file-help { margin: 0.25rem 0 0.5rem; color: var(--muted); font-size: 0.75rem; font-weight: 400; }
+.project-form-profile { margin-top: 1rem; }
+.project-form-profile select, .project-form-exclude-ports { margin-top: 0.5rem; }
+.project-form-port-help { margin-top: 0.35rem; }
+.project-form-actions { justify-content: space-between; margin-top: 0.25rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.project-form-primary-icon { width: 1.2rem; height: 1.2rem; }
+.project-delete-form { display: none; }
