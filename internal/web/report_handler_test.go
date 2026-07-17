@@ -18,6 +18,15 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+func TestSummarizeRisk(t *testing.T) {
+	summary := summarizeRisk([]report.Finding{
+		{Severity: "critical"}, {Severity: "HIGH"}, {Severity: "medium"}, {Severity: "info"},
+	})
+	if summary != (riskSummary{Total: 4, Critical: 1, High: 1, Medium: 1}) {
+		t.Fatalf("unexpected risk summary: %#v", summary)
+	}
+}
+
 func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

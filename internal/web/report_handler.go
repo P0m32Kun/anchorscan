@@ -162,6 +162,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"Filters":                filters,
 			"Fingerprints":           assetPage.Items,
 			"Findings":               findingPage.Items,
+			"Risk":                   summarizeRisk(filteredFindings),
 			"CommandTools":           s.commandTools(filteredFindings),
 			"AssetPage":              assetPage,
 			"FindingPage":            findingPage,
@@ -180,6 +181,28 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			"ExportCSV":              "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 		})
 	}
+}
+
+type riskSummary struct {
+	Total    int
+	Critical int
+	High     int
+	Medium   int
+}
+
+func summarizeRisk(findings []report.Finding) riskSummary {
+	summary := riskSummary{Total: len(findings)}
+	for _, finding := range findings {
+		switch strings.ToLower(finding.Severity) {
+		case "critical":
+			summary.Critical++
+		case "high":
+			summary.High++
+		case "medium":
+			summary.Medium++
+		}
+	}
+	return summary
 }
 
 type commandToolView struct {

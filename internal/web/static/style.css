@@ -2025,3 +2025,56 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Ticket 03: report workspace. */
+.report-status { margin-right: 0.5rem; }
+.report-overview { display: flex; align-items: center; justify-content: space-between; gap: 2rem; margin-bottom: 1rem; }
+.report-overview h3 { margin: 0; color: var(--heading); font-size: 1.2rem; letter-spacing: -0.02em; }
+.report-overview-copy .meta-line { margin: 0.35rem 0 0; }
+.risk-summary { display: grid; grid-template-columns: repeat(4, minmax(5.5rem, 1fr)); gap: 1.25rem; margin: 0; }
+.risk-summary div { min-width: 0; padding-left: 1.25rem; border-left: 1px solid var(--border); }
+.risk-summary dt { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
+.risk-summary dd { margin: 0.2rem 0 0; color: var(--heading); font-size: 1.35rem; font-weight: 700; letter-spacing: -0.04em; }
+.risk-summary .risk-critical dd { color: var(--sev-critical); }
+.risk-summary .risk-high dd { color: #bd5b16; }
+
+.report-filter { position: sticky; top: 1rem; z-index: 20; margin-bottom: 1.25rem; padding: 0; }
+.search-console-form { margin: 0; border: 0; box-shadow: none; }
+.search-icon svg { width: 1rem; height: 1rem; display: block; }
+.popover-trigger-btn .chevron-icon { width: 0.7rem; height: 0.7rem; transition: transform 0.15s ease; }
+.button-icon { width: 1rem; height: 1rem; }
+.filter-reset { height: 34px; padding: 0 0.85rem; font-size: 0.82rem; }
+.report-filter .popover-panel, #active-filter-badges, #active-severity-count, #distribution-container { display: none; }
+
+.report-section { margin-bottom: 1.25rem; }
+.report-section .panel-heading { align-items: flex-start; }
+.report-section .meta-line { margin: 0.35rem 0 0; }
+.report-table { min-width: 100%; }
+.report-section .scroll-table { max-height: 42rem; overflow: auto; }
+.report-table thead th { position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 var(--border); }
+.report-actions { margin-bottom: 1rem; }
+.mono-cell { color: var(--heading); font-family: var(--mono); font-size: 0.85rem; word-break: break-all; }
+.primary-cell { font-weight: 700; }
+.service-cell { font-weight: 600; }
+.secondary-cell { color: var(--muted); font-size: 0.9rem; }
+.secondary-cell small { display: block; margin-top: 4px; color: var(--muted); font-size: 0.8rem; }
+.empty-cell { color: var(--muted); }
+.url-cell { font-family: var(--mono); font-size: 0.85rem; word-break: break-all; }
+.host-url-list { margin: 0; max-height: 14rem; }
+.copy-actions { justify-content: flex-end; gap: 0.45rem; }
+.finding-summary { font-size: 0.9rem; line-height: 1.4; }
+.finding-actions { text-align: right; vertical-align: middle; }
+.details-toggle-btn { padding: 0.45rem 0.85rem; font-size: 0.8rem; border-radius: var(--radius-sm); }
+.details-toggle-btn .chevron-icon { width: 0.75rem; height: 0.75rem; margin-left: 0.25rem; transition: transform 0.2s ease; }
+.command-generate-btn { margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem; }
+.details-expanded-content { padding: 0.85rem 1rem; }
+.evidence-empty { padding: 0.5rem 0; }
+.finding-col-severity { width: 12%; }
+.finding-col-source { width: 10%; }
+.finding-col-id, .finding-col-target { width: 20%; }
+.finding-col-summary { width: 25%; }
+.finding-col-actions { width: 13%; text-align: right; }
+.data-table .finding-col-actions { text-align: right; }
+.details-toggle-btn.active-toggle { color: #fff; }
+.report-knowledge-entry { padding: 1.25rem 0; border-top: 1px solid var(--border); }
+.report-pending-heading { border-top: 1px solid var(--border); padding-top: 1.25rem; }
