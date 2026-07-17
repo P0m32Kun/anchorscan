@@ -2207,3 +2207,29 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .run-monitor-title { display: flex; align-items: center; gap: 0.5rem; }
 .event-time { color: var(--muted); }
 .event-stage { color: var(--primary); font-weight: 600; }
+
+/* Ticket 12: knowledge base workspace. */
+.knowledgebase-intro { margin-top: 0.25rem; }
+.knowledgebase-search-panel { margin-bottom: 1.5rem; }
+.knowledgebase-status-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.knowledgebase-status-row h3 { margin: 0; color: var(--heading); font-size: 1.1rem; }
+.knowledgebase-status { background: var(--primary-soft); border-color: var(--primary-glow); color: var(--primary); }
+.knowledgebase-search-form { display: flex; gap: 0.65rem; }
+.knowledgebase-search-form input { flex: 1; }
+.knowledgebase-results { display: grid; gap: 0.65rem; }
+.knowledgebase-entry { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--panel); color: var(--text); }
+.knowledgebase-entry:hover { border-color: var(--primary); background: var(--primary-soft); color: var(--text); }
+.knowledgebase-entry-name { font-weight: 700; }
+.knowledgebase-entry-severity { padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-accent); color: var(--muted); font-family: var(--mono); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+.knowledgebase-entry-severity.severity-critical { border-color: var(--sev-critical-border); background: var(--sev-critical-soft); color: #c5221f; }
+.knowledgebase-entry-severity.severity-high { border-color: var(--sev-high-border); background: var(--sev-high-soft); color: #a94600; }
+.knowledgebase-entry-severity.severity-medium { border-color: var(--sev-medium-border); background: var(--sev-medium-soft); color: #7c5700; }
+.knowledgebase-entry-severity.severity-low { border-color: var(--sev-low-border); background: var(--sev-low-soft); color: #0369a1; }
+.knowledgebase-empty { margin: 0; padding: 3rem 1rem; text-align: center; }
+.knowledgebase-empty strong, .knowledgebase-empty span { display: block; }
+.knowledgebase-empty strong { margin-bottom: 0.4rem; color: var(--heading); }
+.knowledgebase-detail { display: grid; gap: 1.5rem; }
+.knowledgebase-detail-section + .knowledgebase-detail-section { padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.knowledgebase-detail-section h3 { margin: 0.2rem 0 0.75rem; color: var(--heading); font-size: 1.05rem; }
+.knowledgebase-detail-section pre { margin: 0; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-accent); color: var(--text); }
+.knowledgebase-command { color: var(--primary); font-family: var(--mono); }
