@@ -516,13 +516,13 @@ button[type="submit"]:hover {
 .alert-error {
   background: var(--danger-soft);
   border-color: var(--danger-border);
-  color: #fca5a5;
+  color: #b42318;
 }
 
 .alert-warning {
   background: var(--warning-soft);
   border-color: rgba(245, 158, 11, 0.25);
-  color: #fcd34d;
+  color: #7c5700;
 }
 
 /* Form Styles */
