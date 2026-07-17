@@ -5,43 +5,43 @@
     <h2>项目管理</h2>
   </div>
   <a class="button button-primary" href="/projects/new">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+    <svg class="button-icon projects-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
     <span>新建项目</span>
   </a>
 </section>
 
-<section class="panel" style="padding: 0; overflow: hidden;">
-  <table class="data-table" style="border: none; border-radius: 0;">
+<section class="panel projects-table-panel">
+  <table class="data-table projects-table">
     <thead>
       <tr>
-        <th style="width: 20%;">项目名称</th>
-        <th style="width: 35%;">默认目标</th>
-        <th style="width: 20%;">默认端口</th>
-        <th style="width: 12%;">扫描档位</th>
-        <th style="width: 13%; text-align: right;">操作</th>
+        <th class="project-col-name">项目名称</th>
+        <th class="project-col-targets">默认目标</th>
+        <th class="project-col-ports">默认端口</th>
+        <th class="project-col-profile">扫描档位</th>
+        <th class="project-col-actions">操作</th>
       </tr>
     </thead>
     <tbody>
       {{range .Projects}}
       <tr>
         <td>
-          <a href="/projects/{{.ID}}" style="font-weight: 700;">{{.Name}}</a>
-          <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem;">ID: {{.ID}}</div>
+          <a href="/projects/{{.ID}}" class="project-name-link">{{.Name}}</a>
+          <div class="project-id">ID: {{.ID}}</div>
         </td>
-        <td style="font-family: var(--mono); font-size: 0.85rem; word-break: break-all; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <td class="project-targets" title="{{.DefaultTargets}}">
           {{.DefaultTargets}}
         </td>
-        <td style="font-family: var(--mono); font-size: 0.85rem;">{{.DefaultPorts}}</td>
+        <td class="project-ports">{{.DefaultPorts}}</td>
         <td>
-          <span class="status-badge" style="font-size: 0.7rem; padding: 0.2rem 0.5rem; background: var(--bg-accent); border: 1px solid var(--border); color: var(--text);">
+          <span class="status-badge project-profile">
             {{.DefaultProfile}}
           </span>
         </td>
-        <td style="text-align: right;">
-          <a class="button button-secondary" href="/projects/{{.ID}}/edit" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 0.9rem; height: 0.9rem;">
+        <td class="project-actions">
+          <a class="button button-secondary project-edit-action" href="/projects/{{.ID}}/edit">
+            <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
             </svg>
             <span>编辑</span>
@@ -50,9 +50,9 @@
       </tr>
       {{else}}
       <tr>
-        <td colspan="5" class="muted" style="text-align: center; padding: 3rem 1rem;">
-          <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📁</div>
-          暂无项目，请点击上方按钮新建一个项目。
+        <td colspan="5" class="muted projects-empty-state">
+          <strong>暂无项目</strong>
+          <span>点击上方按钮新建一个项目。</span>
         </td>
       </tr>
       {{end}}

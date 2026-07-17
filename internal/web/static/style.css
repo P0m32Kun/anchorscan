@@ -2103,3 +2103,23 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .runs-empty-state strong { margin-bottom: 0.4rem; color: var(--heading); font-size: 1rem; }
 .is-running { animation: spin 2s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Ticket 05: project management workspace. */
+.projects-table-panel { padding: 0; overflow: hidden; }
+.projects-table { border: 0; border-radius: 0; }
+.project-col-name { width: 20%; }
+.project-col-targets { width: 35%; }
+.project-col-ports { width: 20%; }
+.project-col-profile { width: 12%; }
+.project-col-actions { width: 13%; text-align: right; }
+.project-name-link { font-weight: 700; }
+.project-id { margin-top: 0.25rem; color: var(--muted); font-family: var(--mono); font-size: 0.75rem; }
+.project-targets { max-width: 300px; overflow: hidden; font-family: var(--mono); font-size: 0.85rem; text-overflow: ellipsis; white-space: nowrap; word-break: break-all; }
+.project-ports { font-family: var(--mono); font-size: 0.85rem; }
+.project-profile { padding: 0.2rem 0.5rem; border: 1px solid var(--border); background: var(--bg-accent); color: var(--text); font-size: 0.7rem; }
+.project-actions { text-align: right; }
+.project-edit-action { padding: 0.4rem 0.8rem; border-radius: var(--radius-sm); font-size: 0.8rem; }
+.projects-empty-state { padding: 3rem 1rem; text-align: center; }
+.projects-empty-state strong, .projects-empty-state span { display: block; }
+.projects-empty-state strong { margin-bottom: 0.4rem; color: var(--heading); font-size: 1rem; }
+.runs-primary-icon, .projects-primary-icon { width: 1.2rem; height: 1.2rem; }
