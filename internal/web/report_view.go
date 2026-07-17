@@ -19,6 +19,7 @@ type reportViewModel struct {
 	Filters                reportFilters
 	Fingerprints           any
 	Findings               any
+	Risk                   riskSummary
 	CommandTools           map[string]commandToolsView
 	AssetPage              reportPage
 	FindingPage            reportPage
@@ -82,6 +83,7 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 		Filters:                reportFiltersFromValues(query),
 		Fingerprints:           assetPage.Items,
 		Findings:               findingPage.Items,
+		Risk:                   summarizeRisk(in.Findings),
 		CommandTools:           in.CommandTools,
 		AssetPage:              assetPage,
 		FindingPage:            findingPage,

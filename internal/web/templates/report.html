@@ -20,21 +20,21 @@
     </details>
   </div>
   <div class="header-actions">
-    <span class="status-badge status-{{.Run.Status}}" style="margin-right: 0.5rem;">{{.Run.Status}}</span>
+    <span class="status-badge status-{{.Run.Status}} report-status">{{.Run.Status}}</span>
     <a class="button button-secondary" href="{{.ExportJSON}}" download>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1rem; height: 1rem;">
+      <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
       </svg>
       <span>下载 JSON</span>
     </a>
     <a class="button button-secondary" href="{{.ExportHTML}}" download>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1rem; height: 1rem;">
+      <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
       </svg>
       <span>下载 HTML</span>
     </a>
     <a class="button button-secondary" href="{{.ExportCSV}}" download>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1rem; height: 1rem;">
+      <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
       </svg>
       <span>下载 CSV</span>
@@ -42,13 +42,27 @@
   </div>
 </section>
 
-<section class="panel report-filter" style="padding: 1.25rem;">
+<section class="panel report-overview">
+  <div class="report-overview-copy">
+    <p class="eyebrow">风险优先级</p>
+    <h3>先处理严重和高危发现</h3>
+    <p class="meta-line">以下汇总基于当前筛选范围，分页不会影响统计。</p>
+  </div>
+  <dl class="risk-summary" aria-label="风险汇总">
+    <div><dt>安全发现</dt><dd>{{.Risk.Total}}</dd></div>
+    <div class="risk-critical"><dt>严重</dt><dd>{{.Risk.Critical}}</dd></div>
+    <div class="risk-high"><dt>高危</dt><dd>{{.Risk.High}}</dd></div>
+    <div><dt>中危</dt><dd>{{.Risk.Medium}}</dd></div>
+  </dl>
+</section>
+
+<section class="panel report-filter">
   <form class="search-console-form" method="get" id="report-filter-form">
-    
-    <!-- 1. 智能检索主栏 -->
     <div class="search-console-bar">
       <div class="search-input-wrapper">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+        </span>
         <input type="text" id="smart-search-input" placeholder="输入主机 IP、网段或漏洞关键词检索，回车或点击应用..." value="{{if .Filters.IP}}{{.Filters.IP}}{{else}}{{.Filters.Keyword}}{{end}}">
         <input type="hidden" name="ip" id="hidden-ip" value="{{.Filters.IP}}">
         <input type="hidden" name="q" id="hidden-q" value="{{.Filters.Keyword}}">
@@ -56,19 +70,16 @@
       <button class="button button-primary search-submit-btn" type="submit">应用检索</button>
     </div>
 
-    <!-- 2. 下拉维度过滤浮窗行 -->
     <div class="filter-popover-row">
-      
-      <!-- ⚠️ 危险级别 Popover -->
       <div class="popover-wrapper">
         <button class="popover-trigger-btn" type="button" data-popover-target="popover-severity">
-          <span>⚠️ 危险级别</span>
-          <span class="trigger-active-count" id="active-severity-count" style="display: none;">0</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.7rem; height: 0.7rem; transition: transform 0.15s ease;">
+          <span>危险级别</span>
+          <span class="trigger-active-count" id="active-severity-count">0</span>
+          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
           </svg>
         </button>
-        <div class="popover-panel" id="popover-severity" style="display: none;">
+        <div class="popover-panel" id="popover-severity">
           <div class="popover-panel-header">过滤危险级别</div>
           <div class="popover-panel-body">
             <div class="popover-checkbox-list">
@@ -105,15 +116,14 @@
         </div>
       </div>
 
-      <!-- 🔌 端口与服务 Popover -->
       <div class="popover-wrapper">
         <button class="popover-trigger-btn" type="button" data-popover-target="popover-ports">
-          <span>🔌 端口与服务</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.7rem; height: 0.7rem; transition: transform 0.15s ease;">
+          <span>端口与服务</span>
+          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
           </svg>
         </button>
-        <div class="popover-panel" id="popover-ports" style="display: none;">
+        <div class="popover-panel" id="popover-ports">
           <div class="popover-panel-header">端口与服务过滤</div>
           <div class="popover-panel-body">
             <div class="popover-form-group">
@@ -133,15 +143,14 @@
         </div>
       </div>
 
-      <!-- 📦 数据源 Popover -->
       <div class="popover-wrapper">
         <button class="popover-trigger-btn" type="button" data-popover-target="popover-source">
-          <span>📦 数据源</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.7rem; height: 0.7rem; transition: transform 0.15s ease;">
+          <span>数据源</span>
+          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
           </svg>
         </button>
-        <div class="popover-panel" id="popover-source" style="display: none;">
+        <div class="popover-panel" id="popover-source">
           <div class="popover-panel-header">数据源过滤</div>
           <div class="popover-panel-body">
             <div class="popover-form-group">
@@ -157,15 +166,14 @@
         </div>
       </div>
 
-      <!-- 👁️ 视图模式 Popover -->
       <div class="popover-wrapper">
         <button class="popover-trigger-btn" type="button" data-popover-target="popover-view">
-          <span>👁️ 视图模式</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.7rem; height: 0.7rem; transition: transform 0.15s ease;">
+          <span>视图模式</span>
+          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
           </svg>
         </button>
-        <div class="popover-panel" id="popover-view" style="display: none;">
+        <div class="popover-panel" id="popover-view">
           <div class="popover-panel-header">切换视图呈现</div>
           <div class="popover-panel-body">
             <div class="popover-form-group">
@@ -182,12 +190,10 @@
         </div>
       </div>
 
-      <!-- 重置全部 -->
-      <a href="/reports/{{.Run.RunID}}" class="button button-secondary" style="height: 34px; padding: 0 0.85rem; font-size: 0.82rem;">重置筛选</a>
+      <a href="/reports/{{.Run.RunID}}" class="button button-secondary filter-reset">重置筛选</a>
     </div>
 
-    <!-- 3. 活动过滤徽章区域 -->
-    <div class="active-filter-badges" id="active-filter-badges" style="display: none;">
+    <div class="active-filter-badges" id="active-filter-badges">
       <span class="active-badges-label">活动过滤器：</span>
       <div class="badges-row-content" id="badges-row-content"></div>
     </div>
@@ -195,7 +201,7 @@
 </section>
 
 {{if eq .AssetView "vulnerabilities"}}
-<section class="panel">
+<section class="panel report-section">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">漏洞交付</p>
@@ -207,7 +213,7 @@
     </div>
   </div>
   {{range .Vulnerabilities}}
-  <article class="knowledgebase-content" style="padding: 1.25rem 0; border-top: 1px solid var(--border);">
+  <article class="knowledgebase-content report-knowledge-entry">
     <div class="panel-heading">
       <h3>{{.Title}}</h3>
       <div class="header-actions">
@@ -229,11 +235,11 @@
   </article>
   {{end}}
   {{if .PendingVulnerabilities}}
-  <div class="panel-heading" style="border-top: 1px solid var(--border); padding-top: 1.25rem;">
+  <div class="panel-heading report-pending-heading">
     <div><p class="eyebrow">待补充</p><h3>知识库未匹配</h3></div>
   </div>
   {{range .PendingVulnerabilities}}
-  <article class="knowledgebase-content" style="padding: 1.25rem 0; border-top: 1px solid var(--border);">
+  <article class="knowledgebase-content report-knowledge-entry">
     <div class="panel-heading">
       <h3>{{.Title}}</h3>
       <div class="header-actions">
@@ -253,16 +259,16 @@
   {{end}}
   {{end}}
   {{if and (not .Vulnerabilities) (not .PendingVulnerabilities)}}
-  <p class="no-data">🛡️ 当前筛选范围没有非 info 漏洞。</p>
+  <p class="no-data">当前筛选范围没有非 info 漏洞。</p>
   {{end}}
 </section>
 {{else}}
-<section class="panel">
+<section class="panel report-section">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">网络空间测绘</p>
       <h3>资产与服务指纹清单</h3>
-      <p class="meta-line" style="margin-top: 0.35rem;">支持按当前筛选结果复制 IP、IP:PORT、URL，或导出为 TXT / CSV。</p>
+      <p class="meta-line">支持按当前筛选结果复制 IP、IP:PORT、URL，或导出为 TXT / CSV。</p>
     </div>
     <div class="pagination">
       {{if eq .AssetView "hosts"}}
@@ -297,7 +303,7 @@
     </div>
   </div>
 
-  <div class="action-row" style="margin-bottom: 1rem;">
+  <div class="action-row report-actions">
     <button class="button button-secondary" type="button" data-copy-url="{{.AssetTXTIP}}">复制 IP</button>
     <button class="button button-secondary" type="button" data-copy-url="{{.AssetTXTIPPort}}">复制 IP:PORT</button>
     <button class="button button-secondary" type="button" data-copy-url="{{.AssetTXTURL}}">复制 URL</button>
@@ -307,7 +313,7 @@
   
   {{if eq .AssetView "hosts"}}
   <div class="scroll-table">
-    <table class="data-table">
+    <table class="data-table report-table">
       <thead>
         <tr>
           <th>主机 IP 地址</th>
@@ -321,19 +327,19 @@
       <tbody>
         {{range .HostPage.Items}}
         <tr>
-          <td style="font-family: var(--mono); font-weight: 700; color: var(--heading);">{{.IP}}</td>
-          <td style="font-family: var(--mono);">{{.Ports}}</td>
-          <td style="font-weight: 600;">{{if .Services}}{{.Services}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}</td>
-          <td style="color: var(--muted); font-size: 0.9rem;">{{if .Products}}{{.Products}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}</td>
+          <td class="mono-cell primary-cell">{{.IP}}</td>
+          <td class="mono-cell">{{.Ports}}</td>
+          <td class="service-cell">{{if .Services}}{{.Services}}{{else}}<span class="empty-cell">—</span>{{end}}</td>
+          <td class="secondary-cell">{{if .Products}}{{.Products}}{{else}}<span class="empty-cell">—</span>{{end}}</td>
           <td>
             {{if .URLs}}
-            <pre class="evidence-block" style="margin: 0; white-space: pre-wrap;">{{.URLs}}</pre>
+            <pre class="evidence-block host-url-list">{{.URLs}}</pre>
             {{else}}
-            <span style="color: rgba(255,255,255,0.15);">—</span>
+            <span class="empty-cell">—</span>
             {{end}}
           </td>
           <td>
-            <div class="header-actions" style="justify-content: flex-end; gap: 0.45rem;">
+            <div class="header-actions copy-actions">
               <button class="button button-secondary" type="button" data-copy-text="{{.CopyPorts}}">复制端口</button>
               <button class="button button-secondary" type="button" data-copy-text="{{.CopyPairs}}">复制 IP:PORT</button>
             </div>
@@ -342,7 +348,7 @@
         {{else}}
         <tr>
           <td colspan="6" class="no-data">
-            🔍 暂无匹配的主机资产。
+            暂无匹配的主机资产。
           </td>
         </tr>
         {{end}}
@@ -351,7 +357,7 @@
   </div>
   {{else}}
   <div class="scroll-table">
-    <table class="data-table">
+    <table class="data-table report-table">
       <thead>
         <tr>
           <th>主机 IP 地址</th>
@@ -365,33 +371,33 @@
       <tbody>
         {{range .Fingerprints}}
         <tr>
-          <td style="font-family: var(--mono); font-weight: 700; color: var(--heading);">{{.IP}}</td>
+          <td class="mono-cell primary-cell">{{.IP}}</td>
           <td>
             <span class="status-badge compact-badge port-badge">
               {{if .Protocol}}{{.Protocol}}/{{end}}{{.Port}}
             </span>
           </td>
-          <td style="font-weight: 600;">{{.Service}}</td>
-          <td style="color: var(--muted); font-size: 0.9rem;">{{if .Product}}{{.Product}}{{else}}<span style="color: rgba(255,255,255,0.15);">—</span>{{end}}{{if .CPE}}<div style="font-size: 0.8rem; margin-top: 4px; color: rgba(255,255,255,0.4);">{{.CPE}}</div>{{end}}</td>
+          <td class="service-cell">{{.Service}}</td>
+          <td class="secondary-cell">{{if .Product}}{{.Product}}{{else}}<span class="empty-cell">—</span>{{end}}{{if .CPE}}<small>{{.CPE}}</small>{{end}}</td>
           <td>
             {{if .IsWeb}}
             <span class="status-badge compact-badge web-badge">WEB</span>
             {{else}}
-            <span style="color: rgba(255,255,255,0.15);">—</span>
+            <span class="empty-cell">—</span>
             {{end}}
           </td>
           <td>
             {{if .URL}}
-            <a href="{{.URL}}" target="_blank" style="font-family: var(--mono); font-size: 0.85rem; word-break: break-all;">{{.URL}}</a>
+            <a href="{{.URL}}" target="_blank" class="url-cell">{{.URL}}</a>
             {{else}}
-            <span style="color: rgba(255,255,255,0.15);">—</span>
+            <span class="empty-cell">—</span>
             {{end}}
           </td>
         </tr>
         {{else}}
         <tr>
           <td colspan="6" class="no-data">
-            🔍 暂无匹配的主机资产。
+            暂无匹配的主机资产。
           </td>
         </tr>
         {{end}}
@@ -401,12 +407,12 @@
   {{end}}
 </section>
 
-<section class="panel">
+<section class="panel report-section">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">漏洞脆弱性</p>
       <h3>已发现的安全风险 (Findings)</h3>
-      <div class="vuln-distribution-container" id="distribution-container" style="display: none; margin-top: 0.85rem;">
+      <div class="vuln-distribution-container" id="distribution-container">
         <div class="vuln-distribution-bar" id="distribution-bar"></div>
         <div class="vuln-distribution-legend" id="distribution-legend"></div>
       </div>
@@ -429,15 +435,15 @@
   </div>
   
   <div class="scroll-table">
-    <table class="data-table">
+    <table class="data-table report-table">
       <thead>
         <tr>
-          <th style="width: 12%;">严重级别</th>
-          <th style="width: 10%;">安全探针</th>
-          <th style="width: 20%;">风险规则ID</th>
-          <th style="width: 20%;">受影响目标</th>
-          <th style="width: 25%;">漏洞摘要描述</th>
-          <th style="width: 13%; text-align: right;">操作/详情</th>
+          <th class="finding-col-severity">严重级别</th>
+          <th class="finding-col-source">安全探针</th>
+          <th class="finding-col-id">风险规则ID</th>
+          <th class="finding-col-target">受影响目标</th>
+          <th class="finding-col-summary">漏洞摘要描述</th>
+          <th class="finding-col-actions">操作/详情</th>
         </tr>
       </thead>
       <tbody>
@@ -451,33 +457,30 @@
               {{.Source}}
             </span>
           </td>
-          <td style="font-family: var(--mono); font-size: 0.85rem; word-break: break-all; color: var(--heading);">{{.ID}}</td>
-          <td style="font-family: var(--mono); font-size: 0.85rem; word-break: break-all;">{{.Target}}</td>
-          <td style="font-size: 0.9rem; line-height: 1.4;">{{.Summary}}</td>
-          <td style="text-align: right; vertical-align: middle;">
-            <button class="button button-secondary details-toggle-btn" onclick="toggleFindingDetails('{{$index}}')" style="padding: 0.45rem 0.85rem; font-size: 0.8rem; border-radius: var(--radius-sm);">
+          <td class="mono-cell primary-cell">{{.ID}}</td>
+          <td class="mono-cell">{{.Target}}</td>
+          <td class="finding-summary">{{.Summary}}</td>
+          <td class="finding-actions">
+            <button class="button button-secondary details-toggle-btn" onclick="toggleFindingDetails('{{$index}}')">
               <span>证据与详情</span>
-              <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.75rem; height: 0.75rem; margin-left: 0.25rem; transition: transform 0.2s ease;">
+              <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
 			{{with index $.CommandTools (findingKey $finding)}}{{range .Tools}}
-			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" data-command-tool="{{.Name}}" style="margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem;">生成 {{.Label}} 命令</button>
+			<button class="button button-secondary command-generate-btn" type="button" data-command-key="{{findingKey $finding}}" data-command-tool="{{.Name}}">生成 {{.Label}} 命令</button>
 			{{end}}{{if .Reason}}<span class="meta-line">{{.Reason}}</span>{{end}}{{else}}<span class="meta-line">知识库未匹配或匹配不唯一</span>{{end}}
           </td>
         </tr>
-        <tr class="details-row" id="finding-details-{{$index}}" style="display: none;">
+        <tr class="details-row" id="finding-details-{{$index}}" hidden>
           <td colspan="6">
-            <div class="details-expanded-content" style="padding: 0.85rem 1rem;">
+            <div class="details-expanded-content">
               {{if .Output}}
               <div class="evidence-container">
                 <div class="evidence-header">
-                  <div style="display: flex; align-items: center; gap: 0.45rem;">
-                    <span>📄</span>
-                    <span>漏洞验证证据报文 / 响应 RAW OUTPUT</span>
-                  </div>
+                  <span>漏洞验证证据报文 / 响应 RAW OUTPUT</span>
                   <button class="evidence-copy-btn" type="button" data-copy-target-id="evidence-pre-{{$index}}">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 0.85rem; height: 0.85rem;">
+                    <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125v-9.75a1.125 1.125 0 011.125-1.125h3.375m1.5 1.5h9.75a1.125 1.125 0 011.125 1.125v-9.75a1.125 1.125 0 01-1.125-1.125h-9.75a1.125 1.125 0 01-1.125 1.125v9.75s0 .375.375.375h.75" />
                     </svg>
                     <span>复制数据</span>
@@ -488,7 +491,7 @@
                 </div>
               </div>
               {{else}}
-              <p class="evidence-empty" style="color: var(--muted); font-size: 0.85rem; margin: 0; padding: 0.5rem 0;">暂无原始证据输出。</p>
+              <p class="evidence-empty">暂无原始证据输出。</p>
               {{end}}
             </div>
           </td>
@@ -496,7 +499,7 @@
         {{else}}
         <tr>
           <td colspan="6" class="no-data">
-            🛡️ 未检测到匹配的漏洞结果。
+            未检测到匹配的漏洞结果。
           </td>
         </tr>
         {{end}}
@@ -504,7 +507,7 @@
     </table>
   </div>
   
-  <div style="display: none;">
+  <div hidden>
     <!-- 仅用于满足单元测试中关于是否存在details及证据详情等关键字符串的断言 -->
     <details>
       <summary>证据与详情</summary>
@@ -519,8 +522,7 @@
     <div class="header-actions"><button class="button button-secondary" type="button" id="nuclei-command-copy">复制完整命令</button><a class="button button-primary" id="nuclei-command-tool" href="/tools/nuclei">带参数打开工具页</a></div>
   </dialog>
   
-          <script src="/static/app.js"></script>
-          <script src="/static/report-ui.js"></script>
+          <script src="/static/report-ui.js" defer></script>
           <script>
     function toggleFindingDetails(index) {
       const detailsRow = document.getElementById('finding-details-' + index);
@@ -530,12 +532,12 @@
       const btn = prevRow ? prevRow.querySelector('.details-toggle-btn') : null;
       const icon = btn ? btn.querySelector('.chevron-icon') : null;
       
-      if (detailsRow.style.display === 'none') {
-        detailsRow.style.display = 'table-row';
+      if (detailsRow.hidden) {
+        detailsRow.hidden = false;
         if (btn) btn.classList.add('active-toggle');
         if (icon) icon.style.transform = 'rotate(180deg)';
       } else {
-        detailsRow.style.display = 'none';
+        detailsRow.hidden = true;
         if (btn) btn.classList.remove('active-toggle');
         if (icon) icon.style.transform = 'rotate(0deg)';
       }

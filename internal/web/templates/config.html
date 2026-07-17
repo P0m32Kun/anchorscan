@@ -3,13 +3,14 @@
   <div>
     <p class="eyebrow">配置管理</p>
     <h2>全局扫描器配置</h2>
+    <p class="meta-line config-intro">维护工具路径、默认扫描策略和高级 YAML 配置。</p>
   </div>
   <a class="button button-secondary" href="/">返回面板</a>
 </section>
 
 {{if .Error}}
 <p class="alert alert-error">
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem; display: inline; vertical-align: middle; margin-right: 0.5rem;">
+  <svg class="alert-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
   </svg>
   <span>配置应用失败: {{.Error}}</span>
@@ -20,8 +21,8 @@
 <p class="alert alert-success">配置已保存；重启 AnchorScan 后生效。</p>
 {{end}}
 
-<section class="config-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
-  <article class="panel">
+<section class="config-grid config-workspace">
+  <article class="panel config-panel">
     <div class="panel-heading">
       <div>
         <p class="eyebrow">基础设置</p>
@@ -48,13 +49,13 @@
       <label class="full-width">
         <span>知识库手册路径</span>
         <input name="knowledge_base_path" value="{{.Config.KnowledgeBase.Path}}" placeholder="例如: ../Pentest-Playbook/handbook/内网渗透测试手册_v2.md">
-        <p class="meta-line" style="margin-top: 0.35rem;">留空则禁用知识库。保存后需重启 AnchorScan 才会加载新手册。</p>
+        <p class="meta-line config-field-help">留空则禁用知识库。保存后需重启 AnchorScan 才会加载新手册。</p>
       </label>
       
       <label>
         <span>全局默认端口</span>
         <input name="ports" value="{{.Config.Scan.Ports}}" placeholder="例如: top1000、100-1000 或 80,443,8080">
-        <p class="meta-line" style="margin-top: 0.35rem;">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk。</p>
+        <p class="meta-line config-field-help">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk。</p>
       </label>
       <label>
         <span>全局默认档位</span>
@@ -65,9 +66,9 @@
         </select>
       </label>
       
-      <div class="form-actions full-width" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-        <button class="button button-primary" type="submit" style="width: 100%;">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+      <div class="form-actions full-width config-actions">
+        <button class="button button-primary config-save-button" type="submit">
+          <svg class="button-icon config-save-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
           </svg>
           <span>保存配置基础选项</span>
@@ -76,7 +77,7 @@
     </form>
   </article>
 
-  <article class="panel">
+  <article class="panel config-panel">
     <div class="panel-heading">
       <div>
         <p class="eyebrow">高级 YAML 编排</p>
@@ -84,13 +85,13 @@
         <p class="meta-line">可直接在此修改高级网络策略、速率限制、核引擎配置等 YAML 参数。</p>
       </div>
     </div>
-    <form method="post" action="/config" style="display: flex; flex-direction: column; gap: 1.25rem; height: calc(100% - 3.5rem);">
+    <form class="config-raw-form" method="post" action="/config">
       <input type="hidden" name="mode" value="raw">
-      <textarea class="code-editor" name="raw_config" spellcheck="false" style="flex-grow: 1; min-height: 23rem;">{{.RawConfig}}</textarea>
+      <textarea class="code-editor config-raw-editor" name="raw_config" spellcheck="false">{{.RawConfig}}</textarea>
       
-      <div class="form-actions" style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border);">
-        <button class="button button-primary" type="submit" style="width: 100%;">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+      <div class="form-actions config-actions config-raw-actions">
+        <button class="button button-primary config-save-button" type="submit">
+          <svg class="button-icon config-save-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286.627zM12 13.013l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>应用高级 YAML 配置</span>
@@ -100,7 +101,7 @@
   </article>
 </section>
 
-<section class="panel" style="margin-top: 1.5rem;">
+<section class="panel config-ports-panel">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">端口预设</p>
@@ -113,9 +114,9 @@
       <span>高危端口 (逗号分隔，会自动去空格与空行)</span>
       <textarea class="code-editor" name="highrisk_ports" rows="5" spellcheck="false" placeholder="例如: 22,80,443,10022,13306,502,2404">{{.HighriskPorts}}</textarea>
     </label>
-    <div class="form-actions full-width" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+    <div class="form-actions full-width config-actions">
       <button class="button button-primary" type="submit">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.1rem; height: 1.1rem;">
+        <svg class="button-icon config-save-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
         </svg>
         <span>保存高危端口列表</span>

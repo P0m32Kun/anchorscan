@@ -5,37 +5,37 @@
     <h2>扫描记录历史</h2>
   </div>
   <a class="button button-primary" href="/projects">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 1.2rem; height: 1.2rem;">
+    <svg class="button-icon runs-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-19.5 0A2.25 2.25 0 002.25 15v4.5a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V15a2.25 2.25 0 00-2.25-2.25m-19.5 0h19.5" />
     </svg>
     <span>进入项目扫描</span>
   </a>
 </section>
 
-<section class="panel" style="padding: 0; overflow: hidden;">
-  <table class="data-table" style="border: none; border-radius: 0;">
+<section class="panel runs-table-panel">
+  <table class="data-table run-history-table">
     <thead>
       <tr>
-        <th style="width: 25%;">扫描任务ID (Run ID)</th>
-        <th style="width: 15%;">任务状态</th>
-        <th style="width: 20%;">目标资产</th>
-        <th style="width: 10%;">项目</th>
-        <th style="width: 15%;">扫描档位</th>
-        <th style="width: 15%; text-align: right;">操作</th>
+        <th class="run-col-id">扫描任务ID (Run ID)</th>
+        <th class="run-col-status">任务状态</th>
+        <th class="run-col-target">目标资产</th>
+        <th class="run-col-project">项目</th>
+        <th class="run-col-profile">扫描档位</th>
+        <th class="run-col-actions">操作</th>
       </tr>
     </thead>
     <tbody>
       {{range .Runs}}
       <tr>
         <td>
-          <a href="/runs/{{.RunID}}" style="font-family: var(--mono); font-weight: 700; font-size: 0.9rem;">
+          <a href="/runs/{{.RunID}}" class="run-id-link">
             {{.RunID}}
           </a>
         </td>
         <td>
           <span class="status-badge status-{{.Status}}">{{.Status}}</span>
         </td>
-        <td style="font-family: var(--mono); font-size: 0.85rem; word-break: break-all; max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <td class="run-target" title="{{.Target}}">
           {{.Target}}
         </td>
         <td>
@@ -46,42 +46,42 @@
           {{else}}<span class="muted">—</span>{{end}}
         </td>
         <td>
-          <span class="status-badge" style="font-size: 0.7rem; padding: 0.2rem 0.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); color: var(--text);">
+          <span class="status-badge run-profile">
             {{.Profile}}
           </span>
         </td>
-        <td style="text-align: right;">
+        <td class="run-actions">
           {{if eq .Status "completed"}}
-          <a class="button button-secondary" href="/reports/{{.RunID}}" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: var(--success-border); color: var(--success); background: var(--success-soft);">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 0.9rem; height: 0.9rem;">
+          <a class="button button-secondary run-report-action" href="/reports/{{.RunID}}">
+            <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span>查看报告</span>
           </a>
           {{else if eq .Status "running"}}
-          <a class="button button-secondary" href="/runs/{{.RunID}}" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; border-color: var(--primary-glow); color: var(--primary); background: var(--primary-soft);">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 0.9rem; height: 0.9rem; animation: spin 2s linear infinite;">
+          <a class="button button-secondary run-monitor-action" href="/runs/{{.RunID}}">
+            <svg class="button-icon is-running" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
             </svg>
             <span>监控中</span>
           </a>
           {{else}}
-          <span style="font-size: 0.85rem; color: var(--muted); padding-right: 0.5rem;">—</span>
+          <span class="run-no-action">—</span>
           {{end}}
           {{if ne .Status "running"}}
-          <form method="post" action="/runs/{{.RunID}}" style="display: inline;" onsubmit="return confirm('确认删除该扫描历史？');">
+          <form class="run-delete-form" method="post" action="/runs/{{.RunID}}" onsubmit="return confirm('确认删除该扫描历史？');">
             <input type="hidden" name="_method" value="delete">
-            <button class="button button-danger" type="submit" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">删除</button>
+            <button class="button button-danger run-delete-action" type="submit">删除</button>
           </form>
           {{end}}
         </td>
       </tr>
       {{else}}
       <tr>
-        <td colspan="6" class="muted" style="text-align: center; padding: 3rem 1rem;">
-          <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⏱️</div>
-          暂无扫描记录。点击右上角按钮以发起第一次安全扫描。
+        <td colspan="6" class="muted runs-empty-state">
+          <strong>暂无扫描记录</strong>
+          <span>点击右上角按钮以发起第一次安全扫描。</span>
         </td>
       </tr>
       {{end}}
@@ -89,10 +89,4 @@
   </table>
 </section>
 
-<style>
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-</style>
 {{end}}

@@ -18,6 +18,15 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+func TestSummarizeRisk(t *testing.T) {
+	summary := summarizeRisk([]report.Finding{
+		{Severity: "critical"}, {Severity: "HIGH"}, {Severity: "medium"}, {Severity: "info"},
+	})
+	if summary != (riskSummary{Total: 4, Critical: 1, High: 1, Medium: 1}) {
+		t.Fatalf("unexpected risk summary: %#v", summary)
+	}
+}
+
 func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -1085,8 +1094,8 @@ func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 	if !strings.Contains(body, "按主机聚合") || !strings.Contains(body, "复制 IP:PORT") || !strings.Contains(body, "/reports/run-1/assets.csv?q=redis") {
 		t.Fatalf("expected asset workbench controls: %s", body)
 	}
-	appScript := strings.Index(body, `<script src="/static/app.js"></script>`)
-	reportUIScript := strings.Index(body, `<script src="/static/report-ui.js"></script>`)
+	appScript := strings.Index(body, `<script src="/static/app.js" defer></script>`)
+	reportUIScript := strings.Index(body, `<script src="/static/report-ui.js" defer></script>`)
 	if appScript == -1 || reportUIScript == -1 || appScript > reportUIScript {
 		t.Fatalf("expected app.js before report-ui.js: %s", body)
 	}

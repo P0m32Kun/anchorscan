@@ -148,6 +148,28 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type riskSummary struct {
+	Total    int
+	Critical int
+	High     int
+	Medium   int
+}
+
+func summarizeRisk(findings []report.Finding) riskSummary {
+	summary := riskSummary{Total: len(findings)}
+	for _, finding := range findings {
+		switch strings.ToLower(finding.Severity) {
+		case "critical":
+			summary.Critical++
+		case "high":
+			summary.High++
+		case "medium":
+			summary.Medium++
+		}
+	}
+	return summary
+}
+
 type commandToolView struct {
 	Name  string
 	Label string

@@ -1,3 +1,17 @@
+function setActiveNavigation(path, items = document.querySelectorAll('.nav-item')) {
+  const activeID = path === '/' || path === '' ? 'nav-home'
+    : path.startsWith('/projects') ? 'nav-projects'
+    : path.startsWith('/runs') || path.startsWith('/scan') || path.startsWith('/reports') ? 'nav-runs'
+    : path.startsWith('/import') ? 'nav-import'
+    : path.startsWith('/tools') ? 'nav-tools'
+    : path.startsWith('/kb') ? 'nav-kb'
+    : path.startsWith('/config') ? 'nav-config'
+    : '';
+  items.forEach(item => item.classList.toggle('active', item.id === activeID));
+}
+
+document.addEventListener('DOMContentLoaded', () => setActiveNavigation(window.location.pathname));
+
 async function copyReportData(button){
   let text = button.dataset.copyText || '';
   if(button.dataset.copyUrl){
@@ -99,13 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         await writeClipboard(text.trimEnd());
         btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 0.85rem; height: 0.85rem; color: var(--success);">
+          <svg class="copy-feedback-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
           </svg>
-          <span style="color: var(--success); font-weight: 700;">已复制!</span>
+          <span class="copy-feedback-success">已复制!</span>
         `;
       } catch (err) {
-        btn.innerHTML = `<span style="color: var(--danger);">复制失败</span>`;
+        btn.innerHTML = `<span class="copy-feedback-error">复制失败</span>`;
       }
       setTimeout(() => {
         btn.disabled = false;

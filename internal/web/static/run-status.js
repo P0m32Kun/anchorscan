@@ -42,8 +42,12 @@ async function refreshEvents(){
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-        
-      return `<span style="color: #64748b;">${formatEventTime(e.time)}</span> <span style="color: #60a5fa; font-weight: 600;">[${e.stage}]</span> <span class="${cls}">${safeMsg}</span>`;
+       
+      const safeStage = String(e.stage || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      return `<span class="event-time">${formatEventTime(e.time)}</span> <span class="event-stage">[${safeStage}]</span> <span class="${cls}">${safeMsg}</span>`;
     });
     box.innerHTML = lines.join('\n') + '\n<span class="terminal-cursor">█</span>';
 
