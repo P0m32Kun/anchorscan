@@ -1,9 +1,8 @@
 :root {
   color-scheme: light;
 
-  /* Theme colors: Stealth Obsidian & Amber */
+  /* Theme colors: calm light product console */
   --bg: #f5f5f7;
-  --bg-dots: rgba(249, 115, 22, 0.012); /* Barely visible warm grid dots */
   --bg-accent: #f9f9fb;
   --panel: #ffffff;
   --panel-strong: #ffffff;
@@ -64,7 +63,7 @@
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
-  scrollbar-color: rgba(249, 115, 22, 0.15) transparent;
+  scrollbar-color: rgba(0, 113, 227, 0.18) transparent;
 }
 
 /* Custom Scrollbar for Webkit */
@@ -76,11 +75,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(249, 115, 22, 0.15);
+  background: rgba(0, 113, 227, 0.18);
   border-radius: var(--radius-sm);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(249, 115, 22, 0.35);
+  background: rgba(0, 113, 227, 0.32);
 }
 
 html {
@@ -93,10 +92,6 @@ body {
   min-height: 100vh;
   font-family: var(--font-sans);
   background-color: var(--bg);
-  background-image: 
-    linear-gradient(180deg, rgba(9, 10, 12, 0.98), rgba(9, 10, 12, 1)),
-    radial-gradient(var(--bg-dots) 1px, transparent 0);
-  background-size: 100% 100%, 32px 32px;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -109,7 +104,7 @@ a {
 }
 
 a:hover {
-  color: #ff8838;
+  color: var(--primary-strong);
 }
 
 /* App Layout - Sidebar style */
@@ -218,7 +213,7 @@ a:hover {
 }
 
 .nav-item.active {
-  background: rgba(249, 115, 22, 0.03);
+  background: var(--primary-soft);
   color: var(--heading);
   font-weight: 600;
   border-left: 2px solid var(--primary);
@@ -424,7 +419,7 @@ button[type="submit"] {
 
 .button-primary:hover,
 button[type="submit"]:hover {
-  background: #ff8838;
+  background: var(--primary-strong);
 }
 
 .button-secondary {
@@ -435,7 +430,7 @@ button[type="submit"]:hover {
 
 .button-secondary:hover {
   background: #ececf0;
-  color: #fff;
+  color: var(--text);
   border-color: var(--muted);
 }
 
@@ -492,7 +487,7 @@ button[type="submit"]:hover {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 113, 227, 0.12), transparent);
   animation: shine 1.8s infinite;
 }
 
@@ -609,7 +604,7 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover {
   background: #ececf0;
   border-color: var(--muted);
-  color: #fff;
+  color: var(--text);
 }
 
 /* Code editor block */
@@ -1345,9 +1340,9 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .pagination a:hover {
-  background: rgba(249, 115, 22, 0.05);
+  background: var(--primary-soft);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--primary);
 }
 
 .pagination select.page-size {
@@ -1417,94 +1412,7 @@ input[type="file"]::file-selector-button:hover {
 
 .pagination .page-jump-btn:hover {
   border-color: var(--primary);
-  color: #fff;
-}
-
-/* Responsiveness */
-@media (max-width: 1024px) {
-  .filter-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  .filter-grid button {
-    grid-column: span 3;
-  }
-}
-
-@media (max-width: 900px) {
-  .app-shell {
-    flex-direction: column;
-  }
-  
-  .sidebar {
-    width: 100%;
-    height: auto;
-    position: relative;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-    padding: 1.25rem 1rem;
-  }
-  
-  .sidebar-logo {
-    margin-bottom: 1rem;
-  }
-  
-  .sidebar-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-  }
-  
-  .nav-item {
-    padding: 0.45rem 0.65rem;
-    font-size: 0.82rem;
-    border-left: 0;
-    border-bottom: 2px solid transparent;
-  }
-  
-  .nav-item.active {
-    border-left: 0;
-    border-bottom: 2px solid var(--primary);
-    border-top-left-radius: var(--radius-md);
-    border-bottom-left-radius: var(--radius-md);
-  }
-  
-  .page-shell {
-    width: 100%;
-    padding: 1.5rem 1rem;
-  }
-  
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .tool-card-grid,
-  .tool-run-layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .form-grid label,
-  .form-grid label.full-width,
-  .details-block,
-  .details-block label {
-    grid-column: span 1;
-  }
-  
-  .filter-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .filter-grid button {
-    grid-column: span 1;
-  }
+  color: var(--primary);
 }
 
 /* --- Project Detail Configuration Cards --- */
@@ -1654,75 +1562,6 @@ input[type="file"]::file-selector-button:hover {
   border-color: rgba(239, 68, 68, 0.2);
   color: #ef4444;
   background: rgba(239, 68, 68, 0.05);
-}
-
-/* Adapt for responsiveness */
-@media (max-width: 768px) {
-  .config-summary-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-}
-
-/* 移动端页眉 & 遮罩 */
-.mobile-header { display: none; }
-.sidebar-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 99;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease;
-}
-
-/* 窄屏断点适配 (max-width: 1024px) */
-@media (max-width: 1024px) {
-  .app-shell { flex-direction: column; }
-  .mobile-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 56px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    padding: 0 1.25rem;
-    position: sticky;
-    top: 0;
-    z-index: 98;
-  }
-  .mobile-title {
-    font-size: 1.05rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: var(--heading);
-  }
-  .sidebar-toggle-btn {
-    background: transparent;
-    border: none;
-    color: var(--text);
-    cursor: pointer;
-    padding: 0.25rem;
-    display: flex;
-    align-items: center;
-  }
-  .sidebar {
-    width: 240px;
-    position: fixed;
-    left: -240px;
-    top: 0;
-    bottom: 0;
-    height: 100vh;
-    transition: left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 100;
-  }
-  .sidebar.open { left: 0; }
-  .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
-  .page-shell {
-    width: 100%;
-    padding: 1.25rem 1rem;
-  }
 }
 
 /* 漏洞分布条样式 */
@@ -2095,8 +1934,8 @@ input[type="file"]::file-selector-button:hover {
   gap: 0.45rem;
 }
 .filter-badge-tag {
-  background: rgba(249, 115, 22, 0.05);
-  border: 1px solid rgba(249, 115, 22, 0.22);
+  background: var(--primary-soft);
+  border: 1px solid rgba(0, 113, 227, 0.22);
   color: var(--primary);
   font-size: 0.76rem;
   font-family: var(--mono);
@@ -2173,21 +2012,16 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .panel { background: var(--panel); border-color: var(--border); box-shadow: 0 3px 12px rgba(25, 25, 30, 0.025); }
 .stat-card { padding: 1.15rem 1.25rem; }
 .panel { padding: 1.3rem 1.4rem; }
+.dashboard-overview { display: flex; align-items: center; justify-content: space-between; gap: 2rem; margin-bottom: 1.25rem; }
+.dashboard-overview h3 { margin: 0; color: var(--heading); font-size: 1.35rem; letter-spacing: -0.02em; }
+.overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(9rem, 1fr)); gap: 1.5rem; margin: 0; }
+.overview-metrics div { min-width: 0; }
+.overview-metrics dt, .overview-metrics span { color: var(--muted); font-size: 0.78rem; }
+.overview-metrics dd { margin: 0.2rem 0; color: var(--heading); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.04em; }
+.overview-metrics .system-ready { color: #167546; font-size: 1rem; }
 .status-running { color: #0063a8; background: #edf7ff; border-color: #b6d8f8; }
 .status-running::after { background: linear-gradient(90deg, transparent, rgba(0, 113, 227, 0.12), transparent); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
-}
-
-/* Desktop-only product: narrow viewports scroll instead of switching shells. */
-@media (max-width: 1024px) {
-  .app-shell { flex-direction: row; }
-  .sidebar { position: sticky; left: auto; width: 228px; height: 100vh; padding: 1.5rem 0.85rem; }
-  .sidebar-nav { flex-direction: column; flex-wrap: nowrap; }
-  .nav-item { padding: 0.6rem 0.75rem; font-size: 0.88rem; border-bottom: 0; }
-  .page-shell { width: calc(100% - 228px); padding: 2rem 2.5rem 3rem; }
-  .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
-  .stats-grid { grid-template-columns: repeat(4, 1fr); }
-  .form-grid { grid-template-columns: repeat(2, 1fr); }
 }

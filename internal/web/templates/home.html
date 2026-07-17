@@ -12,31 +12,18 @@
   </a>
 </section>
 
-<div class="stats-grid">
-  <div class="stat-card">
-    <span class="eyebrow">项目库</span>
-    <span class="stat-value">{{len .Projects}}</span>
-    <span class="meta-line">已保存的扫描范围与配置</span>
+<section class="dashboard-overview panel">
+  <div>
+    <p class="eyebrow">运行概览</p>
+    <h3>工作区已准备就绪</h3>
+    <p class="meta-line">Rust、Nmap 与 Nuclei 级联探测可用于新的项目扫描。</p>
   </div>
-  <div class="stat-card">
-    <span class="eyebrow">历史任务</span>
-    <span class="stat-value">{{len .Runs}}</span>
-    <span class="meta-line">已执行的扫描记录</span>
-  </div>
-  <div class="stat-card">
-    <span class="eyebrow">内置探针引擎</span>
-    <span class="stat-value" style="font-size: 1.5rem; line-height: 2.25rem; font-weight: 700; color: var(--primary);">Rust/Nmap/Nuclei</span>
-    <span class="meta-line">全自动级联指纹探测</span>
-  </div>
-  <div class="stat-card">
-    <span class="eyebrow">系统状态</span>
-    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-      <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite;"></span>
-      <span class="stat-value" style="font-size: 1.5rem; line-height: 1.5rem; font-weight: 700; margin: 0;">运行中</span>
-    </div>
-    <span class="meta-line">Web 控制台已准备就绪</span>
-  </div>
-</div>
+  <dl class="overview-metrics">
+    <div><dt>项目库</dt><dd>{{len .Projects}}</dd><span>已保存的扫描范围与配置</span></div>
+    <div><dt>历史任务</dt><dd>{{len .Runs}}</dd><span>已执行的扫描记录</span></div>
+    <div><dt>系统状态</dt><dd class="system-ready">运行中</dd><span>Web 控制台已准备就绪</span></div>
+  </dl>
+</section>
 
 <section class="dashboard-grid">
   <article class="panel">
@@ -80,11 +67,4 @@
   </article>
 </section>
 
-<style>
-@keyframes pulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-</style>
 {{end}}
