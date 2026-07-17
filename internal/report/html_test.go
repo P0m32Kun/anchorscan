@@ -30,7 +30,7 @@ func TestWriteHTMLStableBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := sha256.Sum256(data)
-	const want = "3dcf7c9a9cd38b69fe6caaba9e8e90cc2ab37c731ba22a1a5e160094c648c91f"
+	const want = "561541194834b0675cc63519cc08bc03f3c5291e5844da7efbc1c27f741fd8b7"
 	if actual := hex.EncodeToString(got[:]); actual != want {
 		t.Fatalf("unexpected HTML SHA-256: got %s, want %s", actual, want)
 	}
@@ -66,9 +66,6 @@ func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "findingText.includes(keywordVal)") {
 		t.Fatalf("expected keyword filtering to include finding details: %s", string(data))
-	}
-	if !strings.Contains(string(data), `tr[data-ip] td {`) {
-		t.Fatalf("expected mobile report rows to adapt to the viewport: %s", string(data))
 	}
 	if !strings.Contains(string(data), "matched-at") || !strings.Contains(string(data), "http://192.168.1.10:8080") {
 		t.Fatalf("expected finding evidence in html: %s", string(data))

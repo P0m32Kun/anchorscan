@@ -6,40 +6,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
-      --bg: #0b0c10;
-      --bg-dots: rgba(249, 115, 22, 0.012);
-      --panel: #13141c;
-      --panel-light: #1c1e28;
-      --border: #222533;
-      --border-strong: #30354a;
-      --text: #d5d8e2;
-      --muted: #72778f;
-      --heading: #f3f4f8;
+      --bg: #f5f5f7;
+      --bg-dots: transparent;
+      --panel: #ffffff;
+      --panel-light: #fbfbfd;
+      --border: rgba(60, 60, 67, 0.18);
+      --border-strong: rgba(60, 60, 67, 0.28);
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --heading: #1d1d1f;
       
-      --primary: #f97316;
-      --primary-hover: #ea580c;
-      --primary-glow: rgba(249, 115, 22, 0.15);
+      --primary: #0071e3;
+      --primary-hover: #0077ed;
+      --primary-glow: rgba(0, 113, 227, 0.18);
       --success: #10b981;
       
-      --sev-critical: #f43f5e;
-      --sev-critical-soft: rgba(244, 63, 94, 0.06);
-      --sev-critical-border: rgba(244, 63, 94, 0.25);
+      --sev-critical: #d70015;
+      --sev-critical-soft: #fff2f3;
+      --sev-critical-border: #f2b8bd;
       
-      --sev-high: #ff8838;
-      --sev-high-soft: rgba(255, 136, 56, 0.06);
-      --sev-high-border: rgba(255, 136, 56, 0.25);
+      --sev-high: #a84600;
+      --sev-high-soft: #fff4e8;
+      --sev-high-border: #f2c79e;
 
-      --sev-medium: #facc15;
-      --sev-medium-soft: rgba(250, 204, 21, 0.06);
-      --sev-medium-border: rgba(250, 204, 21, 0.25);
+      --sev-medium: #735c00;
+      --sev-medium-soft: #fff9db;
+      --sev-medium-border: #e8d68a;
 
-      --sev-low: #38bdf8;
-      --sev-low-soft: rgba(56, 189, 248, 0.06);
-      --sev-low-border: rgba(56, 189, 248, 0.25);
+      --sev-low: #0066cc;
+      --sev-low-soft: #eef6ff;
+      --sev-low-border: #b8d8f7;
 
-      --sev-info: #94a3b8;
-      --sev-info-soft: rgba(148, 163, 184, 0.06);
-      --sev-info-border: rgba(148, 163, 184, 0.25);
+      --sev-info: #59636e;
+      --sev-info-soft: #f2f4f5;
+      --sev-info-border: #d1d6da;
 
       --radius-lg: 8px;
       --radius-md: 6px;
@@ -78,7 +78,7 @@
     
     h1 {
       margin: 0;
-      font-family: 'Outfit', sans-serif;
+      font-family: inherit;
       font-size: 2rem;
       font-weight: 800;
       letter-spacing: -0.02em;
@@ -89,7 +89,7 @@
     }
     
     .brand-tag {
-      font-family: 'Outfit', sans-serif;
+      font-family: inherit;
       font-size: 0.75rem;
       font-weight: 700;
       color: var(--primary);
@@ -146,7 +146,7 @@
     }
     
     .stat-value {
-      font-family: 'Outfit', sans-serif;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 1.75rem;
       font-weight: 800;
       color: var(--heading);
@@ -413,44 +413,6 @@
       overflow-y: auto;
     }
 
-    @media (max-width: 720px) {
-      body { padding: 1.25rem 0.75rem; }
-      table, tbody, tr, td { display: block; width: 100%; }
-      thead { display: none; }
-      table { border: 0; background: transparent; box-shadow: none; }
-      tr[data-ip] {
-        margin-top: 0.75rem;
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        background: var(--panel);
-        overflow: hidden;
-      }
-      tr[data-ip] td {
-        display: grid;
-        grid-template-columns: 5.5rem minmax(0, 1fr);
-        gap: 0.5rem;
-        padding: 0.65rem 0.8rem;
-      }
-      tr[data-ip] td::before {
-        color: var(--muted);
-        content: attr(data-label);
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-      }
-      tr[data-ip] td:nth-child(1)::before { content: "主机"; }
-      tr[data-ip] td:nth-child(2)::before { content: "端口"; }
-      tr[data-ip] td:nth-child(3)::before { content: "服务"; }
-      tr[data-ip] td:nth-child(4)::before { content: "产品"; }
-      tr[data-ip] td:nth-child(5)::before { content: "Web"; }
-      tr[data-ip] td:nth-child(6)::before { content: "漏洞"; }
-      .finding-detail-row { margin-bottom: 0.75rem; }
-      .finding-detail-row td { padding: 0 0.6rem 0.75rem; }
-      .finding-details { padding: 0.7rem; }
-      .finding-delivery { grid-template-columns: 1fr; gap: 0.75rem; }
-    }
-    
     .web-badge {
       display: inline-block;
       padding: 0.15rem 0.45rem;
@@ -541,6 +503,8 @@
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }
     .stat-card { padding: 1rem 1.15rem; border-radius: 10px; }
+    button.stat-card { appearance: none; width: 100%; text-align: left; font: inherit; color: inherit; }
+    .report-generated-at { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
     .clickable-stat:hover { background: #fbfbfd; border-color: rgba(0, 113, 227, 0.4); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06); }
     .clickable-stat.active { border-color: var(--accent); background: #eef6ff; box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.08); }
     .stat-value, .ip-cell, .finding-summary { color: var(--text-primary); }
@@ -582,7 +546,7 @@
         <h1>AnchorScan 扫描安全报告</h1>
       </div>
       <div style="font-size: 0.85rem; color: var(--muted); text-align: right;">
-        报告自动生成时间: <span style="font-family: 'Outfit'; font-weight: 600;">2026-07-08</span>
+        报告自动生成时间: <span class="report-generated-at">2026-07-08</span>
       </div>
     </header>
     
@@ -596,54 +560,54 @@
         <span class="stat-label">开放端口数 (Services)</span>
         <span class="stat-value" id="stat-ports">-</span>
       </div>
-      <div class="stat-card clickable-stat" id="card-crit" onclick="filterBySeverity('critical')">
+      <button type="button" class="stat-card clickable-stat" id="card-crit" onclick="filterBySeverity('critical')">
         <span class="stat-label">
           <span class="severity-dot" style="background: var(--sev-critical); opacity: 1; box-shadow: 0 0 6px var(--sev-critical);"></span>
           严重漏洞 (Critical)
         </span>
         <span class="stat-value" id="count-critical" style="color: var(--sev-critical);">-</span>
-      </div>
-      <div class="stat-card clickable-stat" id="card-high" onclick="filterBySeverity('high')">
+      </button>
+      <button type="button" class="stat-card clickable-stat" id="card-high" onclick="filterBySeverity('high')">
         <span class="stat-label">
           <span class="severity-dot" style="background: var(--sev-high); opacity: 1; box-shadow: 0 0 6px var(--sev-high);"></span>
           高危漏洞 (High)
         </span>
         <span class="stat-value" id="count-high" style="color: var(--sev-high);">-</span>
-      </div>
+      </button>
     </div>
     
     <div class="stats-grid" style="margin-top: 1rem; grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
-      <div class="stat-card clickable-stat" id="card-med" onclick="filterBySeverity('medium')">
+      <button type="button" class="stat-card clickable-stat" id="card-med" onclick="filterBySeverity('medium')">
         <span class="stat-label">
           <span class="severity-dot" style="background: var(--sev-medium); opacity: 1;"></span>
           中危漏洞 (Medium)
         </span>
         <span class="stat-value" id="count-medium" style="color: var(--sev-medium);">-</span>
-      </div>
-      <div class="stat-card clickable-stat" id="card-low" onclick="filterBySeverity('low')">
+      </button>
+      <button type="button" class="stat-card clickable-stat" id="card-low" onclick="filterBySeverity('low')">
         <span class="stat-label">
           <span class="severity-dot" style="background: var(--sev-low); opacity: 1;"></span>
           低危漏洞 (Low)
         </span>
         <span class="stat-value" id="count-low" style="color: var(--sev-low);">-</span>
-      </div>
-      <div class="stat-card clickable-stat" id="card-info" onclick="filterBySeverity('info')">
+      </button>
+      <button type="button" class="stat-card clickable-stat" id="card-info" onclick="filterBySeverity('info')">
         <span class="stat-label">
           <span class="severity-dot" style="background: var(--sev-info); opacity: 1;"></span>
           信息提示 (Info)
         </span>
         <span class="stat-value" id="count-info" style="color: var(--sev-info);">-</span>
-      </div>
-      <div class="stat-card clickable-stat active" id="btn-all-severities" onclick="filterBySeverity('all')">
+      </button>
+      <button type="button" class="stat-card clickable-stat active" id="btn-all-severities" onclick="filterBySeverity('all')">
         <span class="stat-label">全部项 (All Records)</span>
         <span class="stat-value" style="color: var(--primary); font-size: 1.25rem; font-weight: 700; margin-top: 0.35rem;">重置筛选</span>
-      </div>
+      </button>
     </div>
 
     <!-- Search / Filter panel -->
     <div class="filter-panel">
       <div class="filter-header">
-        <h3>🔍 离线数据检索与过滤</h3>
+        <h3>离线数据检索与过滤</h3>
         <span class="showing-badge">当前显示: <span id="showing-count">-</span> / <span id="total-count">-</span></span>
       </div>
       <div class="filter-grid">
@@ -704,7 +668,6 @@
             <span class="finding-count">{{len .Findings}} 条漏洞发现，展开查看详情</span>
             {{else}}
             <div style="color: var(--success); font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 0.25rem;">
-              <span>🛡️</span>
               <span>未发现安全漏洞</span>
             </div>
             {{end}}

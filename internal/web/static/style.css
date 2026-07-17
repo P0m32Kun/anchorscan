@@ -413,7 +413,7 @@ button[type="submit"]:active {
 .button-primary,
 button[type="submit"] {
   background: var(--primary);
-  color: #000000;
+  color: #ffffff;
   font-weight: 700;
 }
 
@@ -870,7 +870,7 @@ input[type="file"]::file-selector-button:hover {
 /* Active States (Selected) */
 .severity-filter-chip.critical:has(input:checked),
 .severity-filter-chip.critical.active {
-  color: var(--sev-critical);
+  color: var(--text);
   background: var(--sev-critical-soft);
   border-color: var(--sev-critical);
   box-shadow: 0 0 10px rgba(244, 63, 94, 0.15);
@@ -884,7 +884,7 @@ input[type="file"]::file-selector-button:hover {
 
 .severity-filter-chip.high:has(input:checked),
 .severity-filter-chip.high.active {
-  color: var(--sev-high);
+  color: var(--text);
   background: var(--sev-high-soft);
   border-color: var(--sev-high);
   box-shadow: 0 0 10px rgba(255, 136, 56, 0.15);
@@ -898,7 +898,7 @@ input[type="file"]::file-selector-button:hover {
 
 .severity-filter-chip.medium:has(input:checked),
 .severity-filter-chip.medium.active {
-  color: var(--sev-medium);
+  color: var(--text);
   background: var(--sev-medium-soft);
   border-color: var(--sev-medium);
   box-shadow: 0 0 10px rgba(250, 204, 21, 0.15);
@@ -912,7 +912,7 @@ input[type="file"]::file-selector-button:hover {
 
 .severity-filter-chip.low:has(input:checked),
 .severity-filter-chip.low.active {
-  color: var(--sev-low);
+  color: var(--text);
   background: var(--sev-low-soft);
   border-color: var(--sev-low);
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
@@ -926,7 +926,7 @@ input[type="file"]::file-selector-button:hover {
 
 .severity-filter-chip.info:has(input:checked),
 .severity-filter-chip.info.active {
-  color: var(--sev-info);
+  color: var(--text);
   background: var(--sev-info-soft);
   border-color: var(--sev-info);
   box-shadow: 0 0 10px rgba(148, 163, 184, 0.15);
