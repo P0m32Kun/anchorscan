@@ -15,6 +15,7 @@ None.
 - [x] 05 — 持久化 DetectionCheck 并显示实时摘要
 - [x] 06 — 保留部分结果并归类最终状态
 - [x] 07 — 交付检测执行覆盖报告
+- [x] 08 — 增加默认关闭的逐工具超时
 
 ## Blocked (needs human)
 

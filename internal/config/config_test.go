@@ -41,6 +41,33 @@ scan:
 	}
 }
 
+func TestLoadValidatesToolTimeouts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: -1s\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load accepted a negative timeout")
+	}
+	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: invalid\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load accepted an invalid timeout")
+	}
+	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: 0\n  nse: 150ms\n  nuclei: 1m\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	timeouts, err := cfg.Timeouts.Durations()
+	if err != nil || timeouts.Rustscan.String() != "2s" || timeouts.NSE.String() != "150ms" || timeouts.Nmap != 0 {
+		t.Fatalf("timeouts = %#v, %v", timeouts, err)
+	}
+}
+
 func TestLoadTagRulesParsesSnakeCaseFields(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "service-tags.yaml")

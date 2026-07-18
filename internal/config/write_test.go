@@ -77,3 +77,33 @@ func TestSaveRawWithBackupRejectsInvalidYAML(t *testing.T) {
 		t.Fatalf("config should remain unchanged: %s", data)
 	}
 }
+
+func TestSaveWithBackupRejectsInvalidToolTimeout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "default.yaml")
+	if err := os.WriteFile(path, []byte("scan:\n  ports: top1000\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SaveWithBackup(path, Config{Timeouts: ToolTimeouts{Nmap: "-1s"}}, time.Now()); err == nil {
+		t.Fatal("expected invalid timeout error")
+	}
+}
+
+func TestSaveRawWithBackupRejectsInvalidToolTimeout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "default.yaml")
+	original := "scan:\n  ports: top1000\n"
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SaveRawWithBackup(path, "timeouts:\n  httpx: nonsense\n", time.Now()); err == nil {
+		t.Fatal("expected invalid timeout error")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != original {
+		t.Fatalf("config should remain unchanged: %s", data)
+	}
+}

@@ -24,6 +24,7 @@ type Options struct {
 	Profile      string
 	Workers      int
 	ExtraArgs    config.ToolArgs
+	Timeouts     config.ToolTimeouts
 	NSERuleCount int
 	TagRuleCount int
 }
@@ -43,6 +44,7 @@ type Summary struct {
 	Workers       int
 	Tools         config.ToolPaths
 	ExtraArgs     config.ToolArgs
+	Timeouts      config.ToolTimeouts
 	NSERuleCount  int
 	TagRuleCount  int
 }
@@ -66,6 +68,7 @@ func Run(opts Options) Result {
 			Workers:      opts.Workers,
 			Tools:        opts.Tools,
 			ExtraArgs:    opts.ExtraArgs,
+			Timeouts:     opts.Timeouts,
 			NSERuleCount: opts.NSERuleCount,
 			TagRuleCount: opts.TagRuleCount,
 		},

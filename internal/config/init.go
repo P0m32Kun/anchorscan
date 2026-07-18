@@ -37,6 +37,7 @@ func defaultConfig() Config {
 			Profile: "normal",
 		},
 		Profiles: builtInProfiles(),
+		Timeouts: ToolTimeouts{Rustscan: "0", Nmap: "0", Httpx: "0", NSE: "0", Nuclei: "0"},
 	}
 	cfg.Tools.Rustscan = detectToolPath("rustscan")
 	cfg.Tools.Nmap = detectToolPath("nmap")

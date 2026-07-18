@@ -61,6 +61,10 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	if err != nil {
 		return PreparedScan{}, err
 	}
+	timeouts, err := cfg.Timeouts.Durations()
+	if err != nil {
+		return PreparedScan{}, err
+	}
 	nseRules, err := config.LoadNSERulesForConfig(req.ConfigPath)
 	if err != nil {
 		return PreparedScan{}, err
@@ -83,6 +87,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		Profile:      effective.ProfileName,
 		Workers:      effective.HostWorkers,
 		ExtraArgs:    extraArgs,
+		Timeouts:     cfg.Timeouts,
 		NSERuleCount: len(nseRules),
 		TagRuleCount: len(tagRules),
 	})
@@ -100,6 +105,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		ProfileName:    effective.ProfileName,
 		HostWorkers:    effective.HostWorkers,
 		ExtraArgs:      extraArgs,
+		Timeouts:       timeouts,
 		JSONReportPath: req.JSONReportPath,
 		ArtifactRoot:   req.ArtifactRoot,
 		NSERules:       nseRules,

@@ -132,6 +132,7 @@ func logScan(w io.Writer, format string, args ...any) {
 
 func logPreflight(w io.Writer, result preflight.Result) {
 	logScan(w, "preflight targets=%d ports=%s profile=%s workers=%d", result.Summary.TargetCount, result.Summary.PortSpec, result.Summary.Profile, result.Summary.Workers)
+	logScan(w, "preflight timeouts rustscan=%s nmap=%s httpx=%s nse=%s nuclei=%s (0=unlimited)", result.Summary.Timeouts.Rustscan, result.Summary.Timeouts.Nmap, result.Summary.Timeouts.Httpx, result.Summary.Timeouts.NSE, result.Summary.Timeouts.Nuclei)
 	for _, warning := range result.Warnings {
 		logScan(w, "preflight warning %s: %s", warning.Field, warning.Message)
 	}

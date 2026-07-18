@@ -9,6 +9,14 @@ tools:
   httpx: httpx
   nuclei: nuclei
 
+# Go duration（如 30s、5m）；0 表示不限时。档位不会覆盖这些全局设置。
+timeouts:
+  rustscan: "0"
+  nmap: "0"
+  httpx: "0"
+  nse: "0"
+  nuclei: "0"
+
 knowledge_base:
   path: ""
 

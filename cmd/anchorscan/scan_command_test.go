@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
@@ -40,6 +42,16 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected %q in help output %q", want, output)
 		}
+	}
+}
+
+func TestLogPreflightReportsEffectiveToolTimeouts(t *testing.T) {
+	var stderr bytes.Buffer
+	logPreflight(&stderr, preflight.Result{Summary: preflight.Summary{Timeouts: config.ToolTimeouts{
+		Rustscan: "0", Nmap: "30s", Httpx: "150ms", NSE: "5m", Nuclei: "1m",
+	}}})
+	if got := stderr.String(); !strings.Contains(got, "rustscan=0 nmap=30s httpx=150ms nse=5m nuclei=1m (0=unlimited)") {
+		t.Fatalf("preflight log missing timeouts: %q", got)
 	}
 }
 

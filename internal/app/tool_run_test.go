@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
@@ -156,5 +158,52 @@ func TestRunToolNucleiSavesFindings(t *testing.T) {
 	}
 	if len(findings) != 1 || findings[0].Source != "nuclei" || findings[0].ID != "redis-default-logins" || findings[0].Severity != "high" || findings[0].IP != "192.0.2.10" || findings[0].Port != 6379 || findings[0].Target != "192.0.2.10:6379" {
 		t.Fatalf("findings = %#v", findings)
+	}
+}
+
+func TestRunToolAppliesConfiguredToolTimeout(t *testing.T) {
+	for _, test := range []struct {
+		tool     string
+		timeouts ToolTimeouts
+	}{
+		{tool: "rustscan", timeouts: ToolTimeouts{Rustscan: time.Millisecond}},
+		{tool: "nmap", timeouts: ToolTimeouts{Nmap: time.Millisecond}},
+		{tool: "httpx", timeouts: ToolTimeouts{Httpx: time.Millisecond}},
+		{tool: "nuclei", timeouts: ToolTimeouts{Nuclei: time.Millisecond}},
+	} {
+		t.Run(test.tool, func(t *testing.T) {
+			st := newToolRunStore(t)
+			runner := runnerFunc(func(ctx context.Context, _ string, _ []string) ([]byte, error) {
+				if _, ok := ctx.Deadline(); !ok {
+					t.Fatal("tool context has no deadline")
+				}
+				<-ctx.Done()
+				return nil, ctx.Err()
+			})
+			err := RunTool(context.Background(), runner, st, ToolRunOptions{
+				RunID: "run-timeout-" + test.tool, Tool: test.tool, UseNativeArgs: true, NativeArgs: []string{"--version"},
+				Tools:    ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+				Timeouts: test.timeouts, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+			})
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("RunTool error = %v, want deadline exceeded", err)
+			}
+		})
+	}
+}
+
+func TestRunToolZeroTimeoutReusesContext(t *testing.T) {
+	st := newToolRunStore(t)
+	runner := runnerFunc(func(ctx context.Context, _ string, _ []string) ([]byte, error) {
+		if _, ok := ctx.Deadline(); ok {
+			t.Fatal("zero timeout added a deadline")
+		}
+		return []byte("ok"), nil
+	})
+	if err := RunTool(context.Background(), runner, st, ToolRunOptions{
+		RunID: "run-unlimited", Tool: "rustscan", UseNativeArgs: true, NativeArgs: []string{"--version"},
+		Tools: ToolPaths{Rustscan: "rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	}); err != nil {
+		t.Fatal(err)
 	}
 }

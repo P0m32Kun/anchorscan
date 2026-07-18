@@ -35,12 +35,15 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 
 	logf(opts, "target %s", target)
 	progress.Emit("info", "rustscan", "rustscan %s ports=%s", target, opts.Ports)
-	ports, out, err := tools.DiscoverPortsWithOutput(ctx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
+	toolCtx, cancel := toolContext(ctx, opts.Timeouts.Rustscan)
+	ports, out, err := tools.DiscoverPortsWithOutput(toolCtx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
+	normalizedErr := normalizeToolError(toolCtx, err)
+	cancel()
 	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("rustscan", target, "ports")+".txt", out); writeErr != nil {
 		return TargetScan{}, writeErr
 	}
 	if err != nil {
-		return TargetScan{}, normalizeToolError(ctx, err)
+		return TargetScan{}, normalizedErr
 	}
 	progress.Emit("info", "rustscan", "rustscan %s open=%v", target, ports)
 	openPorts := append([]int(nil), ports...)
@@ -64,13 +67,16 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			}
 		}
 	}()
-	fingerprints, out, err := tools.FingerprintWithOutput(ctx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
+	toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nmap)
+	fingerprints, out, err := tools.FingerprintWithOutput(toolCtx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
+	normalizedErr = normalizeToolError(toolCtx, err)
+	cancel()
 	close(done)
 	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nmap-service", target)+".xml", out); writeErr != nil {
 		return TargetScan{}, writeErr
 	}
 	if err != nil {
-		return TargetScan{}, normalizeToolError(ctx, err)
+		return TargetScan{}, normalizedErr
 	}
 	progress.Emit("info", "nmap", "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
 
@@ -84,13 +90,16 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		httpResult := tools.HTTPResult{}
 		if fp.IsWeb && opts.Tools.Httpx != "" {
 			progress.Emit("info", "httpx", "httpx %s", fp.URL)
-			httpResult, out, err = tools.EnrichWebWithOutput(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
+			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Httpx)
+			httpResult, out, err = tools.EnrichWebWithOutput(toolCtx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
+			operatorCanceled := isOperatorCanceled(toolCtx)
+			cancel()
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("httpx", fp.IP, strconv.Itoa(fp.Port))+".jsonl", out); writeErr != nil {
 				result.HadErrors = true
 				progress.Emit("error", "httpx", "httpx %s artifact failed: %v", fp.URL, writeErr)
 			}
 			if err != nil {
-				if ctx.Err() != nil {
+				if operatorCanceled {
 					return result, context.Canceled
 				}
 				result.HadErrors = true
@@ -136,7 +145,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			if err := recordDetectionCheck(opts, fp, "nse", "running", "", "", started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
-			nseResults, out, err := tools.RunNSEWithOutput(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
+			toolCtx, cancel = toolContext(ctx, opts.Timeouts.NSE)
+			nseResults, out, err := tools.RunNSEWithOutput(toolCtx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
+			operatorCanceled := isOperatorCanceled(toolCtx)
+			cancel()
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nse", fp.IP, strconv.Itoa(fp.Port), strings.Join(scripts, ","))+".xml", out); writeErr != nil {
 				_ = recordDetectionCheck(opts, fp, "nse", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
 				result.HadErrors = true
@@ -144,8 +156,12 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				progress.Emit("error", "nse", "nse %s:%d artifact failed: %v", fp.IP, fp.Port, writeErr)
 			}
 			if err != nil {
-				_ = recordDetectionCheck(opts, fp, "nse", detectionCheckFailureStatus(ctx), detectionCheckFailureReason(ctx), err.Error(), started, time.Now())
-				if ctx.Err() != nil {
+				status, reason := "failed", "command_failed"
+				if operatorCanceled {
+					status, reason = "canceled", "run_canceled"
+				}
+				_ = recordDetectionCheck(opts, fp, "nse", status, reason, err.Error(), started, time.Now())
+				if operatorCanceled {
 					return result, context.Canceled
 				}
 				result.HadErrors = true
@@ -190,7 +206,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", "", started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
-			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nuclei)
+			out, err := tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+			operatorCanceled := isOperatorCanceled(toolCtx)
+			cancel()
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
 				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
 				result.HadErrors = true
@@ -198,8 +217,12 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				progress.Emit("error", "nuclei", "nuclei %s artifact failed: %v", match.Address, writeErr)
 			}
 			if err != nil {
-				_ = recordDetectionCheck(opts, fp, "nuclei", detectionCheckFailureStatus(ctx), detectionCheckFailureReason(ctx), err.Error(), started, time.Now())
-				if ctx.Err() != nil {
+				status, reason := "failed", "command_failed"
+				if operatorCanceled {
+					status, reason = "canceled", "run_canceled"
+				}
+				_ = recordDetectionCheck(opts, fp, "nuclei", status, reason, err.Error(), started, time.Now())
+				if operatorCanceled {
 					return result, context.Canceled
 				}
 				result.HadErrors = true
@@ -246,20 +269,6 @@ func persistFinding(opts ScanOptions, finding report.Finding) error {
 		return nil
 	}
 	return opts.PersistFinding(finding)
-}
-
-func detectionCheckFailureStatus(ctx context.Context) string {
-	if ctx.Err() != nil {
-		return "canceled"
-	}
-	return "failed"
-}
-
-func detectionCheckFailureReason(ctx context.Context) string {
-	if ctx.Err() != nil {
-		return "run_canceled"
-	}
-	return "command_failed"
 }
 
 func formatNucleiEvidence(result tools.NucleiFinding) string {

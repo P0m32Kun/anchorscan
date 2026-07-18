@@ -58,11 +58,19 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 		cfg.Tools.Nmap = r.FormValue("nmap")
 		cfg.Tools.Httpx = r.FormValue("httpx")
 		cfg.Tools.Nuclei = r.FormValue("nuclei")
+		cfg.Timeouts.Rustscan = r.FormValue("timeout_rustscan")
+		cfg.Timeouts.Nmap = r.FormValue("timeout_nmap")
+		cfg.Timeouts.Httpx = r.FormValue("timeout_httpx")
+		cfg.Timeouts.NSE = r.FormValue("timeout_nse")
+		cfg.Timeouts.Nuclei = r.FormValue("timeout_nuclei")
+		cfg.Timeouts = cfg.Timeouts.Normalized()
 		cfg.KnowledgeBase.Path = r.FormValue("knowledge_base_path")
 		cfg.Scan.Ports = r.FormValue("ports")
 		cfg.Scan.Profile = r.FormValue("profile")
 		if _, err := config.SaveWithBackup(s.opts.ConfigPath, cfg, s.opts.Now()); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
+			highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
+			render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), Error: err.Error(), HighriskPorts: highriskPorts})
 			return
 		}
 		http.Redirect(w, r, "/config?saved=1", http.StatusSeeOther)

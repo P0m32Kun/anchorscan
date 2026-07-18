@@ -21,13 +21,18 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 
 	if opts.Tools.Nmap != "" && len(targets) > 0 {
 		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", targets)
-		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, targets, nil)
+		toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
+		aliveTargets, out, err := tools.DiscoverAliveWithOutput(toolCtx, runner, opts.Tools.Nmap, targets, nil)
 		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
+			cancel()
 			return nil, nil, false, writeErr
 		}
 		if err != nil {
-			return nil, nil, false, normalizeToolError(ctx, err)
+			normalized := normalizeToolError(toolCtx, err)
+			cancel()
+			return nil, nil, false, normalized
 		}
+		cancel()
 		targets = aliveTargets
 		aliveIPs = append([]string(nil), targets...)
 		progress.Emit("info", "nmap", "nmap alive hosts=%v", targets)

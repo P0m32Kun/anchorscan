@@ -49,6 +49,10 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	if err != nil {
 		return err
 	}
+	timeouts, err := cfg.Timeouts.Durations()
+	if err != nil {
+		return err
+	}
 	resolvedPorts := strings.TrimSpace(*portsValue)
 	if toolName == "rustscan" || (toolName == "nmap" && *modeValue != "alive") {
 		if resolvedPorts == "" {
@@ -95,6 +99,7 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 			Httpx:    cfg.Tools.Httpx,
 			Nuclei:   cfg.Tools.Nuclei,
 		},
+		Timeouts:       timeouts,
 		JSONReportPath: *jsonPath,
 		Logf: func(format string, args ...any) {
 			logScan(stderr, format, args...)

@@ -83,6 +83,11 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	timeouts, err := cfg.Timeouts.Durations()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	toolName := strings.TrimSpace(r.FormValue("tool"))
 	if !isManualTool(toolName) {
@@ -146,6 +151,7 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 			Httpx:    cfg.Tools.Httpx,
 			Nuclei:   cfg.Tools.Nuclei,
 		},
+		Timeouts:       timeouts,
 		JSONReportPath: jsonPath,
 	}
 	applyToolExtraArgs(&opts, toolName, extraArgs)

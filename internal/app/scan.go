@@ -18,6 +18,7 @@ import (
 
 type ToolPaths = config.ToolPaths
 type ToolExtraArgs = config.ToolArgs
+type ToolTimeouts = config.ToolDurations
 
 type TagRule = vuln.TagRule
 
@@ -31,6 +32,7 @@ type ScanOptions struct {
 	ProfileName          string
 	HostWorkers          int
 	ExtraArgs            ToolExtraArgs
+	Timeouts             ToolTimeouts
 	ConfigSnapshot       string
 	JSONReportPath       string
 	ArtifactRoot         string
@@ -162,8 +164,22 @@ func normalizeToolError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
-	if ctx.Err() != nil {
+	if isOperatorCanceled(ctx) {
 		return context.Canceled
 	}
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
 	return err
+}
+
+func toolContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
+func isOperatorCanceled(ctx context.Context) bool {
+	return errors.Is(ctx.Err(), context.Canceled)
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -316,6 +317,132 @@ func containsLogSubstring(items []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func TestToolContextLeavesZeroTimeoutWithoutDeadline(t *testing.T) {
+	ctx, cancel := toolContext(context.Background(), 0)
+	defer cancel()
+	if _, ok := ctx.Deadline(); ok {
+		t.Fatal("zero timeout added a deadline")
+	}
+	ctx, cancel = toolContext(context.Background(), time.Second)
+	defer cancel()
+	if _, ok := ctx.Deadline(); !ok {
+		t.Fatal("non-zero timeout did not add a deadline")
+	}
+}
+
+func TestRunScanClassifiesToolDeadlineAsFailure(t *testing.T) {
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(ctx context.Context, _ string, _ []string) ([]byte, error) {
+		if _, ok := ctx.Deadline(); !ok {
+			t.Fatal("tool context has no deadline")
+		}
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-timeout", Targets: []string{"192.0.2.10"}, Ports: "80",
+		Tools: ToolPaths{Rustscan: "rustscan"}, Timeouts: ToolTimeouts{Rustscan: time.Millisecond},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("RunScan error = %v, want deadline exceeded", err)
+	}
+	run, err := scanStore.GetScanRun("run-timeout")
+	if err != nil || run.Status != "failed" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+}
+
+func TestRunScanClassifiesOptionalToolDeadlineAsCompletedWithErrors(t *testing.T) {
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(ctx context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(aliveSweepXML("192.0.2.10")), nil
+		case binary == "rustscan":
+			return []byte("192.0.2.10 -> [22]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+		case binary == "nmap" && strings.Contains(joined, "--script"):
+			<-ctx.Done()
+			return nil, ctx.Err()
+		default:
+			return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
+		}
+	})
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-optional-timeout", Targets: []string{"192.0.2.10"}, Ports: "22",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		Timeouts:       ToolTimeouts{NSE: time.Millisecond},
+		NSERules:       map[string][]string{"ssh": {"ssh-hostkey"}},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	run, err := scanStore.GetScanRun("run-optional-timeout")
+	if err != nil || run.Status != "completed_with_errors" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-optional-timeout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nse" && check.Status == "failed" && check.ReasonCode == "command_failed" {
+			return
+		}
+	}
+	t.Fatalf("expected failed NSE timeout check, got %#v", checks)
+}
+
+func TestRunScanClassifiesCanceledOptionalToolAsCanceled(t *testing.T) {
+	scanStore := newScanStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runner := runnerFunc(func(toolCtx context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(aliveSweepXML("192.0.2.11")), nil
+		case binary == "rustscan":
+			return []byte("192.0.2.11 -> [22]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+		case binary == "nmap" && strings.Contains(joined, "--script"):
+			cancel()
+			<-toolCtx.Done()
+			return nil, toolCtx.Err()
+		default:
+			return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
+		}
+	})
+	err := RunScan(ctx, runner, scanStore, ScanOptions{
+		RunID: "run-optional-canceled", Targets: []string{"192.0.2.11"}, Ports: "22",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		NSERules:       map[string][]string{"ssh": {"ssh-hostkey"}},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunScan error = %v, want canceled", err)
+	}
+	run, err := scanStore.GetScanRun("run-optional-canceled")
+	if err != nil || run.Status != "canceled" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-optional-canceled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nse" && check.Status == "canceled" && check.ReasonCode == "run_canceled" {
+			return
+		}
+	}
+	t.Fatalf("expected canceled NSE check, got %#v", checks)
 }
 
 type blockingRunner struct {

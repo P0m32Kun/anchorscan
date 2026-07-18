@@ -46,6 +46,17 @@
         <span>Nuclei 路径</span>
         <input name="nuclei" value="{{.Config.Tools.Nuclei}}" placeholder="例如: /usr/local/bin/nuclei">
       </label>
+      <div class="full-width">
+        <span>逐工具超时</span>
+        <p class="meta-line config-field-help">使用 Go duration（例如 30s、5m）；填 0 表示不限时，档位不会覆盖这些全局设置。</p>
+        <div class="form-grid">
+          <label><span>Rustscan</span><input name="timeout_rustscan" value="{{.Config.Timeouts.Rustscan}}"></label>
+          <label><span>Nmap</span><input name="timeout_nmap" value="{{.Config.Timeouts.Nmap}}"></label>
+          <label><span>Httpx</span><input name="timeout_httpx" value="{{.Config.Timeouts.Httpx}}"></label>
+          <label><span>NSE</span><input name="timeout_nse" value="{{.Config.Timeouts.NSE}}"></label>
+          <label><span>Nuclei</span><input name="timeout_nuclei" value="{{.Config.Timeouts.Nuclei}}"></label>
+        </div>
+      </div>
       <label class="full-width">
         <span>知识库手册路径</span>
         <input name="knowledge_base_path" value="{{.Config.KnowledgeBase.Path}}" placeholder="例如: ../Pentest-Playbook/handbook/内网渗透测试手册_v2.md">

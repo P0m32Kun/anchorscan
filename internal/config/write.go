@@ -8,6 +8,9 @@ import (
 )
 
 func SaveWithBackup(path string, cfg Config, now time.Time) (string, error) {
+	if _, err := cfg.Timeouts.Durations(); err != nil {
+		return "", err
+	}
 	out, err := yaml.Marshal(cfg)
 	if err != nil {
 		return "", err
@@ -18,6 +21,9 @@ func SaveWithBackup(path string, cfg Config, now time.Time) (string, error) {
 func SaveRawWithBackup(path string, raw string, now time.Time) (string, error) {
 	var cfg Config
 	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {
+		return "", err
+	}
+	if _, err := cfg.Timeouts.Durations(); err != nil {
 		return "", err
 	}
 	return saveBytesWithBackup(path, []byte(raw), now)

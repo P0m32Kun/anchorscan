@@ -31,6 +31,7 @@ type ToolRunOptions struct {
 	Template        string
 	Tools           ToolPaths
 	ExtraArgs       ToolExtraArgs
+	Timeouts        ToolTimeouts
 	JSONReportPath  string
 	Logf            func(format string, args ...any)
 }
@@ -136,14 +137,18 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		return nil, err
 	}
 	emitTool(opts, scanStore, "info", opts.Tool, "%s", displayCommand(binary, opts.NativeArgs))
-	out, err := runner.Run(ctx, binary, opts.NativeArgs)
+	toolCtx, cancel := toolRunContext(ctx, opts)
+	out, err := runner.Run(toolCtx, binary, opts.NativeArgs)
 	output := string(out)
 	if strings.TrimSpace(output) != "" {
 		emitTool(opts, scanStore, "info", opts.Tool, "%s", strings.TrimRight(output, "\n"))
 	}
 	if err != nil {
-		return nil, normalizeToolError(ctx, err)
+		normalizedErr := normalizeToolError(toolCtx, err)
+		cancel()
+		return nil, normalizedErr
 	}
+	cancel()
 	finding := report.Finding{
 		Source:   opts.Tool,
 		ID:       "native-output",
@@ -189,10 +194,14 @@ func runRustscanTool(ctx context.Context, runner tools.Runner, scanStore *store.
 		return nil, errors.New("rustscan requires target and ports")
 	}
 	emitTool(opts, scanStore, "info", "rustscan", "rustscan %s ports=%s", opts.Target, opts.Ports)
-	ports, err := tools.DiscoverPorts(ctx, runner, opts.Tools.Rustscan, opts.Target, opts.Ports, opts.ExtraArgs.Rustscan)
+	toolCtx, cancel := toolRunContext(ctx, opts)
+	ports, err := tools.DiscoverPorts(toolCtx, runner, opts.Tools.Rustscan, opts.Target, opts.Ports, opts.ExtraArgs.Rustscan)
 	if err != nil {
-		return nil, normalizeToolError(ctx, err)
+		normalizedErr := normalizeToolError(toolCtx, err)
+		cancel()
+		return nil, normalizedErr
 	}
+	cancel()
 
 	out := make([]fingerprint.ServiceFingerprint, 0, len(ports))
 	for _, port := range ports {
@@ -210,10 +219,14 @@ func runNmapTool(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 		return nil, nil, errors.New("nmap requires target")
 	}
 	if opts.Mode == "alive" {
-		alive, err := tools.CheckAlive(ctx, runner, opts.Tools.Nmap, opts.Target, opts.ExtraArgs.Nmap)
+		toolCtx, cancel := toolRunContext(ctx, opts)
+		alive, err := tools.CheckAlive(toolCtx, runner, opts.Tools.Nmap, opts.Target, opts.ExtraArgs.Nmap)
 		if err != nil {
-			return nil, nil, normalizeToolError(ctx, err)
+			normalizedErr := normalizeToolError(toolCtx, err)
+			cancel()
+			return nil, nil, normalizedErr
 		}
+		cancel()
 		summary := "Host did not respond"
 		if alive {
 			summary = "Host is alive"
@@ -229,10 +242,14 @@ func runNmapTool(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 	if err != nil {
 		return nil, nil, err
 	}
-	fps, err := tools.Fingerprint(ctx, runner, opts.Tools.Nmap, opts.Target, ports, opts.ExtraArgs.Nmap)
+	toolCtx, cancel := toolRunContext(ctx, opts)
+	fps, err := tools.Fingerprint(toolCtx, runner, opts.Tools.Nmap, opts.Target, ports, opts.ExtraArgs.Nmap)
 	if err != nil {
-		return nil, nil, normalizeToolError(ctx, err)
+		normalizedErr := normalizeToolError(toolCtx, err)
+		cancel()
+		return nil, nil, normalizedErr
 	}
+	cancel()
 	var findings []report.Finding
 	for _, fp := range fps {
 		if err := scanStore.SaveFingerprint(opts.RunID, fp); err != nil {
@@ -253,10 +270,14 @@ func runHTTPXTool(ctx context.Context, runner tools.Runner, scanStore *store.Sto
 	if err != nil {
 		return nil, nil, err
 	}
-	result, err := tools.EnrichWeb(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
+	toolCtx, cancel := toolRunContext(ctx, opts)
+	result, err := tools.EnrichWeb(toolCtx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
 	if err != nil {
-		return nil, nil, normalizeToolError(ctx, err)
+		normalizedErr := normalizeToolError(toolCtx, err)
+		cancel()
+		return nil, nil, normalizedErr
 	}
+	cancel()
 	if result.URL != "" {
 		fp.URL = result.URL
 	}
@@ -284,18 +305,22 @@ func runNucleiTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		return nil, err
 	}
 
+	if strings.TrimSpace(opts.Template) == "" && len(opts.Tags) == 0 {
+		return nil, errors.New("nuclei requires tags or template")
+	}
 	var out []byte
+	toolCtx, cancel := toolRunContext(ctx, opts)
 	if strings.TrimSpace(opts.Template) != "" {
-		out, err = tools.RunNucleiTemplate(ctx, runner, opts.Tools.Nuclei, opts.URL, opts.Template, opts.ExtraArgs.Nuclei)
+		out, err = tools.RunNucleiTemplate(toolCtx, runner, opts.Tools.Nuclei, opts.URL, opts.Template, opts.ExtraArgs.Nuclei)
 	} else {
-		if len(opts.Tags) == 0 {
-			return nil, errors.New("nuclei requires tags or template")
-		}
-		out, err = tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, opts.URL, opts.Tags, nil, opts.ExtraArgs.Nuclei)
+		out, err = tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, opts.URL, opts.Tags, nil, opts.ExtraArgs.Nuclei)
 	}
 	if err != nil {
-		return nil, normalizeToolError(ctx, err)
+		normalizedErr := normalizeToolError(toolCtx, err)
+		cancel()
+		return nil, normalizedErr
 	}
+	cancel()
 
 	parsed, err := tools.ParseNucleiJSONL(out)
 	if err != nil {
@@ -310,6 +335,21 @@ func runNucleiTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		findings = append(findings, finding)
 	}
 	return findings, nil
+}
+
+func toolRunContext(ctx context.Context, opts ToolRunOptions) (context.Context, context.CancelFunc) {
+	switch opts.Tool {
+	case "rustscan":
+		return toolContext(ctx, opts.Timeouts.Rustscan)
+	case "nmap":
+		return toolContext(ctx, opts.Timeouts.Nmap)
+	case "httpx":
+		return toolContext(ctx, opts.Timeouts.Httpx)
+	case "nuclei":
+		return toolContext(ctx, opts.Timeouts.Nuclei)
+	default:
+		return toolContext(ctx, 0)
+	}
 }
 
 func fingerprintFromURL(raw string) (fingerprint.ServiceFingerprint, error) {

@@ -87,8 +87,57 @@ func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 		t.Fatalf("status mismatch: %d", res.Code)
 	}
 	body := res.Body.String()
-	if !strings.Contains(body, "name=\"raw_config\"") || !strings.Contains(body, "高级 YAML") {
+	if !strings.Contains(body, "name=\"raw_config\"") || !strings.Contains(body, "高级 YAML") || !strings.Contains(body, "name=\"timeout_rustscan\"") || !strings.Contains(body, "value=\"0\"") {
 		t.Fatalf("expected raw editor in body: %s", body)
+	}
+}
+
+func TestConfigPageUpdatesToolTimeouts(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools: {}\nscan:\n  ports: top1000\n  profile: normal\nprofiles: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	form := strings.NewReader("rustscan=&nmap=&httpx=&nuclei=&ports=top1000&profile=normal&timeout_rustscan=30s&timeout_nmap=0&timeout_httpx=150ms&timeout_nse=5m&timeout_nuclei=1m")
+	req := httptest.NewRequest(http.MethodPost, "/config", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusSeeOther {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.Timeouts.NSE, "5m"; got != want {
+		t.Fatalf("NSE timeout = %q, want %q", got, want)
+	}
+}
+
+func TestConfigPageRejectsInvalidToolTimeout(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("tools: {}\nscan:\n  ports: top1000\n  profile: normal\nprofiles: {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	form := strings.NewReader("rustscan=&nmap=&httpx=&nuclei=&ports=top1000&profile=normal&timeout_rustscan=-1s")
+	req := httptest.NewRequest(http.MethodPost, "/config", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "invalid rustscan timeout") {
+		t.Fatalf("expected timeout validation error, got %d: %s", res.Code, res.Body.String())
 	}
 }
 
