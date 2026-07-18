@@ -18,6 +18,7 @@ let browser;
 let context;
 let page;
 let server;
+let workDir;
 
 function appendOutput(chunk) {
   serverOutput += chunk.toString();
@@ -36,6 +37,9 @@ async function freePort() {
 async function waitForServer(baseURL) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
+    if (server?.exitCode !== null || server?.signalCode !== null) {
+      throw new Error(`Web server exited before becoming ready.\n${serverOutput}`);
+    }
     try {
       const response = await fetch(baseURL);
       if (response.ok) return;
@@ -45,6 +49,28 @@ async function waitForServer(baseURL) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   throw new Error(`Web server did not become ready.\n${serverOutput}`);
+}
+
+async function startServer(configPath) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const port = await freePort();
+    const baseURL = `http://127.0.0.1:${port}`;
+    serverOutput = '';
+    server = spawn(binary, ['web', '--config', configPath, '--db', path.join(workDir, 'scans.sqlite'), '--listen', `127.0.0.1:${port}`], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    server.stdout.on('data', appendOutput);
+    server.stderr.on('data', appendOutput);
+    try {
+      await waitForServer(baseURL);
+      return baseURL;
+    } catch (error) {
+      await stopServer();
+      if (attempt === 3) throw error;
+    }
+  }
+  throw new Error('Web server could not acquire a test port.');
 }
 
 async function writeTestConfig(workDir) {
@@ -78,18 +104,9 @@ try {
   await fs.access(fixture);
   await fs.rm(artifactDir, { recursive: true, force: true });
 
-  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'anchorscan-web-smoke-'));
+  workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'anchorscan-web-smoke-'));
   const configPath = await writeTestConfig(workDir);
-  const port = await freePort();
-  const baseURL = `http://127.0.0.1:${port}`;
-
-  server = spawn(binary, ['web', '--config', configPath, '--db', path.join(workDir, 'scans.sqlite'), '--listen', `127.0.0.1:${port}`], {
-    cwd: repoRoot,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  server.stdout.on('data', appendOutput);
-  server.stderr.on('data', appendOutput);
-  await waitForServer(baseURL);
+  const baseURL = await startServer(configPath);
 
   browser = await chromium.launch();
   context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
@@ -127,4 +144,5 @@ try {
 } finally {
   if (browser) await browser.close().catch(() => {});
   await stopServer().catch(() => {});
+  if (workDir) await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
 }
