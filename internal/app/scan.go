@@ -36,12 +36,15 @@ type ScanOptions struct {
 	ArtifactRoot         string
 	NSERules             map[string][]string
 	TagRules             []TagRule
+	PersistFingerprint   func(fingerprint.ServiceFingerprint) error
+	PersistFinding       func(report.Finding) error
 	RecordDetectionCheck func(store.DetectionCheck) error
 	Logf                 func(format string, args ...any)
 }
 
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
 	artifactDir := ""
+	partialErrors := false
 
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
@@ -58,6 +61,10 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 		status := "completed"
 		message := ""
+		if partialErrors {
+			status = "completed_with_errors"
+			message = "one or more optional stages failed"
+		}
 		if runErr != nil {
 			status = "failed"
 			message = runErr.Error()
@@ -93,11 +100,18 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.RecordDetectionCheck == nil && scanStore != nil {
 		opts.RecordDetectionCheck = scanStore.UpsertDetectionCheck
 	}
+	if opts.PersistFingerprint == nil && scanStore != nil {
+		opts.PersistFingerprint = func(fp fingerprint.ServiceFingerprint) error { return scanStore.UpsertFingerprint(opts.RunID, fp) }
+	}
+	if opts.PersistFinding == nil && scanStore != nil {
+		opts.PersistFinding = func(finding report.Finding) error { return scanStore.SaveFinding(opts.RunID, finding) }
+	}
 	progress := storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}
-	scans, aliveIPs, err := scanTargets(ctx, runner, scanStore, opts, artifactDir, progress)
+	scans, aliveIPs, partial, err := scanTargets(ctx, runner, opts, artifactDir, progress)
 	if err != nil {
 		return err
 	}
+	partialErrors = partial
 
 	allFingerprints, allFindings, openPorts := flattenScans(scans)
 	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)

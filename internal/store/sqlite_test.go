@@ -156,8 +156,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 6 {
-		t.Fatalf("expected 6 applied migrations, got %d", count)
+	if count != 7 {
+		t.Fatalf("expected 7 applied migrations, got %d", count)
 	}
 }
 
@@ -186,6 +186,58 @@ func TestSQLiteStoreSavesAndListsFingerprints(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Port != 6379 || got[0].Version != "7.2.0" {
 		t.Fatalf("unexpected rows: %#v", got)
+	}
+}
+
+func TestSQLiteStoreUpsertsFingerprintByRunNetworkKey(t *testing.T) {
+	scanStore, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+	fingerprint := fingerprint.ServiceFingerprint{IP: "192.0.2.10", Port: 443, Protocol: "tcp", Service: "https"}
+	if err := scanStore.UpsertFingerprint("run-1", fingerprint); err != nil {
+		t.Fatal(err)
+	}
+	fingerprint.Product, fingerprint.URL = "nginx", "https://192.0.2.10:443"
+	if err := scanStore.UpsertFingerprint("run-1", fingerprint); err != nil {
+		t.Fatal(err)
+	}
+	got, err := scanStore.ListFingerprints("run-1")
+	if err != nil || len(got) != 1 || got[0].Product != "nginx" || got[0].URL != "https://192.0.2.10:443" {
+		t.Fatalf("upserted fingerprints = %#v, %v", got, err)
+	}
+}
+
+func TestOpenMigratesDuplicateFingerprintsToNaturalKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "scan.db")
+	first, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.db.Exec(`DROP INDEX fingerprints_run_key`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.db.Exec(`DELETE FROM schema_migrations WHERE version = 7`); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "192.0.2.10", Port: 443, Protocol: "tcp", Product: "old"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "192.0.2.10", Port: 443, Protocol: "tcp", Product: "new"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	second, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer second.Close()
+	got, err := second.ListFingerprints("run-1")
+	if err != nil || len(got) != 1 || got[0].Product != "new" {
+		t.Fatalf("migrated fingerprints = %#v, %v", got, err)
 	}
 }
 

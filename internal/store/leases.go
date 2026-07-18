@@ -71,6 +71,11 @@ func (s *Store) FinishRunWithLease(runID, ownerToken, status, message string, fi
 	if err != nil || updated != 1 {
 		return false, err
 	}
+	if status == "canceled" {
+		if err := cancelDetectionChecks(tx, runID, finishedAt); err != nil {
+			return false, err
+		}
+	}
 	result, err = tx.Exec(`DELETE FROM run_leases WHERE scope = ? AND run_id = ? AND owner_token = ?`, globalRunLeaseScope, runID, ownerToken)
 	if err != nil {
 		return false, err
@@ -130,6 +135,11 @@ func (s *Store) ReconcileInterruptedRuns(now time.Time, ttl time.Duration) error
 
 func interruptDetectionChecks(tx *sql.Tx, runID string, now time.Time) error {
 	_, err := tx.Exec(`UPDATE detection_checks SET status = 'interrupted', reason_code = 'lease_expired', detail = 'run lease expired', finished_at = ? WHERE run_id = ? AND status = 'running'`, formatTime(now), runID)
+	return err
+}
+
+func cancelDetectionChecks(tx *sql.Tx, runID string, now time.Time) error {
+	_, err := tx.Exec(`UPDATE detection_checks SET status = 'canceled', reason_code = 'run_canceled', detail = 'run canceled', finished_at = ? WHERE run_id = ? AND status = 'running'`, formatTime(now), runID)
 	return err
 }
 

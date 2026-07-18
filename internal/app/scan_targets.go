@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
 
@@ -16,7 +15,7 @@ type targetResult struct {
 	err    error
 }
 
-func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions, artifactDir string, progress Progress) ([]TargetScan, []string, error) {
+func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, artifactDir string, progress Progress) ([]TargetScan, []string, bool, error) {
 	var aliveIPs []string
 	targets := opts.Targets
 
@@ -24,10 +23,10 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", targets)
 		aliveTargets, out, err := tools.DiscoverAliveWithOutput(ctx, runner, opts.Tools.Nmap, targets, nil)
 		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
-			return nil, nil, writeErr
+			return nil, nil, false, writeErr
 		}
 		if err != nil {
-			return nil, nil, normalizeToolError(ctx, err)
+			return nil, nil, false, normalizeToolError(ctx, err)
 		}
 		targets = aliveTargets
 		aliveIPs = append([]string(nil), targets...)
@@ -51,6 +50,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 	}
 
 	var scans []TargetScan
+	partialErrors := false
 	if workers > 0 {
 		targetCh := make(chan string)
 		results := make(chan targetResult, len(targets))
@@ -105,24 +105,14 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 					firstErr = result.err
 				}
 				failedTargets = append(failedTargets, result)
-				progress.Emit("info", "progress", "progress %d/%d done=%d failed=%d current=%s", done, totalTargets, done, failed, result.target)
-				continue
-			}
-			// Per-target persistence: each target's fingerprints/findings land as
-			// soon as that target completes, preserving the incremental behavior
-			// the live report view relies on (results are read by ip/port order,
-			// not insertion order, so grouping by target is observation-equivalent).
-			if err := persistTargetScan(scanStore, opts.RunID, result.scan); err != nil {
-				failed++
-				done++
-				if firstErr == nil {
-					firstErr = err
-				}
-				failedTargets = append(failedTargets, targetResult{target: result.target, err: err})
+				partialErrors = true
 				progress.Emit("info", "progress", "progress %d/%d done=%d failed=%d current=%s", done, totalTargets, done, failed, result.target)
 				continue
 			}
 			done++
+			if result.scan.HadErrors {
+				partialErrors = true
+			}
 			scans = append(scans, result.scan)
 			progress.Emit("info", "progress", "progress %d/%d done=%d failed=%d current=%s", done, totalTargets, done, failed, result.target)
 		}
@@ -130,32 +120,12 @@ func scanTargets(ctx context.Context, runner tools.Runner, scanStore *store.Stor
 			progress.Emit("error", "target", "target %s failed: %v", result.target, result.err)
 		}
 		if canceledErr != nil {
-			return nil, nil, canceledErr
+			return nil, nil, partialErrors, canceledErr
 		}
 		if failed == len(targets) {
-			return nil, nil, fmt.Errorf("all targets failed: %w", firstErr)
+			return nil, nil, partialErrors, fmt.Errorf("all targets failed: %w", firstErr)
 		}
 	}
 
-	return scans, aliveIPs, nil
-}
-
-// persistTargetScan writes one target's fingerprints and findings to the store.
-// It is the persistence seam that previously lived inline inside scanTarget;
-// pulling it out keeps scanTarget a pure pipeline with no *store.Store dependency.
-func persistTargetScan(scanStore *store.Store, runID string, scan TargetScan) error {
-	if scanStore == nil {
-		return nil
-	}
-	for _, fp := range scan.Fingerprints {
-		if err := scanStore.SaveFingerprint(runID, fp); err != nil {
-			return err
-		}
-	}
-	for _, finding := range scan.Findings {
-		if err := scanStore.SaveFinding(runID, finding); err != nil {
-			return err
-		}
-	}
-	return nil
+	return scans, aliveIPs, partialErrors, nil
 }

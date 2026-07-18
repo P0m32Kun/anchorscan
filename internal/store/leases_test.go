@@ -47,6 +47,31 @@ func TestRunLeaseDoesNotExpireFreshFractionalSecondHeartbeat(t *testing.T) {
 	}
 }
 
+func TestFinishCanceledRunClosesRunningDetectionChecks(t *testing.T) {
+	scanStore, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+	now := time.Date(2026, 7, 18, 0, 0, 0, 0, time.UTC)
+	if err := scanStore.SaveScanRun(ScanRun{RunID: "run-1", Status: "running", StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scanStore.AcquireRunLease("run-1", "owner-1", now, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 443, Protocol: "tcp", Engine: "nuclei", Status: "running", StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := scanStore.FinishRunWithLease("run-1", "owner-1", "canceled", "context canceled", now.Add(time.Second)); err != nil || !ok {
+		t.Fatalf("FinishRunWithLease = %t, %v", ok, err)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-1")
+	if err != nil || len(checks) != 1 || checks[0].Status != "canceled" || checks[0].ReasonCode != "run_canceled" {
+		t.Fatalf("canceled checks = %#v, %v", checks, err)
+	}
+}
+
 func TestRunLeaseHonorsLegacyHeartbeatDuringUpgrade(t *testing.T) {
 	scanStore, err := Open(filepath.Join(t.TempDir(), "scan.db"))
 	if err != nil {

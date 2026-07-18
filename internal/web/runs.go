@@ -65,7 +65,7 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/run.html", map[string]any{
 		"Run":      run,
 		"RunMeta":  newRunMetaView(run),
-		"CanRerun": run.Status == "interrupted" && run.ProjectID != "" && isScanProfile(run.Profile),
+		"CanRerun": (run.Status == "interrupted" || run.Status == "completed_with_errors") && run.ProjectID != "" && isScanProfile(run.Profile),
 	})
 }
 

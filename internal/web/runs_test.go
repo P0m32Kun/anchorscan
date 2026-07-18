@@ -333,6 +333,36 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 	}
 }
 
+func TestCompletedWithErrorsRunCanBeRerun(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-errors", ProjectID: "p1", Target: "198.51.100.10", Ports: "443", Profile: "normal", Status: "completed_with_errors", ConfigSnapshot: `{"target":"198.51.100.10","ports":"443","profile":"normal"}`, StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	detail := httptest.NewRecorder()
+	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/runs/run-errors", nil))
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "/projects/p1/scans/new?rerun=run-errors") {
+		t.Fatalf("run detail = %d %s", detail.Code, detail.Body.String())
+	}
+	rerun := httptest.NewRecorder()
+	handler.ServeHTTP(rerun, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new?rerun=run-errors", nil))
+	if rerun.Code != http.StatusOK || !strings.Contains(rerun.Body.String(), "198.51.100.10") {
+		t.Fatalf("rerun page = %d %s", rerun.Code, rerun.Body.String())
+	}
+}
+
 func TestInterruptedLegacyProjectScanPrefillsPersistedFields(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

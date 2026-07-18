@@ -120,6 +120,129 @@ func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 	}
 }
 
+func TestRunScanContinuesAfterNSEFailure(t *testing.T) {
+	runner := &recordingSequenceRunner{
+		outputs: [][]byte{
+			aliveNmapXML,
+			[]byte("192.168.1.10 -> [22]\n"),
+			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+			[]byte(`<nmaprun/>`),
+			[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
+		},
+		errors: []error{nil, nil, nil, errors.New("nse unavailable"), nil},
+	}
+	scanStore := newScanStore(t)
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-nse-failed",
+		Targets:        []string{"192.168.1.10"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		NSERules:       map[string][]string{"ssh": {"ssh2-enum-algos"}},
+		TagRules:       []TagRule{{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, Target: "hostport"}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	run, err := scanStore.GetScanRun("run-nse-failed")
+	if err != nil || run.Status != "completed_with_errors" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+	fingerprints, err := scanStore.ListFingerprints("run-nse-failed")
+	if err != nil || len(fingerprints) != 1 {
+		t.Fatalf("fingerprints = %#v, %v", fingerprints, err)
+	}
+	findings, err := scanStore.ListFindings("run-nse-failed")
+	if err != nil || len(findings) != 1 || findings[0].Source != "nuclei" {
+		t.Fatalf("findings = %#v, %v", findings, err)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-nse-failed")
+	if err != nil || len(checks) != 2 || checks[0].Engine != "nse" || checks[0].Status != "failed" || checks[1].Engine != "nuclei" || checks[1].Status != "completed" {
+		t.Fatalf("checks = %#v, %v", checks, err)
+	}
+}
+
+func TestRunScanContinuesAfterHTTPXFailure(t *testing.T) {
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
+		case binary == "rustscan":
+			return []byte("127.0.0.1 -> [80]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "httpx":
+			return []byte("httpx unavailable"), errors.New("exit status 1")
+		case binary == "nuclei":
+			return []byte("{\"template-id\":\"demo\",\"info\":{\"name\":\"demo\",\"severity\":\"medium\"},\"matched-at\":\"http://127.0.0.1:80\"}\n"), nil
+		default:
+			return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
+		}
+	})
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-httpx-failed",
+		Targets:        []string{"127.0.0.1"},
+		Ports:          "80",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		TagRules:       []TagRule{{Name: "nginx", Service: []string{"http"}, Product: []string{"nginx"}, NucleiTags: []string{"demo"}, Target: "url"}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	run, err := scanStore.GetScanRun("run-httpx-failed")
+	if err != nil || run.Status != "completed_with_errors" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+	fingerprints, err := scanStore.ListFingerprints("run-httpx-failed")
+	if err != nil || len(fingerprints) != 1 {
+		t.Fatalf("fingerprints = %#v, %v", fingerprints, err)
+	}
+	findings, err := scanStore.ListFindings("run-httpx-failed")
+	if err != nil || len(findings) != 1 || findings[0].Source != "nuclei" {
+		t.Fatalf("findings = %#v, %v", findings, err)
+	}
+}
+
+func TestRunScanKeepsEarlierFindingWhenLaterStageIsCanceled(t *testing.T) {
+	scanStore := newScanStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	runner := runnerFunc(func(ctx context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(`<nmaprun><host><status state="up"/><address addr="192.0.2.10"/></host></nmaprun>`), nil
+		case binary == "rustscan":
+			return []byte("192.0.2.10 -> [3389,6379]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			return []byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port></ports></host></nmaprun>`), nil
+		case binary == "nmap" && strings.Contains(joined, "--script"):
+			cancel()
+			return nil, ctx.Err()
+		default:
+			return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
+		}
+	})
+	err := RunScan(ctx, runner, scanStore, ScanOptions{
+		RunID:          "run-canceled-after-finding",
+		Targets:        []string{"192.0.2.10"},
+		Ports:          "3389,6379",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		NSERules:       map[string][]string{"redis": {"redis-info"}},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("RunScan error = %v, want context canceled", err)
+	}
+	findings, err := scanStore.ListFindings("run-canceled-after-finding")
+	if err != nil || len(findings) != 1 || findings[0].ID != "manual-review:CVE-2019-0708" {
+		t.Fatalf("findings = %#v, %v", findings, err)
+	}
+}
+
 func TestRunScanSkipsNmapWhenRustscanFindsNoOpenPorts(t *testing.T) {
 	runner := &emptyPortRunner{}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
@@ -320,18 +443,35 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 			},
 		},
 	})
-	if err == nil {
-		t.Fatal("expected scan error")
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	run, err := scanStore.GetScanRun("run-failed-nuclei")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if run.Status != "completed_with_errors" {
+		t.Fatalf("run status = %q, want completed_with_errors", run.Status)
 	}
 
 	entries, readErr := os.ReadDir(filepath.Join(dir, "run-failed-nuclei"))
 	if readErr != nil {
 		t.Fatalf("ReadDir returned error: %v", readErr)
 	}
+	foundArtifact := false
 	for _, entry := range entries {
 		if strings.Contains(entry.Name(), "nuclei-127.0.0.1-80-demo") {
-			return
+			foundArtifact = true
 		}
 	}
-	t.Fatalf("expected failed nuclei artifact, got %#v", entries)
+	if !foundArtifact {
+		t.Fatalf("expected failed nuclei artifact, got %#v", entries)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-failed-nuclei")
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	if len(checks) != 2 || checks[1].Engine != "nuclei" || checks[1].Status != "failed" || checks[1].ReasonCode != "command_failed" {
+		t.Fatalf("detection checks = %#v, want failed nuclei command check", checks)
+	}
 }

@@ -181,6 +181,19 @@ CREATE TABLE detection_checks (
   PRIMARY KEY (run_id, ip, port, protocol, engine)
 );`,
 	},
+	{
+		version: 7,
+		name:    "add_fingerprint_natural_key",
+		up: func(tx *sql.Tx) error {
+			if _, err := tx.Exec(`DELETE FROM fingerprints WHERE rowid NOT IN (
+				SELECT MAX(rowid) FROM fingerprints GROUP BY run_id, ip, port, protocol
+			)`); err != nil {
+				return err
+			}
+			_, err := tx.Exec(`CREATE UNIQUE INDEX fingerprints_run_key ON fingerprints (run_id, ip, port, protocol)`)
+			return err
+		},
+	},
 }
 
 func runMigrations(db *sql.DB) error {

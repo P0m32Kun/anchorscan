@@ -54,6 +54,18 @@ func (s *Store) SaveFingerprint(runID string, fp fingerprint.ServiceFingerprint)
 	return err
 }
 
+func (s *Store) UpsertFingerprint(runID string, fp fingerprint.ServiceFingerprint) error {
+	_, err := s.db.Exec(
+		`INSERT INTO fingerprints (run_id, ip, port, protocol, service, product, version, extrainfo, tunnel, cpe, normalized, is_web, url)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(run_id, ip, port, protocol) DO UPDATE SET
+		 service = excluded.service, product = excluded.product, version = excluded.version, extrainfo = excluded.extrainfo,
+		 tunnel = excluded.tunnel, cpe = excluded.cpe, normalized = excluded.normalized, is_web = excluded.is_web, url = excluded.url`,
+		runID, fp.IP, fp.Port, fp.Protocol, fp.Service, fp.Product, fp.Version, fp.ExtraInfo, fp.Tunnel, fp.CPE, fp.Normalized, boolToInt(fp.IsWeb), fp.URL,
+	)
+	return err
+}
+
 func (s *Store) ListFingerprints(runID string) ([]fingerprint.ServiceFingerprint, error) {
 	rows, err := s.db.Query(
 		`SELECT ip, port, protocol, service, product, version, extrainfo, tunnel, cpe, normalized, is_web, url

@@ -23,13 +23,12 @@ type TargetScan struct {
 	Fingerprints []fingerprint.ServiceFingerprint
 	Findings     []report.Finding
 	OpenPorts    []int
+	HadErrors    bool
 }
 
 // scanTarget runs the per-target pipeline (rustscan → nmap → httpx → NSE/nuclei)
-// and returns everything it discovered as a TargetScan. It is a pure pipeline:
-// it does not persist results or write progress events itself — it reports
-// progress through the Progress seam, and the fan-out (scanTargets) owns
-// persisting the returned TargetScan to the store.
+// and returns everything it discovered as a TargetScan. It persists durable
+// facts through the option seams while retaining them for the JSON report.
 func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, target string, artifactDir string, progress Progress) (TargetScan, error) {
 	var allFingerprints []fingerprint.ServiceFingerprint
 	var allFindings []report.Finding
@@ -75,25 +74,44 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}
 	progress.Emit("info", "nmap", "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
 
+	result := TargetScan{Target: target, OpenPorts: openPorts}
 	for _, fp := range fingerprints {
+		if opts.PersistFingerprint != nil {
+			if err := opts.PersistFingerprint(fp); err != nil {
+				return result, err
+			}
+		}
 		httpResult := tools.HTTPResult{}
 		if fp.IsWeb && opts.Tools.Httpx != "" {
 			progress.Emit("info", "httpx", "httpx %s", fp.URL)
 			httpResult, out, err = tools.EnrichWebWithOutput(ctx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("httpx", fp.IP, strconv.Itoa(fp.Port))+".jsonl", out); writeErr != nil {
-				return TargetScan{}, writeErr
+				result.HadErrors = true
+				progress.Emit("error", "httpx", "httpx %s artifact failed: %v", fp.URL, writeErr)
 			}
 			if err != nil {
-				return TargetScan{}, normalizeToolError(ctx, err)
+				if ctx.Err() != nil {
+					return result, context.Canceled
+				}
+				result.HadErrors = true
+				progress.Emit("error", "httpx", "httpx %s failed: %v", fp.URL, err)
 			}
 			if httpResult.URL != "" {
 				fp.URL = httpResult.URL
+			}
+		}
+		if opts.PersistFingerprint != nil {
+			if err := opts.PersistFingerprint(fp); err != nil {
+				return result, err
 			}
 		}
 
 		allFingerprints = append(allFingerprints, fp)
 
 		for _, finding := range ManualReviewFindings(fp) {
+			if err := persistFinding(opts, finding); err != nil {
+				return result, err
+			}
 			allFindings = append(allFindings, finding)
 		}
 
@@ -114,34 +132,40 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		default:
 			progress.Emit("info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
 			started := time.Now()
+			stageFailed := false
 			if err := recordDetectionCheck(opts, fp, "nse", "running", "", "", started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
 			nseResults, out, err := tools.RunNSEWithOutput(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nse", fp.IP, strconv.Itoa(fp.Port), strings.Join(scripts, ","))+".xml", out); writeErr != nil {
 				_ = recordDetectionCheck(opts, fp, "nse", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
-				return TargetScan{}, writeErr
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "nse", "nse %s:%d artifact failed: %v", fp.IP, fp.Port, writeErr)
 			}
 			if err != nil {
-				_ = recordDetectionCheck(opts, fp, "nse", detectionCheckFailureStatus(ctx), "command_failed", err.Error(), started, time.Now())
-				return TargetScan{}, normalizeToolError(ctx, err)
-			}
-			if err := recordDetectionCheck(opts, fp, "nse", "completed", "", "", started, time.Now()); err != nil {
-				return TargetScan{}, err
-			}
-			for _, result := range nseResults {
-				finding := report.Finding{
-					IP:       fp.IP,
-					Port:     fp.Port,
-					Protocol: fp.Protocol,
-					Source:   "nse",
-					ID:       result.ID,
-					Severity: "info",
-					Summary:  result.ID,
-					Target:   fp.IP,
-					Output:   result.Output,
+				_ = recordDetectionCheck(opts, fp, "nse", detectionCheckFailureStatus(ctx), detectionCheckFailureReason(ctx), err.Error(), started, time.Now())
+				if ctx.Err() != nil {
+					return result, context.Canceled
 				}
-				allFindings = append(allFindings, finding)
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "nse", "nse %s:%d failed: %v", fp.IP, fp.Port, err)
+			}
+			if err == nil {
+				for _, check := range nseResults {
+					finding := report.Finding{IP: fp.IP, Port: fp.Port, Protocol: fp.Protocol, Source: "nse", ID: check.ID, Severity: "info", Summary: check.ID, Target: fp.IP, Output: check.Output}
+					if err := persistFinding(opts, finding); err != nil {
+						_ = recordDetectionCheck(opts, fp, "nse", "failed", "persistence_failed", err.Error(), started, time.Now())
+						return result, err
+					}
+					allFindings = append(allFindings, finding)
+				}
+			}
+			if !stageFailed {
+				if err := recordDetectionCheck(opts, fp, "nse", "completed", "", "", started, time.Now()); err != nil {
+					return result, err
+				}
 			}
 		}
 
@@ -162,34 +186,52 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		default:
 			progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 			started := time.Now()
+			stageFailed := false
 			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", "", started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
 			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
 				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
-				return TargetScan{}, writeErr
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "nuclei", "nuclei %s artifact failed: %v", match.Address, writeErr)
 			}
 			if err != nil {
-				_ = recordDetectionCheck(opts, fp, "nuclei", detectionCheckFailureStatus(ctx), "command_failed", err.Error(), started, time.Now())
-				return TargetScan{}, normalizeToolError(ctx, err)
+				_ = recordDetectionCheck(opts, fp, "nuclei", detectionCheckFailureStatus(ctx), detectionCheckFailureReason(ctx), err.Error(), started, time.Now())
+				if ctx.Err() != nil {
+					return result, context.Canceled
+				}
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "nuclei", "nuclei %s failed: %v", match.Address, err)
 			}
-			nucleiFindings, err := tools.ParseNucleiJSONL(out)
-			if err != nil {
-				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "invalid_output", err.Error(), started, time.Now())
-				return TargetScan{}, err
+			nucleiFindings, parseErr := tools.ParseNucleiJSONL(out)
+			if err == nil && parseErr != nil {
+				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "invalid_output", parseErr.Error(), started, time.Now())
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "nuclei", "nuclei %s returned invalid output: %v", match.Address, parseErr)
 			}
-			if err := recordDetectionCheck(opts, fp, "nuclei", "completed", "", "", started, time.Now()); err != nil {
-				return TargetScan{}, err
+			if err == nil && parseErr == nil {
+				for _, nucleiResult := range nucleiFindings {
+					finding := findingFromNuclei(nucleiResult, fp, allFingerprints)
+					if err := persistFinding(opts, finding); err != nil {
+						_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "persistence_failed", err.Error(), started, time.Now())
+						return result, err
+					}
+					allFindings = append(allFindings, finding)
+				}
 			}
-			for _, result := range nucleiFindings {
-				finding := findingFromNuclei(result, fp, allFingerprints)
-				allFindings = append(allFindings, finding)
+			if !stageFailed {
+				if err := recordDetectionCheck(opts, fp, "nuclei", "completed", "", "", started, time.Now()); err != nil {
+					return TargetScan{}, err
+				}
 			}
 		}
 	}
 
-	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts}, nil
+	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
 }
 
 func recordDetectionCheck(opts ScanOptions, fp fingerprint.ServiceFingerprint, engine, status, reasonCode, detail string, startedAt, finishedAt time.Time) error {
@@ -199,11 +241,25 @@ func recordDetectionCheck(opts ScanOptions, fp fingerprint.ServiceFingerprint, e
 	return opts.RecordDetectionCheck(store.DetectionCheck{RunID: opts.RunID, IP: fp.IP, Port: fp.Port, Protocol: fp.Protocol, Engine: engine, Status: status, ReasonCode: reasonCode, Detail: detail, StartedAt: startedAt, FinishedAt: finishedAt})
 }
 
+func persistFinding(opts ScanOptions, finding report.Finding) error {
+	if opts.PersistFinding == nil || opts.RunID == "" {
+		return nil
+	}
+	return opts.PersistFinding(finding)
+}
+
 func detectionCheckFailureStatus(ctx context.Context) string {
 	if ctx.Err() != nil {
 		return "canceled"
 	}
 	return "failed"
+}
+
+func detectionCheckFailureReason(ctx context.Context) string {
+	if ctx.Err() != nil {
+		return "run_canceled"
+	}
+	return "command_failed"
 }
 
 func formatNucleiEvidence(result tools.NucleiFinding) string {

@@ -256,6 +256,7 @@ func (r *killedAfterCancelRunner) Run(ctx context.Context, binary string, _ []st
 
 type recordingSequenceRunner struct {
 	outputs  [][]byte
+	errors   []error
 	commands [][]string
 	index    int
 }
@@ -263,8 +264,12 @@ type recordingSequenceRunner struct {
 func (r *recordingSequenceRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
 	r.commands = append(r.commands, append([]string{binary}, args...))
 	out := r.outputs[r.index]
+	err := error(nil)
+	if len(r.errors) > r.index {
+		err = r.errors[r.index]
+	}
 	r.index++
-	return out, nil
+	return out, err
 }
 
 func (r *recordingSequenceRunner) hasArg(binary string, arg string) bool {

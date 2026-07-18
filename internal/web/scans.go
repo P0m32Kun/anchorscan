@@ -148,8 +148,8 @@ func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
 	if err != nil {
 		return scanForm{}, err
 	}
-	if run.ProjectID != projectID || run.Status != "interrupted" {
-		return scanForm{}, errors.New("rerun is only available for an interrupted project scan")
+	if run.ProjectID != projectID || (run.Status != "interrupted" && run.Status != "completed_with_errors") {
+		return scanForm{}, errors.New("rerun is only available for an interrupted or incomplete project scan")
 	}
 	var form scanForm
 	if err := json.Unmarshal([]byte(run.ConfigSnapshot), &form); err != nil || !completeScanForm(form) {
@@ -158,7 +158,7 @@ func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
 		form = scanForm{Target: run.Target, Ports: run.Ports, Profile: run.Profile}
 	}
 	if !completeScanForm(form) || !isScanProfile(form.Profile) {
-		return scanForm{}, errors.New("interrupted run has an incomplete scan snapshot")
+		return scanForm{}, errors.New("prior run has an incomplete scan snapshot")
 	}
 	form.IsRerun = true
 	return form, nil
