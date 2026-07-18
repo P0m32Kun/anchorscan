@@ -4,7 +4,7 @@ Plan: docs/plans/harden-scan-confidence/
 
 ## Doing
 
-- [ ] 05 — 持久化 DetectionCheck 并显示实时摘要
+- [ ] 06 — 保留部分结果并归类最终状态
 
 ## Done
 
@@ -12,6 +12,7 @@ Plan: docs/plans/harden-scan-confidence/
 - [x] 02 — 覆盖核心 Web 工作流
 - [x] 03 — 强制全局 Run Lease
 - [x] 04 — 收敛 interrupted Run
+- [x] 05 — 持久化 DetectionCheck 并显示实时摘要
 
 ## Blocked (needs human)
 
