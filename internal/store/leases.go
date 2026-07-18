@@ -20,7 +20,7 @@ func (s *Store) AcquireRunLease(runID, ownerToken string, now time.Time, ttl tim
 	heartbeat := now.UnixNano()
 	result, err := s.db.Exec(`INSERT INTO run_leases (scope, run_id, owner_token, heartbeat_at, heartbeat_at_ns) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT(scope) DO UPDATE SET run_id = excluded.run_id, owner_token = excluded.owner_token, heartbeat_at = excluded.heartbeat_at, heartbeat_at_ns = excluded.heartbeat_at_ns
-		WHERE run_leases.heartbeat_at_ns < ?`, globalRunLeaseScope, runID, ownerToken, time.Unix(0, heartbeat).UTC().Format(time.RFC3339Nano), heartbeat, cutoff)
+		WHERE run_leases.heartbeat_at_ns < ? AND julianday(run_leases.heartbeat_at) < julianday(?)`, globalRunLeaseScope, runID, ownerToken, time.Unix(0, heartbeat).UTC().Format(time.RFC3339Nano), heartbeat, cutoff, time.Unix(0, cutoff).UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return RunLease{}, err
 	}
