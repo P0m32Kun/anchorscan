@@ -62,7 +62,8 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, ExcludeTags: []string{"default-login"}, Target: "hostport"},
 		},
 	}
-	if err := RunScan(context.Background(), runner, newScanStore(t), opts); err != nil {
+	scanStore := newScanStore(t)
+	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
 
@@ -75,6 +76,10 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	// targeting IP:22, jsonl output.
 	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "default-login", "-target", "192.168.1.10:22", "-jsonl") {
 		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-ssh-dual")
+	if err != nil || len(checks) != 2 || checks[0].Status != "completed" || checks[1].Status != "completed" {
+		t.Fatalf("detection checks = %#v, %v", checks, err)
 	}
 }
 

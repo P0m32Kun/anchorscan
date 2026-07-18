@@ -82,8 +82,18 @@ func (s *server) runAPI(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		counts, err := s.store.CountDetectionChecksByStatus(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, status := range []string{"running", "completed", "skipped", "failed", "canceled", "interrupted"} {
+			if _, ok := counts[status]; !ok {
+				counts[status] = 0
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": run.Status})
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": run.Status, "detection_checks": counts})
 		return
 	}
 	if !strings.HasSuffix(path, "/events") {

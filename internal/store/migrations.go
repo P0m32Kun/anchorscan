@@ -163,6 +163,24 @@ CREATE TABLE run_leases (
 			return nil
 		},
 	},
+	{
+		version: 6,
+		name:    "create_detection_checks",
+		sql: `
+CREATE TABLE detection_checks (
+  run_id TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  protocol TEXT NOT NULL,
+  engine TEXT NOT NULL,
+  status TEXT NOT NULL,
+  reason_code TEXT NOT NULL DEFAULT '',
+  detail TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL DEFAULT '',
+  finished_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (run_id, ip, port, protocol, engine)
+);`,
+	},
 }
 
 func runMigrations(db *sql.DB) error {

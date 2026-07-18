@@ -37,3 +37,16 @@ type ScanEvent struct {
 	Stage   string    `json:"stage"`
 	Message string    `json:"message"`
 }
+
+type DetectionCheck struct {
+	RunID      string
+	IP         string
+	Port       int
+	Protocol   string
+	Engine     string
+	Status     string
+	ReasonCode string
+	Detail     string
+	StartedAt  time.Time
+	FinishedAt time.Time
+}

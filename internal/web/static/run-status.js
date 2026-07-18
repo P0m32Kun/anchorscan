@@ -68,11 +68,15 @@ refreshEvents();
 async function refreshRunStatus(){
   if(!window.anchorRunID) return;
   const current = (window.anchorRunStatus || document.getElementById('run-status')?.textContent || '').trim().toLowerCase();
-  if(current !== 'running') return;
   const res = await fetch('/api/runs/' + window.anchorRunID + '/status');
   if(!res.ok) return;
   const data = await res.json();
-  if((data.status || '').toLowerCase() !== 'running') location.reload();
+  const summary = document.getElementById('detection-check-summary');
+  if(summary && data.detection_checks){
+    const checks = data.detection_checks;
+    summary.textContent = `检测检查：运行 ${checks.running || 0} · 完成 ${checks.completed || 0} · 跳过 ${checks.skipped || 0} · 失败 ${checks.failed || 0} · 已取消 ${checks.canceled || 0} · 已中断 ${checks.interrupted || 0}`;
+  }
+  if(current === 'running' && (data.status || '').toLowerCase() !== 'running') location.reload();
 }
 setInterval(refreshRunStatus, 1500);
 refreshRunStatus();

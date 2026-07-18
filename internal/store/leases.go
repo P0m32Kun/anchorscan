@@ -100,8 +100,14 @@ func (s *Store) ReconcileInterruptedRuns(now time.Time, ttl time.Duration) error
 			return err
 		}
 		if deleted, _ := result.RowsAffected(); deleted == 1 {
-			if _, err := tx.Exec(`UPDATE scan_runs SET status = 'interrupted', error = 'run lease expired', finished_at = ? WHERE run_id = ? AND status = 'running'`, formatTime(now), runID); err != nil {
+			updated, err := tx.Exec(`UPDATE scan_runs SET status = 'interrupted', error = 'run lease expired', finished_at = ? WHERE run_id = ? AND status = 'running'`, formatTime(now), runID)
+			if err != nil {
 				return err
+			}
+			if changed, _ := updated.RowsAffected(); changed == 1 {
+				if err := interruptDetectionChecks(tx, runID, now); err != nil {
+					return err
+				}
 			}
 		}
 	} else if err != nil && err != sql.ErrNoRows {
@@ -113,7 +119,18 @@ func (s *Store) ReconcileInterruptedRuns(now time.Time, ttl time.Duration) error
 	if err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`UPDATE detection_checks SET status = 'interrupted', reason_code = 'lease_expired', detail = 'run lease missing', finished_at = ?
+		WHERE status = 'running' AND run_id IN (
+			SELECT run_id FROM scan_runs WHERE status = 'interrupted' AND error = 'run lease missing' AND finished_at = ?
+		)`, formatTime(now), formatTime(now)); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+func interruptDetectionChecks(tx *sql.Tx, runID string, now time.Time) error {
+	_, err := tx.Exec(`UPDATE detection_checks SET status = 'interrupted', reason_code = 'lease_expired', detail = 'run lease expired', finished_at = ? WHERE run_id = ? AND status = 'running'`, formatTime(now), runID)
+	return err
 }
 
 func runLeaseFresh(heartbeat string, heartbeatNS int64, now time.Time, ttl time.Duration) bool {

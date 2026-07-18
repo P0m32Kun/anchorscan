@@ -8,6 +8,7 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
+	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
@@ -97,14 +98,36 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		}
 
 		scripts := vuln.MatchNSE(fp, opts.NSERules)
-		if len(scripts) > 0 && !fp.IsWeb {
+		switch {
+		case len(scripts) == 0:
+			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case fp.IsWeb:
+			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "not_applicable", "NSE checks are not run for web services", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case opts.Tools.Nmap == "":
+			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "tool_unconfigured", "nmap is not configured", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		default:
 			progress.Emit("info", "nse", "nse %s:%d scripts=%v", fp.IP, fp.Port, scripts)
+			started := time.Now()
+			if err := recordDetectionCheck(opts, fp, "nse", "running", "", "", started, time.Time{}); err != nil {
+				return TargetScan{}, err
+			}
 			nseResults, out, err := tools.RunNSEWithOutput(ctx, runner, opts.Tools.Nmap, fp.IP, fp.Port, scripts, opts.ExtraArgs.Nmap)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nse", fp.IP, strconv.Itoa(fp.Port), strings.Join(scripts, ","))+".xml", out); writeErr != nil {
+				_ = recordDetectionCheck(opts, fp, "nse", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
 				return TargetScan{}, writeErr
 			}
 			if err != nil {
+				_ = recordDetectionCheck(opts, fp, "nse", detectionCheckFailureStatus(ctx), "command_failed", err.Error(), started, time.Now())
 				return TargetScan{}, normalizeToolError(ctx, err)
+			}
+			if err := recordDetectionCheck(opts, fp, "nse", "completed", "", "", started, time.Now()); err != nil {
+				return TargetScan{}, err
 			}
 			for _, result := range nseResults {
 				finding := report.Finding{
@@ -123,17 +146,40 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		}
 
 		match := vuln.MatchNucleiTags(fp, vuln.HTTPResult{URL: fp.URL, Tech: httpResult.Tech}, opts.TagRules)
-		if len(match.Tags) > 0 && opts.Tools.Nuclei != "" {
+		switch {
+		case len(match.Tags) == 0:
+			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case match.Address == "":
+			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "missing_target", "nuclei target is empty", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case opts.Tools.Nuclei == "":
+			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "tool_unconfigured", "nuclei is not configured", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		default:
 			progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
+			started := time.Now()
+			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", "", started, time.Time{}); err != nil {
+				return TargetScan{}, err
+			}
 			out, err := tools.RunNuclei(ctx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
+				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
 				return TargetScan{}, writeErr
 			}
 			if err != nil {
+				_ = recordDetectionCheck(opts, fp, "nuclei", detectionCheckFailureStatus(ctx), "command_failed", err.Error(), started, time.Now())
 				return TargetScan{}, normalizeToolError(ctx, err)
 			}
 			nucleiFindings, err := tools.ParseNucleiJSONL(out)
 			if err != nil {
+				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "invalid_output", err.Error(), started, time.Now())
+				return TargetScan{}, err
+			}
+			if err := recordDetectionCheck(opts, fp, "nuclei", "completed", "", "", started, time.Now()); err != nil {
 				return TargetScan{}, err
 			}
 			for _, result := range nucleiFindings {
@@ -144,6 +190,20 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts}, nil
+}
+
+func recordDetectionCheck(opts ScanOptions, fp fingerprint.ServiceFingerprint, engine, status, reasonCode, detail string, startedAt, finishedAt time.Time) error {
+	if opts.RecordDetectionCheck == nil || opts.RunID == "" {
+		return nil
+	}
+	return opts.RecordDetectionCheck(store.DetectionCheck{RunID: opts.RunID, IP: fp.IP, Port: fp.Port, Protocol: fp.Protocol, Engine: engine, Status: status, ReasonCode: reasonCode, Detail: detail, StartedAt: startedAt, FinishedAt: finishedAt})
+}
+
+func detectionCheckFailureStatus(ctx context.Context) string {
+	if ctx.Err() != nil {
+		return "canceled"
+	}
+	return "failed"
 }
 
 func formatNucleiEvidence(result tools.NucleiFinding) string {

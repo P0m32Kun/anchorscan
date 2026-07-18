@@ -22,21 +22,22 @@ type ToolExtraArgs = config.ToolArgs
 type TagRule = vuln.TagRule
 
 type ScanOptions struct {
-	RunID           string
-	LeaseOwnerToken string
-	ProjectID       string
-	Targets         []string
-	Ports           string
-	Tools           ToolPaths
-	ProfileName     string
-	HostWorkers     int
-	ExtraArgs       ToolExtraArgs
-	ConfigSnapshot  string
-	JSONReportPath  string
-	ArtifactRoot    string
-	NSERules        map[string][]string
-	TagRules        []TagRule
-	Logf            func(format string, args ...any)
+	RunID                string
+	LeaseOwnerToken      string
+	ProjectID            string
+	Targets              []string
+	Ports                string
+	Tools                ToolPaths
+	ProfileName          string
+	HostWorkers          int
+	ExtraArgs            ToolExtraArgs
+	ConfigSnapshot       string
+	JSONReportPath       string
+	ArtifactRoot         string
+	NSERules             map[string][]string
+	TagRules             []TagRule
+	RecordDetectionCheck func(store.DetectionCheck) error
+	Logf                 func(format string, args ...any)
 }
 
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
@@ -89,6 +90,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		runSaved = true
 	}
 
+	if opts.RecordDetectionCheck == nil && scanStore != nil {
+		opts.RecordDetectionCheck = scanStore.UpsertDetectionCheck
+	}
 	progress := storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}
 	scans, aliveIPs, err := scanTargets(ctx, runner, scanStore, opts, artifactDir, progress)
 	if err != nil {

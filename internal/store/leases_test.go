@@ -114,6 +114,9 @@ func TestReconcileInterruptedRunsClosesExpiredOrMissingRunsOnce(t *testing.T) {
 	if _, err := scanStore.AcquireRunLease("expired", "owner-1", now, time.Minute); err != nil {
 		t.Fatal(err)
 	}
+	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: "expired", IP: "198.51.100.10", Port: 443, Engine: "nuclei", Status: "running", StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
 	reconciledAt := now.Add(2 * time.Minute)
 	if err := scanStore.ReconcileInterruptedRuns(reconciledAt, time.Minute); err != nil {
 		t.Fatal(err)
@@ -144,5 +147,9 @@ func TestReconcileInterruptedRunsClosesExpiredOrMissingRunsOnce(t *testing.T) {
 	findings, err := scanStore.ListFindings("expired")
 	if err != nil || len(findings) != 1 {
 		t.Fatalf("reconciliation lost findings: %#v %v", findings, err)
+	}
+	checks, err := scanStore.ListDetectionChecks("expired")
+	if err != nil || len(checks) != 1 || checks[0].Status != "interrupted" || checks[0].ReasonCode != "lease_expired" {
+		t.Fatalf("reconciliation did not interrupt checks: %#v %v", checks, err)
 	}
 }

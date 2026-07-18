@@ -36,6 +36,38 @@ func TestOpenConfiguresSQLiteForConcurrentScanWrites(t *testing.T) {
 	}
 }
 
+func TestDetectionChecksUpsertAndCountByStatus(t *testing.T) {
+	scanStore, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+	now := time.Date(2026, 7, 18, 0, 0, 0, 0, time.UTC)
+	check := DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 443, Protocol: "tcp", Engine: "nuclei", Status: "running", StartedAt: now}
+	if err := scanStore.UpsertDetectionCheck(check); err != nil {
+		t.Fatal(err)
+	}
+	check.Status, check.ReasonCode, check.FinishedAt = "completed", "", now.Add(time.Second)
+	if err := scanStore.UpsertDetectionCheck(check); err != nil {
+		t.Fatal(err)
+	}
+	check.Status, check.FinishedAt = "running", time.Time{}
+	if err := scanStore.UpsertDetectionCheck(check); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 443, Protocol: "tcp", Engine: "nse", Status: "skipped", ReasonCode: "no_matching_rule", StartedAt: now, FinishedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-1")
+	if err != nil || len(checks) != 2 || checks[1].Status != "completed" {
+		t.Fatalf("checks = %#v, %v", checks, err)
+	}
+	counts, err := scanStore.CountDetectionChecksByStatus("run-1")
+	if err != nil || counts["completed"] != 1 || counts["skipped"] != 1 {
+		t.Fatalf("counts = %#v, %v", counts, err)
+	}
+}
+
 func TestOpenCreatesSchemaMigrations(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scan.db")
 	scanStore, err := Open(path)
@@ -124,8 +156,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 5 {
-		t.Fatalf("expected 5 applied migrations, got %d", count)
+	if count != 6 {
+		t.Fatalf("expected 6 applied migrations, got %d", count)
 	}
 }
 

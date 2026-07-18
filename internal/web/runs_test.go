@@ -232,11 +232,14 @@ func TestRunStatusAPI(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
-	var body map[string]string
+	var body struct {
+		Status          string         `json:"status"`
+		DetectionChecks map[string]int `json:"detection_checks"`
+	}
 	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
 		t.Fatalf("Unmarshal returned error: %v", err)
 	}
-	if body["status"] != "completed" {
+	if body.Status != "completed" || body.DetectionChecks["completed"] != 0 || body.DetectionChecks["interrupted"] != 0 {
 		t.Fatalf("unexpected status response: %#v", body)
 	}
 }
