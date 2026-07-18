@@ -61,7 +61,7 @@ Implemented capabilities:
 | `config/ports-top1000.txt` | common port preset used by `top1000` |
 | `config/service-tags.yaml` | dual-engine nuclei tag mapping (26+ services, each with `default-login`) |
 | `config/nse.yaml` | dual-engine NSE script mapping (information-collection scripts per service) |
-| `config/service-aliases.yaml` | service normalization aliases |
+| `internal/fingerprint/normalize.go` | service normalization aliases |
 
 Third-party tools are configured by path. AnchorScan does not package `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
 

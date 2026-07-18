@@ -1,0 +1,16 @@
+id: anchorscan-lab-tomcat
+
+info:
+  name: AnchorScan lab Tomcat reachability
+  author: anchorscan
+  severity: info
+  tags: tomcat,anchorscan-lab
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+    matchers:
+      - type: status
+        status:
+          - 200

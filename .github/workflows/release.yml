@@ -12,7 +12,11 @@ permissions:
   contents: write
 
 jobs:
+  lab:
+    uses: ./.github/workflows/lab.yml
+
   build:
+    needs: lab
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

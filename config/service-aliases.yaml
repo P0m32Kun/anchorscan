@@ -1,6 +1,0 @@
-ssl/http: http
-http-proxy: http
-microsoft-ds: smb
-netbios-ssn: smb
-ms-wbt-server: rdp
-mariadb: mysql

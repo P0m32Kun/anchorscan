@@ -1,0 +1,66 @@
+name: real-tool-lab
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install real scan tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nmap
+          cargo install rustscan --locked
+          go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1
+          go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.4.4
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Run real-tool Docker laboratory
+        run: |
+          set -o pipefail
+          mkdir -p test-artifacts/real-tool-lab
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "date=$(date -u +%FT%TZ)"
+            rustscan --version
+            nmap --version | head -1
+            httpx -version
+            nuclei -version
+          } | tee test-artifacts/real-tool-lab/evidence.txt
+          go test -tags=e2e ./e2e -timeout 55m -v 2>&1 | tee test-artifacts/real-tool-lab/test.log
+
+      - name: Collect laboratory diagnostics
+        if: always()
+        run: |
+          mkdir -p test-artifacts/real-tool-lab
+          docker compose -f docker-compose.lab.yml ps | tee test-artifacts/real-tool-lab/compose.log
+          docker compose -f docker-compose.lab.yml logs --no-color | tee test-artifacts/real-tool-lab/compose.log.txt
+
+      - name: Upload laboratory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-tool-lab-evidence
+          path: test-artifacts/real-tool-lab
+          if-no-files-found: error
