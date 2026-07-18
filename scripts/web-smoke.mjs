@@ -20,6 +20,8 @@ let page;
 let server;
 let workDir;
 
+const importFixture = `<nmaprun><host><address addr="192.0.2.53"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx" version="1.24"/></port></ports></host></nmaprun>`;
+
 function appendOutput(chunk) {
   serverOutput += chunk.toString();
 }
@@ -106,6 +108,8 @@ try {
 
   workDir = await fs.mkdtemp(path.join(os.tmpdir(), 'anchorscan-web-smoke-'));
   const configPath = await writeTestConfig(workDir);
+  const xmlPath = path.join(workDir, 'import.xml');
+  await fs.writeFile(xmlPath, importFixture);
   const baseURL = await startServer(configPath);
 
   browser = await chromium.launch();
@@ -125,10 +129,37 @@ try {
   await page.locator('textarea[name="default_ports"]').fill('80,443');
   await page.getByRole('button', { name: '保存项目设置' }).click();
   await page.waitForURL(`${baseURL}/projects`);
-  await assert.doesNotReject(() => page.getByRole('link', { name: 'Browser gate project' }).waitFor());
+  const projectLink = page.getByRole('link', { name: 'Browser gate project' });
+  await assert.doesNotReject(() => projectLink.waitFor());
+  await projectLink.click();
+  await page.getByRole('link', { name: /发起扫描/ }).click();
+  await page.locator('textarea[name="target"]').fill('198.51.100.99');
+  await page.locator('textarea[name="ports"]').fill('80');
+  await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
+  await page.waitForURL(/\/runs\/run-/);
+  await page.getByRole('button', { name: '中止扫描' }).click();
+  await page.waitForURL(/\/runs\/run-/);
+  await assert.doesNotReject(() => page.getByText('canceled').waitFor());
 
   await page.getByRole('link', { name: '扫描历史' }).click();
   await page.waitForURL(`${baseURL}/runs`);
+
+  await page.getByRole('link', { name: '导入 Nmap XML' }).click();
+  await page.locator('input[name="xml_file"]').setInputFiles(xmlPath);
+  await page.getByRole('button', { name: /导入/ }).click();
+  await page.waitForURL(/\/runs\/run-/);
+  const runID = page.url().split('/').pop();
+  await page.goto(`${baseURL}/reports/${runID}`);
+  await page.getByLabel(/端口/).fill('80');
+  await page.getByRole('button', { name: /筛选|应用/ }).click();
+  await assert.doesNotReject(() => page.getByText('192.0.2.53').first().waitFor());
+
+  await page.setViewportSize({ width: 1280, height: 960 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto(`${baseURL}/config`);
+  await page.getByRole('button', { name: /保存/ }).first().click();
+  await page.waitForURL(/\/config\?saved=1/);
   assert.equal(consoleLogs.length, 0, consoleLogs.join('\n'));
 
   await context.tracing.stop();
