@@ -4,13 +4,14 @@ Plan: docs/plans/harden-scan-confidence/
 
 ## Doing
 
-- [ ] 04 — 收敛 interrupted Run
+- [ ] 05 — 持久化 DetectionCheck 并显示实时摘要
 
 ## Done
 
 - [x] 01 — 建立确定性 PR 浏览器门禁
 - [x] 02 — 覆盖核心 Web 工作流
 - [x] 03 — 强制全局 Run Lease
+- [x] 04 — 收敛 interrupted Run
 
 ## Blocked (needs human)
 
