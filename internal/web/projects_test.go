@@ -262,6 +262,9 @@ func TestDeleteProjectRejectsRunningRuns(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveScanRun returned error: %v", err)
 	}
+	if _, err := scanStore.AcquireRunLease("run-1", "owner-1", time.Now(), time.Minute); err != nil {
+		t.Fatalf("AcquireRunLease returned error: %v", err)
+	}
 
 	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
 	if err != nil {

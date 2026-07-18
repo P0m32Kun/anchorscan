@@ -62,7 +62,11 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	render(w, "templates/run.html", map[string]any{"Run": run, "RunMeta": newRunMetaView(run)})
+	render(w, "templates/run.html", map[string]any{
+		"Run":      run,
+		"RunMeta":  newRunMetaView(run),
+		"CanRerun": run.Status == "interrupted" && run.ProjectID != "" && isScanProfile(run.Profile),
+	})
 }
 
 func (s *server) runAPI(w http.ResponseWriter, r *http.Request) {

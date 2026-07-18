@@ -97,14 +97,15 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-		render(w, "templates/scan_project.html", map[string]any{
-			"Title":         "发起扫描",
-			"Project":       project,
-			"ArtifactRoot":  "",
-			"Preflight":     preflight.Result{},
-			"HighriskPorts": highriskPorts,
-		})
+		form := scanForm{}
+		if rerunID := strings.TrimSpace(r.URL.Query().Get("rerun")); rerunID != "" {
+			form, err = s.rerunScanForm(id, rerunID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+		}
+		s.renderProjectScanForm(w, project, preflight.Result{}, form)
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/edit"):
 		project, err := s.store.GetProject(id)
 		if err != nil {

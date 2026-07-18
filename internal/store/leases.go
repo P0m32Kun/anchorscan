@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"errors"
 	"time"
 )
@@ -79,4 +80,47 @@ func (s *Store) FinishRunWithLease(runID, ownerToken, status, message string, fi
 		return false, err
 	}
 	return true, tx.Commit()
+}
+
+// ReconcileInterruptedRuns closes runs whose owner can no longer renew its lease.
+// It is safe to call on startup and before a new lease acquisition.
+func (s *Store) ReconcileInterruptedRuns(now time.Time, ttl time.Duration) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var runID, heartbeat string
+	var heartbeatNS int64
+	err = tx.QueryRow(`SELECT run_id, heartbeat_at, heartbeat_at_ns FROM run_leases WHERE scope = ?`, globalRunLeaseScope).Scan(&runID, &heartbeat, &heartbeatNS)
+	if err == nil && !runLeaseFresh(heartbeat, heartbeatNS, now, ttl) {
+		result, err := tx.Exec(`DELETE FROM run_leases WHERE scope = ? AND run_id = ? AND heartbeat_at_ns < ? AND julianday(heartbeat_at) < julianday(?)`, globalRunLeaseScope, runID, now.Add(-ttl).UnixNano(), now.Add(-ttl).UTC().Format(time.RFC3339Nano))
+		if err != nil {
+			return err
+		}
+		if deleted, _ := result.RowsAffected(); deleted == 1 {
+			if _, err := tx.Exec(`UPDATE scan_runs SET status = 'interrupted', error = 'run lease expired', finished_at = ? WHERE run_id = ? AND status = 'running'`, formatTime(now), runID); err != nil {
+				return err
+			}
+		}
+	} else if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	_, err = tx.Exec(`UPDATE scan_runs SET status = 'interrupted', error = 'run lease missing', finished_at = ?
+		WHERE status = 'running' AND NOT EXISTS (SELECT 1 FROM run_leases WHERE scope = ? AND run_id = scan_runs.run_id)`, formatTime(now), globalRunLeaseScope)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func runLeaseFresh(heartbeat string, heartbeatNS int64, now time.Time, ttl time.Duration) bool {
+	cutoff := now.Add(-ttl)
+	if heartbeatNS >= cutoff.UnixNano() {
+		return true
+	}
+	at, err := time.Parse(time.RFC3339Nano, heartbeat)
+	return err != nil || !at.Before(cutoff)
 }

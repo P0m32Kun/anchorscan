@@ -43,6 +43,9 @@
       </svg>
       <span>查看扫描报告</span>
     </a>
+    {{if .CanRerun}}
+    <a class="button button-secondary" href="/projects/{{.Run.ProjectID}}/scans/new?rerun={{.Run.RunID}}">确认并重新运行</a>
+    {{end}}
     {{end}}
   </div>
 </section>

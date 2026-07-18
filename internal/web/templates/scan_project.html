@@ -28,6 +28,10 @@
   <form class="form-grid" method="post" action="/scan">
     <input type="hidden" name="project_id" value="{{.Project.ID}}">
 
+    {{if .Form.IsRerun}}
+    <p class="alert alert-warning full-width">这是一次重新运行。请检查并提交下方参数后，系统才会创建一个新的扫描任务。</p>
+    {{end}}
+
     <div class="full-width project-defaults">
       <p class="meta-line">
         <strong>项目默认值</strong> · 目标: {{if .Project.DefaultTargets}}<code>{{.Project.DefaultTargets}}</code>{{else}}<span class="muted">未设置</span>{{end}} · 端口: {{if .Project.DefaultPorts}}<code>{{.Project.DefaultPorts}}</code>{{else}}<span class="muted">全局默认</span>{{end}} · 档位: {{if .Project.DefaultProfile}}{{.Project.DefaultProfile}}{{else}}<span class="muted">全局默认</span>{{end}}
@@ -44,21 +48,21 @@
         <label>
           <span>临时覆盖档位</span>
           <select name="profile">
-            <option value="">使用项目/全局默认值</option>
-            <option value="slow" {{if eq .Project.DefaultProfile "slow"}}selected{{end}}>slow (轻载/低速率)</option>
-            <option value="normal" {{if eq .Project.DefaultProfile "normal"}}selected{{end}}>normal (均衡/默认值)</option>
-            <option value="fast" {{if eq .Project.DefaultProfile "fast"}}selected{{end}}>fast (极速/多路并发)</option>
+            <option value="" {{if eq .Form.Profile ""}}selected{{end}}>使用项目/全局默认值</option>
+            <option value="slow" {{if eq .Form.Profile "slow"}}selected{{end}}>slow (轻载/低速率)</option>
+            <option value="normal" {{if eq .Form.Profile "normal"}}selected{{end}}>normal (均衡/默认值)</option>
+            <option value="fast" {{if eq .Form.Profile "fast"}}selected{{end}}>fast (极速/多路并发)</option>
           </select>
         </label>
 
         <label class="full-width">
           <span>临时覆盖目标</span>
-          <textarea name="target" rows="4" placeholder="留空使用项目默认目标。支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔"></textarea>
+          <textarea name="target" rows="4" placeholder="留空使用项目默认目标。支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔">{{.Form.Target}}</textarea>
         </label>
 
         <label class="full-width">
           <span>临时覆盖端口</span>
-          <textarea name="ports" rows="3" placeholder="留空使用项目默认端口。支持: top1000、100-1000 或 80,443,8080"></textarea>
+          <textarea name="ports" rows="3" placeholder="留空使用项目默认端口。支持: top1000、100-1000 或 80,443,8080">{{.Form.Ports}}</textarea>
           <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
           <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="ports">
             ＋ 插入高危端口列表
@@ -77,19 +81,19 @@
       <div class="form-grid project-scan-detail-body">
         <label>
           <span>Rustscan 参数</span>
-          <input name="rustscan_args" placeholder="例如: --ulimit 5000">
+          <input name="rustscan_args" value="{{.Form.RustscanArgs}}" placeholder="例如: --ulimit 5000">
         </label>
         <label>
           <span>Nmap 参数</span>
-          <input name="nmap_args" placeholder="例如: --min-rate 300 -sV">
+          <input name="nmap_args" value="{{.Form.NmapArgs}}" placeholder="例如: --min-rate 300 -sV">
         </label>
         <label>
           <span>Httpx 参数</span>
-          <input name="httpx_args" placeholder="例如: -title -content-length">
+          <input name="httpx_args" value="{{.Form.HttpxArgs}}" placeholder="例如: -title -content-length">
         </label>
         <label>
           <span>Nuclei 参数</span>
-          <input name="nuclei_args" placeholder="例如: -tags cve,vuln">
+          <input name="nuclei_args" value="{{.Form.NucleiArgs}}" placeholder="例如: -tags cve,vuln">
         </label>
       </div>
     </details>

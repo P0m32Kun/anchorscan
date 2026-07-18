@@ -271,3 +271,87 @@ func TestRunPageLoadsStatusPolling(t *testing.T) {
 		t.Fatalf("expected app.js before run-status.js: %s", body)
 	}
 }
+
+func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:          "run-1",
+		ProjectID:      "p1",
+		Target:         "198.51.100.10",
+		Ports:          "80,443",
+		Profile:        "normal",
+		Status:         "interrupted",
+		ConfigSnapshot: `{"target":"198.51.100.10","ports":"80,443","profile":"fast","rustscan_args":"--ulimit 5000","nmap_args":"-sV"}`,
+		StartedAt:      time.Unix(1, 0),
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveFingerprint("run-1", fingerprint.ServiceFingerprint{IP: "198.51.100.10", Port: 443, Service: "https"}); err != nil {
+		t.Fatalf("SaveFingerprint returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	detail := httptest.NewRecorder()
+	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/runs/run-1", nil))
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "status-interrupted") || !strings.Contains(detail.Body.String(), "/projects/p1/scans/new?rerun=run-1") {
+		t.Fatalf("unexpected run detail: %d %s", detail.Code, detail.Body.String())
+	}
+
+	rerun := httptest.NewRecorder()
+	handler.ServeHTTP(rerun, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new?rerun=run-1", nil))
+	if rerun.Code != http.StatusOK {
+		t.Fatalf("rerun page status: %d %s", rerun.Code, rerun.Body.String())
+	}
+	body := rerun.Body.String()
+	for _, want := range []string{`name="target"`, "198.51.100.10", `name="ports"`, "80,443", `value="fast" selected`, "--ulimit 5000", "-sV"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("rerun page missing %q: %s", want, body)
+		}
+	}
+	runs, err := scanStore.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 1 || runs[0].RunID != "run-1" {
+		t.Fatalf("opening rerun page changed history: %#v", runs)
+	}
+}
+
+func TestInterruptedLegacyProjectScanPrefillsPersistedFields(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "legacy", ProjectID: "p1", Target: "198.51.100.20", Ports: "443", Profile: "normal", Status: "interrupted", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new?rerun=legacy", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "198.51.100.20") || !strings.Contains(res.Body.String(), ">443</textarea>") || !strings.Contains(res.Body.String(), `value="normal" selected`) {
+		t.Fatalf("legacy rerun page: %d %s", res.Code, res.Body.String())
+	}
+}

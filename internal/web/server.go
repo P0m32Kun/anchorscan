@@ -64,6 +64,10 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := scanStore.ReconcileInterruptedRuns(opts.Now(), 30*time.Second); err != nil {
+		_ = scanStore.Close()
+		return nil, err
+	}
 
 	catalog := knowledgebase.Load(opts.ConfigPath, "")
 	if cfg, err := config.Load(opts.ConfigPath); err == nil {

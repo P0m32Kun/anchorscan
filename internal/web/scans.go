@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -16,15 +17,29 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+// scanForm is the small, explicitly allowed subset of a prior scan that can
+// be shown again for user-confirmed reruns.
+type scanForm struct {
+	Target       string `json:"target"`
+	Ports        string `json:"ports"`
+	Profile      string `json:"profile"`
+	RustscanArgs string `json:"rustscan_args"`
+	NmapArgs     string `json:"nmap_args"`
+	HttpxArgs    string `json:"httpx_args"`
+	NucleiArgs   string `json:"nuclei_args"`
+	IsRerun      bool   `json:"-"`
+}
+
 // renderProjectScanForm renders the in-project scan form with the project
 // context and an optional preflight result used to surface validation errors
 // when a scan submission is rejected. Scans are always bound to a project.
-func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, preflightResult preflight.Result) {
+func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, preflightResult preflight.Result, form scanForm) {
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 	render(w, "templates/scan_project.html", map[string]any{
 		"Title":         "发起扫描",
 		"Project":       project,
 		"ArtifactRoot":  "",
+		"Form":          form,
 		"Preflight":     preflightResult,
 		"HighriskPorts": highriskPorts,
 	})
@@ -62,6 +77,15 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	if portValue == "" {
 		portValue = project.DefaultPorts
 	}
+	form := scanForm{
+		Target:       targetValue,
+		Ports:        portValue,
+		Profile:      coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
+		RustscanArgs: r.FormValue("rustscan_args"),
+		NmapArgs:     r.FormValue("nmap_args"),
+		HttpxArgs:    r.FormValue("httpx_args"),
+		NucleiArgs:   r.FormValue("nuclei_args"),
+	}
 
 	runID := newID("run", s.opts.Now())
 	projectID := project.ID
@@ -77,11 +101,11 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		ExcludeTargets: project.ExcludeTargets,
 		ExcludePorts:   project.ExcludePorts,
 		Overrides: config.Overrides{
-			ProfileName:  coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
-			RustscanArgs: r.FormValue("rustscan_args"),
-			NmapArgs:     r.FormValue("nmap_args"),
-			HttpxArgs:    r.FormValue("httpx_args"),
-			NucleiArgs:   r.FormValue("nuclei_args"),
+			ProfileName:  form.Profile,
+			RustscanArgs: form.RustscanArgs,
+			NmapArgs:     form.NmapArgs,
+			HttpxArgs:    form.HttpxArgs,
+			NucleiArgs:   form.NucleiArgs,
 		},
 		DBPath:         s.opts.DBPath,
 		JSONReportPath: jsonPath,
@@ -95,9 +119,13 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if prepared.Preflight.HasErrors() {
 		w.WriteHeader(http.StatusBadRequest)
-		s.renderProjectScanForm(w, *project, prepared.Preflight)
+		s.renderProjectScanForm(w, *project, prepared.Preflight, form)
 		return
 	}
+	form.Target = strings.Join(prepared.Options.Targets, ",")
+	form.Ports = prepared.Options.Ports
+	form.Profile = prepared.Options.ProfileName
+	prepared.Options.ConfigSnapshot = scanFormSnapshot(form)
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -108,6 +136,45 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
+}
+
+func scanFormSnapshot(form scanForm) string {
+	snapshot, _ := json.Marshal(form)
+	return string(snapshot)
+}
+
+func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
+	run, err := s.store.GetScanRun(runID)
+	if err != nil {
+		return scanForm{}, err
+	}
+	if run.ProjectID != projectID || run.Status != "interrupted" {
+		return scanForm{}, errors.New("rerun is only available for an interrupted project scan")
+	}
+	var form scanForm
+	if err := json.Unmarshal([]byte(run.ConfigSnapshot), &form); err != nil || !completeScanForm(form) {
+		// Runs created before snapshots existed can still safely reuse their
+		// persisted scan columns; advanced arguments were never retained.
+		form = scanForm{Target: run.Target, Ports: run.Ports, Profile: run.Profile}
+	}
+	if !completeScanForm(form) || !isScanProfile(form.Profile) {
+		return scanForm{}, errors.New("interrupted run has an incomplete scan snapshot")
+	}
+	form.IsRerun = true
+	return form, nil
+}
+
+func completeScanForm(form scanForm) bool {
+	return strings.TrimSpace(form.Target) != "" && strings.TrimSpace(form.Ports) != "" && strings.TrimSpace(form.Profile) != ""
+}
+
+func isScanProfile(profile string) bool {
+	switch strings.TrimSpace(profile) {
+	case "slow", "normal", "fast":
+		return true
+	default:
+		return false
+	}
 }
 
 func mergedTargetsInput(r *http.Request) (string, error) {

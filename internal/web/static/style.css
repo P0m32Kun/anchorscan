@@ -504,6 +504,12 @@ button[type="submit"]:hover {
   border-color: var(--danger-border);
 }
 
+.status-interrupted {
+  color: #9a6700;
+  background: #fff8c5;
+  border-color: #f3d36b;
+}
+
 /* Alert Boxes */
 .alert {
   margin: 0 0 1.25rem;

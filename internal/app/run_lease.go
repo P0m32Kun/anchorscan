@@ -28,6 +28,9 @@ func reserveRunLease(scanStore *store.Store, runID string) (string, error) {
 	if scanStore == nil || runID == "" {
 		return "", nil
 	}
+	if err := scanStore.ReconcileInterruptedRuns(time.Now(), runLeaseTTL); err != nil {
+		return "", err
+	}
 	token, err := newRunLeaseToken()
 	if err != nil {
 		return "", err
@@ -42,6 +45,9 @@ func reserveRunLease(scanStore *store.Store, runID string) (string, error) {
 func acquireRunLease(ctx context.Context, scanStore *store.Store, runID, ownerToken string) (context.Context, func(string, string, time.Time), func(), error) {
 	if scanStore == nil || runID == "" {
 		return ctx, func(string, string, time.Time) {}, func() {}, nil
+	}
+	if err := scanStore.ReconcileInterruptedRuns(time.Now(), runLeaseTTL); err != nil {
+		return nil, nil, nil, err
 	}
 	if ownerToken == "" {
 		var err error
