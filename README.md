@@ -87,6 +87,7 @@ go run ./cmd/anchorscan scan --target 127.0.0.1 --profile slow
 make test      # 运行全部测试
 make build     # 编译到 dist/anchorscan
 make package   # 打包到 dist/
+make pr-check  # 完整质量门禁（首次执行前运行 npm ci 与 npx playwright install chromium）
 ```
 
 导入已有的 Nmap XML：

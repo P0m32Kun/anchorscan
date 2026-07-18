@@ -1,0 +1,14 @@
+{
+  "name": "anchorscan-quality-gates",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:web": "node scripts/web-smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

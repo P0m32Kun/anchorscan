@@ -9,6 +9,8 @@
 /.codex/settings.local.json
 /.zcode/
 /ip.txt
+/node_modules/
+/test-artifacts/
 
 # config/default.yaml 由首次运行自动生成（工具路径与本机 PATH 相关），不进版本控制
 # config/default.yaml.example 是提交进仓库的参考模板
@@ -24,4 +26,3 @@
 # AIOS & ContextDB
 /.aios/
 /.contextdb-enable
-
