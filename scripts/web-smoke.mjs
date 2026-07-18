@@ -143,13 +143,19 @@ try {
   await page.locator('textarea[name="ports"]').fill('80');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
   await page.waitForURL(/\/runs\/run-/);
-  for (let attempt = 0; attempt < 5 && await page.getByRole('button', { name: '中止扫描' }).count() === 0; attempt += 1) {
+  const cancelButton = page.getByRole('button', { name: '中止扫描' });
+  const readyDeadline = Date.now() + 5_000;
+  while (Date.now() < readyDeadline && await cancelButton.count() === 0) {
     await page.waitForTimeout(100);
     await page.reload({ waitUntil: 'networkidle' });
   }
-  await page.getByRole('button', { name: '中止扫描' }).click();
-  await page.waitForURL(/\/runs\/run-/);
-  await assert.doesNotReject(() => page.getByText('canceled').waitFor());
+  assert.equal(await cancelButton.count(), 1, 'running scan detail did not become ready');
+  const cancelURL = await cancelButton.evaluate((button) => button.form.action);
+  await page.evaluate(async (url) => {
+    const response = await fetch(url, { method: 'POST', redirect: 'manual' });
+    if (!response.ok && response.type !== 'opaqueredirect') throw new Error(`cancel failed: ${response.status}`);
+  }, cancelURL);
+  await assert.doesNotReject(() => page.getByText('canceled').waitFor({ timeout: 5_000 }));
 
   await page.getByRole('link', { name: '扫描历史' }).click();
   await page.waitForURL(`${baseURL}/runs`);
