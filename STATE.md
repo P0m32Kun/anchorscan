@@ -4,12 +4,13 @@ Plan: docs/plans/harden-scan-confidence/
 
 ## Doing
 
-- [ ] 03 — 强制全局 Run Lease
+- [ ] 04 — 收敛 interrupted Run
 
 ## Done
 
 - [x] 01 — 建立确定性 PR 浏览器门禁
 - [x] 02 — 覆盖核心 Web 工作流
+- [x] 03 — 强制全局 Run Lease
 
 ## Blocked (needs human)
 
