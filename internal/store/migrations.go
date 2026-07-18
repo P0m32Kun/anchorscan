@@ -115,6 +115,17 @@ CREATE TABLE IF NOT EXISTS scan_events (
 			return nil
 		},
 	},
+	{
+		version: 4,
+		name:    "create_run_leases",
+		sql: `
+CREATE TABLE run_leases (
+  scope TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  owner_token TEXT NOT NULL,
+  heartbeat_at TEXT NOT NULL
+);`,
+	},
 }
 
 func runMigrations(db *sql.DB) error {

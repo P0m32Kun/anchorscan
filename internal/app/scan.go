@@ -44,6 +44,11 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
 	}
+	ctx, releaseLease, err := acquireRunLease(ctx, scanStore, opts.RunID)
+	if err != nil {
+		return err
+	}
+	defer releaseLease()
 	if opts.RunID != "" && strings.TrimSpace(opts.ArtifactRoot) != "" {
 		artifactDir = filepath.Join(opts.ArtifactRoot, opts.RunID)
 		if err := os.MkdirAll(artifactDir, 0o755); err != nil {

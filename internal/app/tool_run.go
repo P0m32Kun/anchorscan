@@ -47,6 +47,11 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.Mode == "" {
 		opts.Mode = "service"
 	}
+	ctx, releaseLease, err := acquireRunLease(ctx, scanStore, opts.RunID)
+	if err != nil {
+		return err
+	}
+	defer releaseLease()
 
 	saveToolRun(scanStore, opts)
 	defer func() {
