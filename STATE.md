@@ -4,11 +4,12 @@ Plan: docs/plans/harden-scan-confidence/
 
 ## Doing
 
-- [ ] 02 — 覆盖核心 Web 工作流
+- [ ] 03 — 强制全局 Run Lease
 
 ## Done
 
 - [x] 01 — 建立确定性 PR 浏览器门禁
+- [x] 02 — 覆盖核心 Web 工作流
 
 ## Blocked (needs human)
 
