@@ -1472,7 +1472,7 @@ input[type="file"]::file-selector-button:hover {
   color: var(--text);
 }
 
-/* Custom dark scrollbar for bodies */
+/* Keep scrollbars visible against the light configuration panel. */
 .config-card-body::-webkit-scrollbar {
   width: 6px;
 }
@@ -1480,11 +1480,11 @@ input[type="file"]::file-selector-button:hover {
   background: transparent;
 }
 .config-card-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: #c7c7cc;
   border-radius: var(--radius-sm);
 }
 .config-card-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #aeaeb2;
 }
 
 .copy-btn {
@@ -1963,7 +1963,6 @@ input[type="file"]::file-selector-button:hover {
 /* Ticket 02: desktop shell and shared primitives. */
 html,
 body {
-  min-width: 1280px;
   background: var(--bg);
 }
 

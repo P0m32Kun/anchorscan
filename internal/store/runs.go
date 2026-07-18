@@ -168,7 +168,7 @@ func (s *Store) ListScanEvents(runID string, limit int) ([]ScanEvent, error) {
 	}
 	defer rows.Close()
 
-	var events []ScanEvent
+	events := make([]ScanEvent, 0)
 	for rows.Next() {
 		var event ScanEvent
 		var at string
