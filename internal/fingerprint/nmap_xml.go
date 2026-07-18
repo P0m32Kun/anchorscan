@@ -17,8 +17,8 @@ type nmapRun struct {
 }
 
 type nmapHost struct {
-	Address     nmapAddress `xml:"address"`
-	Ports       []nmapPort  `xml:"ports>port"`
+	Address     nmapAddress  `xml:"address"`
+	Ports       []nmapPort   `xml:"ports>port"`
 	Hostscripts []nmapScript `xml:"hostscript>script"`
 }
 
@@ -107,9 +107,9 @@ func ParseNmapXML(data []byte) ([]ServiceFingerprint, []ImportedScript, error) {
 		}
 		for _, script := range host.Hostscripts {
 			scripts = append(scripts, ImportedScript{
-				Scope: "host",
-				IP:    host.Address.Addr,
-				ID:    script.ID,
+				Scope:  "host",
+				IP:     host.Address.Addr,
+				ID:     script.ID,
 				Output: script.Output,
 			})
 		}

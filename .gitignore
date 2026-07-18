@@ -5,6 +5,7 @@
 /dist/
 /.worktrees/
 /.codegraph/
+/.pi-subagents/
 /.agents/
 /.codex/settings.local.json
 /.zcode/
