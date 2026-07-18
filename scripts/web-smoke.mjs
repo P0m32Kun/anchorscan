@@ -84,6 +84,9 @@ async function writeTestConfig(workDir) {
   );
   const configPath = path.join(workDir, 'config.yaml');
   await fs.writeFile(configPath, config);
+  await Promise.all(['nse.yaml', 'service-tags.yaml'].map(async (name) => {
+    await fs.copyFile(path.join(repoRoot, 'config', name), path.join(workDir, name));
+  }));
   return configPath;
 }
 
@@ -99,6 +102,12 @@ async function stopServer() {
   if (!server || server.exitCode !== null || server.signalCode !== null) return;
   server.kill('SIGTERM');
   await once(server, 'exit');
+}
+
+async function seedRun(sql) {
+  const child = spawn('sqlite3', [path.join(workDir, 'scans.sqlite'), sql]);
+  const [code] = await once(child, 'close');
+  assert.equal(code, 0, 'sqlite fixture setup failed');
 }
 
 try {
@@ -131,6 +140,7 @@ try {
   await page.waitForURL(`${baseURL}/projects`);
   const projectLink = page.getByRole('link', { name: 'Browser gate project' });
   await assert.doesNotReject(() => projectLink.waitFor());
+  const projectURL = await projectLink.getAttribute('href');
   await projectLink.click();
   await page.getByRole('link', { name: /发起扫描/ }).click();
   await page.locator('textarea[name="ports"]').fill('invalid');
@@ -157,6 +167,37 @@ try {
   }, cancelURL);
   await assert.doesNotReject(() => page.getByText('canceled').waitFor({ timeout: 5_000 }));
 
+  await page.goto(`${baseURL}${projectURL}/scans/new`, { waitUntil: 'networkidle' });
+  await page.locator('textarea[name="target"]').fill('192.0.2.20');
+  await page.locator('textarea[name="ports"]').fill('80');
+  await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
+  await page.waitForURL(/\/runs\/run-/);
+  await assert.doesNotReject(() => page.getByText('completed').waitFor({ timeout: 10_000 }));
+  await page.getByRole('link', { name: '查看扫描报告' }).click();
+  await assert.doesNotReject(() => page.getByText('检测执行覆盖').waitFor());
+  await assert.doesNotReject(() => page.getByText('anchorscan-test').waitFor());
+
+  const projectID = projectURL.split('/').pop();
+  await seedRun(`INSERT INTO scan_runs (run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
+    ('browser-errors', '${projectID}', '192.0.2.30', '443', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"target":"192.0.2.30","ports":"443","profile":"normal"}', ''),
+    ('browser-interrupted', '${projectID}', '192.0.2.31', '80,443', 'normal', 'interrupted', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"target":"192.0.2.31","ports":"80,443","profile":"fast"}', '');
+    INSERT INTO detection_checks (run_id, ip, port, protocol, engine, status, reason_code, detail, started_at, finished_at) VALUES
+    ('browser-errors', '192.0.2.30', 443, 'tcp', 'nuclei', 'failed', 'command_failed', 'fixture failure', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z');`);
+  await page.goto(`${baseURL}/runs/browser-errors`, { waitUntil: 'networkidle' });
+  await assert.doesNotReject(() => page.getByText('completed_with_errors').waitFor());
+  await assert.doesNotReject(() => page.getByText(/检测检查：.*失败 1/).waitFor({ timeout: 5_000 }));
+  await page.goto(`${baseURL}/runs/browser-interrupted`, { waitUntil: 'networkidle' });
+  await assert.doesNotReject(() => page.getByText('interrupted').waitFor());
+  await page.getByRole('link', { name: '确认并重新运行' }).click();
+  await page.waitForURL(new RegExp(`/projects/${projectID}/scans/new\\?rerun=browser-interrupted`));
+  assert.equal(await page.locator('textarea[name="target"]').inputValue(), '192.0.2.31');
+  assert.equal(await page.locator('textarea[name="ports"]').inputValue(), '80,443');
+  assert.equal(await page.locator('select[name="profile"]').inputValue(), 'fast');
+  await page.locator('textarea[name="target"]').focus();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'target');
+  await page.locator('textarea[name="target"]').press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'ports');
+
   await page.getByRole('link', { name: '扫描历史' }).click();
   await page.waitForURL(`${baseURL}/runs`);
 
@@ -176,13 +217,22 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`${baseURL}/config`);
+  assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '0');
+  await page.locator('input[name="timeout_rustscan"]').fill('30s');
+  await page.locator('input[name="timeout_rustscan"]').focus();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'timeout_rustscan');
+  await page.locator('input[name="timeout_nmap"]').fill('0');
   await page.locator('textarea[name="raw_config"]').fill(': invalid');
   await page.getByRole('button', { name: '应用高级 YAML 配置' }).click();
   await assert.doesNotReject(() => page.getByText(/配置应用失败/).waitFor());
   await page.goto(`${baseURL}/config`);
+  assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '0');
+  await page.locator('input[name="timeout_rustscan"]').fill('30s');
   await page.getByLabel('全局默认端口').fill('80,443');
   await page.getByRole('button', { name: /保存/ }).first().click();
   await page.waitForURL(/\/config\?saved=1/);
+  await page.goto(`${baseURL}/config`);
+  assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '30s');
   assert.equal(consoleLogs.length, 0, consoleLogs.join('\n'));
 
   await context.tracing.stop();
