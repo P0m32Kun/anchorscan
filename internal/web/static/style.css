@@ -1546,8 +1546,11 @@ input[type="file"]::file-selector-button:hover {
   background: transparent;
 }
 .ports-badge-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: #c7c7cc;
   border-radius: 2px;
+}
+.ports-badge-container::-webkit-scrollbar-thumb:hover {
+  background: #aeaeb2;
 }
 
 .port-badge {
