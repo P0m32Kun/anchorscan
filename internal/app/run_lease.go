@@ -39,30 +39,30 @@ func reserveRunLease(scanStore *store.Store, runID string) (string, error) {
 	return token, err
 }
 
-func acquireRunLease(ctx context.Context, scanStore *store.Store, runID, ownerToken string) (context.Context, func(string, string, time.Time), error) {
+func acquireRunLease(ctx context.Context, scanStore *store.Store, runID, ownerToken string) (context.Context, func(string, string, time.Time), func(), error) {
 	if scanStore == nil || runID == "" {
-		return ctx, func(string, string, time.Time) {}, nil
+		return ctx, func(string, string, time.Time) {}, func() {}, nil
 	}
 	if ownerToken == "" {
 		var err error
 		ownerToken, err = newRunLeaseToken()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		lease, err := scanStore.AcquireRunLease(runID, ownerToken, time.Now(), runLeaseTTL)
 		if err != nil {
 			if errors.Is(err, store.ErrRunLeaseHeld) {
-				return nil, nil, fmt.Errorf("scan already running: %s", lease.RunID)
+				return nil, nil, nil, fmt.Errorf("scan already running: %s", lease.RunID)
 			}
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	} else {
 		owned, err := scanStore.RenewRunLease(runID, ownerToken, time.Now())
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if !owned {
-			return nil, nil, errors.New("run lease was lost")
+			return nil, nil, nil, errors.New("run lease was lost")
 		}
 	}
 
@@ -91,10 +91,16 @@ func acquireRunLease(ctx context.Context, scanStore *store.Store, runID, ownerTo
 		}
 	}()
 
-	return runCtx, func(status, message string, finishedAt time.Time) {
+	stopHeartbeat := func() {
 		close(stop)
 		<-done
 		cancel()
-		_, _ = scanStore.FinishRunWithLease(runID, ownerToken, status, message, finishedAt)
-	}, nil
+	}
+	return runCtx, func(status, message string, finishedAt time.Time) {
+			stopHeartbeat()
+			_, _ = scanStore.FinishRunWithLease(runID, ownerToken, status, message, finishedAt)
+		}, func() {
+			stopHeartbeat()
+			_, _ = scanStore.ReleaseRunLease(runID, ownerToken)
+		}, nil
 }

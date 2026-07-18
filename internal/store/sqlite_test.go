@@ -124,8 +124,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 4 {
-		t.Fatalf("expected 4 applied migrations, got %d", count)
+	if count != 5 {
+		t.Fatalf("expected 5 applied migrations, got %d", count)
 	}
 }
 
@@ -237,10 +237,10 @@ func TestSaveImportRunWritesRunFingerprintsAndFindings(t *testing.T) {
 	}
 
 	run := ScanRun{
-		RunID:     "import-1",
-		Target:    "nmap-import",
-		Status:    "completed",
-		StartedAt: time.Unix(1, 0),
+		RunID:      "import-1",
+		Target:     "nmap-import",
+		Status:     "completed",
+		StartedAt:  time.Unix(1, 0),
 		FinishedAt: time.Unix(2, 0),
 	}
 	fps := []fingerprint.ServiceFingerprint{

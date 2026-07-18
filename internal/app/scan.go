@@ -45,31 +45,14 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
 	}
-	ctx, finishLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
+	ctx, finishLease, abortLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
 	if err != nil {
 		return err
 	}
-	if opts.RunID != "" && strings.TrimSpace(opts.ArtifactRoot) != "" {
-		artifactDir = filepath.Join(opts.ArtifactRoot, opts.RunID)
-		if err := os.MkdirAll(artifactDir, 0o755); err != nil {
-			return err
-		}
-	}
-	if opts.RunID != "" && scanStore != nil {
-		_ = scanStore.SaveScanRun(store.ScanRun{
-			RunID:          opts.RunID,
-			ProjectID:      opts.ProjectID,
-			Target:         strings.Join(opts.Targets, ","),
-			Ports:          opts.Ports,
-			Profile:        opts.ProfileName,
-			Status:         "running",
-			StartedAt:      time.Now(),
-			ConfigSnapshot: opts.ConfigSnapshot,
-			ArtifactDir:    artifactDir,
-		})
-	}
+	runSaved := false
 	defer func() {
-		if opts.RunID == "" || scanStore == nil {
+		if !runSaved {
+			abortLease()
 			return
 		}
 		status := "completed"
@@ -83,6 +66,28 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 		finishLease(status, message, time.Now())
 	}()
+	if opts.RunID != "" && strings.TrimSpace(opts.ArtifactRoot) != "" {
+		artifactDir = filepath.Join(opts.ArtifactRoot, opts.RunID)
+		if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+			return err
+		}
+	}
+	if opts.RunID != "" && scanStore != nil {
+		if err := scanStore.SaveScanRun(store.ScanRun{
+			RunID:          opts.RunID,
+			ProjectID:      opts.ProjectID,
+			Target:         strings.Join(opts.Targets, ","),
+			Ports:          opts.Ports,
+			Profile:        opts.ProfileName,
+			Status:         "running",
+			StartedAt:      time.Now(),
+			ConfigSnapshot: opts.ConfigSnapshot,
+			ArtifactDir:    artifactDir,
+		}); err != nil {
+			return err
+		}
+		runSaved = true
+	}
 
 	progress := storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}
 	scans, aliveIPs, err := scanTargets(ctx, runner, scanStore, opts, artifactDir, progress)

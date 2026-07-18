@@ -48,13 +48,16 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.Mode == "" {
 		opts.Mode = "service"
 	}
-	ctx, finishLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
+	ctx, finishLease, abortLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
 	if err != nil {
 		return err
 	}
-
-	saveToolRun(scanStore, opts)
+	runSaved := false
 	defer func() {
+		if !runSaved {
+			abortLease()
+			return
+		}
 		status := "completed"
 		message := ""
 		if runErr != nil {
@@ -66,6 +69,11 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 		finishLease(status, message, time.Now())
 	}()
+
+	if err := saveToolRun(scanStore, opts); err != nil {
+		return err
+	}
+	runSaved = true
 
 	if opts.UseNativeArgs {
 		findings, runErr := runNativeTool(ctx, runner, scanStore, opts)
@@ -98,7 +106,7 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	return report.WriteJSON(opts.JSONReportPath, report.Build(fingerprints, findings))
 }
 
-func saveToolRun(scanStore *store.Store, opts ToolRunOptions) {
+func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 	snapshot, _ := json.Marshal(map[string]any{
 		"tool":        opts.Tool,
 		"mode":        opts.Mode,
@@ -110,7 +118,7 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) {
 		"use_native":  opts.UseNativeArgs,
 		"native_args": opts.NativeArgs,
 	})
-	_ = scanStore.SaveScanRun(store.ScanRun{
+	return scanStore.SaveScanRun(store.ScanRun{
 		RunID:          opts.RunID,
 		ProjectID:      opts.ProjectID,
 		Target:         firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),

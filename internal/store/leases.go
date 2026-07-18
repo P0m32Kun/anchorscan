@@ -18,9 +18,9 @@ type RunLease struct {
 func (s *Store) AcquireRunLease(runID, ownerToken string, now time.Time, ttl time.Duration) (RunLease, error) {
 	cutoff := now.Add(-ttl).UnixNano()
 	heartbeat := now.UnixNano()
-	result, err := s.db.Exec(`INSERT INTO run_leases (scope, run_id, owner_token, heartbeat_at) VALUES (?, ?, ?, ?)
-		ON CONFLICT(scope) DO UPDATE SET run_id = excluded.run_id, owner_token = excluded.owner_token, heartbeat_at = excluded.heartbeat_at
-		WHERE run_leases.heartbeat_at < ?`, globalRunLeaseScope, runID, ownerToken, heartbeat, cutoff)
+	result, err := s.db.Exec(`INSERT INTO run_leases (scope, run_id, owner_token, heartbeat_at, heartbeat_at_ns) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(scope) DO UPDATE SET run_id = excluded.run_id, owner_token = excluded.owner_token, heartbeat_at = excluded.heartbeat_at, heartbeat_at_ns = excluded.heartbeat_at_ns
+		WHERE run_leases.heartbeat_at_ns < ?`, globalRunLeaseScope, runID, ownerToken, time.Unix(0, heartbeat).UTC().Format(time.RFC3339Nano), heartbeat, cutoff)
 	if err != nil {
 		return RunLease{}, err
 	}
@@ -29,7 +29,7 @@ func (s *Store) AcquireRunLease(runID, ownerToken string, now time.Time, ttl tim
 	}
 	var lease RunLease
 	var recorded int64
-	if err := s.db.QueryRow(`SELECT run_id, owner_token, heartbeat_at FROM run_leases WHERE scope = ?`, globalRunLeaseScope).Scan(&lease.RunID, &lease.OwnerToken, &recorded); err != nil {
+	if err := s.db.QueryRow(`SELECT run_id, owner_token, heartbeat_at_ns FROM run_leases WHERE scope = ?`, globalRunLeaseScope).Scan(&lease.RunID, &lease.OwnerToken, &recorded); err != nil {
 		return RunLease{}, err
 	}
 	lease.HeartbeatAt = time.Unix(0, recorded).UTC()
@@ -37,7 +37,7 @@ func (s *Store) AcquireRunLease(runID, ownerToken string, now time.Time, ttl tim
 }
 
 func (s *Store) RenewRunLease(runID, ownerToken string, now time.Time) (bool, error) {
-	result, err := s.db.Exec(`UPDATE run_leases SET heartbeat_at = ? WHERE scope = ? AND run_id = ? AND owner_token = ?`, now.UnixNano(), globalRunLeaseScope, runID, ownerToken)
+	result, err := s.db.Exec(`UPDATE run_leases SET heartbeat_at = ?, heartbeat_at_ns = ? WHERE scope = ? AND run_id = ? AND owner_token = ?`, now.UTC().Format(time.RFC3339Nano), now.UnixNano(), globalRunLeaseScope, runID, ownerToken)
 	if err != nil {
 		return false, err
 	}

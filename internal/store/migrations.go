@@ -123,8 +123,16 @@ CREATE TABLE run_leases (
   scope TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,
   owner_token TEXT NOT NULL,
-  heartbeat_at INTEGER NOT NULL
+  heartbeat_at TEXT NOT NULL
 );`,
+	},
+	{
+		version: 5,
+		name:    "add_run_lease_heartbeat_nanoseconds",
+		up: func(tx *sql.Tx) error {
+			_, err := tx.Exec(`ALTER TABLE run_leases ADD COLUMN heartbeat_at_ns INTEGER NOT NULL DEFAULT 0`)
+			return err
+		},
 	},
 }
 
