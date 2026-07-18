@@ -130,8 +130,37 @@ CREATE TABLE run_leases (
 		version: 5,
 		name:    "add_run_lease_heartbeat_nanoseconds",
 		up: func(tx *sql.Tx) error {
-			_, err := tx.Exec(`ALTER TABLE run_leases ADD COLUMN heartbeat_at_ns INTEGER NOT NULL DEFAULT 0`)
-			return err
+			if _, err := tx.Exec(`ALTER TABLE run_leases ADD COLUMN heartbeat_at_ns INTEGER NOT NULL DEFAULT 0`); err != nil {
+				return err
+			}
+			rows, err := tx.Query(`SELECT scope, heartbeat_at FROM run_leases`)
+			if err != nil {
+				return err
+			}
+			heartbeats := map[string]int64{}
+			for rows.Next() {
+				var scope, heartbeat string
+				if err := rows.Scan(&scope, &heartbeat); err != nil {
+					return err
+				}
+				at, err := time.Parse(time.RFC3339Nano, heartbeat)
+				if err != nil {
+					return err
+				}
+				heartbeats[scope] = at.UnixNano()
+			}
+			if err := rows.Err(); err != nil {
+				return err
+			}
+			if err := rows.Close(); err != nil {
+				return err
+			}
+			for scope, heartbeat := range heartbeats {
+				if _, err := tx.Exec(`UPDATE run_leases SET heartbeat_at_ns = ? WHERE scope = ?`, heartbeat, scope); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	},
 }
