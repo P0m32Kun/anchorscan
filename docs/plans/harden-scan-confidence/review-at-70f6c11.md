@@ -53,6 +53,8 @@ axes: [Standards, Spec]
 
 **Standards 最严重项：** `scan_target.go` NSE/nuclei 检测执行块 Duplicated Code（major，判断项）。
 
+> **处置（2026-07-18 修复轮）：** 评估后**刻意保留**各自实现。NSE 收尾为四段（解析在 `RunNSEWithOutput` 内部），nuclei 为五段（多独立 `ParseNucleiJSONL` + `invalid_output` 终态）；强行合并需把 DetectionCheck 状态机参数化为「带可选解析失败阶段」，会糊化语义，且重复仅为结构相似非逐字。`internal/app/scan_target.go` 已加注释说明。领域正确性优先于去重。
+
 ---
 
 ## Spec
@@ -102,4 +104,4 @@ axes: [Standards, Spec]
 
 - ticket `10-integrated-release-acceptance.md` 要求的「以计划开始时的 fixed point 执行 Standards/Spec 双轴 code-review，修复 blocker/major 后重新运行完整验证」**现已具备留痕**（本文件）。
 - 因双轴均无 blocker/major，ticket 10 的 `done` 状态成立，无需回退或补实现。
-- 遗留项均为 minor 判断项，可在后续小 ticket 中清理（优先级建议：Spec 的 `not_applicable` 原因码词汇对齐，因其违反 td 明确约束；其次 Standards 的 NSE/nuclei 检测块重复抽取）。
+- **遗留项处置（2026-07-18 修复轮）：** Spec 两项 minor 已修复——`not_applicable` 并入 `no_matching_rule`（对齐 td 词汇表，未扩展），NSE 跳过分支把 `tool_unconfigured` 前移避免误分类；`go test ./...` 全绿。Standards 的 NSE/nuclei 重复经评估**刻意保留**（见上节处置说明），`internal/app/scan_target.go` 已留注释。其余 minor 判断项（英文 Run 摘要、TTL 字面量重复、终态轮询早返回等）不阻塞，可在后续小 ticket 中清理。

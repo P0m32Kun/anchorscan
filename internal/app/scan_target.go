@@ -126,16 +126,16 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 
 		scripts := vuln.MatchNSE(fp, opts.NSERules)
 		switch {
-		case len(scripts) == 0:
-			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
+		case opts.Tools.Nmap == "":
+			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "tool_unconfigured", "nmap is not configured", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
 		case fp.IsWeb:
-			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "not_applicable", "NSE checks are not run for web services", time.Now(), time.Now()); err != nil {
+			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "no_matching_rule", "NSE checks are not run for web services", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
-		case opts.Tools.Nmap == "":
-			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "tool_unconfigured", "nmap is not configured", time.Now(), time.Now()); err != nil {
+		case len(scripts) == 0:
+			if err := recordDetectionCheck(opts, fp, "nse", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
 		default:
@@ -199,6 +199,9 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "tool_unconfigured", "nuclei is not configured", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
+		// NSE and nuclei DetectionCheck tails are kept separate on purpose:
+		// nuclei has an extra ParseNucleiJSONL + invalid_output stage that NSE lacks,
+		// so a shared helper would parameterize (and blur) the state machine.
 		default:
 			progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 			started := time.Now()
