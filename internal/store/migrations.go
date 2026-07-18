@@ -123,7 +123,7 @@ CREATE TABLE run_leases (
   scope TEXT PRIMARY KEY,
   run_id TEXT NOT NULL,
   owner_token TEXT NOT NULL,
-  heartbeat_at TEXT NOT NULL
+  heartbeat_at INTEGER NOT NULL
 );`,
 	},
 }

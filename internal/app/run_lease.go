@@ -16,21 +16,54 @@ const (
 	runLeaseTTL       = 30 * time.Second
 )
 
-func acquireRunLease(ctx context.Context, scanStore *store.Store, runID string) (context.Context, func(), error) {
-	if scanStore == nil || runID == "" {
-		return ctx, func() {}, nil
-	}
+func newRunLeaseToken() (string, error) {
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
-		return nil, nil, err
+		return "", err
 	}
-	ownerToken := hex.EncodeToString(bytes)
-	lease, err := scanStore.AcquireRunLease(runID, ownerToken, time.Now(), runLeaseTTL)
+	return hex.EncodeToString(bytes), nil
+}
+
+func reserveRunLease(scanStore *store.Store, runID string) (string, error) {
+	if scanStore == nil || runID == "" {
+		return "", nil
+	}
+	token, err := newRunLeaseToken()
 	if err != nil {
-		if errors.Is(err, store.ErrRunLeaseHeld) {
-			return nil, nil, fmt.Errorf("scan already running: %s", lease.RunID)
+		return "", err
+	}
+	lease, err := scanStore.AcquireRunLease(runID, token, time.Now(), runLeaseTTL)
+	if errors.Is(err, store.ErrRunLeaseHeld) {
+		return "", fmt.Errorf("scan already running: %s", lease.RunID)
+	}
+	return token, err
+}
+
+func acquireRunLease(ctx context.Context, scanStore *store.Store, runID, ownerToken string) (context.Context, func(string, string, time.Time), error) {
+	if scanStore == nil || runID == "" {
+		return ctx, func(string, string, time.Time) {}, nil
+	}
+	if ownerToken == "" {
+		var err error
+		ownerToken, err = newRunLeaseToken()
+		if err != nil {
+			return nil, nil, err
 		}
-		return nil, nil, err
+		lease, err := scanStore.AcquireRunLease(runID, ownerToken, time.Now(), runLeaseTTL)
+		if err != nil {
+			if errors.Is(err, store.ErrRunLeaseHeld) {
+				return nil, nil, fmt.Errorf("scan already running: %s", lease.RunID)
+			}
+			return nil, nil, err
+		}
+	} else {
+		owned, err := scanStore.RenewRunLease(runID, ownerToken, time.Now())
+		if err != nil {
+			return nil, nil, err
+		}
+		if !owned {
+			return nil, nil, errors.New("run lease was lost")
+		}
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)
@@ -58,10 +91,10 @@ func acquireRunLease(ctx context.Context, scanStore *store.Store, runID string) 
 		}
 	}()
 
-	return runCtx, func() {
+	return runCtx, func(status, message string, finishedAt time.Time) {
 		close(stop)
 		<-done
 		cancel()
-		_, _ = scanStore.ReleaseRunLease(runID, ownerToken)
+		_, _ = scanStore.FinishRunWithLease(runID, ownerToken, status, message, finishedAt)
 	}, nil
 }

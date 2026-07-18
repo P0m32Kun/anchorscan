@@ -52,6 +52,35 @@ func TestManagerAllowsOnlyOneActiveToolRun(t *testing.T) {
 	waitForInactive(t, manager)
 }
 
+func TestManagerRejectsRunHeldByAnotherManager(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "scan.db")
+	firstStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer firstStore.Close()
+	secondStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer secondStore.Close()
+	first := NewManager(sleepRunner{}, firstStore)
+	second := NewManager(sleepRunner{}, secondStore)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	firstOpts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "first.json")}
+	if _, err := first.Start(ctx, firstOpts); err != nil {
+		t.Fatal(err)
+	}
+	secondOpts := firstOpts
+	secondOpts.RunID = "run-2"
+	if _, err := second.Start(context.Background(), secondOpts); err == nil || err.Error() != "scan already running: run-1" {
+		t.Fatalf("second manager error = %v", err)
+	}
+	cancel()
+	waitForInactive(t, first)
+}
+
 type sleepRunner struct{}
 
 func (sleepRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {

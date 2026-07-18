@@ -17,21 +17,22 @@ import (
 )
 
 type ToolRunOptions struct {
-	RunID          string
-	ProjectID      string
-	Tool           string
-	Mode           string
-	Target         string
-	Ports          string
-	UseNativeArgs  bool
-	NativeArgs     []string
-	URL            string
-	Tags           []string
-	Template       string
-	Tools          ToolPaths
-	ExtraArgs      ToolExtraArgs
-	JSONReportPath string
-	Logf           func(format string, args ...any)
+	RunID           string
+	LeaseOwnerToken string
+	ProjectID       string
+	Tool            string
+	Mode            string
+	Target          string
+	Ports           string
+	UseNativeArgs   bool
+	NativeArgs      []string
+	URL             string
+	Tags            []string
+	Template        string
+	Tools           ToolPaths
+	ExtraArgs       ToolExtraArgs
+	JSONReportPath  string
+	Logf            func(format string, args ...any)
 }
 
 func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) (runErr error) {
@@ -47,11 +48,10 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.Mode == "" {
 		opts.Mode = "service"
 	}
-	ctx, releaseLease, err := acquireRunLease(ctx, scanStore, opts.RunID)
+	ctx, finishLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
 	if err != nil {
 		return err
 	}
-	defer releaseLease()
 
 	saveToolRun(scanStore, opts)
 	defer func() {
@@ -64,7 +64,7 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 				status = "canceled"
 			}
 		}
-		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
+		finishLease(status, message, time.Now())
 	}()
 
 	if opts.UseNativeArgs {

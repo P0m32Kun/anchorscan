@@ -27,7 +27,13 @@ func (m *Manager) Start(ctx context.Context, opts ScanOptions) (string, error) {
 		m.mu.Unlock()
 		return "", errors.New("scan already running")
 	}
+	ownerToken, err := reserveRunLease(m.store, opts.RunID)
+	if err != nil {
+		m.mu.Unlock()
+		return "", err
+	}
 	runCtx, cancel := context.WithCancel(ctx)
+	opts.LeaseOwnerToken = ownerToken
 	m.activeID = opts.RunID
 	m.cancel = cancel
 	m.mu.Unlock()
@@ -48,7 +54,13 @@ func (m *Manager) StartTool(ctx context.Context, opts ToolRunOptions) (string, e
 		m.mu.Unlock()
 		return "", errors.New("scan already running")
 	}
+	ownerToken, err := reserveRunLease(m.store, opts.RunID)
+	if err != nil {
+		m.mu.Unlock()
+		return "", err
+	}
 	runCtx, cancel := context.WithCancel(ctx)
+	opts.LeaseOwnerToken = ownerToken
 	m.activeID = opts.RunID
 	m.cancel = cancel
 	m.mu.Unlock()

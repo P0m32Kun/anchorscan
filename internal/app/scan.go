@@ -22,20 +22,21 @@ type ToolExtraArgs = config.ToolArgs
 type TagRule = vuln.TagRule
 
 type ScanOptions struct {
-	RunID          string
-	ProjectID      string
-	Targets        []string
-	Ports          string
-	Tools          ToolPaths
-	ProfileName    string
-	HostWorkers    int
-	ExtraArgs      ToolExtraArgs
-	ConfigSnapshot string
-	JSONReportPath string
-	ArtifactRoot   string
-	NSERules       map[string][]string
-	TagRules       []TagRule
-	Logf           func(format string, args ...any)
+	RunID           string
+	LeaseOwnerToken string
+	ProjectID       string
+	Targets         []string
+	Ports           string
+	Tools           ToolPaths
+	ProfileName     string
+	HostWorkers     int
+	ExtraArgs       ToolExtraArgs
+	ConfigSnapshot  string
+	JSONReportPath  string
+	ArtifactRoot    string
+	NSERules        map[string][]string
+	TagRules        []TagRule
+	Logf            func(format string, args ...any)
 }
 
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
@@ -44,11 +45,10 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
 	}
-	ctx, releaseLease, err := acquireRunLease(ctx, scanStore, opts.RunID)
+	ctx, finishLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
 	if err != nil {
 		return err
 	}
-	defer releaseLease()
 	if opts.RunID != "" && strings.TrimSpace(opts.ArtifactRoot) != "" {
 		artifactDir = filepath.Join(opts.ArtifactRoot, opts.RunID)
 		if err := os.MkdirAll(artifactDir, 0o755); err != nil {
@@ -81,7 +81,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 				status = "canceled"
 			}
 		}
-		_ = scanStore.UpdateScanRunStatus(opts.RunID, status, message, time.Now())
+		finishLease(status, message, time.Now())
 	}()
 
 	progress := storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}
