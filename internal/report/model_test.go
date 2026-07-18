@@ -180,3 +180,37 @@ func TestBuildKeepsProtocollessFindingSeparateWhenFingerprintIsAmbiguous(t *test
 		t.Fatalf("first port = %#v, want separate protocol-less finding", port)
 	}
 }
+
+func TestBuildWithDetectionChecksClassifiesOnlyCompletedEngines(t *testing.T) {
+	rpt := BuildWithScanDataAndDetectionChecks(
+		[]fingerprint.ServiceFingerprint{
+			{IP: "192.0.2.1", Port: 22, Protocol: "tcp"},
+			{IP: "192.0.2.2", Port: 443, Protocol: "tcp"},
+			{IP: "192.0.2.3", Port: 6379, Protocol: "tcp"},
+		},
+		nil,
+		ScanData{},
+		[]DetectionCheck{
+			{IP: "192.0.2.1", Port: 22, Protocol: "tcp", Engine: "nse", Status: "completed"},
+			{IP: "192.0.2.1", Port: 22, Protocol: "tcp", Engine: "nuclei", Status: "completed"},
+			{IP: "192.0.2.2", Port: 443, Protocol: "tcp", Engine: "nse", Status: "completed"},
+			{IP: "192.0.2.2", Port: 443, Protocol: "tcp", Engine: "nuclei", Status: "failed"},
+			{IP: "192.0.2.3", Port: 6379, Protocol: "tcp", Engine: "nse", Status: "skipped"},
+		},
+	)
+	if rpt.DetectionCoverage == nil || rpt.DetectionCoverage.DualEngine != 1 || rpt.DetectionCoverage.SingleEngine != 1 || rpt.DetectionCoverage.Uncovered != 1 || rpt.DetectionCoverage.Failed != 1 || rpt.DetectionCoverage.Skipped != 1 {
+		t.Fatalf("detection coverage = %#v", rpt.DetectionCoverage)
+	}
+	if len(rpt.DetectionChecks) != 5 || rpt.DetectionChecks[0].IP != "192.0.2.1" {
+		t.Fatalf("detection checks = %#v", rpt.DetectionChecks)
+	}
+}
+
+func TestBuildWithDetectionChecksMarksMissingChecksUncovered(t *testing.T) {
+	rpt := BuildWithScanDataAndDetectionChecks(
+		[]fingerprint.ServiceFingerprint{{IP: "192.0.2.10", Port: 443, Protocol: "tcp"}}, nil, ScanData{}, nil,
+	)
+	if rpt.DetectionCoverage == nil || rpt.DetectionCoverage.Uncovered != 1 || len(rpt.DetectionChecks) != 0 {
+		t.Fatalf("detection coverage = %#v, checks = %#v", rpt.DetectionCoverage, rpt.DetectionChecks)
+	}
+}

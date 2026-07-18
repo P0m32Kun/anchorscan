@@ -19,6 +19,8 @@ type reportViewModel struct {
 	Filters                reportFilters
 	Fingerprints           any
 	Findings               any
+	DetectionChecks        []report.DetectionCheck
+	DetectionCoverage      *report.DetectionCoverage
 	Risk                   riskSummary
 	CommandTools           map[string]commandToolsView
 	AssetPage              reportPage
@@ -43,12 +45,14 @@ type reportViewModel struct {
 // depends on server-held tool config via buildCommand). Everything else the
 // builder does is pure shaping over a plain url.Values.
 type reportViewInput struct {
-	Run          store.ScanRun
-	Fingerprints []fingerprint.ServiceFingerprint
-	Findings     []report.Finding
-	Query        url.Values
-	Catalog      *knowledgebase.Catalog
-	CommandTools map[string]commandToolsView
+	Run               store.ScanRun
+	Fingerprints      []fingerprint.ServiceFingerprint
+	Findings          []report.Finding
+	DetectionChecks   []report.DetectionCheck
+	DetectionCoverage *report.DetectionCoverage
+	Query             url.Values
+	Catalog           *knowledgebase.Catalog
+	CommandTools      map[string]commandToolsView
 }
 
 // buildReportViewModel shapes the HTML report view: parses the view mode, builds
@@ -83,6 +87,8 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 		Filters:                reportFiltersFromValues(query),
 		Fingerprints:           assetPage.Items,
 		Findings:               findingPage.Items,
+		DetectionChecks:        in.DetectionChecks,
+		DetectionCoverage:      in.DetectionCoverage,
 		Risk:                   summarizeRisk(in.Findings),
 		CommandTools:           in.CommandTools,
 		AssetPage:              assetPage,

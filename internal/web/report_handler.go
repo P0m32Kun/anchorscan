@@ -66,10 +66,29 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	var detectionChecks []report.DetectionCheck
+	if run.Status != "running" {
+		checks, err := s.store.ListDetectionChecks(runID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, check := range checks {
+			detectionChecks = append(detectionChecks, report.DetectionCheck{
+				IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine,
+				Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail,
+				StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
+			})
+		}
+	}
 	filters := reportFiltersFromValues(r.URL.Query())
 	filteredFingerprints := filterFingerprints(fps, filters)
 	filteredFindings := filterFindings(findings, fps, filters)
+	filteredChecks := filterDetectionChecks(detectionChecks, filteredFingerprints)
 	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
+	if run.Status != "running" {
+		filteredBuilt = report.BuildWithScanDataAndDetectionChecks(filteredFingerprints, filteredFindings, report.ScanData{}, filteredChecks)
+	}
 	if format == "html" || exportFormat == "html" {
 		report.EnrichFindingsWithVulnerabilityDetails(&filteredBuilt, s.catalog)
 	}
@@ -138,12 +157,14 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		render(w, "templates/report.html", buildReportViewModel(reportViewInput{
-			Run:          run,
-			Fingerprints: filteredFingerprints,
-			Findings:     filteredFindings,
-			Query:        r.URL.Query(),
-			Catalog:      s.catalog,
-			CommandTools: s.commandTools(filteredFindings),
+			Run:               run,
+			Fingerprints:      filteredFingerprints,
+			Findings:          filteredFindings,
+			DetectionChecks:   filteredBuilt.DetectionChecks,
+			DetectionCoverage: filteredBuilt.DetectionCoverage,
+			Query:             r.URL.Query(),
+			Catalog:           s.catalog,
+			CommandTools:      s.commandTools(filteredFindings),
 		}))
 	}
 }

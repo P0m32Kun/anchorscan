@@ -4,15 +4,14 @@
 
 **Blocked by:** `06-preserve-partial-results.md`。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
-- [ ] Web 报告按 Fingerprint 显示 NSE/nuclei 状态、原因和详情，运行中页面仍只显示摘要。
-- [ ] 仅 completed 计入成功执行覆盖：两个 completed 为双引擎，一个为单引擎，零个为未覆盖。
-- [ ] failed/canceled/interrupted/skipped 另行显示数量和逐项事实，不被算成成功覆盖。
-- [ ] JSON 增加可选 `detection_checks` 字段；旧字段、顺序和消费者兼容。
-- [ ] 独立 HTML 消费同一数据并保持自包含。
-- [ ] 现有 IP、IP:PORT、URL、CSV 导出行为完全不变。
-- [ ] Web HTTP、JSON 和独立报告测试证明分类一致且不输出百分比或安全保证。
-
+- [x] Web 报告按 Fingerprint 显示 NSE/nuclei 状态、原因和详情，运行中页面仍只显示摘要。
+- [x] 仅 completed 计入成功执行覆盖：两个 completed 为双引擎，一个为单引擎，零个为未覆盖。
+- [x] failed/canceled/interrupted/skipped 另行显示数量和逐项事实，不被算成成功覆盖。
+- [x] JSON 增加可选 `detection_checks` 字段；旧字段、顺序和消费者兼容。
+- [x] 独立 HTML 消费同一数据并保持自包含。
+- [x] 现有 IP、IP:PORT、URL、CSV 导出行为完全不变。
+- [x] Web HTTP、JSON 和独立报告测试证明分类一致且不输出百分比或安全保证。

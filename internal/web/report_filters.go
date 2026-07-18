@@ -76,6 +76,19 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 	return out
 }
 
+func filterDetectionChecks(items []report.DetectionCheck, fps []fingerprint.ServiceFingerprint) []report.DetectionCheck {
+	var out []report.DetectionCheck
+	for _, item := range items {
+		for _, fp := range fps {
+			if item.IP == fp.IP && item.Port == fp.Port && item.Protocol == fp.Protocol {
+				out = append(out, item)
+				break
+			}
+		}
+	}
+	return out
+}
+
 func containsValue(items []string, value string) bool {
 	for _, item := range items {
 		if item == value {

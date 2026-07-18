@@ -30,7 +30,7 @@ func TestWriteHTMLStableBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := sha256.Sum256(data)
-	const want = "561541194834b0675cc63519cc08bc03f3c5291e5844da7efbc1c27f741fd8b7"
+	const want = "c1a0cb52b99777e7f7220e445e5e7ab53955b4f1b1376d6e20e160667979763c"
 	if actual := hex.EncodeToString(got[:]); actual != want {
 		t.Fatalf("unexpected HTML SHA-256: got %s, want %s", actual, want)
 	}
@@ -69,6 +69,21 @@ func TestWriteHTMLIncludesFindingSummary(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "matched-at") || !strings.Contains(string(data), "http://192.168.1.10:8080") {
 		t.Fatalf("expected finding evidence in html: %s", string(data))
+	}
+}
+
+func TestWriteHTMLIncludesDetectionChecks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "report.html")
+	input := BuildWithScanDataAndDetectionChecks(
+		[]fingerprint.ServiceFingerprint{{IP: "192.0.2.10", Port: 443, Protocol: "tcp"}}, nil, ScanData{},
+		[]DetectionCheck{{IP: "192.0.2.10", Port: 443, Protocol: "tcp", Engine: "nuclei", Status: "failed", ReasonCode: "command_failed", Detail: "tool exited"}},
+	)
+	if err := WriteHTML(path, input); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(data), "command_failed") || !strings.Contains(string(data), "192.0.2.10:443/tcp") {
+		t.Fatalf("detection HTML = %s, %v", data, err)
 	}
 }
 

@@ -114,11 +114,25 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	partialErrors = partial
 
 	allFingerprints, allFindings, openPorts := flattenScans(scans)
+	var detectionChecks []report.DetectionCheck
+	if scanStore != nil {
+		checks, err := scanStore.ListDetectionChecks(opts.RunID)
+		if err != nil {
+			return err
+		}
+		for _, check := range checks {
+			detectionChecks = append(detectionChecks, report.DetectionCheck{
+				IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine,
+				Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail,
+				StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
+			})
+		}
+	}
 	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)
-	return report.WriteJSON(opts.JSONReportPath, report.BuildWithScanData(allFingerprints, allFindings, report.ScanData{
+	return report.WriteJSON(opts.JSONReportPath, report.BuildWithScanDataAndDetectionChecks(allFingerprints, allFindings, report.ScanData{
 		AliveIPs:  aliveIPs,
 		OpenPorts: openPorts,
-	}))
+	}, detectionChecks))
 }
 
 func logf(opts ScanOptions, format string, args ...any) {

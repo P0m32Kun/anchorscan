@@ -41,4 +41,7 @@ func TestWriteJSONOutputsHostAndPortData(t *testing.T) {
 	if len(findings) != 1 {
 		t.Fatalf("expected one finding in report, got %#v", firstPort)
 	}
+	if _, ok := decoded["detection_checks"]; ok {
+		t.Fatalf("legacy report unexpectedly contains detection checks: %#v", decoded)
+	}
 }

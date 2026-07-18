@@ -50,7 +50,19 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	if err != nil {
 		return err
 	}
-	builtReport := report.Build(fps, findings)
+	checks, err := scanStore.ListDetectionChecks(*runID)
+	if err != nil {
+		return err
+	}
+	reportChecks := make([]report.DetectionCheck, 0, len(checks))
+	for _, check := range checks {
+		reportChecks = append(reportChecks, report.DetectionCheck{
+			IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine,
+			Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail,
+			StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
+		})
+	}
+	builtReport := report.BuildWithScanDataAndDetectionChecks(fps, findings, report.ScanData{}, reportChecks)
 	if *jsonPath != "" {
 		if err := ensureParentDir(*jsonPath); err != nil {
 			return err

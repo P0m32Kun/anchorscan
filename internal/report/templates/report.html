@@ -604,6 +604,20 @@
       </button>
     </div>
 
+    {{if .DetectionCoverage}}
+    <p style="color: var(--muted); margin: 0 0 0.75rem;">检测执行汇总仅表示本次记录，不代表安全保证。</p>
+    <div class="stats-grid" style="margin-bottom: 1rem;">
+      <div class="stat-card"><span class="stat-label">双引擎</span><span class="stat-value">{{.DetectionCoverage.DualEngine}}</span></div>
+      <div class="stat-card"><span class="stat-label">单引擎</span><span class="stat-value">{{.DetectionCoverage.SingleEngine}}</span></div>
+      <div class="stat-card"><span class="stat-label">未覆盖</span><span class="stat-value">{{.DetectionCoverage.Uncovered}}</span></div>
+      <div class="stat-card"><span class="stat-label">失败 / 跳过 / 取消 / 中断</span><span class="stat-value">{{.DetectionCoverage.Failed}} / {{.DetectionCoverage.Skipped}} / {{.DetectionCoverage.Canceled}} / {{.DetectionCoverage.Interrupted}}</span></div>
+    </div>
+    <table>
+      <thead><tr><th>Fingerprint</th><th>引擎</th><th>状态</th><th>时间</th><th>原因</th><th>详情</th></tr></thead>
+      <tbody>{{range .DetectionChecks}}<tr><td class="ip-cell">{{.IP}}:{{.Port}}/{{.Protocol}}</td><td>{{.Engine}}</td><td>{{.Status}}</td><td>{{.StartedAt}} {{.FinishedAt}}</td><td>{{.ReasonCode}}</td><td>{{.Detail}}</td></tr>{{end}}</tbody>
+    </table>
+    {{end}}
+
     <!-- Search / Filter panel -->
     <div class="filter-panel">
       <div class="filter-header">

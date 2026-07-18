@@ -25,6 +25,9 @@ func TestExecuteReportWritesHTMLFromStoredRun(t *testing.T) {
 	if err := scanStore.SaveFingerprint("run-1", sampleFingerprint()); err != nil {
 		t.Fatalf("SaveFingerprint returned error: %v", err)
 	}
+	if err := scanStore.UpsertDetectionCheck(store.DetectionCheck{RunID: "run-1", IP: "192.168.1.10", Port: 6379, Engine: "nuclei", Status: "skipped", ReasonCode: "no_matching_rule"}); err != nil {
+		t.Fatalf("UpsertDetectionCheck returned error: %v", err)
+	}
 
 	err = run([]string{
 		"report",
@@ -42,6 +45,10 @@ func TestExecuteReportWritesHTMLFromStoredRun(t *testing.T) {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected file %s: %v", path, err)
 		}
+	}
+	data, err := os.ReadFile(jsonPath)
+	if err != nil || !strings.Contains(string(data), `"detection_checks"`) || !strings.Contains(string(data), "no_matching_rule") {
+		t.Fatalf("report json = %s, %v", data, err)
 	}
 }
 

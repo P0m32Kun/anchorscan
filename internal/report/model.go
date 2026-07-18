@@ -3,6 +3,7 @@ package report
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 )
@@ -45,9 +46,40 @@ type ScanMeta struct {
 }
 
 type ScanReport struct {
-	ScanMeta ScanMeta     `json:"scan_meta"`
-	AliveIPs []string     `json:"alive_ips,omitempty"`
-	Hosts    []HostReport `json:"hosts"`
+	ScanMeta          ScanMeta           `json:"scan_meta"`
+	AliveIPs          []string           `json:"alive_ips,omitempty"`
+	Hosts             []HostReport       `json:"hosts"`
+	DetectionChecks   []DetectionCheck   `json:"detection_checks,omitempty"`
+	DetectionCoverage *DetectionCoverage `json:"detection_coverage,omitempty"`
+}
+
+type DetectionCheck struct {
+	IP         string `json:"ip"`
+	Port       int    `json:"port"`
+	Protocol   string `json:"protocol"`
+	Engine     string `json:"engine"`
+	Status     string `json:"status"`
+	ReasonCode string `json:"reason_code,omitempty"`
+	Detail     string `json:"detail,omitempty"`
+	StartedAt  string `json:"started_at,omitempty"`
+	FinishedAt string `json:"finished_at,omitempty"`
+}
+
+type DetectionCoverage struct {
+	DualEngine   int `json:"dual_engine"`
+	SingleEngine int `json:"single_engine"`
+	Uncovered    int `json:"uncovered"`
+	Failed       int `json:"failed"`
+	Canceled     int `json:"canceled"`
+	Interrupted  int `json:"interrupted"`
+	Skipped      int `json:"skipped"`
+}
+
+func DetectionCheckTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339Nano)
 }
 
 // ScanData carries the supplementary scan results that the report should expose
@@ -68,6 +100,14 @@ func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport 
 // that are alive but yielded no fingerprints are still emitted (with empty
 // Ports) so the report reflects every live host on the network.
 func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding, data ScanData) ScanReport {
+	return buildWithScanDataAndDetectionChecks(fps, findings, data, nil, false)
+}
+
+func BuildWithScanDataAndDetectionChecks(fps []fingerprint.ServiceFingerprint, findings []Finding, data ScanData, checks []DetectionCheck) ScanReport {
+	return buildWithScanDataAndDetectionChecks(fps, findings, data, checks, true)
+}
+
+func buildWithScanDataAndDetectionChecks(fps []fingerprint.ServiceFingerprint, findings []Finding, data ScanData, checks []DetectionCheck, includeCoverage bool) ScanReport {
 	hostMap := map[string]*HostReport{}
 	findingsByPort := map[string][]Finding{}
 	attachedFindingPorts := map[string]bool{}
@@ -171,11 +211,69 @@ func BuildWithScanData(fps []fingerprint.ServiceFingerprint, findings []Finding,
 		aliveIPs = dedupeStrings(aliveIPs)
 	}
 
-	return ScanReport{
+	report := ScanReport{
 		ScanMeta: ScanMeta{Tool: "anchorscan"},
 		AliveIPs: aliveIPs,
 		Hosts:    hosts,
 	}
+	if len(checks) > 0 {
+		report.DetectionChecks = append([]DetectionCheck(nil), checks...)
+		sort.Slice(report.DetectionChecks, func(i, j int) bool {
+			left, right := report.DetectionChecks[i], report.DetectionChecks[j]
+			if left.IP != right.IP {
+				return left.IP < right.IP
+			}
+			if left.Port != right.Port {
+				return left.Port < right.Port
+			}
+			if left.Protocol != right.Protocol {
+				return left.Protocol < right.Protocol
+			}
+			return left.Engine < right.Engine
+		})
+	}
+	if includeCoverage {
+		coverage := summarizeDetectionCoverage(fps, report.DetectionChecks)
+		report.DetectionCoverage = &coverage
+	}
+	return report
+}
+
+func summarizeDetectionCoverage(fps []fingerprint.ServiceFingerprint, checks []DetectionCheck) DetectionCoverage {
+	completed := map[string]map[string]bool{}
+	coverage := DetectionCoverage{}
+	for _, check := range checks {
+		switch check.Status {
+		case "failed":
+			coverage.Failed++
+		case "canceled":
+			coverage.Canceled++
+		case "interrupted":
+			coverage.Interrupted++
+		case "skipped":
+			coverage.Skipped++
+		}
+		if check.Status != "completed" || (check.Engine != "nse" && check.Engine != "nuclei") {
+			continue
+		}
+		key := portKey(check.IP, check.Port, check.Protocol)
+		if completed[key] == nil {
+			completed[key] = map[string]bool{}
+		}
+		completed[key][check.Engine] = true
+	}
+	for _, fp := range fps {
+		count := len(completed[portKey(fp.IP, fp.Port, fp.Protocol)])
+		switch count {
+		case 2:
+			coverage.DualEngine++
+		case 1:
+			coverage.SingleEngine++
+		default:
+			coverage.Uncovered++
+		}
+	}
+	return coverage
 }
 
 func dedupeInts(values []int) []int {

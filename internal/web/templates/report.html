@@ -56,6 +56,41 @@
   </dl>
 </section>
 
+{{if .DetectionCoverage}}
+<section class="panel report-overview">
+  <div class="report-overview-copy">
+    <p class="eyebrow">检测执行覆盖</p>
+    <h3>仅统计已完成的检测引擎</h3>
+    <p class="meta-line">数量反映本次运行记录，不代表安全保证。</p>
+  </div>
+  <dl class="risk-summary" aria-label="检测执行覆盖汇总">
+    <div><dt>双引擎</dt><dd>{{.DetectionCoverage.DualEngine}}</dd></div>
+    <div><dt>单引擎</dt><dd>{{.DetectionCoverage.SingleEngine}}</dd></div>
+    <div><dt>未覆盖</dt><dd>{{.DetectionCoverage.Uncovered}}</dd></div>
+    <div><dt>失败 / 跳过 / 取消 / 中断</dt><dd>{{.DetectionCoverage.Failed}} / {{.DetectionCoverage.Skipped}} / {{.DetectionCoverage.Canceled}} / {{.DetectionCoverage.Interrupted}}</dd></div>
+  </dl>
+</section>
+
+<section class="panel report-section">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">检测执行事实</p>
+      <h3>NSE 与 nuclei</h3>
+    </div>
+  </div>
+  <div class="scroll-table">
+    <table class="data-table report-table">
+      <thead><tr><th>Fingerprint</th><th>引擎</th><th>状态</th><th>时间</th><th>原因</th><th>详情</th></tr></thead>
+      <tbody>
+        {{range .DetectionChecks}}
+        <tr><td class="mono-value">{{.IP}}:{{.Port}}/{{.Protocol}}</td><td>{{.Engine}}</td><td>{{.Status}}</td><td class="mono-value">{{.StartedAt}} {{.FinishedAt}}</td><td>{{.ReasonCode}}</td><td>{{.Detail}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+{{end}}
+
 <section class="panel report-filter">
   <form class="search-console-form" method="get" id="report-filter-form">
     <div class="search-console-bar">

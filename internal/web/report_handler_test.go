@@ -27,6 +27,47 @@ func TestSummarizeRisk(t *testing.T) {
 	}
 }
 
+func TestTerminalReportIncludesDetectionCoverage(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-coverage", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFingerprint("run-coverage", fingerprint.ServiceFingerprint{IP: "192.0.2.10", Port: 443, Protocol: "tcp", Service: "https"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range []store.DetectionCheck{
+		{RunID: "run-coverage", IP: "192.0.2.10", Port: 443, Protocol: "tcp", Engine: "nse", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)},
+		{RunID: "run-coverage", IP: "192.0.2.10", Port: 443, Protocol: "tcp", Engine: "nuclei", Status: "failed", ReasonCode: "command_failed", Detail: "tool exited", StartedAt: time.Unix(3, 0), FinishedAt: time.Unix(4, 0)},
+	} {
+		if err := scanStore.UpsertDetectionCheck(check); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	page := httptest.NewRecorder()
+	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/reports/run-coverage", nil))
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "检测执行覆盖") || !strings.Contains(page.Body.String(), "command_failed") {
+		t.Fatalf("report page = %d %s", page.Code, page.Body.String())
+	}
+	jsonReport := httptest.NewRecorder()
+	handler.ServeHTTP(jsonReport, httptest.NewRequest(http.MethodGet, "/reports/run-coverage.json", nil))
+	if jsonReport.Code != http.StatusOK || !strings.Contains(jsonReport.Body.String(), `"detection_checks"`) || !strings.Contains(jsonReport.Body.String(), `"single_engine":1`) || !strings.Contains(jsonReport.Body.String(), `"started_at":"1970-01-01T00:00:01Z"`) || strings.Contains(jsonReport.Body.String(), "%") {
+		t.Fatalf("report JSON = %d %s", jsonReport.Code, jsonReport.Body.String())
+	}
+}
+
 func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
