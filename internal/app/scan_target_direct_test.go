@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
 // recordingProgress is a no-store Progress used to exercise scanTarget without a
@@ -89,5 +91,63 @@ func TestScanTargetSkipsFingerprintWhenNoOpenPorts(t *testing.T) {
 	// Only rustscan should have run.
 	if len(runner.commands) != 1 {
 		t.Fatalf("tool commands = %d, want 1 (rustscan only): %v", len(runner.commands), runner.commands)
+	}
+}
+
+func TestScanTargetRecordsNSESkipReasons(t *testing.T) {
+	tests := []struct {
+		name       string
+		serviceXML []byte
+		tools      ToolPaths
+		rules      map[string][]string
+		wantReason string
+	}{
+		{
+			name:       "web service skips matching nse rule",
+			serviceXML: []byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+			tools:      ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+			rules:      map[string][]string{"http": {"http-title"}},
+			wantReason: "no_matching_rule",
+		},
+		{
+			name:       "unconfigured nmap wins over no matching nse rule",
+			serviceXML: []byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+			tools:      ToolPaths{Rustscan: "/opt/rustscan"},
+			rules:      map[string][]string{"mysql": {"mysql-info"}},
+			wantReason: "tool_unconfigured",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := &recordingSequenceRunner{outputs: [][]byte{
+				[]byte("192.168.1.10 -> [80]\\n"),
+				tt.serviceXML,
+			}}
+			var checks []store.DetectionCheck
+			opts := ScanOptions{
+				RunID:                "run-nse-skip",
+				Ports:                "1-65535",
+				Tools:                tt.tools,
+				NSERules:             tt.rules,
+				RecordDetectionCheck: func(check store.DetectionCheck) error { checks = append(checks, check); return nil },
+			}
+
+			if _, err := scanTarget(context.Background(), runner, opts, "192.168.1.10", t.TempDir(), &recordingProgress{}); err != nil {
+				t.Fatalf("scanTarget returned error: %v", err)
+			}
+			for _, check := range checks {
+				if check.Engine == "nse" {
+					if check.Status != "skipped" || check.ReasonCode != tt.wantReason {
+						t.Fatalf("NSE check = %#v, want skipped/%s", check, tt.wantReason)
+					}
+					if len(runner.commands) != 2 {
+						t.Fatalf("NSE should not run, commands=%#v", runner.commands)
+					}
+					return
+				}
+			}
+			t.Fatalf("NSE detection check not recorded: %#v", checks)
+		})
 	}
 }
