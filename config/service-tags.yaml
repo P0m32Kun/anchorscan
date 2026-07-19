@@ -160,36 +160,30 @@
 
 # ===== Web 产品指纹（target: url，依赖 httpx 识别技术栈） =====
 - name: tomcat
-  service: ["http"]
   product: ["tomcat", "apache tomcat"]
   tech: ["tomcat"]
   nuclei_tags: ["tomcat", "apache-tomcat"]
   target: "url"
 - name: nginx
-  service: ["http"]
   product: ["nginx"]
   tech: ["nginx"]
   nuclei_tags: ["nginx"]
   target: "url"
 - name: apache
-  service: ["http"]
   product: ["apache", "apache httpd", "apache http server"]
   tech: ["apache"]
   nuclei_tags: ["apache"]
   target: "url"
 - name: iis
-  service: ["http"]
   product: ["iis", "microsoft iis"]
   tech: ["iis", "microsoft-iis"]
   nuclei_tags: ["iis"]
   target: "url"
 - name: wordpress
-  service: ["http"]
   tech: ["wordpress"]
   nuclei_tags: ["wordpress"]
   target: "url"
 - name: joomla
-  service: ["http"]
   tech: ["joomla"]
   nuclei_tags: ["joomla"]
   target: "url"

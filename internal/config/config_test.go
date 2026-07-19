@@ -4,8 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
 
@@ -242,6 +244,58 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 		}
 		if rule.Target != "url" && rule.Target != "hostport" {
 			t.Fatalf("rule %s has unexpected target %q (want url or hostport)", rule.Name, rule.Target)
+		}
+	}
+}
+
+func TestDefaultWebRulesRouteByFingerprint(t *testing.T) {
+	rules, err := LoadTagRules(filepath.Join("..", "..", "config", "service-tags.yaml"))
+	if err != nil {
+		t.Fatalf("LoadTagRules returned error: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		product string
+		tech    []string
+		wantTag string
+	}{
+		{name: "IIS is not claimed by Tomcat", tech: []string{"iis"}, wantTag: "iis"},
+		{name: "Tomcat remains product-specific", product: "Apache Tomcat", tech: []string{"tomcat"}, wantTag: "tomcat"},
+		{name: "unknown HTTP uses generic fallback", wantTag: "http"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := vuln.MatchNucleiTags(fingerprint.ServiceFingerprint{
+				IP: "127.0.0.1", Port: 8080, Normalized: "http", Product: tt.product,
+			}, vuln.HTTPResult{URL: "http://127.0.0.1:8080", Tech: tt.tech}, rules)
+			if len(got.Tags) == 0 || got.Tags[0] != tt.wantTag {
+				t.Fatalf("unexpected tags: got %#v want first tag %q", got.Tags, tt.wantTag)
+			}
+		})
+	}
+}
+
+func TestDefaultHighriskPortsCoverRequestedServices(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "config", "ports-highrisk.txt"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	ports := map[string]bool{}
+	for _, port := range strings.Split(strings.TrimSpace(string(data)), ",") {
+		ports[port] = true
+	}
+	for _, port := range []string{
+		"21", "22", "23", "25", "80", "102", "111", "161", "443", "445", "502", "513", "514", "873", "901", "1099",
+		"1234", "1433", "1521", "1911", "2181", "2200", "2222", "2375", "2376", "2404", "2455", "3306", "3389", "4840",
+		"5006", "5007", "5900", "5901", "5984", "6000", "6001", "6379", "6380", "6443", "6666", "7001", "7002", "8009",
+		"8022", "8080", "8081", "8082", "8090", "8161", "8443", "8834", "9092", "9200", "9300", "9600", "10022", "11211",
+		"11234", "12345", "13306", "13389", "15432", "15900", "16379", "18080", "20000", "22022", "26379", "27017", "27018",
+		"28017", "28080", "33060", "44818", "47808",
+	} {
+		if !ports[port] {
+			t.Errorf("high-risk port %s is missing", port)
 		}
 	}
 }
