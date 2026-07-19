@@ -114,7 +114,18 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		ProjectID:      projectID,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		field := "target"
+		errMsg := err.Error()
+		if strings.Contains(strings.ToLower(errMsg), "port") {
+			field = "ports"
+		}
+		preflightResult := preflight.Result{
+			Errors: []preflight.Message{
+				{Field: field, Message: errMsg},
+			},
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		s.renderProjectScanForm(w, *project, preflightResult, form)
 		return
 	}
 	if prepared.Preflight.HasErrors() {

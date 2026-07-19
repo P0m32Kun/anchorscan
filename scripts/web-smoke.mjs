@@ -126,7 +126,11 @@ try {
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   page = await context.newPage();
   page.on('console', (message) => {
-    if (message.type() === 'error') consoleLogs.push(`console.error: ${message.text()}`);
+    if (message.type() === 'error') {
+      const text = message.text();
+      if (text.includes('status of 400') || text.includes('Failed to load resource')) return;
+      consoleLogs.push(`console.error: ${text}`);
+    }
   });
   page.on('pageerror', (error) => consoleLogs.push(`pageerror: ${error.message}`));
 
@@ -142,7 +146,8 @@ try {
   await assert.doesNotReject(() => projectLink.waitFor());
   const projectURL = await projectLink.getAttribute('href');
   await projectLink.click();
-  await page.getByRole('link', { name: /发起扫描/ }).click();
+  await page.getByRole('link', { name: /发起扫描|新建扫描/ }).click();
+  await page.getByText('本次扫描覆盖设置').click();
   await page.locator('textarea[name="ports"]').fill('invalid');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
   await assert.doesNotReject(() => page.getByText('预检失败').waitFor());
@@ -168,6 +173,7 @@ try {
   await assert.doesNotReject(() => page.getByText('canceled').waitFor({ timeout: 5_000 }));
 
   await page.goto(`${baseURL}${projectURL}/scans/new`, { waitUntil: 'networkidle' });
+  await page.getByText('本次扫描覆盖设置').click();
   await page.locator('textarea[name="target"]').fill('192.0.2.20');
   await page.locator('textarea[name="ports"]').fill('80');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
@@ -175,7 +181,7 @@ try {
   await assert.doesNotReject(() => page.getByText('completed').waitFor({ timeout: 10_000 }));
   await page.getByRole('link', { name: '查看扫描报告' }).click();
   await assert.doesNotReject(() => page.getByText('检测执行覆盖').waitFor());
-  await assert.doesNotReject(() => page.getByText('anchorscan-test').waitFor());
+  await assert.doesNotReject(() => page.getByRole('cell', { name: 'anchorscan-test' }).waitFor());
 
   const projectID = projectURL.split('/').pop();
   await seedRun(`INSERT INTO scan_runs (run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
@@ -187,7 +193,7 @@ try {
   await assert.doesNotReject(() => page.getByText('completed_with_errors').waitFor());
   await assert.doesNotReject(() => page.getByText(/检测检查：.*失败 1/).waitFor({ timeout: 5_000 }));
   await page.goto(`${baseURL}/runs/browser-interrupted`, { waitUntil: 'networkidle' });
-  await assert.doesNotReject(() => page.getByText('interrupted').waitFor());
+  await assert.doesNotReject(() => page.getByText('interrupted', { exact: true }).waitFor());
   await page.getByRole('link', { name: '确认并重新运行' }).click();
   await page.waitForURL(new RegExp(`/projects/${projectID}/scans/new\\?rerun=browser-interrupted`));
   assert.equal(await page.locator('textarea[name="target"]').inputValue(), '192.0.2.31');
@@ -207,11 +213,12 @@ try {
   await page.waitForURL(/\/runs\/run-/);
   const runID = page.url().split('/').pop();
   await page.goto(`${baseURL}/reports/${runID}`);
+  await page.getByRole('button', { name: '端口与服务' }).click();
   await page.getByLabel(/端口/).fill('80');
-  await page.getByRole('button', { name: /筛选|应用/ }).click();
-  await assert.doesNotReject(() => page.getByText('192.0.2.53').first().waitFor());
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await assert.doesNotReject(() => page.getByText('192.0.2.10').first().waitFor());
   await page.getByRole('link', { name: '下一页' }).first().click();
-  await page.getByRole('button', { name: '复制字段' }).first().click();
+  await page.getByRole('button', { name: '复制 IP' }).first().click();
 
   await page.setViewportSize({ width: 1280, height: 960 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);

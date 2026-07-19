@@ -42,7 +42,7 @@
       下方覆盖项留空即使用项目默认值；仅在本次扫描需要临时调整时填写。
     </p>
 
-    <details class="details-block full-width project-scan-details">
+    <details class="details-block full-width project-scan-details" {{if or .Preflight.Errors .Preflight.Warnings .Form.Target .Form.Ports .Form.IsRerun}}open{{end}}>
       <summary>本次扫描覆盖设置</summary>
       <div class="form-grid project-scan-detail-body">
         <label>
