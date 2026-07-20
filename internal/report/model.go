@@ -58,7 +58,9 @@ type DetectionCheck struct {
 	Port       int    `json:"port"`
 	Protocol   string `json:"protocol"`
 	Engine     string `json:"engine"`
+	CheckID    string `json:"check_id,omitempty"`
 	Status     string `json:"status"`
+	Verdict    string `json:"verdict,omitempty"`
 	ReasonCode string `json:"reason_code,omitempty"`
 	Detail     string `json:"detail,omitempty"`
 	StartedAt  string `json:"started_at,omitempty"`

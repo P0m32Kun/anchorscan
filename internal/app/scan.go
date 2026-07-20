@@ -124,8 +124,8 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 		for _, check := range checks {
 			detectionChecks = append(detectionChecks, report.DetectionCheck{
-				IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine,
-				Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail,
+				IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine, CheckID: check.CheckID,
+				Status: check.Status, Verdict: check.Verdict, ReasonCode: check.ReasonCode, Detail: check.Detail,
 				StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
 			})
 		}

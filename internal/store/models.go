@@ -44,7 +44,9 @@ type DetectionCheck struct {
 	Port       int
 	Protocol   string
 	Engine     string
+	CheckID    string
 	Status     string
+	Verdict    string
 	ReasonCode string
 	Detail     string
 	StartedAt  time.Time

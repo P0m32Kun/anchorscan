@@ -68,6 +68,84 @@ func TestDetectionChecksUpsertAndCountByStatus(t *testing.T) {
 	}
 }
 
+func TestDetectionChecksKeepBuiltinProbesSeparate(t *testing.T) {
+	scanStore, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+
+	now := time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
+	base := DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 3389, Protocol: "tcp", Engine: "builtin", Status: "running", StartedAt: now}
+	for _, check := range []DetectionCheck{
+		{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2019-0708", Status: base.Status, StartedAt: base.StartedAt},
+		{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2099-0001", Status: base.Status, StartedAt: base.StartedAt},
+	} {
+		if err := scanStore.UpsertDetectionCheck(check); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2019-0708", Status: "completed", Verdict: "vulnerable", StartedAt: now, FinishedAt: now.Add(time.Second)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2019-0708", Status: "running", StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+
+	checks, err := scanStore.ListDetectionChecks(base.RunID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(checks) != 2 {
+		t.Fatalf("checks = %#v, want two builtin probes", checks)
+	}
+	if checks[0].CheckID != "CVE-2019-0708" || checks[0].Status != "completed" || checks[0].Verdict != "vulnerable" {
+		t.Fatalf("completed probe regressed: %#v", checks[0])
+	}
+	if checks[1].CheckID != "CVE-2099-0001" || checks[1].Status != "running" {
+		t.Fatalf("sibling probe overwritten: %#v", checks[1])
+	}
+}
+
+func TestOpenMigratesLegacyDetectionChecks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`
+CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
+CREATE TABLE detection_checks (
+  run_id TEXT NOT NULL, ip TEXT NOT NULL, port INTEGER NOT NULL, protocol TEXT NOT NULL, engine TEXT NOT NULL,
+  status TEXT NOT NULL, reason_code TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (run_id, ip, port, protocol, engine)
+);
+INSERT INTO detection_checks VALUES ('run-1', '198.51.100.10', 443, 'tcp', 'nuclei', 'completed', '', '', '', '');
+INSERT INTO schema_migrations (version, name, applied_at) VALUES
+  (1, 'legacy', '2026-07-20T00:00:00Z'), (2, 'legacy', '2026-07-20T00:00:00Z'),
+  (3, 'legacy', '2026-07-20T00:00:00Z'), (4, 'legacy', '2026-07-20T00:00:00Z'),
+  (5, 'legacy', '2026-07-20T00:00:00Z'), (6, 'legacy', '2026-07-20T00:00:00Z'),
+  (7, 'legacy', '2026-07-20T00:00:00Z');`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	scanStore, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+	checks, err := scanStore.ListDetectionChecks("run-1")
+	if err != nil || len(checks) != 1 || checks[0].Engine != "nuclei" || checks[0].CheckID != "" || checks[0].Verdict != "" {
+		t.Fatalf("legacy checks = %#v, %v", checks, err)
+	}
+}
+
 func TestOpenCreatesSchemaMigrations(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scan.db")
 	scanStore, err := Open(path)
@@ -156,8 +234,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 7 {
-		t.Fatalf("expected 7 applied migrations, got %d", count)
+	if count != 8 {
+		t.Fatalf("expected 8 applied migrations, got %d", count)
 	}
 }
 

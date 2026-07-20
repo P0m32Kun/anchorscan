@@ -194,6 +194,38 @@ CREATE TABLE detection_checks (
 			return err
 		},
 	},
+	{
+		version: 8,
+		name:    "add_detection_check_probe_identity",
+		up: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`ALTER TABLE detection_checks RENAME TO detection_checks_legacy`,
+				`CREATE TABLE detection_checks (
+  run_id TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  protocol TEXT NOT NULL,
+  engine TEXT NOT NULL,
+  check_id TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL,
+  verdict TEXT NOT NULL DEFAULT '',
+  reason_code TEXT NOT NULL DEFAULT '',
+  detail TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL DEFAULT '',
+  finished_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (run_id, ip, port, protocol, engine, check_id)
+)`,
+				`INSERT INTO detection_checks (run_id, ip, port, protocol, engine, status, reason_code, detail, started_at, finished_at)
+SELECT run_id, ip, port, protocol, engine, status, reason_code, detail, started_at, finished_at FROM detection_checks_legacy`,
+				`DROP TABLE detection_checks_legacy`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 func runMigrations(db *sql.DB) error {
