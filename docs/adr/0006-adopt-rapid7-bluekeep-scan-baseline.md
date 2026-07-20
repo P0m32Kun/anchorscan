@@ -1,6 +1,6 @@
 # ADR-0006：采用 Rapid7 BlueKeep Scan 作为安全行为基线
 
-- 状态：Accepted
+- 状态：Superseded by ADR-0007
 - 日期：2026-07-20
 - 关联计划：`docs/plans/add-builtin-vulnerability-probes/`
 - 替代：ADR-0005
