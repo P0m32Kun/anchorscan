@@ -4,7 +4,7 @@
 
 **Blocked by:** 无
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Spec:** `docs/plans/add-rdpscan-bluekeep-detection/spec.md`
 
