@@ -1,6 +1,6 @@
 # ADR-0005：首版默认内置探针排除 BlueKeep
 
-- 状态：Accepted
+- 状态：Superseded by ADR-0006
 - 日期：2026-07-20
 - 关联计划：`docs/plans/add-builtin-vulnerability-probes/`
 
