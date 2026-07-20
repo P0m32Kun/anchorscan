@@ -122,6 +122,16 @@ CREATE TABLE detection_checks (
   started_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (run_id, ip, port, protocol, engine)
 );
+CREATE TABLE scan_runs (
+  run_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, target TEXT NOT NULL, ports TEXT NOT NULL, profile TEXT NOT NULL,
+  status TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, error TEXT NOT NULL,
+  config_snapshot TEXT NOT NULL, artifact_dir TEXT NOT NULL
+);
+CREATE TABLE run_leases (
+  scope TEXT PRIMARY KEY, run_id TEXT NOT NULL, owner_token TEXT NOT NULL, heartbeat_at TEXT NOT NULL,
+  heartbeat_at_ns INTEGER NOT NULL DEFAULT 0
+);
+INSERT INTO scan_runs VALUES ('run-1', '', '', '', '', 'running', '', '', '', '', '');
 INSERT INTO detection_checks VALUES ('run-1', '198.51.100.10', 443, 'tcp', 'nuclei', 'completed', '', '', '', '');
 INSERT INTO schema_migrations (version, name, applied_at) VALUES
   (1, 'legacy', '2026-07-20T00:00:00Z'), (2, 'legacy', '2026-07-20T00:00:00Z'),
@@ -143,6 +153,20 @@ INSERT INTO schema_migrations (version, name, applied_at) VALUES
 	checks, err := scanStore.ListDetectionChecks("run-1")
 	if err != nil || len(checks) != 1 || checks[0].Engine != "nuclei" || checks[0].CheckID != "" || checks[0].Verdict != "" {
 		t.Fatalf("legacy checks = %#v, %v", checks, err)
+	}
+	now := time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
+	if _, err := scanStore.AcquireRunLease("run-1", "owner-1", now, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 443, Protocol: "tcp", Engine: "builtin", CheckID: "CVE-2019-0708", Status: "running", StartedAt: now}); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := scanStore.FinishRunWithLease("run-1", "owner-1", "canceled", "context canceled", now.Add(time.Second)); err != nil || !ok {
+		t.Fatalf("FinishRunWithLease = %t, %v", ok, err)
+	}
+	counts, err := scanStore.CountDetectionChecksByStatus("run-1")
+	if err != nil || counts["completed"] != 1 || counts["canceled"] != 1 {
+		t.Fatalf("migrated check counts = %#v, %v", counts, err)
 	}
 }
 
