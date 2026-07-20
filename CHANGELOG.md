@@ -4,6 +4,17 @@ All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
 
+## [Unreleased]
+
+### Added
+- 可选外部检测引擎 rdpscan：当配置 `tools.rdpscan` 路径后，完整扫描对归一化为 `rdp` 的服务指纹执行 BlueKeep (CVE-2019-0708) 检测；`VULNERABLE` 产出 `source=rdpscan` 的 critical Finding，未配置或 `SAFE`/`UNKNOWN` 时跳过或仅保留执行事实。
+- `doctor` 对 rdpscan 给出分平台编译/安装提示（Linux/macOS 通过 make；Windows 说明 MSVC+OpenSSL 门槛并给出 WSL/Docker 替代），且未安装时仍显示 OK 以避免误报失败。
+- Web 配置页新增 rdpscan 路径与超时输入。
+
+### Changed
+- `config.ToolPaths`、`config.ToolTimeouts` 和 `config.ToolDurations` 新增 `Rdpscan` 字段。
+- 扫描预检（preflight）将 rdpscan 列为可选工具，未配置不影响扫描启动。
+
 ## [1.7.2] - 2026-07-13
 
 ### Changed

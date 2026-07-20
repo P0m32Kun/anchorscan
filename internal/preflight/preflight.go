@@ -99,6 +99,7 @@ func Run(opts Options) Result {
 	checkRequiredTool(&result, "nmap", opts.Tools.Nmap)
 	checkOptionalTool(&result, "httpx", opts.Tools.Httpx)
 	checkOptionalTool(&result, "nuclei", opts.Tools.Nuclei)
+	checkOptionalTool(&result, "rdpscan", opts.Tools.Rdpscan)
 
 	checkWritableParent(&result, "database", opts.DBPath)
 	checkWritableParent(&result, "json", opts.JSONPath)

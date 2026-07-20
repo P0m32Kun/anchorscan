@@ -66,6 +66,7 @@ type DetectionCheck struct {
 }
 
 type DetectionCoverage struct {
+	TripleEngine int `json:"triple_engine"`
 	DualEngine   int `json:"dual_engine"`
 	SingleEngine int `json:"single_engine"`
 	Uncovered    int `json:"uncovered"`
@@ -253,7 +254,7 @@ func summarizeDetectionCoverage(fps []fingerprint.ServiceFingerprint, checks []D
 		case "skipped":
 			coverage.Skipped++
 		}
-		if check.Status != "completed" || (check.Engine != "nse" && check.Engine != "nuclei") {
+		if check.Status != "completed" || (check.Engine != "nse" && check.Engine != "nuclei" && check.Engine != "rdpscan") {
 			continue
 		}
 		key := portKey(check.IP, check.Port, check.Protocol)
@@ -265,6 +266,8 @@ func summarizeDetectionCoverage(fps []fingerprint.ServiceFingerprint, checks []D
 	for _, fp := range fps {
 		count := len(completed[portKey(fp.IP, fp.Port, fp.Protocol)])
 		switch count {
+		case 3:
+			coverage.TripleEngine++
 		case 2:
 			coverage.DualEngine++
 		case 1:

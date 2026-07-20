@@ -2,7 +2,7 @@
 
 `anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。
 
-核心思路是「**指纹驱动、精准分类、服务双引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 每个已识别服务按双引擎规则表（`config/service-tags.yaml` + `config/nse.yaml`）同时调度 `nuclei`（含默认凭据检测）和 nmap NSE → Web 服务额外走 `httpx` → 结果统一落入 SQLite → 导出 JSON / HTML 报告。
+核心思路是「**指纹驱动、精准分类、服务多引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 每个已识别服务按 `nuclei` + NSE 双引擎规则表（`config/service-tags.yaml` + `config/nse.yaml`）同时调度；RDP 服务可额外启用可选 `rdpscan` 引擎检测 BlueKeep（CVE-2019-0708）→ Web 服务额外走 `httpx` → 结果统一落入 SQLite → 导出 JSON / HTML 报告。
 
 ## 快速开始
 

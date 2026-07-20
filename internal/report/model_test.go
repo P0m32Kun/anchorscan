@@ -214,3 +214,19 @@ func TestBuildWithDetectionChecksMarksMissingChecksUncovered(t *testing.T) {
 		t.Fatalf("detection coverage = %#v, checks = %#v", rpt.DetectionCoverage, rpt.DetectionChecks)
 	}
 }
+
+func TestBuildWithDetectionChecksCountsTripleEngine(t *testing.T) {
+	rpt := BuildWithScanDataAndDetectionChecks(
+		[]fingerprint.ServiceFingerprint{{IP: "192.0.2.1", Port: 3389, Protocol: "tcp"}},
+		nil,
+		ScanData{},
+		[]DetectionCheck{
+			{IP: "192.0.2.1", Port: 3389, Protocol: "tcp", Engine: "nse", Status: "completed"},
+			{IP: "192.0.2.1", Port: 3389, Protocol: "tcp", Engine: "nuclei", Status: "completed"},
+			{IP: "192.0.2.1", Port: 3389, Protocol: "tcp", Engine: "rdpscan", Status: "completed"},
+		},
+	)
+	if rpt.DetectionCoverage == nil || rpt.DetectionCoverage.TripleEngine != 1 {
+		t.Fatalf("detection coverage = %#v", rpt.DetectionCoverage)
+	}
+}
