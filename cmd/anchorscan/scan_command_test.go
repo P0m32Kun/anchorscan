@@ -48,9 +48,9 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 func TestLogPreflightReportsEffectiveToolTimeouts(t *testing.T) {
 	var stderr bytes.Buffer
 	logPreflight(&stderr, preflight.Result{Summary: preflight.Summary{Timeouts: config.ToolTimeouts{
-		Rustscan: "0", Nmap: "30s", Httpx: "150ms", NSE: "5m", Nuclei: "1m",
+		Rustscan: "0", Nmap: "30s", Httpx: "150ms", NSE: "5m", Nuclei: "1m", Rdpscan: "0",
 	}}})
-	if got := stderr.String(); !strings.Contains(got, "rustscan=0 nmap=30s httpx=150ms nse=5m nuclei=1m (0=unlimited)") {
+	if got := stderr.String(); !strings.Contains(got, "rustscan=0 nmap=30s httpx=150ms nse=5m nuclei=1m rdpscan=0 (0=unlimited)") {
 		t.Fatalf("preflight log missing timeouts: %q", got)
 	}
 }

@@ -26,13 +26,13 @@
 在一个 Target 的某端口上发现的服务：IP/端口/协议、service、product、version、是否 web、URL 等。由 nmap 服务识别产出，httpx 可对其进行 web 增强。
 
 ### Finding（漏洞发现，`report.Finding`）
-绑定到某指纹（IP:Port）的一条漏洞或值得关注项。来源（`Source`）：`manual-review`（人工复核建议）、`nse`（nmap NSE 脚本）、`nuclei`（nuclei 模板）。带 severity。
+绑定到某指纹（IP:Port）的一条漏洞或值得关注项。来源（`Source`）：`manual-review`（人工复核建议）、`nse`（nmap NSE 脚本）、`nuclei`（nuclei 模板）、`rdpscan`（rdpscan BlueKeep 检测）。带 severity。
 
 ### DetectionCheck（检测检查）
 一个检测引擎针对某个 Fingerprint 的实际执行记录。它回答“当时是否执行以及结果如何”，不表示漏洞覆盖率或目标安全程度。状态包括：`running`（已经开始且仍在执行）、`completed`（执行完成，Finding 可为零）、`skipped`（按规则未执行并说明原因）、`failed`（已尝试但失败）、`canceled`（操作者取消 Run 时仍未完成）、`interrupted`（租约过期或进程终止时仍未完成）。每次 Run 持久化自己的 DetectionChecks，后续规则变化不得改写历史执行事实。
 
 ### Detection Coverage（检测执行覆盖）
-报告对每个指纹汇总 NSE 与 nuclei 的实际完成情况，显示双引擎、单引擎、未覆盖及失败/跳过/取消/中断数量。它是本次执行记录的可见汇总，不是漏洞覆盖率或安全保证。
+报告对每个指纹汇总 NSE、nuclei 与 rdpscan 的实际完成情况，显示各引擎、未覆盖及失败/跳过/取消/中断数量。它是本次执行记录的可见汇总，不是漏洞覆盖率或安全保证。
 
 ### Progress（进度事件流）
 扫描进行中按 level/stage/message 报告的实时事件流，驱动 web 的 `/runs/:id/status` 与 `/runs/:id/events`。持久化为 `store.ScanEvent`。

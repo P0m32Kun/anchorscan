@@ -46,6 +46,11 @@
         <span>Nuclei 路径</span>
         <input name="nuclei" value="{{.Config.Tools.Nuclei}}" placeholder="例如: /usr/local/bin/nuclei">
       </label>
+      <label class="full-width">
+        <span>rdpscan 路径（BlueKeep 可选检测）</span>
+        <input name="rdpscan" value="{{.Config.Tools.Rdpscan}}" placeholder="例如: /usr/local/bin/rdpscan">
+        <p class="meta-line config-field-help">留空则 BlueKeep (CVE-2019-0708) 检测自动跳过。需自行编译 rdpscan 并填入路径。</p>
+      </label>
       <div class="full-width">
         <span>逐工具超时</span>
         <p class="meta-line config-field-help">使用 Go duration（例如 30s、5m）；填 0 表示不限时，档位不会覆盖这些全局设置。</p>
@@ -55,6 +60,7 @@
           <label><span>Httpx</span><input name="timeout_httpx" value="{{.Config.Timeouts.Httpx}}"></label>
           <label><span>NSE</span><input name="timeout_nse" value="{{.Config.Timeouts.NSE}}"></label>
           <label><span>Nuclei</span><input name="timeout_nuclei" value="{{.Config.Timeouts.Nuclei}}"></label>
+          <label><span>rdpscan</span><input name="timeout_rdpscan" value="{{.Config.Timeouts.Rdpscan}}"></label>
         </div>
       </div>
       <label class="full-width">

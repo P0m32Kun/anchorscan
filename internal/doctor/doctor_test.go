@@ -3,6 +3,7 @@ package doctor
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -82,4 +83,31 @@ func writeExecutable(t *testing.T, dir string, name string) string {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
 	}
 	return path
+}
+
+func TestRdpscanMissingReportsOptionalHint(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+
+	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
+	if HasFailures(checks) {
+		t.Fatalf("rdpscan missing should not make doctor fail: %#v", checks)
+	}
+	if !containsCheck(checks, "rdpscan", true) {
+		t.Fatalf("expected rdpscan check ok: %#v", checks)
+	}
+	var found bool
+	for _, c := range checks {
+		if c.Name == "rdpscan" {
+			found = true
+			if !strings.Contains(c.Message, "not installed") {
+				t.Fatalf("expected rdpscan hint, got %q", c.Message)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("rdpscan check not found: %#v", checks)
+	}
 }

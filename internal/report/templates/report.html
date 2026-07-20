@@ -607,6 +607,7 @@
     {{if .DetectionCoverage}}
     <p style="color: var(--muted); margin: 0 0 0.75rem;">检测执行汇总仅表示本次记录，不代表安全保证。</p>
     <div class="stats-grid" style="margin-bottom: 1rem;">
+      <div class="stat-card"><span class="stat-label">三引擎</span><span class="stat-value">{{.DetectionCoverage.TripleEngine}}</span></div>
       <div class="stat-card"><span class="stat-label">双引擎</span><span class="stat-value">{{.DetectionCoverage.DualEngine}}</span></div>
       <div class="stat-card"><span class="stat-label">单引擎</span><span class="stat-value">{{.DetectionCoverage.SingleEngine}}</span></div>
       <div class="stat-card"><span class="stat-label">未覆盖</span><span class="stat-value">{{.DetectionCoverage.Uncovered}}</span></div>

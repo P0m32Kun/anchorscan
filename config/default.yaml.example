@@ -8,6 +8,7 @@ tools:
   nmap: nmap
   httpx: httpx
   nuclei: nuclei
+  rdpscan: ""              # 可选：BlueKeep (CVE-2019-0708) 检测；留空则自动跳过
 
 # Go duration（如 30s、5m）；0 表示不限时。档位不会覆盖这些全局设置。
 timeouts:
@@ -16,6 +17,7 @@ timeouts:
   httpx: "0"
   nse: "0"
   nuclei: "0"
+  rdpscan: "0"
 
 knowledge_base:
   path: ""

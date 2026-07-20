@@ -21,6 +21,7 @@ type ToolPaths struct {
 	Nmap     string `yaml:"nmap"`
 	Httpx    string `yaml:"httpx"`
 	Nuclei   string `yaml:"nuclei"`
+	Rdpscan  string `yaml:"rdpscan"`
 }
 
 type ToolTimeouts struct {
@@ -29,6 +30,7 @@ type ToolTimeouts struct {
 	Httpx    string `yaml:"httpx"`
 	NSE      string `yaml:"nse"`
 	Nuclei   string `yaml:"nuclei"`
+	Rdpscan  string `yaml:"rdpscan"`
 }
 
 type ToolDurations struct {
@@ -37,6 +39,7 @@ type ToolDurations struct {
 	Httpx    time.Duration
 	NSE      time.Duration
 	Nuclei   time.Duration
+	Rdpscan  time.Duration
 }
 
 func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
@@ -67,11 +70,14 @@ func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
 	if out.Nuclei, err = parse("nuclei", timeouts.Nuclei); err != nil {
 		return out, err
 	}
+	if out.Rdpscan, err = parse("rdpscan", timeouts.Rdpscan); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
 func (timeouts ToolTimeouts) Normalized() ToolTimeouts {
-	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei} {
+	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan} {
 		if *value == "" {
 			*value = "0"
 		}

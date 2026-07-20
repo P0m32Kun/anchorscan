@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
@@ -34,6 +35,7 @@ func Run(opts Options) []Check {
 		executableCheck("nmap", cfg.Tools.Nmap),
 		executableCheck("httpx", cfg.Tools.Httpx),
 		executableCheck("nuclei", cfg.Tools.Nuclei),
+		rdpscanCheck(cfg.Tools.Rdpscan),
 	)
 
 	if _, err := ports.Resolve(cfg.Scan.Ports, filepath.Dir(opts.ConfigPath)); err != nil {
@@ -81,6 +83,27 @@ func executableCheck(name string, path string) Check {
 		return Check{Name: name, OK: false, Message: "not executable"}
 	}
 	return Check{Name: name, OK: true, Message: "ok"}
+}
+
+func rdpscanCheck(path string) Check {
+	check := executableCheck("rdpscan", path)
+	if check.OK {
+		check.Message = "ok: " + path
+		return check
+	}
+	return Check{Name: "rdpscan", OK: true, Message: rdpscanInstallHint()}
+}
+
+func rdpscanInstallHint() string {
+	repo := "https://github.com/robertdavidgraham/rdpscan"
+	switch runtime.GOOS {
+	case "windows":
+		return "not installed (optional): BlueKeep (CVE-2019-0708) detection will be skipped. Building on Windows requires MSVC + OpenSSL; consider compiling in WSL or using the Docker-based BKScan alternative. Set tools.rdpscan in config after building."
+	case "darwin":
+		return "not installed (optional): BlueKeep (CVE-2019-0708) detection will be skipped. Build: git clone " + repo + " && cd rdpscan && make (Homebrew openssl may be needed; see README)."
+	default:
+		return "not installed (optional): BlueKeep (CVE-2019-0708) detection will be skipped. Build: git clone " + repo + " && cd rdpscan && make (requires libssl-dev)."
+	}
 }
 
 func writableParentCheck(name string, path string) Check {

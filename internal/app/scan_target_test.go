@@ -78,7 +78,7 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
 	}
 	checks, err := scanStore.ListDetectionChecks("run-ssh-dual")
-	if err != nil || len(checks) != 2 || checks[0].Status != "completed" || checks[1].Status != "completed" {
+	if err != nil || len(checks) != 3 || checks[0].Status != "completed" || checks[1].Status != "completed" || checks[2].Engine != "rdpscan" || checks[2].Status != "skipped" {
 		t.Fatalf("detection checks = %#v, %v", checks, err)
 	}
 }
@@ -157,7 +157,7 @@ func TestRunScanContinuesAfterNSEFailure(t *testing.T) {
 		t.Fatalf("findings = %#v, %v", findings, err)
 	}
 	checks, err := scanStore.ListDetectionChecks("run-nse-failed")
-	if err != nil || len(checks) != 2 || checks[0].Engine != "nse" || checks[0].Status != "failed" || checks[1].Engine != "nuclei" || checks[1].Status != "completed" {
+	if err != nil || len(checks) != 3 || checks[0].Engine != "nse" || checks[0].Status != "failed" || checks[1].Engine != "nuclei" || checks[1].Status != "completed" || checks[2].Engine != "rdpscan" || checks[2].Status != "skipped" {
 		t.Fatalf("checks = %#v, %v", checks, err)
 	}
 }
@@ -471,7 +471,7 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListDetectionChecks returned error: %v", err)
 	}
-	if len(checks) != 2 || checks[1].Engine != "nuclei" || checks[1].Status != "failed" || checks[1].ReasonCode != "command_failed" {
+	if len(checks) != 3 || checks[1].Engine != "nuclei" || checks[1].Status != "failed" || checks[1].ReasonCode != "command_failed" || checks[2].Engine != "rdpscan" {
 		t.Fatalf("detection checks = %#v, want failed nuclei command check", checks)
 	}
 }

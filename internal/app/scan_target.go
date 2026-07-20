@@ -255,6 +255,84 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				}
 			}
 		}
+
+		// rdpscan (BlueKeep, CVE-2019-0708) — optional third engine. It mirrors the
+		// nuclei DetectionCheck tail shape but with a three-state verdict instead of
+		// template findings. Execution only happens when the service fingerprint is
+		// normalized to "rdp"; port 3389 is not enough on its own, so non-standard
+		// RDP ports are also covered.
+		switch {
+		case fp.Normalized != "rdp":
+			if err := recordDetectionCheck(opts, fp, "rdpscan", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case opts.Tools.Rdpscan == "":
+			if err := recordDetectionCheck(opts, fp, "rdpscan", "skipped", "tool_unconfigured", "rdpscan is not configured", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		default:
+			progress.Emit("info", "rdpscan", "rdpscan %s:%d (CVE-2019-0708 active probe; extremely low risk of target BSOD)", fp.IP, fp.Port)
+			started := time.Now()
+			stageFailed := false
+			if err := recordDetectionCheck(opts, fp, "rdpscan", "running", "", "", started, time.Time{}); err != nil {
+				return TargetScan{}, err
+			}
+			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Rdpscan)
+			out, err := tools.RunRdpscan(toolCtx, runner, opts.Tools.Rdpscan, fp.IP, fp.Port)
+			operatorCanceled := isOperatorCanceled(toolCtx)
+			cancel()
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("rdpscan", fp.IP, strconv.Itoa(fp.Port))+".txt", out); writeErr != nil {
+				_ = recordDetectionCheck(opts, fp, "rdpscan", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "rdpscan", "rdpscan %s:%d artifact failed: %v", fp.IP, fp.Port, writeErr)
+			}
+			if err != nil {
+				status, reason := "failed", "command_failed"
+				if operatorCanceled {
+					status, reason = "canceled", "run_canceled"
+				}
+				_ = recordDetectionCheck(opts, fp, "rdpscan", status, reason, err.Error(), started, time.Now())
+				if operatorCanceled {
+					return result, context.Canceled
+				}
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "rdpscan", "rdpscan %s:%d failed: %v", fp.IP, fp.Port, err)
+			}
+			if err == nil {
+				verdict := tools.ParseRdpscanOutput(out)
+				switch verdict {
+				case tools.RdpscanVulnerable:
+					finding := report.Finding{
+						IP:       fp.IP,
+						Port:     fp.Port,
+						Protocol: fp.Protocol,
+						Source:   "rdpscan",
+						ID:       "CVE-2019-0708",
+						Severity: "critical",
+						Summary:  "Microsoft Remote Desktop Services RCE (BlueKeep, CVE-2019-0708)",
+						Target:   fp.IP,
+						Output:   strings.TrimSpace(string(out)),
+					}
+					if err := persistFinding(opts, finding); err != nil {
+						_ = recordDetectionCheck(opts, fp, "rdpscan", "failed", "persistence_failed", err.Error(), started, time.Now())
+						return result, err
+					}
+					allFindings = append(allFindings, finding)
+					progress.Emit("info", "rdpscan", "rdpscan %s:%d VULNERABLE CVE-2019-0708", fp.IP, fp.Port)
+				case tools.RdpscanSafe:
+					progress.Emit("info", "rdpscan", "rdpscan %s:%d SAFE", fp.IP, fp.Port)
+				default:
+					progress.Emit("info", "rdpscan", "rdpscan %s:%d UNKNOWN (no conclusion, see artifact)", fp.IP, fp.Port)
+				}
+			}
+			if !stageFailed {
+				if err := recordDetectionCheck(opts, fp, "rdpscan", "completed", "", "", started, time.Now()); err != nil {
+					return TargetScan{}, err
+				}
+			}
+		}
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
