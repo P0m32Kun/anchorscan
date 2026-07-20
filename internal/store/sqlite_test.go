@@ -68,108 +68,6 @@ func TestDetectionChecksUpsertAndCountByStatus(t *testing.T) {
 	}
 }
 
-func TestDetectionChecksKeepBuiltinProbesSeparate(t *testing.T) {
-	scanStore, err := Open(filepath.Join(t.TempDir(), "scan.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer scanStore.Close()
-
-	now := time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
-	base := DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 3389, Protocol: "tcp", Engine: "builtin", Status: "running", StartedAt: now}
-	for _, check := range []DetectionCheck{
-		{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2019-0708", Status: base.Status, StartedAt: base.StartedAt},
-		{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2099-0001", Status: base.Status, StartedAt: base.StartedAt},
-	} {
-		if err := scanStore.UpsertDetectionCheck(check); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2019-0708", Status: "completed", Verdict: "vulnerable", StartedAt: now, FinishedAt: now.Add(time.Second)}); err != nil {
-		t.Fatal(err)
-	}
-	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: base.RunID, IP: base.IP, Port: base.Port, Protocol: base.Protocol, Engine: base.Engine, CheckID: "CVE-2019-0708", Status: "running", StartedAt: now}); err != nil {
-		t.Fatal(err)
-	}
-
-	checks, err := scanStore.ListDetectionChecks(base.RunID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(checks) != 2 {
-		t.Fatalf("checks = %#v, want two builtin probes", checks)
-	}
-	if checks[0].CheckID != "CVE-2019-0708" || checks[0].Status != "completed" || checks[0].Verdict != "vulnerable" {
-		t.Fatalf("completed probe regressed: %#v", checks[0])
-	}
-	if checks[1].CheckID != "CVE-2099-0001" || checks[1].Status != "running" {
-		t.Fatalf("sibling probe overwritten: %#v", checks[1])
-	}
-}
-
-func TestOpenMigratesLegacyDetectionChecks(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "legacy.db")
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = db.Exec(`
-CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
-CREATE TABLE detection_checks (
-  run_id TEXT NOT NULL, ip TEXT NOT NULL, port INTEGER NOT NULL, protocol TEXT NOT NULL, engine TEXT NOT NULL,
-  status TEXT NOT NULL, reason_code TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '',
-  started_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '',
-  PRIMARY KEY (run_id, ip, port, protocol, engine)
-);
-CREATE TABLE scan_runs (
-  run_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, target TEXT NOT NULL, ports TEXT NOT NULL, profile TEXT NOT NULL,
-  status TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT NOT NULL, error TEXT NOT NULL,
-  config_snapshot TEXT NOT NULL, artifact_dir TEXT NOT NULL
-);
-CREATE TABLE run_leases (
-  scope TEXT PRIMARY KEY, run_id TEXT NOT NULL, owner_token TEXT NOT NULL, heartbeat_at TEXT NOT NULL,
-  heartbeat_at_ns INTEGER NOT NULL DEFAULT 0
-);
-INSERT INTO scan_runs VALUES ('run-1', '', '', '', '', 'running', '', '', '', '', '');
-INSERT INTO detection_checks VALUES ('run-1', '198.51.100.10', 443, 'tcp', 'nuclei', 'completed', '', '', '', '');
-INSERT INTO schema_migrations (version, name, applied_at) VALUES
-  (1, 'legacy', '2026-07-20T00:00:00Z'), (2, 'legacy', '2026-07-20T00:00:00Z'),
-  (3, 'legacy', '2026-07-20T00:00:00Z'), (4, 'legacy', '2026-07-20T00:00:00Z'),
-  (5, 'legacy', '2026-07-20T00:00:00Z'), (6, 'legacy', '2026-07-20T00:00:00Z'),
-  (7, 'legacy', '2026-07-20T00:00:00Z');`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	scanStore, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer scanStore.Close()
-	checks, err := scanStore.ListDetectionChecks("run-1")
-	if err != nil || len(checks) != 1 || checks[0].Engine != "nuclei" || checks[0].CheckID != "" || checks[0].Verdict != "" {
-		t.Fatalf("legacy checks = %#v, %v", checks, err)
-	}
-	now := time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC)
-	if _, err := scanStore.AcquireRunLease("run-1", "owner-1", now, time.Minute); err != nil {
-		t.Fatal(err)
-	}
-	if err := scanStore.UpsertDetectionCheck(DetectionCheck{RunID: "run-1", IP: "198.51.100.10", Port: 443, Protocol: "tcp", Engine: "builtin", CheckID: "CVE-2019-0708", Status: "running", StartedAt: now}); err != nil {
-		t.Fatal(err)
-	}
-	if ok, err := scanStore.FinishRunWithLease("run-1", "owner-1", "canceled", "context canceled", now.Add(time.Second)); err != nil || !ok {
-		t.Fatalf("FinishRunWithLease = %t, %v", ok, err)
-	}
-	counts, err := scanStore.CountDetectionChecksByStatus("run-1")
-	if err != nil || counts["completed"] != 1 || counts["canceled"] != 1 {
-		t.Fatalf("migrated check counts = %#v, %v", counts, err)
-	}
-}
-
 func TestOpenCreatesSchemaMigrations(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "scan.db")
 	scanStore, err := Open(path)
@@ -258,8 +156,52 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 8 {
-		t.Fatalf("expected 8 applied migrations, got %d", count)
+	if count != 9 {
+		t.Fatalf("expected 9 applied migrations, got %d", count)
+	}
+}
+
+func TestOpenKeepsDetectionChecksWritableAfterBuiltinProbeRollback(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "builtin-v8.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`
+CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
+CREATE TABLE detection_checks (
+  run_id TEXT NOT NULL, ip TEXT NOT NULL, port INTEGER NOT NULL, protocol TEXT NOT NULL, engine TEXT NOT NULL,
+  check_id TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, verdict TEXT NOT NULL DEFAULT '',
+  reason_code TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '', started_at TEXT NOT NULL DEFAULT '', finished_at TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (run_id, ip, port, protocol, engine, check_id)
+);
+INSERT INTO schema_migrations (version, name, applied_at) VALUES
+  (1, 'legacy', ''), (2, 'legacy', ''), (3, 'legacy', ''), (4, 'legacy', ''), (5, 'legacy', ''),
+  (6, 'legacy', ''), (7, 'legacy', ''), (8, 'add_detection_check_probe_identity', '');
+INSERT INTO detection_checks (run_id, ip, port, protocol, engine, check_id, status, verdict)
+VALUES
+  ('run-1', '192.0.2.1', 443, 'tcp', 'nuclei', '', 'completed', ''),
+  ('run-1', '192.0.2.1', 443, 'tcp', 'nse', '', 'running', ''),
+  ('run-1', '192.0.2.1', 443, 'tcp', 'builtin', 'CVE-2019-0708', 'completed', 'vulnerable');`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	scanStore, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+	check := DetectionCheck{RunID: "run-1", IP: "192.0.2.1", Port: 443, Protocol: "tcp", Engine: "nse", Status: "completed"}
+	if err := scanStore.UpsertDetectionCheck(check); err != nil {
+		t.Fatalf("UpsertDetectionCheck after rollback returned error: %v", err)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-1")
+	if err != nil || len(checks) != 2 || checks[0].Engine != "nse" || checks[1].Engine != "nuclei" {
+		t.Fatalf("detection checks = %#v, %v", checks, err)
 	}
 }
 

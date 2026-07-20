@@ -43,7 +43,6 @@ func TestTerminalReportIncludesDetectionCoverage(t *testing.T) {
 	for _, check := range []store.DetectionCheck{
 		{RunID: "run-coverage", IP: "192.0.2.10", Port: 443, Protocol: "tcp", Engine: "nse", Status: "completed", StartedAt: time.Unix(1, 0), FinishedAt: time.Unix(2, 0)},
 		{RunID: "run-coverage", IP: "192.0.2.10", Port: 443, Protocol: "tcp", Engine: "nuclei", Status: "failed", ReasonCode: "command_failed", Detail: "tool exited", StartedAt: time.Unix(3, 0), FinishedAt: time.Unix(4, 0)},
-		{RunID: "run-coverage", IP: "192.0.2.10", Port: 443, Protocol: "tcp", Engine: "builtin", CheckID: "CVE-2019-0708", Status: "completed", Verdict: "vulnerable", StartedAt: time.Unix(5, 0), FinishedAt: time.Unix(6, 0)},
 	} {
 		if err := scanStore.UpsertDetectionCheck(check); err != nil {
 			t.Fatal(err)
@@ -64,7 +63,7 @@ func TestTerminalReportIncludesDetectionCoverage(t *testing.T) {
 	}
 	jsonReport := httptest.NewRecorder()
 	handler.ServeHTTP(jsonReport, httptest.NewRequest(http.MethodGet, "/reports/run-coverage.json", nil))
-	if jsonReport.Code != http.StatusOK || !strings.Contains(jsonReport.Body.String(), `"detection_checks"`) || !strings.Contains(jsonReport.Body.String(), `"check_id":"CVE-2019-0708"`) || !strings.Contains(jsonReport.Body.String(), `"verdict":"vulnerable"`) || !strings.Contains(jsonReport.Body.String(), `"single_engine":1`) || !strings.Contains(jsonReport.Body.String(), `"started_at":"1970-01-01T00:00:01Z"`) || strings.Contains(jsonReport.Body.String(), "%") {
+	if jsonReport.Code != http.StatusOK || !strings.Contains(jsonReport.Body.String(), `"detection_checks"`) || !strings.Contains(jsonReport.Body.String(), `"single_engine":1`) || !strings.Contains(jsonReport.Body.String(), `"started_at":"1970-01-01T00:00:01Z"`) || strings.Contains(jsonReport.Body.String(), "%") {
 		t.Fatalf("report JSON = %d %s", jsonReport.Code, jsonReport.Body.String())
 	}
 }

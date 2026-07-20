@@ -57,8 +57,8 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	reportChecks := make([]report.DetectionCheck, 0, len(checks))
 	for _, check := range checks {
 		reportChecks = append(reportChecks, report.DetectionCheck{
-			IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine, CheckID: check.CheckID,
-			Status: check.Status, Verdict: check.Verdict, ReasonCode: check.ReasonCode, Detail: check.Detail,
+			IP: check.IP, Port: check.Port, Protocol: check.Protocol, Engine: check.Engine,
+			Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail,
 			StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
 		})
 	}

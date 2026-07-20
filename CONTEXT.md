@@ -34,12 +34,6 @@
 ### Detection Coverage（检测执行覆盖）
 报告对每个指纹汇总 NSE 与 nuclei 的实际完成情况，显示双引擎、单引擎、未覆盖及失败/跳过/取消/中断数量。它是本次执行记录的可见汇总，不是漏洞覆盖率或安全保证。
 
-### Builtin Probe（内置漏洞检测探针）
-AnchorScan 随二进制交付、根据服务指纹自动执行的非破坏性协议漏洞检查，用于补充 NSE 与 nuclei 无法覆盖的检测缺口。避免称为“插件”或“利用 POC”，因为它不加载外部代码，也不包含利用、认证尝试或状态修改行为。
-
-### Probe Verdict（探针结论）
-某个 Builtin Probe 对特定 Fingerprint 的漏洞判定，取值为 `vulnerable`、`not_vulnerable` 或 `inconclusive`。它只描述该探针针对该漏洞的结论，不表示目标整体安全。
-
 ### Progress（进度事件流）
 扫描进行中按 level/stage/message 报告的实时事件流，驱动 web 的 `/runs/:id/status` 与 `/runs/:id/events`。持久化为 `store.ScanEvent`。
 > 由候选 #1 深化引入：`internal/app.Progress` 接口（单方法 `Emit`）是 scanTarget 报告进度的窄接缝，store 适配器 `storeProgress` 负责落 `ScanEvent` + 调日志。
