@@ -29,6 +29,7 @@
 - 模板与渲染结果保留 3 个 `sectPr`、3 个页眉、7 个页脚、footer6 浮动图形和原域签名；设置了 `w:updateFields`。
 - 第三轮占位符模板 7 页已用标准 LibreOffice 管线重新渲染并逐页检查：三条下划线起止和粗细一致、月份恢复用户保存格式、新增负向验证标题与说明位置正确、正文无示例图。随后生成 `out/project-report-fake.docx`：11 页，覆盖 I区、III区和互联网接入区，每区依次生成 confirmed 漏洞、不编号的其它漏洞不存在小节及其 Evidence，再进入下一区或第四节；7 张 fake Evidence 的插入顺序和纵横比通过自动检查。当前渲染环境缺少源模板使用的中文字体，中文字形不据此验收；文本和结构由 OOXML 检查覆盖。WPS 无修复提示及目录/页码刷新仍待可交互人工验收。
 - 最终封面修复彻底移除前后制表位 run：每条线只保留一个下划线 run，并在同一 run 内用不换行空格包住数据；第四轮用户复核后把下划线从 thick 改回默认 single。自动门检查无 `w:tabs`、`w:u=single`、左右空格和统一宽度单位；模板与 fake 报告已重新生成，结构回归和 11 页渲染检查通过。
+- 目录重建修复（WPS 验收发现）：源模板目录是自动 TOC 域但缓存了 3.1/3.2/3.2 三个分区条目，其 PAGEREF 指向的书签在动态分区循环中被删除，导致「未定义书签」。`prototype.rebuild_toc_field` 现清空 TOC 域缓存 result、保留 begin/instr/separate/end 骨架，靠正文 Heading 样式 + `updateFields` 在 WPS 打开时自动重建目录；`check_structure` 的域校验放宽为「稳定域（PAGE/STYLEREF/REF）签名不变 + 仍含 1 个 TOC 域」。重新生成的模板与 fake 报告 PAGEREF=0、无缺失书签、无残留 XX/Jinja。
 
 - [ ] 用户复核并批准第二轮 `template-slot-contract.md` 与可视占位符模板；历史决定已记录，但模板基线尚未最终锁定。
 - [ ] 一次性正式模板制备：实验模板已按逐位置地图放置 Jinja 槽、动态表 3-1、第三节网络分区区块，已删除 2 张正文示例截图并补 `updateFields`；待用户确认业务版式和 WPS 人工验收后再作为受版本管理的正式模板入库。

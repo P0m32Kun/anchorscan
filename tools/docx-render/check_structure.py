@@ -66,6 +66,44 @@ def field_signature(docx: Path) -> dict[str, list[tuple[str, str]]]:
     return signature
 
 
+# TOC_CACHE_INSTRS are the nested field instructions that only exist inside a
+# TOC field's cached result. The TOC itself is rebuilt dynamically (its cached
+# zone entries are stripped), so these are excluded from the stable signature.
+TOC_CACHE_INSTRS = ("TOC", "HYPERLINK", "PAGEREF")
+
+
+def stable_field_signature(docx: Path) -> dict[str, list[str]]:
+    """Per-part instrText signature with the dynamic TOC cache excluded.
+
+    Stable fields (PAGE / STYLEREF / REF / etc.) must stay identical between the
+    source and the generated template; only the TOC and its cached hyperlinks /
+    pagerefs are allowed to change because the table of contents is rebuilt from
+    the live Heading paragraphs.
+    """
+    signature: dict[str, list[str]] = {}
+    for name in part_names(docx, "word/"):
+        if not (name == "word/document.xml" or "/header" in name or "/footer" in name):
+            continue
+        root = read_xml(docx, name)
+        instrs = [
+            "".join(node.itertext()).strip()
+            for node in root.iter(qn(W, "instrText"))
+        ]
+        signature[name] = sorted(
+            i for i in instrs if not any(tag in i for tag in TOC_CACHE_INSTRS)
+        )
+    return signature
+
+
+def toc_instruction_count(docx: Path) -> int:
+    root = read_xml(docx, "word/document.xml")
+    return sum(
+        1
+        for node in root.iter(qn(W, "instrText"))
+        if "TOC" in "".join(node.itertext())
+    )
+
+
 def body_texts(docx: Path) -> list[str]:
     body = read_xml(docx, "word/document.xml").find("w:body", NS)
     return ["".join(node.itertext()).strip() for node in body]
@@ -345,7 +383,8 @@ def verify_package(docx: Path, base: dict) -> None:
     assert len(document.findall(".//w:sectPr", NS)) == base["sections"] == 3
     assert part_names(docx, "word/header") == base["headers"]
     assert part_names(docx, "word/footer") == base["footers"]
-    assert field_signature(docx) == base["fields"]
+    assert stable_field_signature(docx) == base["stable_fields"], "stable fields (PAGE/STYLEREF/REF) changed"
+    assert toc_instruction_count(docx) == 1, "document must keep exactly one TOC field"
     footer6 = read_xml(docx, "word/footer6.xml")
     assert len(footer6.findall(".//wp:anchor", NS)) == base["footer6_anchor"]
     assert len(footer6.findall(".//wps:wsp", NS)) == base["footer6_shape"]
@@ -362,6 +401,7 @@ def verify(source: Path, template: Path, out: Path) -> None:
         "headers": part_names(source, "word/header"),
         "footers": part_names(source, "word/footer"),
         "fields": field_signature(source),
+        "stable_fields": stable_field_signature(source),
         "footer6_anchor": len(read_xml(source, "word/footer6.xml").findall(".//wp:anchor", NS)),
         "footer6_shape": len(read_xml(source, "word/footer6.xml").findall(".//wps:wsp", NS)),
     }
