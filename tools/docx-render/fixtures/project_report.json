@@ -1,0 +1,155 @@
+{
+  "report": {
+    "title": "示例电力有限公司安全渗透测试分析报告",
+    "client_name": "示例电力有限公司",
+    "test_subject": "示例电力有限公司生产控制系统",
+    "project_created_date": "2026年7月1日",
+    "project_created_month": "二零二六年七月",
+    "testers_text": "张三、李四",
+    "test_period": "2026年7月15日至2026年7月18日"
+  },
+  "summary_rows": [
+    {
+      "number": 1,
+      "title": "弱口令",
+      "assets_text": "10.10.1.10:22",
+      "severity_label": "高危"
+    },
+    {
+      "number": 2,
+      "title": "过期组件",
+      "assets_text": "10.10.3.20:443",
+      "severity_label": "中危"
+    },
+    {
+      "number": 3,
+      "title": "不安全默认配置",
+      "assets_text": "172.16.1.30:80",
+      "severity_label": "低危"
+    }
+  ],
+  "network_zones": [
+    {
+      "name": "I区",
+      "sessions": [
+        {
+          "label": "生产控制区扫描任务",
+          "access_point": "调度数据网接入点",
+          "tester_ip": "10.10.1.250",
+          "targets_text": "10.10.1.0/24",
+          "exclusions_text": "10.10.1.1",
+          "notes": ""
+        }
+      ],
+      "confirmed": [
+        {
+          "heading": "弱口令（高危）",
+          "description": "目标服务使用了容易猜测的认证口令。",
+          "assets_text": "10.10.1.10:22",
+          "remediation": "修改为符合单位口令策略的强口令，并限制管理端访问来源。",
+          "evidence": [
+            {
+              "image": "evidence-01-wide"
+            },
+            {
+              "image": "evidence-02-tall"
+            }
+          ]
+        }
+      ],
+      "not_observed": [
+        {
+          "title": "Redis 未授权访问漏洞",
+          "ports_text": "6379",
+          "evidence": [
+            {
+              "image": "evidence-03-wide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "III区",
+      "sessions": [
+        {
+          "label": "管理信息区扫描任务",
+          "access_point": "管理信息网接入点",
+          "tester_ip": "10.10.3.250",
+          "targets_text": "10.10.3.0/24",
+          "exclusions_text": "",
+          "notes": "仅验证明确授权的服务。"
+        }
+      ],
+      "confirmed": [
+        {
+          "heading": "过期组件（中危）",
+          "description": "目标使用的组件版本已停止安全维护。",
+          "assets_text": "10.10.3.20:443",
+          "remediation": "评估兼容性后升级到仍受支持的稳定版本。",
+          "evidence": [
+            {
+              "image": "evidence-03-wide"
+            }
+          ]
+        }
+      ],
+      "not_observed": [
+        {
+          "title": "SQL 注入漏洞",
+          "ports_text": "443",
+          "evidence": [
+            {
+              "image": "evidence-01-wide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "互联网接入区",
+      "sessions": [
+        {
+          "label": "互联网接入区扫描任务",
+          "access_point": "互联网边界测试接入点",
+          "tester_ip": "172.16.1.250",
+          "targets_text": "172.16.1.0/24",
+          "exclusions_text": "",
+          "notes": ""
+        }
+      ],
+      "confirmed": [
+        {
+          "heading": "不安全默认配置（低危）",
+          "description": "目标服务保留了不必要的默认配置。",
+          "assets_text": "172.16.1.30:80",
+          "remediation": "删除示例配置并关闭不需要的默认功能。",
+          "evidence": [
+            {
+              "image": "evidence-02-tall"
+            }
+          ]
+        }
+      ],
+      "not_observed": [
+        {
+          "title": "目录遍历漏洞",
+          "ports_text": "80",
+          "evidence": [
+            {
+              "image": "evidence-03-wide"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "network_zone_names_text": "I区、III区、互联网接入区",
+    "total": 3,
+    "high": 1,
+    "medium": 1,
+    "low": 1,
+    "focus_text": "账号口令\\组件版本\\默认配置"
+  }
+}

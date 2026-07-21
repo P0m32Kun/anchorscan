@@ -13,6 +13,16 @@
 /node_modules/
 /test-artifacts/
 
+# macOS
+.DS_Store
+
+# 临时 AI 草稿
+.scratch/
+
+# Python sidecar 虚拟环境与产物
+tools/docx-render/.venv/
+tools/docx-render/out/
+
 # config/default.yaml 由首次运行自动生成（工具路径与本机 PATH 相关），不进版本控制
 # config/default.yaml.example 是提交进仓库的参考模板
 /config/default.yaml

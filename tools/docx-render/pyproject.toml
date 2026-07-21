@@ -1,0 +1,11 @@
+[project]
+name = "docx-render-prototype"
+version = "0.0.0"
+description = "Throwaway docxtpl feasibility prototype for Project Report"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "docxtpl==0.20.2",
+]
+
+[tool.uv]
+package = false
