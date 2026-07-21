@@ -57,13 +57,13 @@ func TestBuildReportViewModel(t *testing.T) {
 		t.Error("AssetPage.HasPrev = false, want true on page 2")
 	}
 	// export / asset link URLs carry the run id and path
-	for _, u := range []string{model.ExportJSON, model.ExportHTML, model.ExportCSV} {
+	for _, u := range []string{model.ExportHTML} {
 		if !strings.Contains(u, "/reports/run-x/export") {
 			t.Errorf("export URL %q missing /reports/run-x/export", u)
 		}
 	}
-	if !strings.Contains(model.AssetCSV, "/reports/run-x/assets.csv") {
-		t.Errorf("AssetCSV = %q, want /reports/run-x/assets.csv", model.AssetCSV)
+	if !strings.Contains(model.AssetTXTIPPort, "/reports/run-x/assets.txt") {
+		t.Errorf("AssetTXTIPPort = %q, want /reports/run-x/assets.txt", model.AssetTXTIPPort)
 	}
 	// catalog status/diagnostics flow through from the catalog (zero catalog → empty)
 	if model.CatalogStatus != "" {

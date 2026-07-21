@@ -63,8 +63,8 @@ func TestTerminalReportIncludesDetectionCoverage(t *testing.T) {
 	}
 	jsonReport := httptest.NewRecorder()
 	handler.ServeHTTP(jsonReport, httptest.NewRequest(http.MethodGet, "/reports/run-coverage.json", nil))
-	if jsonReport.Code != http.StatusOK || !strings.Contains(jsonReport.Body.String(), `"detection_checks"`) || !strings.Contains(jsonReport.Body.String(), `"single_engine":1`) || !strings.Contains(jsonReport.Body.String(), `"started_at":"1970-01-01T00:00:01Z"`) || strings.Contains(jsonReport.Body.String(), "%") {
-		t.Fatalf("report JSON = %d %s", jsonReport.Code, jsonReport.Body.String())
+	if jsonReport.Code != http.StatusNotFound {
+		t.Fatalf("json report export should be removed (404), got %d", jsonReport.Code)
 	}
 }
 
@@ -557,9 +557,7 @@ func TestReportPageRendersFindings(t *testing.T) {
 	for _, want := range []string{
 		`type="checkbox" name="severity" value="critical"`,
 		`type="checkbox" name="severity" value="high"`,
-		`href="/reports/run-1/export?format=json"`,
 		`href="/reports/run-1/export?format=html"`,
-		`href="/reports/run-1/export?format=csv"`,
 	} {
 		if !strings.Contains(res.Body.String(), want) {
 			t.Fatalf("expected %q in report page: %s", want, res.Body.String())
@@ -631,8 +629,8 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	}
 	export := httptest.NewRecorder()
 	handler.ServeHTTP(export, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=json&view=vulnerabilities", nil))
-	if export.Code != http.StatusOK || !strings.Contains(export.Body.String(), "192.0.2.51") {
-		t.Fatalf("vulnerability view unexpectedly changed the existing export: %d %s", export.Code, export.Body.String())
+	if export.Code != http.StatusBadRequest {
+		t.Fatalf("json export should be removed (400), got %d", export.Code)
 	}
 	htmlExport := httptest.NewRecorder()
 	handler.ServeHTTP(htmlExport, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=html", nil))
@@ -1132,7 +1130,7 @@ func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 		t.Fatalf("status mismatch: %d", res.Code)
 	}
 	body := res.Body.String()
-	if !strings.Contains(body, "按主机聚合") || !strings.Contains(body, "复制 IP:PORT") || !strings.Contains(body, "/reports/run-1/assets.csv?q=redis") {
+	if !strings.Contains(body, "按主机聚合") || !strings.Contains(body, "复制 IP:PORT") {
 		t.Fatalf("expected asset workbench controls: %s", body)
 	}
 	appScript := strings.Index(body, `<script src="/static/app.js" defer></script>`)
@@ -1224,21 +1222,8 @@ func TestReportAssetExportSupportsFilteredTXTAndCSV(t *testing.T) {
 
 	res = httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/assets.csv?q=redis", nil))
-	if res.Code != http.StatusOK {
-		t.Fatalf("csv status mismatch: %d", res.Code)
-	}
-	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
-		t.Fatalf("unexpected csv content-type: %s", ct)
-	}
-	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="run-1-assets.csv"`) {
-		t.Fatalf("unexpected csv content-disposition: %s", cd)
-	}
-	csvBody := res.Body.String()
-	if !strings.Contains(csvBody, "ip,port,protocol,service,product,version,cpe,url") || !strings.Contains(csvBody, "127.0.0.1,6379,,redis,Redis,7.2.0,,") {
-		t.Fatalf("unexpected csv export: %s", csvBody)
-	}
-	if strings.Contains(csvBody, "127.0.0.2") {
-		t.Fatalf("expected filtered csv export: %s", csvBody)
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("csv asset export should be removed (404), got %d", res.Code)
 	}
 }
 
@@ -1286,32 +1271,14 @@ func TestReportExportDownloadsRicherFormats(t *testing.T) {
 
 	res = httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=json&severity=high", nil))
-	if res.Code != http.StatusOK {
-		t.Fatalf("json status mismatch: %d body=%s", res.Code, res.Body.String())
-	}
-	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.json"`) {
-		t.Fatalf("unexpected json content-disposition: %s", cd)
-	}
-	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "application/json") {
-		t.Fatalf("unexpected json content-type: %s", ct)
-	}
-	if !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
-		t.Fatalf("unexpected json export: %s", res.Body.String())
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("json export should be removed (400 unknown format), got %d", res.Code)
 	}
 
 	res = httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-1/export?format=csv&severity=high", nil))
-	if res.Code != http.StatusOK {
-		t.Fatalf("csv status mismatch: %d body=%s", res.Code, res.Body.String())
-	}
-	if cd := res.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="anchorscan-run-1.csv"`) {
-		t.Fatalf("unexpected csv content-disposition: %s", cd)
-	}
-	if ct := res.Header().Get("Content-Type"); !strings.Contains(ct, "text/csv") {
-		t.Fatalf("unexpected csv content-type: %s", ct)
-	}
-	if !strings.Contains(res.Body.String(), "severity,source,id,ip,port,protocol,service,product,target,summary,evidence") || !strings.Contains(res.Body.String(), "redis-default-logins") || strings.Contains(res.Body.String(), "tomcat-detect") {
-		t.Fatalf("unexpected csv export: %s", res.Body.String())
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("csv export should be removed (400 unknown format), got %d", res.Code)
 	}
 
 	res = httptest.NewRecorder()
