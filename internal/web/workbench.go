@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"html/template"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,24 +13,39 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
-// workbenchViewModel is the data passed to the positive verification workbench
-// template. It contains the aggregated project report and existing verifications
-// so the UI can render candidates and their verification state together.
+// workbenchViewModel is the data passed to the verification workbench template.
+// It contains the aggregated project report and existing verifications so the UI
+// can render positive candidates, negative candidates and incomplete checks.
 type workbenchCandidate struct {
 	report.ProjectVulnerabilityCandidate
 	ZoneID string `json:"zone_id"`
 }
 
+type negativeWorkbenchItem struct {
+	report.ProjectNegativeCandidate
+	ZoneID string `json:"zone_id"`
+}
+
+type incompleteWorkbenchItem struct {
+	report.ProjectIncompleteCheck
+	ZoneID string `json:"zone_id"`
+}
+
 type workbenchViewModel struct {
-	Project            store.Project
-	Zones              []store.ProjectZone
-	ZoneNames          map[string]string
-	Report             report.ProjectReport
-	Verifications      []store.Verification
-	VerificationMap    map[string]store.Verification
-	CandidatesJSON     string
-	CatalogStatus      string
-	CatalogDiagnostics []string
+	Project                store.Project
+	Zones                  []store.ProjectZone
+	ZoneNames              map[string]string
+	Report                 report.ProjectReport
+	Verifications          []store.Verification
+	VerificationMap        map[string]store.Verification
+	CandidatesJSON         template.JS
+	NegativeCandidatesJSON template.JS
+	IncompleteChecksJSON   template.JS
+	PositiveCount          int
+	NegativeCount          int
+	IncompleteCount        int
+	CatalogStatus          string
+	CatalogDiagnostics     []string
 }
 
 func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -67,12 +83,34 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 		verificationMap[v.VulnerabilityKey] = v
 	}
 	var candidates []workbenchCandidate
+	var negatives []negativeWorkbenchItem
+	var incompletes []incompleteWorkbenchItem
+	var posCount, negCount, incCount int
 	for _, zone := range projReport.Zones {
 		for _, c := range zone.PositiveCandidates {
 			candidates = append(candidates, workbenchCandidate{ProjectVulnerabilityCandidate: c, ZoneID: zone.Zone.ZoneID})
+			posCount++
+		}
+		for _, nc := range zone.NegativeCandidates {
+			negatives = append(negatives, negativeWorkbenchItem{ProjectNegativeCandidate: nc, ZoneID: zone.Zone.ZoneID})
+			negCount++
+		}
+		for _, ic := range zone.IncompleteChecks {
+			incompletes = append(incompletes, incompleteWorkbenchItem{ProjectIncompleteCheck: ic, ZoneID: zone.Zone.ZoneID})
+			incCount++
 		}
 	}
 	candidatesJSON, err := json.Marshal(candidates)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	negativesJSON, err := json.Marshal(negatives)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	incompletesJSON, err := json.Marshal(incompletes)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -82,15 +120,20 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 		diagnostics = append(diagnostics, d.Reason)
 	}
 	render(w, "templates/workbench.html", workbenchViewModel{
-		Project:            project,
-		Zones:              zones,
-		ZoneNames:          zoneNames,
-		Report:             projReport,
-		Verifications:      verifications,
-		VerificationMap:    verificationMap,
-		CandidatesJSON:     string(candidatesJSON),
-		CatalogStatus:      string(s.catalog.Status()),
-		CatalogDiagnostics: diagnostics,
+		Project:                project,
+		Zones:                  zones,
+		ZoneNames:              zoneNames,
+		Report:                 projReport,
+		Verifications:          verifications,
+		VerificationMap:        verificationMap,
+		CandidatesJSON:         template.JS(candidatesJSON),
+		NegativeCandidatesJSON: template.JS(negativesJSON),
+		IncompleteChecksJSON:   template.JS(incompletesJSON),
+		PositiveCount:          posCount,
+		NegativeCount:          negCount,
+		IncompleteCount:        incCount,
+		CatalogStatus:          string(s.catalog.Status()),
+		CatalogDiagnostics:     diagnostics,
 	})
 }
 

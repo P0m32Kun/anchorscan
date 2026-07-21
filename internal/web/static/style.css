@@ -2795,3 +2795,76 @@ body {
   max-height: 40vh;
 }
 
+
+/* Workbench queue tabs */
+.workbench-queue-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.queue-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.queue-tab:hover,
+.queue-tab.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+.queue-count {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0.1em 0.4em;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  background: var(--bg-accent);
+  color: var(--muted);
+  text-align: center;
+}
+.queue-tab.active .queue-count {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Negative queue toolbar */
+.negative-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+/* Candidate select row */
+.candidate-select-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+.candidate-select-row input[type="checkbox"] {
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+  width: 1.1em;
+  height: 1.1em;
+}
+
+/* Negative and Incomplete dialogs */
+#negative-dialog {
+  width: min(600px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+#negative-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
