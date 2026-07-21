@@ -133,6 +133,28 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 	}
 }
 
+func TestProjectReportDOCXReturnsClearErrorWhenUnconfigured(t *testing.T) {
+	dir := t.TempDir()
+	st := newProjectReportStore(t, dir)
+	seedProjectReportFixtures(t, st)
+	st.Close()
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.docx", nil))
+	if res.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when sidecar unconfigured, got %d body=%s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "docxtpl") {
+		t.Fatalf("expected docxtpl hint in body: %s", res.Body.String())
+	}
+}
+
 func TestProjectReportHTMLRejectsMissingMetadata(t *testing.T) {
 	dir := t.TempDir()
 	st := newProjectReportStore(t, dir)

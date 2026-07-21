@@ -13,31 +13,47 @@ import (
 
 // projectReportHTML renders the single-file formal project report. It projects
 // only included verifications and embeds their evidence as data URIs so the
-// output is fully offline-readable. Missing required metadata or no included
-// confirmed evidence blocks the export.
+// output is fully offline-readable. Missing required metadata blocks the export.
 func (s *server) projectReportHTML(w http.ResponseWriter, r *http.Request, projectID string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	deliverable, project, err := s.buildProjectDeliverable(w, r, projectID)
+	if err != nil {
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.html"`, safeReportFilename(project)))
+	if err := report.RenderProjectHTML(w, deliverable); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// buildProjectDeliverable loads the project, validates report metadata, and
+// projects included verifications + evidence into the shared deliverable model
+// consumed by both the HTML and DOCX exporters. It writes HTTP errors and
+// returns a non-nil error when the response is already handled.
+func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request, projectID string) (report.ProjectDeliverable, store.Project, error) {
 	project, err := s.store.GetProject(projectID)
 	if err != nil {
 		http.NotFound(w, r)
-		return
+		return report.ProjectDeliverable{}, store.Project{}, err
 	}
 	if missing := projectReportMissingMetadata(project); len(missing) > 0 {
 		http.Error(w, "报告元数据不完整，缺失："+strings.Join(missing, "、"), http.StatusBadRequest)
-		return
+		return report.ProjectDeliverable{}, store.Project{}, fmt.Errorf("missing metadata")
 	}
 	zones, err := s.store.ListProjectZones(projectID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return report.ProjectDeliverable{}, store.Project{}, err
 	}
 	verifications, err := s.store.ListProjectVerifications(projectID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return report.ProjectDeliverable{}, store.Project{}, err
 	}
 
 	reportZones := make([]report.ProjectZone, 0, len(zones))
@@ -56,12 +72,12 @@ func (s *server) projectReportHTML(w http.ResponseWriter, r *http.Request, proje
 		assets, err := s.store.ListVerificationAssets(v.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return report.ProjectDeliverable{}, store.Project{}, err
 		}
 		evidenceRows, err := s.store.ListVerificationEvidence(v.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return report.ProjectDeliverable{}, store.Project{}, err
 		}
 		delAssets := make([]report.DeliverableAsset, 0, len(assets))
 		for _, a := range assets {
@@ -72,9 +88,9 @@ func (s *server) projectReportHTML(w http.ResponseWriter, r *http.Request, proje
 			dataURI, err := s.evidenceDataURI(projectID, e)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+				return report.ProjectDeliverable{}, store.Project{}, err
 			}
-			delEvidence = append(delEvidence, report.DeliverableEvidence{DataURI: dataURI, MediaType: e.MediaType, Caption: e.Caption, Width: e.Width, Height: e.Height})
+			delEvidence = append(delEvidence, report.DeliverableEvidence{DataURI: dataURI, FilePath: s.store.EvidenceFilePath(e, projectID), MediaType: e.MediaType, Caption: e.Caption, Width: e.Width, Height: e.Height})
 		}
 		deliverableVerifications = append(deliverableVerifications, report.DeliverableVerification{
 			ID:          v.ID,
@@ -102,13 +118,7 @@ func (s *server) projectReportHTML(w http.ResponseWriter, r *http.Request, proje
 		Testers:     project.Testers,
 	}
 	deliverable := report.BuildProjectDeliverable(metadata, reportZones, deliverableVerifications, s.opts.Now())
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.html"`, safeReportFilename(project)))
-	if err := report.RenderProjectHTML(w, deliverable); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	return deliverable, project, nil
 }
 
 func (s *server) evidenceDataURI(projectID string, evidence store.VerificationEvidence) (string, error) {

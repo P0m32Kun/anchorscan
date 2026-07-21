@@ -138,6 +138,8 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 		s.projectWorkbench(w, r, id)
 	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "report.html":
 		s.projectReportHTML(w, r, id)
+	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "report.docx":
+		s.projectReportDOCX(w, r, id)
 	case r.Method == http.MethodPost && len(segments) == 4 && segments[1] == "candidates" && segments[3] == "commands":
 		s.projectCandidateCommand(w, r, id, segments[2])
 	case len(segments) >= 2 && segments[1] == "verifications":

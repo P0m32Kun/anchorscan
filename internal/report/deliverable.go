@@ -6,10 +6,12 @@ import (
 	"time"
 )
 
-// DeliverableEvidence is one screenshot embedded into the project report as a
-// base64 data URI, so the rendered HTML stays a single offline-readable file.
+// DeliverableEvidence is one screenshot embedded into the project report. For
+// the HTML exporter DataURI carries the base64 payload; for the DOCX exporter
+// FilePath points at the on-disk image the sidecar reads.
 type DeliverableEvidence struct {
 	DataURI   string
+	FilePath  string
 	MediaType string
 	Caption   string
 	Width     int

@@ -15,6 +15,7 @@ Plan: docs/plans/project-engagement-report/spec.md and tickets 01–11
 - [x] 08 — 生成项目正式单文件 HTML
 - [x] 09 — 收敛用户导出为 HTML
 - [x] 10 — 迁移甘肃历史 Runs
+- [x] 11 — 导出项目 DOCX 报告
 
 ## Blocked (needs human)
 

@@ -4,7 +4,7 @@
 
 **Blocked by:** 08 — 生成项目正式单文件 HTML。
 
-**Status:** draft
+**Status:** done
 
 ## 当前状态：最终封面下划线修复已进入模板和 fake 报告，待用户在 WPS 复核
 

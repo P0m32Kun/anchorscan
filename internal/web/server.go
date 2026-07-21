@@ -15,11 +15,13 @@ import (
 )
 
 type ServerOptions struct {
-	ConfigPath string
-	DBPath     string
-	Listen     string
-	Runner     tools.Runner
-	Now        func() time.Time
+	ConfigPath        string
+	DBPath            string
+	Listen            string
+	Runner            tools.Runner
+	Now               func() time.Time
+	DocxTemplatePath  string
+	DocxRenderProject string
 }
 
 type server struct {
