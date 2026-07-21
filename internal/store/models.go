@@ -6,6 +6,12 @@ type Project struct {
 	ID             string
 	Name           string
 	Description    string
+	ClientUnit     string
+	ReportTitle    string
+	TestObject     string
+	StartDate      string
+	EndDate        string
+	Testers        string
 	DefaultTargets string
 	DefaultPorts   string
 	ExcludeTargets string
@@ -15,9 +21,17 @@ type Project struct {
 	UpdatedAt      time.Time
 }
 
+type ProjectZone struct {
+	ProjectID string
+	ZoneID    string
+	Name      string
+	SortOrder int
+}
+
 type ScanRun struct {
 	RunID          string
 	ProjectID      string
+	ZoneID         string
 	Target         string
 	Ports          string
 	Profile        string

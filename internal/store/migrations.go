@@ -230,6 +230,83 @@ FROM detection_checks_legacy WHERE engine <> 'builtin'`,
 			return nil
 		},
 	},
+	{
+		version: 10,
+		name:    "add_project_report_metadata_and_zones",
+		up: func(tx *sql.Tx) error {
+			columns := []struct {
+				table string
+				name  string
+				def   string
+			}{
+				{"projects", "client_unit", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "report_title", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "test_object", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "start_date", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "end_date", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "testers", "TEXT NOT NULL DEFAULT ''"},
+				{"scan_runs", "zone_id", "TEXT NOT NULL DEFAULT ''"},
+			}
+			for _, col := range columns {
+				if !hasTable(tx, col.table) {
+					continue
+				}
+				if hasColumn(tx, col.table, col.name) {
+					continue
+				}
+				if _, err := tx.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s %s`, col.table, col.name, col.def)); err != nil {
+					return err
+				}
+			}
+			if !hasTable(tx, "project_zones") {
+				for _, stmt := range []string{
+					`CREATE TABLE IF NOT EXISTS project_zones (
+  project_id TEXT NOT NULL,
+  zone_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (project_id, zone_id)
+)`,
+					`CREATE INDEX IF NOT EXISTS idx_project_zones_project ON project_zones (project_id)`,
+				} {
+					if _, err := tx.Exec(stmt); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	},
+}
+
+func hasTable(tx *sql.Tx, table string) bool {
+	row := tx.QueryRow(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, table)
+	var one int
+	if err := row.Scan(&one); err != nil {
+		return false
+	}
+	return true
+}
+
+func hasColumn(tx *sql.Tx, table, column string) bool {
+	rows, err := tx.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
 }
 
 func runMigrations(db *sql.DB) error {

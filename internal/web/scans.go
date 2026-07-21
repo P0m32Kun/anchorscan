@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -186,35 +185,6 @@ func isScanProfile(profile string) bool {
 	default:
 		return false
 	}
-}
-
-func mergedTargetsInput(r *http.Request) (string, error) {
-	values := []string{strings.TrimSpace(r.FormValue("default_targets"))}
-	file, _, err := r.FormFile("targets_file")
-	if err != nil {
-		if errors.Is(err, http.ErrMissingFile) {
-			return joinNonEmpty(values...), nil
-		}
-		return "", err
-	}
-	defer file.Close()
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-	values = append(values, strings.TrimSpace(string(data)))
-	return joinNonEmpty(values...), nil
-}
-
-func joinNonEmpty(values ...string) string {
-	var out []string
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			out = append(out, value)
-		}
-	}
-	return strings.Join(out, "\n")
 }
 
 func (s *server) loadProjectForScan(id string) (*store.Project, error) {

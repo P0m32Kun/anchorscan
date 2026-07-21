@@ -16,10 +16,11 @@ func (s *Store) SaveImportRun(run ScanRun, fps []fingerprint.ServiceFingerprint,
 
 	if _, err := tx.Exec(
 		`INSERT INTO scan_runs (
-			run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(run_id) DO UPDATE SET
 			project_id = excluded.project_id,
+			zone_id = excluded.zone_id,
 			target = excluded.target,
 			ports = excluded.ports,
 			profile = excluded.profile,
@@ -31,6 +32,7 @@ func (s *Store) SaveImportRun(run ScanRun, fps []fingerprint.ServiceFingerprint,
 			artifact_dir = excluded.artifact_dir`,
 		run.RunID,
 		run.ProjectID,
+		run.ZoneID,
 		run.Target,
 		run.Ports,
 		run.Profile,

@@ -156,8 +156,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 9 {
-		t.Fatalf("expected 9 applied migrations, got %d", count)
+	if count != 10 {
+		t.Fatalf("expected 10 applied migrations, got %d", count)
 	}
 }
 

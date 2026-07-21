@@ -5,10 +5,11 @@ import "time"
 func (s *Store) SaveScanRun(run ScanRun) error {
 	_, err := s.db.Exec(
 		`INSERT INTO scan_runs (
-			run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(run_id) DO UPDATE SET
 			project_id = excluded.project_id,
+			zone_id = excluded.zone_id,
 			target = excluded.target,
 			ports = excluded.ports,
 			profile = excluded.profile,
@@ -20,6 +21,7 @@ func (s *Store) SaveScanRun(run ScanRun) error {
 			artifact_dir = excluded.artifact_dir`,
 		run.RunID,
 		run.ProjectID,
+		run.ZoneID,
 		run.Target,
 		run.Ports,
 		run.Profile,
@@ -35,7 +37,7 @@ func (s *Store) SaveScanRun(run ScanRun) error {
 
 func (s *Store) GetScanRun(runID string) (ScanRun, error) {
 	row := s.db.QueryRow(
-		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		`SELECT run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
 		 WHERE run_id = ?`,
 		runID,
@@ -46,7 +48,7 @@ func (s *Store) GetScanRun(runID string) (ScanRun, error) {
 
 func (s *Store) ListScanRuns(limit int) ([]ScanRun, error) {
 	rows, err := s.db.Query(
-		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		`SELECT run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
 		 ORDER BY started_at DESC
 		 LIMIT ?`,
@@ -62,7 +64,7 @@ func (s *Store) ListScanRuns(limit int) ([]ScanRun, error) {
 
 func (s *Store) ListProjectScanRuns(projectID string, limit int) ([]ScanRun, error) {
 	rows, err := s.db.Query(
-		`SELECT run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		`SELECT run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
 		 WHERE project_id = ?
 		 ORDER BY started_at DESC
@@ -194,6 +196,7 @@ func scanRunFromRow(scan func(dest ...any) error) (ScanRun, error) {
 	if err := scan(
 		&run.RunID,
 		&run.ProjectID,
+		&run.ZoneID,
 		&run.Target,
 		&run.Ports,
 		&run.Profile,
