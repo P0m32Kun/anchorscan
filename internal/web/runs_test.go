@@ -15,6 +15,58 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+func TestToolRunDetailShowsReturnAndEvidenceLinks(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:          "tool-nmap-20260701-120000.000000000",
+		ProjectID:      "p1",
+		ZoneID:         "I",
+		Kind:           "tool",
+		Profile:        "tool:nmap",
+		Target:         "192.0.2.10",
+		Status:         "completed",
+		ConfigSnapshot:   `{"tool":"nmap","mode":"alive","target":"192.0.2.10","verification_id":"v1"}`,
+		StartedAt:      time.Unix(1, 0),
+		FinishedAt:     time.Unix(2, 0),
+		IncludeInReport: false,
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/runs/tool-nmap-20260701-120000.000000000?return=/projects/p1/workbench", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, want := range []string{
+		"返回工作台",
+		"上传证据",
+		"/projects/p1/workbench",
+		"/projects/p1/verifications/v1/evidence",
+		"复制输出",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body: %s", want, body)
+		}
+	}
+}
+
 func TestRunsPageShowsProjectID(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

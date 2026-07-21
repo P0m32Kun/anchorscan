@@ -15,7 +15,18 @@
 <section class="tool-run-layout">
   <form class="panel form-grid tool-run-form" method="post" action="/tools" data-tool-form data-tool="{{.Tool.Name}}">
     <input type="hidden" name="tool" value="{{.Tool.Name}}">
+    {{if .SelectedZoneID}}<input type="hidden" name="zone_id" value="{{.SelectedZoneID}}">{{end}}
     {{if .VerificationID}}<input type="hidden" name="verification_id" value="{{.VerificationID}}">{{end}}
+    {{if .ReturnURL}}<input type="hidden" name="return" value="{{.ReturnURL}}">{{end}}
+
+    {{if .Verification}}
+    <div class="panel verification-summary" style="margin-bottom: 1rem;">
+      <p class="eyebrow">绑定验证项</p>
+      <p><strong>{{.Verification.Title}}</strong> <span class="status-badge severity-{{.Verification.Severity}}">{{.Verification.Severity}}</span></p>
+      <p class="muted">{{.Verification.Description}}</p>
+      <p class="muted">运行完成后可返回工作台上传证据。</p>
+    </div>
+    {{end}}
 
     <label class="full-width">
       <span>可选绑定到项目</span>
@@ -26,6 +37,18 @@
         {{end}}
       </select>
     </label>
+
+    {{if .Zones}}
+    <label class="full-width">
+      <span>网络分区</span>
+      <select name="zone_id">
+        <option value="">请选择分区</option>
+        {{range .Zones}}
+        <option value="{{.ZoneID}}" {{if eq $.SelectedZoneID .ZoneID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+    {{end}}
 
     <label class="full-width">
       <span>参数</span>

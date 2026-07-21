@@ -20,6 +20,8 @@ type ToolRunOptions struct {
 	RunID           string
 	LeaseOwnerToken string
 	ProjectID       string
+	ZoneID          string
+	VerificationID  string
 	Tool            string
 	Mode            string
 	Target          string
@@ -109,19 +111,22 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 	snapshot, _ := json.Marshal(map[string]any{
-		"tool":        opts.Tool,
-		"mode":        opts.Mode,
-		"target":      opts.Target,
-		"url":         opts.URL,
-		"ports":       opts.Ports,
-		"tags":        opts.Tags,
-		"template":    opts.Template,
-		"use_native":  opts.UseNativeArgs,
-		"native_args": opts.NativeArgs,
+		"tool":           opts.Tool,
+		"mode":           opts.Mode,
+		"target":         opts.Target,
+		"url":            opts.URL,
+		"ports":          opts.Ports,
+		"tags":           opts.Tags,
+		"template":       opts.Template,
+		"use_native":     opts.UseNativeArgs,
+		"native_args":    opts.NativeArgs,
+		"zone_id":        opts.ZoneID,
+		"verification_id": opts.VerificationID,
 	})
 	return scanStore.SaveScanRun(store.ScanRun{
 		RunID:           opts.RunID,
 		ProjectID:       opts.ProjectID,
+		ZoneID:          opts.ZoneID,
 		Kind:            "tool",
 		IncludeInReport: false,
 		Target:          firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),
