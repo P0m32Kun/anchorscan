@@ -12,6 +12,7 @@ Plan: docs/plans/project-engagement-report/spec.md and tickets 01–11
 - [x] 05 — 交付正向漏洞验证工作台
 - [x] 06 — 交付负向验证候选与结论
 - [x] 07 — 打通命令、工具页与 Evidence 返回链路
+- [x] 08 — 生成项目正式单文件 HTML
 
 ## Blocked (needs human)
 
