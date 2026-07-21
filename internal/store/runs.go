@@ -1,6 +1,9 @@
 package store
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 func (s *Store) SaveScanRun(run ScanRun) error {
 	_, err := s.db.Exec(
@@ -152,6 +155,28 @@ func (s *Store) UpdateScanRunIncludeInReport(runID string, include bool) error {
 		runID,
 	)
 	return err
+}
+
+// ReassignScanRun moves a run to a different project and zone and updates its
+// report-inclusion flag. It is the one-time migration seam used by the
+// merge-runs command; it does not touch artifacts, evidence or the managed
+// report directory (those are relocated by the caller).
+func (s *Store) ReassignScanRun(runID, projectID, zoneID string, includeInReport bool) error {
+	result, err := s.db.Exec(
+		`UPDATE scan_runs SET project_id = ?, zone_id = ?, include_in_report = ? WHERE run_id = ?`,
+		projectID,
+		zoneID,
+		boolToInt(includeInReport),
+		runID,
+	)
+	if err != nil {
+		return err
+	}
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (s *Store) UpdateScanRunStatus(runID string, status string, message string, finishedAt time.Time) error {
