@@ -14,6 +14,16 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+func saveProjectWithZones(t *testing.T, s *store.Store, project store.Project) {
+	t.Helper()
+	if err := s.SaveProject(project); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := s.CreateDefaultProjectZones(project.ID); err != nil {
+		t.Fatalf("CreateDefaultProjectZones returned error: %v", err)
+	}
+}
+
 func TestNewScanPageRenders(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -23,9 +33,7 @@ func TestNewScanPageRenders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", DefaultTargets: "127.0.0.1", DefaultPorts: "8080", DefaultProfile: "normal", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Listen: "127.0.0.1:8088"})
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
@@ -43,15 +51,12 @@ func TestNewScanPageRenders(t *testing.T) {
 	if !strings.Contains(body, "Local Lab") {
 		t.Fatalf("expected project name in body, got body=%s", body)
 	}
-	if !strings.Contains(body, "<textarea name=\"target\"") {
-		t.Fatalf("expected target textarea, got body=%s", body)
+	if !strings.Contains(body, `<select name="zone_id"`) {
+		t.Fatalf("expected zone selector, got body=%s", body)
 	}
-	if !strings.Contains(body, "支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔") {
-		t.Fatalf("expected updated target help text, got body=%s", body)
-	}
-	for _, want := range []string{"本次扫描覆盖设置", "临时覆盖档位", "临时覆盖目标", "临时覆盖端口"} {
+	for _, want := range []string{"I区 (I)", "II区 (II)", "III区 (III)", "网络分区", "目标资产", "端口范围", "扫描档位"} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected scan override copy %q, got body=%s", want, body)
+			t.Fatalf("expected scan form copy %q, got body=%s", want, body)
 		}
 	}
 	if !strings.Contains(body, `name="artifact_root"`) {
@@ -72,9 +77,7 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	handler, err := NewServer(ServerOptions{
 		ConfigPath: configPath,
@@ -87,7 +90,7 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=top1000&profile=normal")
+	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=top1000&profile=normal")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -113,9 +116,7 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -133,7 +134,7 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=top1000&profile=normal")
+	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=top1000&profile=normal")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -165,9 +166,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -185,7 +184,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=100-1000&profile=normal")
+	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=100-1000&profile=normal")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -215,9 +214,7 @@ func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	handler, err := NewServer(ServerOptions{
 		ConfigPath: configPath,
@@ -231,7 +228,7 @@ func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
 	closeServer(t, handler)
 
 	for _, ports := range []string{"full", "highrisk", "80,100-200"} {
-		body := strings.NewReader("project_id=p1&target=127.0.0.1&ports=" + ports + "&profile=normal")
+		body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=" + ports + "&profile=normal")
 		req := httptest.NewRequest(http.MethodPost, "/scan", body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
@@ -253,16 +250,14 @@ func TestScanCreateDoesNotStartManagerWhenPreparationReturnsOrdinaryError(t *tes
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: &serverSequenceRunner{}})
 	if err != nil {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
 	closeServer(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader("project_id=p1&target=127.0.0.1&ports=full"))
+	req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=full"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
@@ -290,9 +285,7 @@ func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 	runner := &serverSequenceRunner{started: make(chan struct{}), block: make(chan struct{})}
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: runner, Now: func() time.Time { return time.Unix(10, 0) }})
 	if err != nil {
@@ -300,7 +293,7 @@ func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	form := "project_id=p1&target=127.0.0.1&ports=80"
+	form := "project_id=p1&zone_id=I&target=127.0.0.1&ports=80"
 	first := httptest.NewRecorder()
 	firstReq := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(form))
 	firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -320,13 +313,13 @@ func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	close(runner.block)
 }
 
-func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
+func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
-	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "22,80,8080\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,8080\n")
 	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
@@ -335,20 +328,7 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	now := time.Unix(1, 0)
-	if err := scanStore.SaveProject(store.Project{
-		ID:             "p1",
-		Name:           "Local Lab",
-		DefaultTargets: "127.0.0.1\n127.0.0.2",
-		DefaultPorts:   "top1000",
-		ExcludeTargets: "127.0.0.2",
-		ExcludePorts:   "22",
-		DefaultProfile: "slow",
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}); err != nil {
-		t.Fatalf("SaveProject returned error: %v", err)
-	}
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -367,7 +347,7 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	form := strings.NewReader("project_id=p1")
+	form := strings.NewReader("project_id=p1&zone_id=I&label=segment-a&target=127.0.0.1&ports=80,8080&profile=normal&access_point=core-sw-a&tester_ip=10.0.0.5&notes=lab")
 	req := httptest.NewRequest(http.MethodPost, "/scan", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := httptest.NewRecorder()
@@ -391,8 +371,17 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if run.RunID == "" {
 		t.Fatalf("expected completed run, got none")
 	}
-	if run.Target != "127.0.0.1" || run.Ports != "80,8080" || run.Profile != "slow" {
-		t.Fatalf("unexpected run: %#v", run)
+	if run.ZoneID != "I" || run.Label != "segment-a" || run.Target != "127.0.0.1" || run.Ports != "80,8080" || run.Profile != "normal" {
+		t.Fatalf("unexpected run parameters: %#v", run)
+	}
+	if run.AccessPoint != "core-sw-a" || run.TesterIP != "10.0.0.5" || run.Notes != "lab" {
+		t.Fatalf("unexpected run context fields: %#v", run)
+	}
+	if run.Kind != "scan" {
+		t.Fatalf("expected kind scan, got %q", run.Kind)
+	}
+	if !run.IncludeInReport {
+		t.Fatalf("expected completed scan to be included by default")
 	}
 	reportPath := filepath.Join(dir, "projects", "p1", "runs", run.RunID, "report.json")
 	if _, err := os.Stat(reportPath); err != nil {
@@ -402,17 +391,47 @@ func TestScanCreateUsesProjectDefaultsAndExclusions(t *testing.T) {
 	if run.ArtifactDir != wantArtifactDir {
 		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
 	}
-	if _, err := os.Stat(wantArtifactDir); err != nil {
-		t.Fatalf("expected managed artifact dir at %s: %v", wantArtifactDir, err)
-	}
 	if !runner.hasArgs(rustscanPath, "-a", "127.0.0.1", "--ports", "80,8080") {
 		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
 	}
-	if !runner.hasArgs(nmapPath, "-sn", "127.0.0.1") {
-		t.Fatalf("unexpected alive check args: %#v", runner.commands)
+}
+
+func TestScanCreateRejectsMissingZoneTargetOrPorts(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "scan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
 	}
-	if runner.callCount(rustscanPath) != 1 {
-		t.Fatalf("expected single rustscan target after exclusions, got %#v", runner.commands)
+	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Runner: &serverSequenceRunner{}})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	cases := []string{
+		"project_id=p1&target=127.0.0.1&ports=80&profile=normal",
+		"project_id=p1&zone_id=I&ports=80&profile=normal",
+		"project_id=p1&zone_id=I&target=127.0.0.1&profile=normal",
+	}
+	for _, form := range cases {
+		req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for form %q, got %d", form, res.Code)
+		}
+	}
+	runs, err := scanStore.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 0 {
+		t.Fatalf("expected no runs, got %#v", runs)
 	}
 }
 

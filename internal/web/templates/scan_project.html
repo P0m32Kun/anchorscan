@@ -3,7 +3,7 @@
   <div>
     <p class="eyebrow">项目扫描</p>
     <h2>{{.Project.Name}} · 发起扫描</h2>
-    <p class="meta-line project-scan-intro">扫描将归属本项目并自动使用项目默认配置。</p>
+    <p class="meta-line project-scan-intro">本次扫描将归属本项目，并绑定到所选 Zone。</p>
   </div>
   <a class="button button-secondary" href="/projects/{{.Project.ID}}">返回项目</a>
 </section>
@@ -32,51 +32,60 @@
     <p class="alert alert-warning full-width">这是一次重新运行。请检查并提交下方参数后，系统才会创建一个新的扫描任务。</p>
     {{end}}
 
-    <div class="full-width project-defaults">
-      <p class="meta-line">
-        <strong>项目默认值</strong> · 目标: {{if .Project.DefaultTargets}}<code>{{.Project.DefaultTargets}}</code>{{else}}<span class="muted">未设置</span>{{end}} · 端口: {{if .Project.DefaultPorts}}<code>{{.Project.DefaultPorts}}</code>{{else}}<span class="muted">全局默认</span>{{end}} · 档位: {{if .Project.DefaultProfile}}{{.Project.DefaultProfile}}{{else}}<span class="muted">全局默认</span>{{end}}
-      </p>
-    </div>
+    <label>
+      <span>网络分区 (Zone) <span class="required">*</span></span>
+      <select name="zone_id" required>
+        <option value="" {{if eq .Form.ZoneID ""}}selected{{end}}>请选择 Zone</option>
+        {{range .Zones}}
+        <option value="{{.ZoneID}}" {{if eq $.Form.ZoneID .ZoneID}}selected{{end}}>{{.Name}} ({{.ZoneID}})</option>
+        {{end}}
+      </select>
+    </label>
 
-    <p class="full-width project-scan-help">
-      下方覆盖项留空即使用项目默认值；仅在本次扫描需要临时调整时填写。
-    </p>
+    <label>
+      <span>扫描标签</span>
+      <input name="label" value="{{.Form.Label}}" placeholder="例如：核心交换机接入段">
+    </label>
 
-    <details class="details-block full-width project-scan-details" {{if or .Preflight.Errors .Preflight.Warnings .Form.Target .Form.Ports .Form.IsRerun}}open{{end}}>
-      <summary>本次扫描覆盖设置</summary>
-      <div class="form-grid project-scan-detail-body">
-        <label>
-          <span>临时覆盖档位</span>
-          <select name="profile">
-            <option value="" {{if eq .Form.Profile ""}}selected{{end}}>使用项目/全局默认值</option>
-            <option value="slow" {{if eq .Form.Profile "slow"}}selected{{end}}>slow (轻载/低速率)</option>
-            <option value="normal" {{if eq .Form.Profile "normal"}}selected{{end}}>normal (均衡/默认值)</option>
-            <option value="fast" {{if eq .Form.Profile "fast"}}selected{{end}}>fast (极速/多路并发)</option>
-          </select>
-        </label>
+    <label class="full-width">
+      <span>目标资产 <span class="required">*</span></span>
+      <textarea name="target" rows="4" required placeholder="支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔">{{.Form.Target}}</textarea>
+    </label>
 
-        <label class="full-width">
-          <span>临时覆盖目标</span>
-          <textarea name="target" rows="4" placeholder="留空使用项目默认目标。支持IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔">{{.Form.Target}}</textarea>
-        </label>
+    <label class="full-width">
+      <span>端口范围 <span class="required">*</span></span>
+      <textarea name="ports" rows="3" required placeholder="支持: top1000、100-1000 或 80,443,8080">{{.Form.Ports}}</textarea>
+      <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
+      <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="ports">
+        ＋ 插入高危端口列表
+      </button>
+    </label>
 
-        <label class="full-width">
-          <span>临时覆盖端口</span>
-          <textarea name="ports" rows="3" placeholder="留空使用项目默认端口。支持: top1000、100-1000 或 80,443,8080">{{.Form.Ports}}</textarea>
-          <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
-          <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="ports">
-            ＋ 插入高危端口列表
-          </button>
-        </label>
+    <label>
+      <span>扫描档位 <span class="required">*</span></span>
+      <select name="profile" required>
+        <option value="slow" {{if eq .Form.Profile "slow"}}selected{{end}}>slow (轻载/低速率)</option>
+        <option value="normal" {{if eq .Form.Profile "normal"}}selected{{end}}>normal (均衡/默认值)</option>
+        <option value="fast" {{if eq .Form.Profile "fast"}}selected{{end}}>fast (极速/多路并发)</option>
+      </select>
+    </label>
 
-        <label class="full-width">
-          <span>过程文件目录</span>
-          <input name="artifact_root" value="{{.ArtifactRoot}}" placeholder="留空则与 report.json 放在同一个 run 目录">
-        </label>
-      </div>
-    </details>
+    <label>
+      <span>接入点/交换机</span>
+      <input name="access_point" value="{{.Form.AccessPoint}}" placeholder="例如：核心交换机 A 千兆口">
+    </label>
 
-    <details class="details-block full-width project-scan-details">
+    <label>
+      <span>测试机 IP</span>
+      <input name="tester_ip" value="{{.Form.TesterIP}}" placeholder="例如：10.0.0.5">
+    </label>
+
+    <label class="full-width">
+      <span>备注</span>
+      <textarea name="notes" rows="2" placeholder="本次扫描的特殊说明">{{.Form.Notes}}</textarea>
+    </label>
+
+    <details class="details-block full-width project-scan-details" {{if or .Preflight.Errors .Preflight.Warnings .Form.IsRerun}}open{{end}}>
       <summary>高级自定义参数 (自定义引擎命令行参数)</summary>
       <div class="form-grid project-scan-detail-body">
         <label>
@@ -94,6 +103,16 @@
         <label>
           <span>Nuclei 参数</span>
           <input name="nuclei_args" value="{{.Form.NucleiArgs}}" placeholder="例如: -tags cve,vuln">
+        </label>
+      </div>
+    </details>
+
+    <details class="details-block full-width project-scan-details">
+      <summary>过程文件目录</summary>
+      <div class="form-grid project-scan-detail-body">
+        <label class="full-width">
+          <span>Artifact 根目录</span>
+          <input name="artifact_root" value="{{.ArtifactRoot}}" placeholder="留空则与 report.json 放在同一个 run 目录">
         </label>
       </div>
     </details>

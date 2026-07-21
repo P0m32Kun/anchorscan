@@ -107,6 +107,11 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
+		zones, err := s.store.ListProjectZones(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		form := scanForm{}
 		if rerunID := strings.TrimSpace(r.URL.Query().Get("rerun")); rerunID != "" {
 			form, err = s.rerunScanForm(id, rerunID)
@@ -115,7 +120,7 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		s.renderProjectScanForm(w, project, preflight.Result{}, form)
+		s.renderProjectScanForm(w, project, zones, preflight.Result{}, form)
 	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "edit":
 		project, err := s.store.GetProject(id)
 		if err != nil {
@@ -129,6 +134,12 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 		})
 	case r.Method == http.MethodPost && len(segments) >= 2 && segments[1] == "zones":
 		s.projectZones(w, r, id, segments)
+	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "workbench":
+		s.projectWorkbench(w, r, id)
+	case r.Method == http.MethodPost && len(segments) == 4 && segments[1] == "candidates" && segments[3] == "commands":
+		s.projectCandidateCommand(w, r, id, segments[2])
+	case len(segments) >= 2 && segments[1] == "verifications":
+		s.projectVerifications(w, r, id, segments)
 	case r.Method == http.MethodGet:
 		project, err := s.store.GetProject(id)
 		if err != nil {
@@ -145,11 +156,16 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		zoneNames := make(map[string]string, len(zones))
+		for _, z := range zones {
+			zoneNames[z.ZoneID] = z.Name
+		}
 		render(w, "templates/project_detail.html", map[string]any{
-			"Title":   project.Name,
-			"Project": project,
-			"Zones":   zones,
-			"Runs":    runs,
+			"Title":     project.Name,
+			"Project":   project,
+			"Zones":     zones,
+			"ZoneNames": zoneNames,
+			"Runs":      runs,
 		})
 	case r.Method == http.MethodPost:
 		if err := parseProjectRequest(r); err != nil {
@@ -268,6 +284,15 @@ func (s *server) projectZones(w http.ResponseWriter, r *http.Request, projectID 
 		}
 		if hasRuns {
 			http.Error(w, "zone has runs and cannot be deleted", http.StatusConflict)
+			return
+		}
+		hasVerifications, err := s.store.ZoneHasVerifications(projectID, zoneID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if hasVerifications {
+			http.Error(w, "zone has verifications and cannot be deleted", http.StatusConflict)
 			return
 		}
 		if err := s.store.DeleteProjectZone(projectID, zoneID); err != nil {

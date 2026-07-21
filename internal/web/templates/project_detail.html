@@ -17,6 +17,13 @@
   </div>
 </section>
 
+<nav class="project-tabs" aria-label="项目视图">
+  <a class="project-tab active" href="/projects/{{.Project.ID}}" aria-current="page">概览</a>
+  <a class="project-tab" href="/projects/{{.Project.ID}}#runs">扫描任务</a>
+  <a class="project-tab" href="/projects/{{.Project.ID}}/workbench">验证工作台</a>
+  <a class="project-tab disabled" href="#" onclick="return false;" aria-disabled="true">正式报告</a>
+</nav>
+
 <section class="panel">
   <div class="panel-heading">
     <div>
@@ -126,6 +133,8 @@
   </form>
 </section>
 
+{{$zoneNames := .ZoneNames}}
+{{$runs := .Runs}}
 <section class="panel project-runs-panel">
   <div class="panel-heading project-runs-heading">
     <div>
@@ -133,65 +142,87 @@
       <h3>项目扫描历史</h3>
     </div>
   </div>
-  <table class="data-table run-history-table">
-    <thead>
-      <tr>
-        <th class="project-run-col-id">扫描任务ID (Run ID)</th>
-        <th class="run-col-status">任务状态</th>
-        <th class="project-run-col-target">目标资产</th>
-        <th class="run-col-profile">扫描档位</th>
-        <th class="run-col-actions">操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Runs}}
-      <tr>
-        <td>
-          <a href="/runs/{{.RunID}}" class="run-id-link">
-            {{.RunID}}
-          </a>
-        </td>
-        <td>
-          <span class="status-badge status-{{.Status}}">{{.Status}}</span>
-        </td>
-        <td class="run-target" title="{{.Target}}">
-          {{.Target}}
-        </td>
-        <td>
-          <span class="status-badge run-profile">
-            {{.Profile}}
-          </span>
-        </td>
-        <td class="run-actions">
-          {{if eq .Status "completed"}}
-          <a class="button button-secondary run-report-action" href="/reports/{{.RunID}}">
-            <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>查看报告</span>
-          </a>
-          {{else if eq .Status "running"}}
-          <a class="button button-secondary run-monitor-action" href="/runs/{{.RunID}}">
-            <svg class="button-icon is-running" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            <span>监控中</span>
-          </a>
-          {{else}}
-          <a class="button button-secondary project-run-detail" href="/runs/{{.RunID}}">详情</a>
-          {{end}}
-        </td>
-      </tr>
-      {{else}}
-      <tr>
-        <td colspan="5" class="muted projects-empty-state">
-          <strong>该项目暂无扫描记录</strong>
-          <span>点击右上角“新建扫描”发起第一次扫描。</span>
-        </td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+
+  {{range .Zones}}
+  {{$zoneID := .ZoneID}}
+  {{$zoneName := .Name}}
+  <div class="project-zone-runs">
+    <h4 class="project-zone-runs-title">{{$zoneName}} <span class="muted">{{$zoneID}}</span></h4>
+    <table class="data-table run-history-table">
+      <thead>
+        <tr>
+          <th class="project-run-col-id">扫描任务ID (Run ID)</th>
+          <th class="run-col-status">任务状态</th>
+          <th class="project-run-col-target">目标资产</th>
+          <th class="run-col-profile">扫描档位</th>
+          <th class="project-run-col-include">纳入报告</th>
+          <th class="run-col-actions">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $runs}}
+        {{if eq .ZoneID $zoneID}}
+        <tr>
+          <td>
+            <a href="/runs/{{.RunID}}" class="run-id-link">
+              {{.RunID}}
+            </a>
+            {{if .Label}}<br><span class="muted project-run-label">{{.Label}}</span>{{end}}
+          </td>
+          <td>
+            <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+          </td>
+          <td class="run-target" title="{{.Target}}">
+            {{.Target}}
+          </td>
+          <td>
+            <span class="status-badge run-profile">
+              {{.Profile}}
+            </span>
+          </td>
+          <td>
+            {{if eq .Status "completed"}}
+            <form class="run-include-form" method="post" action="/runs/{{.RunID}}/include">
+              <label class="toggle-switch">
+                <input type="checkbox" name="include" value="1" {{if .IncludeInReport}}checked{{end}} onchange="this.form.submit()">
+                <span class="toggle-slider"></span>
+              </label>
+            </form>
+            {{else}}
+            <span class="muted">—</span>
+            {{end}}
+          </td>
+          <td class="run-actions">
+            {{if eq .Status "completed"}}
+            <a class="button button-secondary run-report-action" href="/reports/{{.RunID}}">
+              <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>查看报告</span>
+            </a>
+            {{else if eq .Status "running"}}
+            <a class="button button-secondary run-monitor-action" href="/runs/{{.RunID}}">
+              <svg class="button-icon is-running" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span>监控中</span>
+            </a>
+            {{else}}
+            <a class="button button-secondary project-run-detail" href="/runs/{{.RunID}}">详情</a>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="muted projects-empty-state">
+    <strong>该项目暂无扫描记录</strong>
+    <span>点击右上角“新建扫描”发起第一次扫描。</span>
+  </p>
+  {{end}}
 </section>
 {{end}}

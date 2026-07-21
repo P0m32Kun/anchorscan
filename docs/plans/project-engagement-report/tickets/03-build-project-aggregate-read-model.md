@@ -4,11 +4,11 @@
 
 **Blocked by:** 02 — 创建归属 Zone 的 Scan Runs。
 
-**Status:** draft
+**Status:** done
 
-- [ ] 查询结果保留 RunID/ZoneID，不从 report.json 或 handler 递归聚合。
-- [ ] 复用 Catalog.Match、ObservationFromFinding 和现有漏洞分组身份。
-- [ ] 同一漏洞同一 IP:port 跨重复 Runs 只出现一次，来源 Runs 仍可审计。
-- [ ] info 不进入正向漏洞候选。
-- [ ] 未匹配/歧义项不丢失且不能猜选知识库条目。
-- [ ] `BuildProjectReport` 是 handler 与测试共用的唯一聚合 seam。
+- [x] 查询结果保留 RunID/ZoneID，不从 report.json 或 handler 递归聚合。
+- [x] 复用 Catalog.Match、ObservationFromFinding 和现有漏洞分组身份。
+- [x] 同一漏洞同一 IP:port 跨重复 Runs 只出现一次，来源 Runs 仍可审计。
+- [x] info 不进入正向漏洞候选。
+- [x] 未匹配/歧义项不丢失且不能猜选知识库条目。
+- [x] `BuildProjectReport` 是 handler 与测试共用的唯一聚合 seam。

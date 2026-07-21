@@ -61,9 +61,10 @@ func (s *Store) FinishRunWithLease(runID, ownerToken, status, message string, fi
 		return false, err
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec(`UPDATE scan_runs SET status = ?, error = ?, finished_at = ?
+	result, err := tx.Exec(`UPDATE scan_runs SET status = ?, error = ?, finished_at = ?,
+		include_in_report = CASE WHEN kind = 'scan' AND ? IN ('completed', 'completed_with_errors') THEN 1 ELSE include_in_report END
 		WHERE run_id = ? AND EXISTS (SELECT 1 FROM run_leases WHERE scope = ? AND run_id = ? AND owner_token = ?)`,
-		status, message, formatTime(finishedAt), runID, globalRunLeaseScope, runID, ownerToken)
+		status, message, formatTime(finishedAt), status, runID, globalRunLeaseScope, runID, ownerToken)
 	if err != nil {
 		return false, err
 	}

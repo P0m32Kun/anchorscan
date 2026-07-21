@@ -1,30 +1,18 @@
 # Plan Run State
 
-Plan: docs/plans/harden-scan-confidence/
+Plan: docs/plans/project-engagement-report/spec.md and tickets 01–11
 
 ## Doing
 
-None.
-
 ## Done
-
-- [x] 01 — 建立确定性 PR 浏览器门禁
-- [x] 02 — 覆盖核心 Web 工作流
-- [x] 03 — 强制全局 Run Lease
-- [x] 04 — 收敛 interrupted Run
-- [x] 05 — 持久化 DetectionCheck 并显示实时摘要
-- [x] 06 — 保留部分结果并归类最终状态
-- [x] 07 — 交付检测执行覆盖报告
-- [x] 08 — 增加默认关闭的逐工具超时
-- [x] 09 — 扩展真实工具实验室并以证据修正规则
-- [x] 10 — 完成集成发布验收
+- [x] 01 — 建立任务型 Project 与 Network Zones
+- [x] 02 — 创建归属 Zone 的 Scan Runs
+- [x] 03 — 构建跨 Runs 的 Project 聚合读模型
+- [x] 04 — 持久化 Verification 与 Evidence
+- [x] 05 — 交付正向漏洞验证工作台
 
 ## Blocked (needs human)
 
-None.
-
 ## Decisions Log
-
-- 2026-07-17 — 延续已批准的浅色 Apple-inspired 桌面方向，完成余下票据。 
-- 2026-07-18 — 1280px 浏览器窗口的可用内容宽度会被滚动条占用；技术设计改为验收无页面级横向溢出，而非以 `html`/`body` 固定最小宽度强制布局。
-- 2026-07-18 — 用户授权连续执行；完成旧计划后立即进入 harden-scan-confidence 的首个可执行票据。
+- 2026-07-21 — 用户批准 project-engagement-report spec；占位符模板已确认并固化为 tools/docx-render/templates/project-report.docx；WPS 可手动刷新目录；下划线已改回默认粗细。 — re: plan baseline
+- 2026-07-21 — 用户授权用 run-plan 自动推进 01–11 号 ticket。 — re: run mode

@@ -2586,3 +2586,212 @@ body {
   border-color: rgba(0, 113, 227, 0.12) !important;
 }
 
+/* Project tabs */
+.project-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+}
+.project-tab {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.project-tab:hover,
+.project-tab.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.project-tab.disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Workbench filter */
+.workbench-filter-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+.workbench-filter-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.workbench-filter-form input,
+.workbench-filter-form select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-accent);
+  color: var(--text);
+}
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+.checkbox-row label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: normal;
+  color: var(--text);
+}
+
+/* Candidate cards */
+.candidate-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  background: var(--panel);
+  margin-bottom: 1rem;
+}
+.candidate-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.candidate-header h3 {
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.candidate-description {
+  color: var(--text);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+.asset-details {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: var(--bg-accent);
+  border-radius: var(--radius-sm);
+}
+.asset-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.asset-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.asset-link {
+  color: var(--primary);
+  text-decoration: none;
+  word-break: break-all;
+}
+.candidate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* Verify dialog */
+.verify-asset-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+.evidence-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+.evidence-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+}
+.evidence-item img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.paste-hint {
+  padding: 0.75rem;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  outline: none;
+}
+.paste-hint:focus {
+  border-color: var(--primary);
+}
+.file-input-label input {
+  display: none;
+}
+.file-input-label span {
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+/* Small dialog adjustments */
+#command-dialog,
+#verify-dialog {
+  width: min(720px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+#command-dialog::backdrop,
+#verify-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.25);
+}
+#command-dialog-body {
+  white-space: pre-wrap;
+  background: var(--bg-accent);
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  max-height: 40vh;
+}
+

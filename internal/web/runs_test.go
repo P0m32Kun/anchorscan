@@ -285,14 +285,18 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatalf("SaveProject returned error: %v", err)
 	}
+	if err := scanStore.CreateDefaultProjectZones("p1"); err != nil {
+		t.Fatalf("CreateDefaultProjectZones returned error: %v", err)
+	}
 	if err := scanStore.SaveScanRun(store.ScanRun{
 		RunID:          "run-1",
 		ProjectID:      "p1",
+		ZoneID:         "I",
 		Target:         "198.51.100.10",
 		Ports:          "80,443",
 		Profile:        "normal",
 		Status:         "interrupted",
-		ConfigSnapshot: `{"target":"198.51.100.10","ports":"80,443","profile":"fast","rustscan_args":"--ulimit 5000","nmap_args":"-sV"}`,
+		ConfigSnapshot: `{"zone_id":"I","target":"198.51.100.10","ports":"80,443","profile":"fast","rustscan_args":"--ulimit 5000","nmap_args":"-sV"}`,
 		StartedAt:      time.Unix(1, 0),
 	}); err != nil {
 		t.Fatalf("SaveScanRun returned error: %v", err)
@@ -319,7 +323,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 		t.Fatalf("rerun page status: %d %s", rerun.Code, rerun.Body.String())
 	}
 	body := rerun.Body.String()
-	for _, want := range []string{`name="target"`, "198.51.100.10", `name="ports"`, "80,443", `value="fast" selected`, "--ulimit 5000", "-sV"} {
+	for _, want := range []string{`name="zone_id"`, `value="I" selected`, `name="target"`, "198.51.100.10", `name="ports"`, "80,443", `value="fast" selected`, "--ulimit 5000", "-sV"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("rerun page missing %q: %s", want, body)
 		}
@@ -343,7 +347,10 @@ func TestCompletedWithErrorsRunCanBeRerun(t *testing.T) {
 	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatal(err)
 	}
-	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-errors", ProjectID: "p1", Target: "198.51.100.10", Ports: "443", Profile: "normal", Status: "completed_with_errors", ConfigSnapshot: `{"target":"198.51.100.10","ports":"443","profile":"normal"}`, StartedAt: time.Unix(1, 0)}); err != nil {
+	if err := scanStore.CreateDefaultProjectZones("p1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-errors", ProjectID: "p1", ZoneID: "I", Target: "198.51.100.10", Ports: "443", Profile: "normal", Status: "completed_with_errors", ConfigSnapshot: `{"target":"198.51.100.10","ports":"443","profile":"normal"}`, StartedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatal(err)
 	}
 	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
@@ -373,7 +380,10 @@ func TestInterruptedLegacyProjectScanPrefillsPersistedFields(t *testing.T) {
 	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatalf("SaveProject returned error: %v", err)
 	}
-	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "legacy", ProjectID: "p1", Target: "198.51.100.20", Ports: "443", Profile: "normal", Status: "interrupted", StartedAt: time.Unix(1, 0)}); err != nil {
+	if err := scanStore.CreateDefaultProjectZones("p1"); err != nil {
+		t.Fatalf("CreateDefaultProjectZones returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "legacy", ProjectID: "p1", ZoneID: "I", Target: "198.51.100.20", Ports: "443", Profile: "normal", Status: "interrupted", StartedAt: time.Unix(1, 0)}); err != nil {
 		t.Fatalf("SaveScanRun returned error: %v", err)
 	}
 	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})

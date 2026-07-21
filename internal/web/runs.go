@@ -26,6 +26,25 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/runs/"+id, http.StatusSeeOther)
 		return
 	}
+	if strings.HasSuffix(path, "/include") {
+		id := strings.TrimSuffix(path, "/include")
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		run, err := s.store.GetScanRun(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		include := r.FormValue("include") == "1"
+		if err := s.store.UpdateScanRunIncludeInReport(id, include); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/projects/"+run.ProjectID, http.StatusSeeOther)
+		return
+	}
 	if r.Method == http.MethodPost && r.FormValue("_method") == "delete" {
 		run, err := s.store.GetScanRun(path)
 		if err != nil {

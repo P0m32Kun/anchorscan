@@ -510,3 +510,99 @@ func TestOldProjectFieldsRemainReadable(t *testing.T) {
 		t.Fatalf("new metadata not set: %#v", updated)
 	}
 }
+
+func TestProjectDetailGroupsRunsByZoneAndTogglesInclude(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	now := time.Unix(1, 0)
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "甘肃任务", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.CreateDefaultProjectZones("p1"); err != nil {
+		t.Fatalf("CreateDefaultProjectZones returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:           "run-I-1",
+		ProjectID:       "p1",
+		ZoneID:          "I",
+		Label:           "核心段",
+		Target:          "10.0.1.0/24",
+		Ports:           "80,443",
+		Profile:         "normal",
+		Status:          "completed",
+		IncludeInReport: true,
+		StartedAt:       now,
+		FinishedAt:      now,
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:           "run-III-1",
+		ProjectID:       "p1",
+		ZoneID:          "III",
+		Target:          "10.0.3.0/24",
+		Ports:           "3389",
+		Profile:         "slow",
+		Status:          "completed",
+		IncludeInReport: false,
+		StartedAt:       now,
+		FinishedAt:      now,
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{
+		RunID:      "run-II-running",
+		ProjectID:  "p1",
+		ZoneID:     "II",
+		Target:     "10.0.2.0/24",
+		Ports:      "22",
+		Profile:    "fast",
+		Status:     "running",
+		StartedAt:  now,
+		FinishedAt: now,
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	for _, want := range []string{"I区", "II区", "III区", "run-I-1", "run-III-1", "run-II-running", "核心段"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected %q in body, got %s", want, body)
+		}
+	}
+	if !strings.Contains(body, "run-I-1") || !strings.Contains(body, "纳入报告") {
+		t.Fatalf("expected include report toggle in body, got %s", body)
+	}
+
+	// Toggle include for run-III-1
+	toggle := strings.NewReader("include=1")
+	toggleReq := httptest.NewRequest(http.MethodPost, "/runs/run-III-1/include", toggle)
+	toggleReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	toggleRes := httptest.NewRecorder()
+	handler.ServeHTTP(toggleRes, toggleReq)
+	if toggleRes.Code != http.StatusSeeOther {
+		t.Fatalf("expected redirect after toggle, got %d body=%s", toggleRes.Code, toggleRes.Body.String())
+	}
+	got, err := scanStore.GetScanRun("run-III-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if !got.IncludeInReport {
+		t.Fatalf("expected IncludeInReport true after toggle")
+	}
+}

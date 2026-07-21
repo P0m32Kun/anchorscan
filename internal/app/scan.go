@@ -26,6 +26,13 @@ type ScanOptions struct {
 	RunID                string
 	LeaseOwnerToken      string
 	ProjectID            string
+	ZoneID               string
+	Kind                 string
+	Label                string
+	AccessPoint          string
+	TesterIP             string
+	Notes                string
+	IncludeInReport      bool
 	Targets              []string
 	Ports                string
 	Tools                ToolPaths
@@ -84,15 +91,22 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	}
 	if opts.RunID != "" && scanStore != nil {
 		if err := scanStore.SaveScanRun(store.ScanRun{
-			RunID:          opts.RunID,
-			ProjectID:      opts.ProjectID,
-			Target:         strings.Join(opts.Targets, ","),
-			Ports:          opts.Ports,
-			Profile:        opts.ProfileName,
-			Status:         "running",
-			StartedAt:      time.Now(),
-			ConfigSnapshot: opts.ConfigSnapshot,
-			ArtifactDir:    artifactDir,
+			RunID:           opts.RunID,
+			ProjectID:       opts.ProjectID,
+			ZoneID:          opts.ZoneID,
+			Kind:            "scan",
+			Label:           opts.Label,
+			AccessPoint:     opts.AccessPoint,
+			TesterIP:        opts.TesterIP,
+			Notes:           opts.Notes,
+			IncludeInReport: opts.IncludeInReport,
+			Target:          strings.Join(opts.Targets, ","),
+			Ports:           opts.Ports,
+			Profile:         opts.ProfileName,
+			Status:          "running",
+			StartedAt:       time.Now(),
+			ConfigSnapshot:  opts.ConfigSnapshot,
+			ArtifactDir:     artifactDir,
 		}); err != nil {
 			return err
 		}

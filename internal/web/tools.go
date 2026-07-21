@@ -15,11 +15,14 @@ import (
 )
 
 type toolPageData struct {
-	Projects      []store.Project
-	Tools         []manualTool
-	Tool          manualTool
-	HighriskPorts string
-	RawArgs       string
+	Projects          []store.Project
+	Tools             []manualTool
+	Tool              manualTool
+	HighriskPorts     string
+	RawArgs           string
+	SelectedProjectID string
+	ReturnURL         string
+	VerificationID    string
 }
 
 type manualTool struct {
@@ -66,7 +69,15 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool, HighriskPorts: highriskPorts, RawArgs: strings.TrimSpace(r.URL.Query().Get("raw_args"))})
+	render(w, "templates/tool_page.html", toolPageData{
+		Projects:          projects,
+		Tool:              tool,
+		HighriskPorts:     highriskPorts,
+		RawArgs:           strings.TrimSpace(r.URL.Query().Get("raw_args")),
+		SelectedProjectID: strings.TrimSpace(r.URL.Query().Get("project_id")),
+		ReturnURL:         strings.TrimSpace(r.URL.Query().Get("return")),
+		VerificationID:    strings.TrimSpace(r.URL.Query().Get("verification_id")),
+	})
 }
 
 func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
@@ -272,4 +283,13 @@ func splitCSV(value string) []string {
 		}
 	}
 	return out
+}
+
+func coalesce(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }

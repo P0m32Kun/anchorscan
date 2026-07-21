@@ -149,6 +149,11 @@ func (s *Store) DeleteProject(id string) error {
 }
 
 func (s *Store) DeleteProjectCascade(id string) error {
+	// Remove verifications and evidence files before dropping the project row.
+	if err := s.DeleteProjectVerifications(id); err != nil {
+		return err
+	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -159,6 +164,7 @@ func (s *Store) DeleteProjectCascade(id string) error {
 		`DELETE FROM fingerprints WHERE run_id IN (SELECT run_id FROM scan_runs WHERE project_id = ?)`,
 		`DELETE FROM scan_events WHERE run_id IN (SELECT run_id FROM scan_runs WHERE project_id = ?)`,
 		`DELETE FROM scan_runs WHERE project_id = ?`,
+		`DELETE FROM project_zones WHERE project_id = ?`,
 		`DELETE FROM projects WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(stmt, id); err != nil {

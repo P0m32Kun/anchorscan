@@ -19,9 +19,14 @@ import (
 // scanForm is the small, explicitly allowed subset of a prior scan that can
 // be shown again for user-confirmed reruns.
 type scanForm struct {
+	ZoneID       string `json:"zone_id"`
 	Target       string `json:"target"`
 	Ports        string `json:"ports"`
 	Profile      string `json:"profile"`
+	Label        string `json:"label"`
+	AccessPoint  string `json:"access_point"`
+	TesterIP     string `json:"tester_ip"`
+	Notes        string `json:"notes"`
 	RustscanArgs string `json:"rustscan_args"`
 	NmapArgs     string `json:"nmap_args"`
 	HttpxArgs    string `json:"httpx_args"`
@@ -32,11 +37,12 @@ type scanForm struct {
 // renderProjectScanForm renders the in-project scan form with the project
 // context and an optional preflight result used to surface validation errors
 // when a scan submission is rejected. Scans are always bound to a project.
-func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, preflightResult preflight.Result, form scanForm) {
+func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, zones []store.ProjectZone, preflightResult preflight.Result, form scanForm) {
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 	render(w, "templates/scan_project.html", map[string]any{
 		"Title":         "发起扫描",
 		"Project":       project,
+		"Zones":         zones,
 		"ArtifactRoot":  "",
 		"Form":          form,
 		"Preflight":     preflightResult,
@@ -68,22 +74,23 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "project_id is required", http.StatusBadRequest)
 		return
 	}
-	targetValue := strings.TrimSpace(r.FormValue("target"))
-	if targetValue == "" {
-		targetValue = project.DefaultTargets
+	zones, err := s.store.ListProjectZones(project.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	portValue := r.FormValue("ports")
-	if portValue == "" {
-		portValue = project.DefaultPorts
+
+	form := scanFormFromRequest(r)
+	if form.Profile == "" {
+		form.Profile = "normal"
 	}
-	form := scanForm{
-		Target:       targetValue,
-		Ports:        portValue,
-		Profile:      coalesce(strings.TrimSpace(r.FormValue("profile")), defaultProjectProfile(project)),
-		RustscanArgs: r.FormValue("rustscan_args"),
-		NmapArgs:     r.FormValue("nmap_args"),
-		HttpxArgs:    r.FormValue("httpx_args"),
-		NucleiArgs:   r.FormValue("nuclei_args"),
+
+	if err := validateScanForm(form, zones); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		s.renderProjectScanForm(w, *project, zones, preflight.Result{
+			Errors: []preflight.Message{{Field: err.Field, Message: err.Message}},
+		}, form)
+		return
 	}
 
 	runID := newID("run", s.opts.Now())
@@ -95,10 +102,10 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	prepared, err := app.PrepareScan(app.PrepareScanRequest{
 		ConfigPath:     s.opts.ConfigPath,
-		TargetSpec:     targetValue,
-		PortSpec:       portValue,
-		ExcludeTargets: project.ExcludeTargets,
-		ExcludePorts:   project.ExcludePorts,
+		TargetSpec:     form.Target,
+		PortSpec:       form.Ports,
+		ExcludeTargets: "",
+		ExcludePorts:   "",
 		Overrides: config.Overrides{
 			ProfileName:  form.Profile,
 			RustscanArgs: form.RustscanArgs,
@@ -111,6 +118,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		ArtifactRoot:   artifactRoot,
 		RunID:          runID,
 		ProjectID:      projectID,
+		ZoneID:         form.ZoneID,
 	})
 	if err != nil {
 		field := "target"
@@ -124,18 +132,24 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 			},
 		}
 		w.WriteHeader(http.StatusBadRequest)
-		s.renderProjectScanForm(w, *project, preflightResult, form)
+		s.renderProjectScanForm(w, *project, zones, preflightResult, form)
 		return
 	}
 	if prepared.Preflight.HasErrors() {
 		w.WriteHeader(http.StatusBadRequest)
-		s.renderProjectScanForm(w, *project, prepared.Preflight, form)
+		s.renderProjectScanForm(w, *project, zones, prepared.Preflight, form)
 		return
 	}
 	form.Target = strings.Join(prepared.Options.Targets, ",")
 	form.Ports = prepared.Options.Ports
 	form.Profile = prepared.Options.ProfileName
 	prepared.Options.ConfigSnapshot = scanFormSnapshot(form)
+	prepared.Options.Kind = "scan"
+	prepared.Options.Label = form.Label
+	prepared.Options.AccessPoint = form.AccessPoint
+	prepared.Options.TesterIP = form.TesterIP
+	prepared.Options.Notes = form.Notes
+	prepared.Options.IncludeInReport = false
 	if err := os.MkdirAll(filepath.Dir(jsonPath), 0o755); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -146,6 +160,54 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
+}
+
+func scanFormFromRequest(r *http.Request) scanForm {
+	return scanForm{
+		ZoneID:       strings.TrimSpace(r.FormValue("zone_id")),
+		Target:       strings.TrimSpace(r.FormValue("target")),
+		Ports:        strings.TrimSpace(r.FormValue("ports")),
+		Profile:      strings.TrimSpace(r.FormValue("profile")),
+		Label:        strings.TrimSpace(r.FormValue("label")),
+		AccessPoint:  strings.TrimSpace(r.FormValue("access_point")),
+		TesterIP:     strings.TrimSpace(r.FormValue("tester_ip")),
+		Notes:        strings.TrimSpace(r.FormValue("notes")),
+		RustscanArgs: r.FormValue("rustscan_args"),
+		NmapArgs:     r.FormValue("nmap_args"),
+		HttpxArgs:    r.FormValue("httpx_args"),
+		NucleiArgs:   r.FormValue("nuclei_args"),
+	}
+}
+
+type scanFormError struct {
+	Field   string
+	Message string
+}
+
+func validateScanForm(form scanForm, zones []store.ProjectZone) *scanFormError {
+	if form.ZoneID == "" {
+		return &scanFormError{Field: "zone_id", Message: "请选择网络分区"}
+	}
+	zoneOK := false
+	for _, z := range zones {
+		if z.ZoneID == form.ZoneID {
+			zoneOK = true
+			break
+		}
+	}
+	if !zoneOK {
+		return &scanFormError{Field: "zone_id", Message: "所选网络分区不属于该项目"}
+	}
+	if form.Target == "" {
+		return &scanFormError{Field: "target", Message: "目标不能为空"}
+	}
+	if form.Ports == "" {
+		return &scanFormError{Field: "ports", Message: "端口不能为空"}
+	}
+	if !isScanProfile(form.Profile) {
+		return &scanFormError{Field: "profile", Message: "请选择有效的扫描档位"}
+	}
+	return nil
 }
 
 func scanFormSnapshot(form scanForm) string {
@@ -167,6 +229,21 @@ func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
 		// persisted scan columns; advanced arguments were never retained.
 		form = scanForm{Target: run.Target, Ports: run.Ports, Profile: run.Profile}
 	}
+	if form.ZoneID == "" {
+		form.ZoneID = run.ZoneID
+	}
+	if form.Label == "" && run.Label != "" {
+		form.Label = run.Label
+	}
+	if form.AccessPoint == "" && run.AccessPoint != "" {
+		form.AccessPoint = run.AccessPoint
+	}
+	if form.TesterIP == "" && run.TesterIP != "" {
+		form.TesterIP = run.TesterIP
+	}
+	if form.Notes == "" && run.Notes != "" {
+		form.Notes = run.Notes
+	}
 	if !completeScanForm(form) || !isScanProfile(form.Profile) {
 		return scanForm{}, errors.New("prior run has an incomplete scan snapshot")
 	}
@@ -175,7 +252,10 @@ func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
 }
 
 func completeScanForm(form scanForm) bool {
-	return strings.TrimSpace(form.Target) != "" && strings.TrimSpace(form.Ports) != "" && strings.TrimSpace(form.Profile) != ""
+	return strings.TrimSpace(form.ZoneID) != "" &&
+		strings.TrimSpace(form.Target) != "" &&
+		strings.TrimSpace(form.Ports) != "" &&
+		strings.TrimSpace(form.Profile) != ""
 }
 
 func isScanProfile(profile string) bool {
@@ -197,20 +277,4 @@ func (s *server) loadProjectForScan(id string) (*store.Project, error) {
 		return nil, err
 	}
 	return &project, nil
-}
-
-func defaultProjectProfile(project *store.Project) string {
-	if project == nil {
-		return ""
-	}
-	return strings.TrimSpace(project.DefaultProfile)
-}
-
-func coalesce(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

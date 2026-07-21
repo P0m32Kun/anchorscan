@@ -156,8 +156,8 @@ func TestOpenMigrationsAreIdempotent(t *testing.T) {
 	if err := second.db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatalf("schema_migrations query returned error: %v", err)
 	}
-	if count != 10 {
-		t.Fatalf("expected 10 applied migrations, got %d", count)
+	if count != 12 {
+		t.Fatalf("expected 12 applied migrations, got %d", count)
 	}
 }
 
@@ -734,5 +734,156 @@ func TestStoreListsScanRunsByChronologicalStartedAtWithMixedPrecision(t *testing
 	}
 	if projectRuns[0].RunID != later.RunID || projectRuns[1].RunID != earlier.RunID {
 		t.Fatalf("unexpected project run order: %#v", projectRuns)
+	}
+}
+
+func TestScanRunZoneFieldsRoundTrip(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer s.Close()
+
+	run := ScanRun{
+		RunID:           "run-1",
+		ProjectID:       "p1",
+		ZoneID:          "I",
+		Kind:            "scan",
+		Label:           "segment-a",
+		AccessPoint:     "core-sw-a",
+		TesterIP:        "10.0.0.5",
+		Notes:           "lab scan",
+		IncludeInReport: true,
+		Target:          "127.0.0.1",
+		Ports:           "80,443",
+		Profile:         "normal",
+		Status:          "completed",
+		StartedAt:       time.Unix(1, 0),
+		FinishedAt:      time.Unix(2, 0),
+	}
+	if err := s.SaveScanRun(run); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	got, err := s.GetScanRun("run-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if got.ZoneID != "I" || got.Kind != "scan" || got.Label != "segment-a" || got.AccessPoint != "core-sw-a" || got.TesterIP != "10.0.0.5" || got.Notes != "lab scan" {
+		t.Fatalf("zone fields mismatch: %#v", got)
+	}
+	if !got.IncludeInReport {
+		t.Fatalf("expected IncludeInReport true")
+	}
+
+	if err := s.UpdateScanRunIncludeInReport("run-1", false); err != nil {
+		t.Fatalf("UpdateScanRunIncludeInReport returned error: %v", err)
+	}
+	got, err = s.GetScanRun("run-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if got.IncludeInReport {
+		t.Fatalf("expected IncludeInReport false after update")
+	}
+
+	runs, err := s.ListProjectScanRuns("p1", 10)
+	if err != nil {
+		t.Fatalf("ListProjectScanRuns returned error: %v", err)
+	}
+	if len(runs) != 1 || runs[0].ZoneID != "I" {
+		t.Fatalf("unexpected project runs: %#v", runs)
+	}
+}
+
+func TestMigrationSetsIncludeInReportForCompletedRuns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("sql.Open returned error: %v", err)
+	}
+	_, err = db.Exec(`
+CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);
+CREATE TABLE scan_runs (
+  run_id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  zone_id TEXT NOT NULL DEFAULT '',
+  target TEXT NOT NULL,
+  ports TEXT NOT NULL,
+  profile TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT NOT NULL,
+  error TEXT NOT NULL,
+  config_snapshot TEXT NOT NULL,
+  artifact_dir TEXT NOT NULL DEFAULT ''
+);
+INSERT INTO schema_migrations (version, name, applied_at) VALUES
+  (1, 'legacy', ''), (2, 'legacy', ''), (3, 'legacy', ''), (4, 'legacy', ''), (5, 'legacy', ''),
+  (6, 'legacy', ''), (7, 'legacy', ''), (8, 'legacy', ''), (9, 'legacy', ''), (10, 'legacy', '');
+INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot)
+VALUES
+  ('run-completed', 'p1', 'I', '127.0.0.1', '80', 'normal', 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '', ''),
+  ('run-errors', 'p1', 'I', '127.0.0.1', '80', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '', ''),
+  ('run-tool', 'p1', 'I', '127.0.0.1', '80', 'tool:nuclei', 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '', ''),
+  ('run-failed', 'p1', 'I', '127.0.0.1', '80', 'normal', 'failed', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '', ''),
+  ('run-running', 'p1', 'I', '127.0.0.1', '80', 'normal', 'running', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '', '');
+`)
+	if err != nil {
+		t.Fatalf("legacy schema setup returned error: %v", err)
+	}
+	_ = db.Close()
+
+	s, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer s.Close()
+
+	runs, err := s.ListProjectScanRuns("p1", 10)
+	if err != nil {
+		t.Fatalf("ListProjectScanRuns returned error: %v", err)
+	}
+	want := map[string]bool{
+		"run-completed": true,
+		"run-errors":    true,
+		"run-tool":      false,
+		"run-failed":    false,
+		"run-running":   false,
+	}
+	for _, run := range runs {
+		if want[run.RunID] != run.IncludeInReport {
+			t.Fatalf("run %s IncludeInReport = %v, want %v", run.RunID, run.IncludeInReport, want[run.RunID])
+		}
+	}
+}
+
+func TestSaveImportRunPreservesZoneFields(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer s.Close()
+
+	run := ScanRun{
+		RunID:      "import-1",
+		ProjectID:  "p1",
+		ZoneID:     "III",
+		Kind:       "import",
+		Target:     "nmap-import",
+		Profile:    "import",
+		Status:     "completed",
+		StartedAt:  time.Unix(1, 0),
+		FinishedAt: time.Unix(2, 0),
+	}
+	if err := s.SaveImportRun(run, nil, nil); err != nil {
+		t.Fatalf("SaveImportRun returned error: %v", err)
+	}
+	got, err := s.GetScanRun("import-1")
+	if err != nil {
+		t.Fatalf("GetScanRun returned error: %v", err)
+	}
+	if got.ZoneID != "III" || got.Kind != "import" {
+		t.Fatalf("unexpected import run fields: %#v", got)
 	}
 }

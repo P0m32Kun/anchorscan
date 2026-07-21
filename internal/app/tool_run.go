@@ -120,14 +120,16 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 		"native_args": opts.NativeArgs,
 	})
 	return scanStore.SaveScanRun(store.ScanRun{
-		RunID:          opts.RunID,
-		ProjectID:      opts.ProjectID,
-		Target:         firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),
-		Ports:          opts.Ports,
-		Profile:        "tool:" + opts.Tool,
-		Status:         "running",
-		StartedAt:      time.Now(),
-		ConfigSnapshot: string(snapshot),
+		RunID:           opts.RunID,
+		ProjectID:       opts.ProjectID,
+		Kind:            "tool",
+		IncludeInReport: false,
+		Target:          firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),
+		Ports:           opts.Ports,
+		Profile:         "tool:" + opts.Tool,
+		Status:          "running",
+		StartedAt:       time.Now(),
+		ConfigSnapshot:  string(snapshot),
 	})
 }
 
