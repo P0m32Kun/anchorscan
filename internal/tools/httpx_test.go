@@ -10,7 +10,7 @@ import (
 
 func TestEnrichWebBuildsHTTPXCommandAndParsesJSON(t *testing.T) {
 	runner := &fakeRunner{
-		output: []byte(`{"url":"https://192.168.1.10:8443","status-code":200,"title":"Admin","tech":["nginx","Vue.js"]}`),
+		output: []byte(`{"url":"https://192.168.1.10:8443","status_code":404,"title":"Admin","tech":["nginx","Vue.js"]}`),
 	}
 
 	fp := fingerprint.ServiceFingerprint{
@@ -24,7 +24,7 @@ func TestEnrichWebBuildsHTTPXCommandAndParsesJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichWeb returned error: %v", err)
 	}
-	if got.URL != "https://192.168.1.10:8443" || got.Title != "Admin" {
+	if got.URL != "https://192.168.1.10:8443" || got.StatusCode != 404 || got.Title != "Admin" {
 		t.Fatalf("unexpected http result: %#v", got)
 	}
 
@@ -52,7 +52,7 @@ func TestEnrichWebIgnoresHTTPXBannerLines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichWeb returned error: %v", err)
 	}
-	if got.URL != "http://127.0.0.1:8080" || got.Title != "Apache Tomcat" {
+	if got.URL != "http://127.0.0.1:8080" || got.StatusCode != 200 || got.Title != "Apache Tomcat" {
 		t.Fatalf("unexpected http result: %#v", got)
 	}
 }

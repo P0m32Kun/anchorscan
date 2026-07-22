@@ -10,7 +10,7 @@ import (
 
 type HTTPResult struct {
 	URL        string   `json:"url"`
-	StatusCode int      `json:"status-code"`
+	StatusCode int      `json:"status_code"`
 	Title      string   `json:"title"`
 	Tech       []string `json:"tech"`
 }
@@ -30,9 +30,16 @@ func EnrichWebWithOutput(ctx context.Context, runner Runner, binaryPath string, 
 	}
 
 	line := lastJSONLine(string(out))
-	var result HTTPResult
-	if err := json.Unmarshal([]byte(line), &result); err != nil {
+	var payload struct {
+		HTTPResult
+		LegacyStatusCode int `json:"status-code"`
+	}
+	if err := json.Unmarshal([]byte(line), &payload); err != nil {
 		return HTTPResult{}, out, err
+	}
+	result := payload.HTTPResult
+	if result.StatusCode == 0 {
+		result.StatusCode = payload.LegacyStatusCode
 	}
 	return result, out, nil
 }
