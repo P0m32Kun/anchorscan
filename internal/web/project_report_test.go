@@ -86,13 +86,28 @@ func seedProjectReportFixtures(t *testing.T, st *store.Store) {
 		t.Fatalf("CreateEvidence v2 returned error: %v", err)
 	}
 
-	// Non-included verification must not appear.
+	// Non-included verification must not appear because outcome is inconclusive.
 	if err := st.CreateVerification(store.Verification{
-		ID: "v3", ProjectID: "p1", ZoneID: zoneI, Outcome: "confirmed",
+		ID: "v3", ProjectID: "p1", ZoneID: zoneI, Outcome: "inconclusive",
 		Title: "不应出现的项", Severity: "high", Included: false, Position: 3,
 		CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0),
 	}, nil, nil); err != nil {
 		t.Fatalf("CreateVerification v3 returned error: %v", err)
+	}
+
+	// Confirmed verification with Included=false should still be projected.
+	if err := st.CreateVerification(store.Verification{
+		ID: "v4", ProjectID: "p1", ZoneID: zoneI, Outcome: "confirmed",
+		Title: "自动纳入的确认项", Severity: "medium", Description: "即使 Included=false 也会自动纳入", Remediation: "修复建议", Included: false, Position: 4,
+		CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0),
+	}, []store.VerificationAsset{{VerificationID: "v4", IP: "10.0.0.5", Port: 8080, Position: 1}}, nil); err != nil {
+		t.Fatalf("CreateVerification v4 returned error: %v", err)
+	}
+	_, err = st.CreateEvidence("p1", store.CreateEvidenceInput{
+		VerificationID: "v4", Data: tinyPNG(), Caption: "自动纳入证据", Position: 0,
+	})
+	if err != nil {
+		t.Fatalf("CreateEvidence v4 returned error: %v", err)
 	}
 }
 
@@ -121,9 +136,12 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 		"修改默认密码并启用强密码策略",
 		"10.0.0.1:22",
 		"10.0.0.1:22, 10.0.0.2:443",
+		"10.0.0.5:8080",
 		"data:image/png;base64,",
 		"弱口令证据",
 		"Redis未授权访问",
+		"自动纳入的确认项",
+		"自动纳入证据",
 		"SW-01",
 		"10.0.0.10",
 		"10.0.1.0/24",

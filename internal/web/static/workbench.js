@@ -193,7 +193,6 @@ const verifyId = document.getElementById('verify-id');
 const verifyTitle = document.getElementById('verify-title');
 const verifySeverity = document.getElementById('verify-severity');
 const verifyOutcome = document.getElementById('verify-outcome');
-const verifyIncluded = document.getElementById('verify-included');
 const verifyDescription = document.getElementById('verify-description');
 const verifyRemediation = document.getElementById('verify-remediation');
 const verifyAssets = document.getElementById('verify-assets');
@@ -230,7 +229,7 @@ function buildVerificationPayload(c){
     severity: verifySeverity.value,
     description: verifyDescription.value.trim(),
     remediation: verifyRemediation.value.trim(),
-    included: verifyIncluded.checked,
+    included: verifyOutcome.value === 'confirmed' || verifyOutcome.value === 'not_observed',
     position: 0,
     assets,
     sources,
@@ -303,7 +302,6 @@ async function openVerifyDialog(key){
   verifyDescription.value = c.Description || '';
   verifyRemediation.value = c.Remediation || '';
   verifyOutcome.value = 'confirmed';
-  verifyIncluded.checked = false;
 
   verifyAssets.innerHTML = (c.Assets || []).map((a) => {
     return '<li><code>' + netHostPort(a.IP, a.Port) + '</code>' + (a.Target ? ' <a href="' + a.Target + '" target="_blank">' + a.Target + '</a>' : '') + '</li>';
@@ -322,7 +320,6 @@ async function openVerifyDialog(key){
         verifyTitle.value = v.Verification.Title;
         verifySeverity.value = v.Verification.Severity;
         verifyOutcome.value = v.Verification.Outcome;
-        verifyIncluded.checked = v.Verification.Included;
         verifyDescription.value = v.Verification.Description || '';
         verifyRemediation.value = v.Verification.Remediation || '';
         renderVerifyEvidenceList();

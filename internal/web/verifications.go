@@ -19,6 +19,10 @@ const (
 	maxEvidenceSize = 10 << 20 // 10 MiB
 )
 
+func outcomeIncluded(outcome string) bool {
+	return outcome == "confirmed" || outcome == "not_observed"
+}
+
 func (s *server) projectVerifications(w http.ResponseWriter, r *http.Request, projectID string, segments []string) {
 	if _, err := s.store.GetProject(projectID); err != nil {
 		http.NotFound(w, r)
@@ -121,10 +125,6 @@ func (s *server) createVerification(w http.ResponseWriter, r *http.Request, proj
 		http.Error(w, "title is required", http.StatusBadRequest)
 		return
 	}
-	if req.Included && (req.Outcome == "confirmed" || req.Outcome == "not_observed") {
-		http.Error(w, "cannot include verification without evidence", http.StatusBadRequest)
-		return
-	}
 
 	now := s.opts.Now()
 	v := store.Verification{
@@ -138,7 +138,7 @@ func (s *server) createVerification(w http.ResponseWriter, r *http.Request, proj
 		Description:      req.Description,
 		Remediation:      req.Remediation,
 		Notes:            req.Notes,
-		Included:         req.Included,
+		Included:         outcomeIncluded(req.Outcome),
 		Position:         req.Position,
 		CreatedAt:        now,
 		UpdatedAt:        now,
@@ -191,7 +191,7 @@ func (s *server) updateVerification(w http.ResponseWriter, r *http.Request, proj
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if req.Included && (req.Outcome == "confirmed" || req.Outcome == "not_observed") {
+	if outcomeIncluded(req.Outcome) {
 		count, err := s.store.CountVerificationEvidence(verificationID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -212,7 +212,7 @@ func (s *server) updateVerification(w http.ResponseWriter, r *http.Request, proj
 	v.Description = req.Description
 	v.Remediation = req.Remediation
 	v.Notes = req.Notes
-	v.Included = req.Included
+	v.Included = outcomeIncluded(req.Outcome)
 	v.Position = req.Position
 	v.UpdatedAt = s.opts.Now()
 	if err := s.store.UpdateVerification(v); err != nil {

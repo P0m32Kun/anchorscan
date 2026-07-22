@@ -13,8 +13,8 @@ import (
 )
 
 // projectReportHTML renders the single-file formal project report. It projects
-// only included verifications and embeds their evidence as data URIs so the
-// output is fully offline-readable. Missing required metadata blocks the export.
+// confirmed and not_observed verifications and embeds their evidence as data URIs
+// so the output is fully offline-readable. Missing required metadata blocks the export.
 func (s *server) projectReportHTML(w http.ResponseWriter, r *http.Request, projectID string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -69,9 +69,6 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 
 	deliverableVerifications := make([]report.DeliverableVerification, 0, len(verifications))
 	for _, v := range verifications {
-		if !v.Included {
-			continue
-		}
 		if v.Outcome != "confirmed" && v.Outcome != "not_observed" {
 			continue
 		}

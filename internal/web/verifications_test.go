@@ -258,3 +258,71 @@ func TestCreateVerificationEndpoint(t *testing.T) {
 		t.Fatalf("unexpected verification: %#v", v)
 	}
 }
+
+func TestCreateVerificationConfirmedAutoIncluded(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, _, _, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+
+	payload := verificationCreateRequest{
+		ZoneID:   "I",
+		Outcome:  "confirmed",
+		Title:    "Auto included",
+		Included: false,
+	}
+	body, _ := json.Marshal(payload)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/projects/p1/verifications", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+	var v store.Verification
+	if err := json.Unmarshal(res.Body.Bytes(), &v); err != nil {
+		t.Fatalf("unmarshal returned error: %v", err)
+	}
+	if !v.Included {
+		t.Fatalf("expected confirmed verification to be auto-included, got Included=%v", v.Included)
+	}
+}
+
+func TestUpdateVerificationConfirmedAutoIncludedWithoutEvidenceFails(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, _, verificationID, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+
+	payload := verificationUpdateRequest{ZoneID: "I", Outcome: "confirmed", Title: "Updated", Included: false}
+	body, _ := json.Marshal(payload)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/projects/p1/verifications/"+verificationID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for confirmed without evidence, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
+func TestUpdateVerificationConfirmedAutoIncludedWithEvidenceSucceeds(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, projectID, verificationID, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	uploadEvidence(t, handler, "/projects/"+projectID+"/verifications/"+verificationID+"/evidence", generateTestPNG(t), "evidence")
+
+	payload := verificationUpdateRequest{ZoneID: "I", Outcome: "confirmed", Title: "Updated", Included: false}
+	body, _ := json.Marshal(payload)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/projects/p1/verifications/"+verificationID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var v store.Verification
+	if err := json.Unmarshal(res.Body.Bytes(), &v); err != nil {
+		t.Fatalf("unmarshal returned error: %v", err)
+	}
+	if !v.Included {
+		t.Fatalf("expected confirmed with evidence to be auto-included, got Included=%v", v.Included)
+	}
+}

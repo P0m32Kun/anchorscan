@@ -194,7 +194,7 @@ func TestWorkbenchCandidateCommandGeneratesToolLink(t *testing.T) {
 	}
 }
 
-func TestWorkbenchCannotIncludeConfirmedWithoutEvidence(t *testing.T) {
+func TestWorkbenchCreateConfirmedAutoIncludes(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := writeTestConfig(t, dir)
@@ -229,17 +229,24 @@ func TestWorkbenchCannotIncludeConfirmedWithoutEvidence(t *testing.T) {
 		ZoneID:           "I",
 		VulnerabilityKey: "some-key",
 		Outcome:          "confirmed",
-		Title:            "Confirmed without evidence",
+		Title:            "Confirmed auto included",
 		Severity:         "high",
-		Included:         true,
+		Included:         false,
 	}
 	body, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/projects/"+project.ID+"/verifications", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
-	if res.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for included without evidence, got %d: %s", res.Code, res.Body.String())
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+	var v store.Verification
+	if err := json.Unmarshal(res.Body.Bytes(), &v); err != nil {
+		t.Fatalf("unmarshal returned error: %v", err)
+	}
+	if !v.Included {
+		t.Fatalf("expected confirmed verification to be auto-included, got Included=%v", v.Included)
 	}
 }
 
