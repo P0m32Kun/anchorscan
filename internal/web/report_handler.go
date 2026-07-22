@@ -75,7 +75,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	filters := reportFiltersFromValues(r.URL.Query())
 	filteredFingerprints := filterFingerprints(fps, filters)
-	filteredFindings := filterFindings(findings, fps, filters)
+	filteredFindings := filterFindingsForView(findings, fps, filters, s.catalog, r.URL.Query().Get("view") == "vulnerabilities")
 	filteredChecks := filterDetectionChecks(detectionChecks, filteredFingerprints)
 	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
 	if run.Status != "running" {
@@ -135,18 +135,21 @@ type riskSummary struct {
 	Critical int
 	High     int
 	Medium   int
+	Low      int
 }
 
 func summarizeRisk(findings []report.Finding) riskSummary {
 	summary := riskSummary{Total: len(findings)}
 	for _, finding := range findings {
-		switch strings.ToLower(finding.Severity) {
-		case "critical":
+		switch knowledgebase.Severity(strings.ToLower(finding.Severity)) {
+		case knowledgebase.SeverityCritical:
 			summary.Critical++
-		case "high":
+		case knowledgebase.SeverityHigh:
 			summary.High++
-		case "medium":
+		case knowledgebase.SeverityMedium:
 			summary.Medium++
+		case knowledgebase.SeverityLow:
+			summary.Low++
 		}
 	}
 	return summary
@@ -273,7 +276,8 @@ func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runI
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	filtered := filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query()))
+	filters := reportFiltersFromValues(r.URL.Query())
+	filtered := filterFindingsForView(findings, fingerprints, filters, s.catalog, r.URL.Query().Get("view") == "vulnerabilities")
 	if tool == "msf" {
 		s.reportBatchMSFCommand(w, filtered, strings.TrimSpace(r.FormValue("group_key")))
 		return

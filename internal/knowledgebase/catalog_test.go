@@ -104,3 +104,34 @@ func TestCatalogMatchReturnsUnmatchedWhenAllEvidenceMisses(t *testing.T) {
 		t.Fatalf("Match() = %#v, want unmatched", result)
 	}
 }
+
+func TestEntryMatchesKeyword(t *testing.T) {
+	entry := Entry{
+		ID:      "test-id",
+		Name:    "Test Vulnerability",
+		Aliases: []string{"alias-one"},
+		Match: MatchKeys{
+			NucleiIDs: []string{"nuclei-test"},
+			NSEIDs:    []string{"nse-test"},
+			CVEs:      []string{"CVE-2024-1234"},
+			Names:     []string{"manual-name"},
+		},
+	}
+	cases := []struct {
+		keyword string
+		want    bool
+	}{
+		{"Test", true},
+		{"cve-2024-1234", true},
+		{"nse-test", true},
+		{"alias-one", true},
+		{"manual-name", true},
+		{"missing", false},
+		{"  TEST  ", true},
+	}
+	for _, c := range cases {
+		if got := entry.MatchesKeyword(c.keyword); got != c.want {
+			t.Errorf("MatchesKeyword(%q) = %v, want %v", c.keyword, got, c.want)
+		}
+	}
+}

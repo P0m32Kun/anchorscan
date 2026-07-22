@@ -23,6 +23,22 @@ const (
 	SeverityLow      Severity = "low"
 )
 
+// Label returns the handbook's user-facing Chinese risk label.
+func (s Severity) Label() string {
+	switch s {
+	case SeverityCritical:
+		return "严重"
+	case SeverityHigh:
+		return "高危"
+	case SeverityMedium:
+		return "中危"
+	case SeverityLow:
+		return "低危"
+	default:
+		return string(s)
+	}
+}
+
 type Tool string
 
 const (
@@ -272,4 +288,19 @@ func copyEntry(entry Entry) Entry {
 	entry.Match.CVEs = append([]string(nil), entry.Match.CVEs...)
 	entry.Match.Names = append([]string(nil), entry.Match.Names...)
 	return entry
+}
+
+func (e Entry) MatchesKeyword(keyword string) bool {
+	needle := strings.ToLower(strings.TrimSpace(keyword))
+	fields := append([]string{e.ID, e.Name}, e.Aliases...)
+	fields = append(fields, e.Match.NucleiIDs...)
+	fields = append(fields, e.Match.NSEIDs...)
+	fields = append(fields, e.Match.CVEs...)
+	fields = append(fields, e.Match.Names...)
+	for _, field := range fields {
+		if strings.Contains(strings.ToLower(field), needle) {
+			return true
+		}
+	}
+	return false
 }

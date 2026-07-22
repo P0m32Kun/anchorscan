@@ -41,6 +41,7 @@
     <div class="risk-critical"><dt>严重</dt><dd>{{.Risk.Critical}}</dd></div>
     <div class="risk-high"><dt>高危</dt><dd>{{.Risk.High}}</dd></div>
     <div><dt>中危</dt><dd>{{.Risk.Medium}}</dd></div>
+    <div><dt>低危</dt><dd>{{.Risk.Low}}</dd></div>
   </dl>
 </section>
 
@@ -87,7 +88,7 @@
         <span class="search-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
         </span>
-        <input type="text" id="smart-search-input" placeholder="输入主机 IP、网段或漏洞关键词检索，回车或点击应用..." value="{{if .Filters.IP}}{{.Filters.IP}}{{else}}{{.Filters.Keyword}}{{end}}">
+        <input type="text" id="smart-search-input" placeholder="{{if eq .AssetView "vulnerabilities"}}输入漏洞名称或漏洞 ID 筛选{{else}}输入主机 IP、网段或漏洞关键词检索{{end}}，回车或点击应用..." value="{{if .Filters.IP}}{{.Filters.IP}}{{else}}{{.Filters.Keyword}}{{end}}">
         <input type="hidden" name="ip" id="hidden-ip" value="{{.Filters.IP}}">
         <input type="hidden" name="q" id="hidden-q" value="{{.Filters.Keyword}}">
       </div>
@@ -235,6 +236,7 @@
       {{if eq .CatalogStatus "unavailable"}}<p class="meta-line">漏洞知识库加载失败：{{range .CatalogDiagnostics}}{{.Reason}}{{end}}</p>{{end}}
       {{if eq .CatalogStatus "degraded"}}<p class="meta-line">漏洞知识库部分降级，已跳过或禁用 {{len .CatalogDiagnostics}} 项内容。</p>{{end}}
     </div>
+    {{if .VulnerabilityAssetCopyText}}<button class="button button-secondary" type="button" data-copy-text="{{.VulnerabilityAssetCopyText}}">复制当前筛选全部 IP:port</button>{{end}}
   </div>
   {{range .Vulnerabilities}}
   <article class="knowledgebase-content report-knowledge-entry">
@@ -250,8 +252,7 @@
     </div>
     <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
     <pre>{{.Description}}</pre>
-    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{range .Assets}}{{.}}
-{{end}}">复制字段</button></div>
+    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{.AssetCopyText}}">复制全部 IP:port</button></div>
     <pre>{{range .Assets}}{{.}}
 {{end}}</pre>
     <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>
@@ -273,8 +274,7 @@
     </div>
     <div class="panel-heading"><h4>漏洞简介</h4><button class="button button-secondary" type="button" data-copy-text="{{.Description}}">复制字段</button></div>
     <pre>{{.Description}}</pre>
-    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{range .Assets}}{{.}}
-{{end}}">复制字段</button></div>
+    <div class="panel-heading"><h4>漏洞资产</h4><button class="button button-secondary" type="button" data-copy-text="{{.AssetCopyText}}">复制全部 IP:port</button></div>
     <pre>{{range .Assets}}{{.}}
 {{end}}</pre>
     <div class="panel-heading"><h4>修复建议</h4><button class="button button-secondary" type="button" data-copy-text="{{.Remediation}}">复制字段</button></div>

@@ -50,11 +50,27 @@ class RenderDocxTests(unittest.TestCase):
         self.assertEqual(
             values,
             [
-                ["1", "弱口令", "10.10.1.10:22", "高危"],
+                ["1", "弱口令", "10.10.1.10:22", "严重"],
                 ["2", "过期组件", "10.10.3.20:443", "中危"],
                 ["3", "不安全默认配置", "172.16.1.30:80", "低危"],
             ],
         )
+
+    def test_runtime_renders_critical_conclusion(self) -> None:
+        context = json.loads((ROOT / "fixtures/project_report.json").read_text())
+        for zone in context["network_zones"]:
+            for key in ("confirmed", "not_observed"):
+                for verification in zone[key]:
+                    verification["evidence"] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "report.docx"
+            render(context, ROOT / "templates/project-report.docx", destination)
+            with zipfile.ZipFile(destination) as archive:
+                document = ET.fromstring(archive.read("word/document.xml"))
+
+        text = "".join(document.itertext())
+        self.assertIn("其中严重漏洞1个、高危漏洞0个、中危漏洞1个、低危漏洞1个", text)
 
     def test_jpeg_images_keep_landscape_and_portrait_aspect_ratios(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

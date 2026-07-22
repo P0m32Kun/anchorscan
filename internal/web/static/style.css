@@ -2056,7 +2056,7 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .report-overview { display: flex; align-items: center; justify-content: space-between; gap: 2rem; margin-bottom: 1rem; }
 .report-overview h3 { margin: 0; color: var(--heading); font-size: 1.2rem; letter-spacing: -0.02em; }
 .report-overview-copy .meta-line { margin: 0.35rem 0 0; }
-.risk-summary { display: grid; grid-template-columns: repeat(4, minmax(5.5rem, 1fr)); gap: 1.25rem; margin: 0; }
+.risk-summary { display: grid; grid-template-columns: repeat(5, minmax(5.5rem, 1fr)); gap: 1.25rem; margin: 0; }
 .risk-summary div { min-width: 0; padding-left: 1.25rem; border-left: 1px solid var(--border); }
 .risk-summary dt { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
 .risk-summary dd { margin: 0.2rem 0 0; color: var(--heading); font-size: 1.35rem; font-weight: 700; letter-spacing: -0.04em; }

@@ -227,6 +227,7 @@ def verify_template_slots(source: Path, template: Path) -> None:
         "{{ report.client_name }}",
         "{{ conclusion.network_zone_names_text }}",
         "{{ conclusion.total }}",
+        "{{ conclusion.critical }}",
         "{{ conclusion.high }}",
         "{{ conclusion.medium }}",
         "{{ conclusion.low }}",
@@ -240,7 +241,6 @@ def verify_template_slots(source: Path, template: Path) -> None:
     assert "{{ verification.detail }}" not in template_text
     assert "{{ evidence.caption }}" not in template_text
     assert "证据截图" not in template_text
-    assert "{{ conclusion.critical }}" not in template_text
     assert "{{ conclusion.text }}" not in template_text
     cover_slots = (
         "{{ report.test_subject|cover_line }}",
@@ -297,7 +297,7 @@ def verify_template_slots(source: Path, template: Path) -> None:
     conclusion_text = "".join(find_paragraph(template, "{{ conclusion.focus_text }}").itertext())
     assert conclusion_text == (
         "本次测试共测试{{ report.client_name }}{{ conclusion.network_zone_names_text }}所有设备，"
-        "共发现漏洞{{ conclusion.total }}个，其中高危漏洞{{ conclusion.high }}个、中危漏洞"
+        "共发现漏洞{{ conclusion.total }}个，其中严重漏洞{{ conclusion.critical }}个、高危漏洞{{ conclusion.high }}个、中危漏洞"
         "{{ conclusion.medium }}个、低危漏洞{{ conclusion.low }}个。其中问题主要集中在"
         "{{ conclusion.focus_text }}这几个方面。"
     )
@@ -418,7 +418,7 @@ def verify(source: Path, template: Path, out: Path) -> None:
             assert actual == [["本次纳入报告范围内无已确认漏洞"]]
         else:
             assert actual == [
-                ["1", "弱口令", "10.10.1.10:22", "高危"],
+                ["1", "弱口令", "10.10.1.10:22", "严重"],
                 ["2", "过期组件", "10.10.3.20:443", "中危"],
                 ["3", "不安全默认配置", "172.16.1.30:80", "低危"],
             ][:count]
@@ -444,7 +444,7 @@ def verify(source: Path, template: Path, out: Path) -> None:
             ):
                 numbered_findings.append("".join(paragraph.itertext()).strip())
         assert numbered_findings == [
-            "弱口令（高危）",
+            "弱口令（严重）",
             "过期组件（中危）",
             "不安全默认配置（低危）",
         ], "unexpected Heading 3 sequence for the current fixture"

@@ -299,7 +299,7 @@ def prepare_conclusion(body: etree._Element) -> None:
         with_text(
             sample,
             "本次测试共测试{{ report.client_name }}{{ conclusion.network_zone_names_text }}所有设备，"
-            "共发现漏洞{{ conclusion.total }}个，其中高危漏洞{{ conclusion.high }}个、中危漏洞"
+            "共发现漏洞{{ conclusion.total }}个，其中严重漏洞{{ conclusion.critical }}个、高危漏洞{{ conclusion.high }}个、中危漏洞"
             "{{ conclusion.medium }}个、低危漏洞{{ conclusion.low }}个。其中问题主要集中在"
             "{{ conclusion.focus_text }}这几个方面。",
         ),

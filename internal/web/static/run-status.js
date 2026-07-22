@@ -24,6 +24,11 @@ async function refreshEvents(){
   const events = await res.json();
   const box = document.getElementById('events');
   if(box){
+    updateProgress(events);
+    const selection = window.getSelection?.();
+    if(selection && !selection.isCollapsed && (box.contains(selection.anchorNode) || box.contains(selection.focusNode))) return;
+    const threshold = 50;
+    const isNearBottom = box.scrollHeight - box.clientHeight - box.scrollTop < threshold;
     const lines = events.map(e => {
       let cls = 'log-info';
       const msg = e.message.toLowerCase();
@@ -50,13 +55,6 @@ async function refreshEvents(){
       return `<span class="event-time">${formatEventTime(e.time)}</span> <span class="event-stage">[${safeStage}]</span> <span class="${cls}">${safeMsg}</span>`;
     });
     box.innerHTML = lines.join('\n') + '\n<span class="terminal-cursor">█</span>';
-
-    // 更新主机扫描进度
-    updateProgress(events);
-
-    // Auto scroll if user is already near bottom
-    const threshold = 50;
-    const isNearBottom = box.scrollHeight - box.clientHeight - box.scrollTop < threshold;
     if (isNearBottom || box.scrollTop === 0) {
       box.scrollTop = box.scrollHeight;
     }

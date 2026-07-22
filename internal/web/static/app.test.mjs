@@ -56,6 +56,16 @@ context.fetch = async () => ({
 await context.refreshEvents();
 assert.ok(mockEventBox.innerHTML.includes('[&lt;img&gt;]'));
 
+const selectedNode = {};
+mockEventBox.innerHTML = '正在选择的日志';
+mockEventBox.contains = (node) => node === selectedNode;
+context.window.getSelection = () => ({ isCollapsed: false, anchorNode: selectedNode, focusNode: selectedNode });
+await context.refreshEvents();
+assert.equal(mockEventBox.innerHTML, '正在选择的日志');
+context.window.getSelection = () => ({ isCollapsed: true, anchorNode: selectedNode, focusNode: selectedNode });
+await context.refreshEvents();
+assert.ok(mockEventBox.innerHTML.includes('[&lt;img&gt;]'));
+
 let toolSubmitHandler;
 const toolContext = {
   window: {},

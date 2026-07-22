@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
 
@@ -74,6 +75,33 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 		out = append(out, item)
 	}
 	return out
+}
+
+func filterFindingsForView(items []report.Finding, fps []fingerprint.ServiceFingerprint, filters reportFilters, catalog *knowledgebase.Catalog, vulnerabilityView bool) []report.Finding {
+	keyword := filters.Keyword
+	if !vulnerabilityView || strings.TrimSpace(keyword) == "" {
+		return filterFindings(items, fps, filters)
+	}
+	filters.Keyword = ""
+	candidates := filterFindings(items, fps, filters)
+	result := make([]report.Finding, 0, len(candidates))
+	for _, finding := range candidates {
+		if findingMatchesKeyword(finding, fps, keyword) || catalogEntryMatchesKeyword(catalog, finding, keyword) {
+			result = append(result, finding)
+		}
+	}
+	return result
+}
+
+func catalogEntryMatchesKeyword(catalog *knowledgebase.Catalog, finding report.Finding, keyword string) bool {
+	if catalog == nil {
+		return false
+	}
+	match := catalog.Match(report.ObservationFromFinding(finding))
+	if match.Status != knowledgebase.MatchMatched {
+		return false
+	}
+	return match.Entry.MatchesKeyword(keyword)
 }
 
 func filterDetectionChecks(items []report.DetectionCheck, fps []fingerprint.ServiceFingerprint) []report.DetectionCheck {

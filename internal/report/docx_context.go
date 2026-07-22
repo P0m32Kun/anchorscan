@@ -66,6 +66,7 @@ type docxEvidence struct {
 type docxConclusion struct {
 	NetworkZoneNamesText string `json:"network_zone_names_text"`
 	Total                int    `json:"total"`
+	Critical             int    `json:"critical"`
 	High                 int    `json:"high"`
 	Medium               int    `json:"medium"`
 	Low                  int    `json:"low"`
@@ -142,6 +143,7 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 		Conclusion: docxConclusion{
 			NetworkZoneNamesText: deliverable.ZoneNames,
 			Total:                deliverable.Stats.Total,
+			Critical:             deliverable.Stats.Critical,
 			High:                 deliverable.Stats.High,
 			Medium:               deliverable.Stats.Medium,
 			Low:                  deliverable.Stats.Low,

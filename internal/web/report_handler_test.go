@@ -21,10 +21,39 @@ import (
 
 func TestSummarizeRisk(t *testing.T) {
 	summary := summarizeRisk([]report.Finding{
-		{Severity: "critical"}, {Severity: "HIGH"}, {Severity: "medium"}, {Severity: "info"},
+		{Severity: "critical"}, {Severity: "HIGH"}, {Severity: "medium"}, {Severity: "low"}, {Severity: "info"},
 	})
-	if summary != (riskSummary{Total: 4, Critical: 1, High: 1, Medium: 1}) {
+	if summary != (riskSummary{Total: 5, Critical: 1, High: 1, Medium: 1, Low: 1}) {
 		t.Fatalf("unexpected risk summary: %#v", summary)
+	}
+}
+
+func TestReportRiskSummaryShowsLowFindings(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-low", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.SaveFinding("run-low", report.Finding{IP: "192.0.2.10", Port: 443, Severity: "low", Summary: "低危验证"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	page := httptest.NewRecorder()
+	handler.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/reports/run-low", nil))
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "<dt>低危</dt><dd>1</dd>") {
+		t.Fatalf("low-risk summary = %d %s", page.Code, page.Body.String())
 	}
 }
 
@@ -570,7 +599,8 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(knowledgeBaseFixture), 0o644); err != nil {
+	handbook := strings.Replace(knowledgeBaseFixture, "nuclei: [smb-signing]", "nuclei: [nuclei-smb-signing]", 1)
+	if err := os.WriteFile(filepath.Join(dir, "handbook.md"), []byte(handbook), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: handbook.md\n"), 0o644); err != nil {
@@ -587,7 +617,7 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 1; i <= 51; i++ {
-		if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "192.0.2." + strconv.Itoa(i), Port: 445, Protocol: "tcp", Source: "nuclei", ID: "smb-signing", Severity: "high", Summary: "SMB signing"}); err != nil {
+		if err := scanStore.SaveFinding("run-aggregate", report.Finding{IP: "192.0.2." + strconv.Itoa(i), Port: 445, Protocol: "tcp", Source: "nuclei", ID: "nuclei-smb-signing", Severity: "high", Summary: "SMB signing"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -603,16 +633,22 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&findings_page=2", nil))
 	body := res.Body.String()
-	for _, want := range []string{"SMB 签名未启用（中危）", "描述。", "启用签名。", "192.0.2.1:445/tcp", "192.0.2.51:445/tcp"} {
+	for _, want := range []string{"SMB 签名未启用（严重）", "描述。", "启用签名。", "192.0.2.1:445/tcp", "192.0.2.51:445/tcp"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("aggregate response missing %q: %s", want, body)
 		}
 	}
+	if !strings.Contains(body, "漏洞名称或漏洞 ID") {
+		t.Fatalf("aggregate response missing vulnerability filter guidance: %s", body)
+	}
 	if strings.Contains(body, "info-only") {
 		t.Fatalf("aggregate response included info finding: %s", body)
 	}
-	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
-		t.Fatalf("aggregate response has %d copy controls, want 5: %s", copies, body)
+	if copies := strings.Count(body, "data-copy-text="); copies != 6 {
+		t.Fatalf("aggregate response has %d copy controls, want 6: %s", copies, body)
+	}
+	if !strings.Contains(body, "复制当前筛选全部 IP:port") {
+		t.Fatalf("aggregate response missing filtered asset copy control: %s", body)
 	}
 	if !strings.Contains(body, `value="vulnerabilities" selected`) {
 		t.Fatalf("aggregate response did not keep the selected view: %s", body)
@@ -627,6 +663,13 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	handler.ServeHTTP(filtered, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&q=192.0.2.51", nil))
 	if filtered.Code != http.StatusOK || !strings.Contains(filtered.Body.String(), "192.0.2.51:445/tcp") || strings.Contains(filtered.Body.String(), "192.0.2.1:445/tcp") {
 		t.Fatalf("aggregate did not use the complete filtered finding set: %d %s", filtered.Code, filtered.Body.String())
+	}
+	for _, query := range []string{"smb-signing", "nuclei-smb-signing", "SMB+签名未启用"} {
+		filtered = httptest.NewRecorder()
+		handler.ServeHTTP(filtered, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?view=vulnerabilities&q="+query, nil))
+		if filtered.Code != http.StatusOK || !strings.Contains(filtered.Body.String(), "SMB 签名未启用（严重）") {
+			t.Fatalf("aggregate did not filter by vulnerability %q: %d %s", query, filtered.Code, filtered.Body.String())
+		}
 	}
 	export := httptest.NewRecorder()
 	handler.ServeHTTP(export, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate/export?format=json&view=vulnerabilities", nil))
@@ -681,7 +724,7 @@ func TestReportPageVulnerabilityAggregateMatchesConsecutiveCVEs(t *testing.T) {
 
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-cve?view=vulnerabilities", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "SMB 签名未启用（中危）") {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "SMB 签名未启用（严重）") {
 		t.Fatalf("aggregate did not match the second consecutive CVE: %d %s", res.Code, res.Body.String())
 	}
 }
@@ -720,8 +763,8 @@ func TestReportPageVulnerabilityAggregateRendersPendingFindings(t *testing.T) {
 			t.Fatalf("pending aggregate response missing %q: %s", want, body)
 		}
 	}
-	if copies := strings.Count(body, "data-copy-text="); copies != 5 {
-		t.Fatalf("pending aggregate response has %d copy controls, want 5: %s", copies, body)
+	if copies := strings.Count(body, "data-copy-text="); copies != 6 {
+		t.Fatalf("pending aggregate response has %d copy controls, want 6: %s", copies, body)
 	}
 	wantCopy := "漏洞名\n待补充漏洞（高危）\n\n漏洞简介\n知识库未匹配，请人工补充\n\n漏洞资产\n192.0.2.3:8080/tcp\n\n修复建议\n知识库未匹配，请人工补充"
 	if !strings.Contains(body, `data-copy-text="`+html.EscapeString(wantCopy)+`"`) {
@@ -791,7 +834,7 @@ func TestReportPageVulnerabilityAggregateSortsPendingFindings(t *testing.T) {
 	if first < 0 || second < first {
 		t.Fatalf("pending findings are not stably sorted by severity: %s", body)
 	}
-	if copies := strings.Count(body, "data-copy-text="); copies != 10 {
+	if copies := strings.Count(body, "data-copy-text="); copies != 11 {
 		t.Fatalf("empty-ID findings were not merged into one pending group: %d %s", copies, body)
 	}
 }
@@ -890,7 +933,7 @@ func TestReportPageVulnerabilityAggregateExplainsDegradedCatalog(t *testing.T) {
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/reports/run-degraded?view=vulnerabilities", nil))
 	body := res.Body.String()
-	if res.Code != http.StatusOK || !strings.Contains(body, "漏洞知识库部分降级") || !strings.Contains(body, "SMB 签名未启用（中危）") {
+	if res.Code != http.StatusOK || !strings.Contains(body, "漏洞知识库部分降级") || !strings.Contains(body, "SMB 签名未启用（严重）") {
 		t.Fatalf("degraded catalog response does not preserve matched delivery: %d %s", res.Code, body)
 	}
 }
@@ -940,6 +983,9 @@ func TestReportPageVulnerabilityAggregateFormatsAssetsAndEscapesHTML(t *testing.
 	}
 	if strings.Contains(body, `<pre><b>描述</b></pre>`) {
 		t.Fatalf("aggregate response rendered unescaped description: %s", body)
+	}
+	if !strings.Contains(body, "复制全部 IP:port") || !strings.Contains(body, "data-copy-text=\"192.0.2.1:445\n192.0.2.2\n[2001:db8::1]:445\ntarget.example:8443\"") {
+		t.Fatalf("aggregate response missing protocol-free IP:port copy text: %s", body)
 	}
 	if strings.Contains(body, "<pre>192.0.2.1:445/tcp\n192.0.2.1:445/tcp") {
 		t.Fatalf("aggregate response did not deduplicate assets: %s", body)

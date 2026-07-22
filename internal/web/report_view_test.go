@@ -87,3 +87,13 @@ func TestBuildReportViewModelDefaultsInvalidView(t *testing.T) {
 		t.Errorf("AssetView = %q, want ports fallback", model.AssetView)
 	}
 }
+
+func TestVulnerabilityAssetCopyTextCombinesFilteredGroups(t *testing.T) {
+	got := vulnerabilityAssetCopyText(
+		[]report.VulnerabilityDelivery{{AssetCopyText: "192.0.2.2:443\n192.0.2.1:80"}},
+		[]report.VulnerabilityDelivery{{AssetCopyText: "192.0.2.1:80\n[2001:db8::1]:22"}},
+	)
+	if got != "192.0.2.1:80\n192.0.2.2:443\n[2001:db8::1]:22" {
+		t.Fatalf("copy text = %q", got)
+	}
+}

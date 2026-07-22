@@ -67,6 +67,13 @@ func TestBuildDocxContextDefaultsDateWhenProjectHasNone(t *testing.T) {
 	}
 }
 
+func TestBuildDocxContextCarriesCriticalConclusion(t *testing.T) {
+	context := BuildDocxContext(ProjectDeliverable{Stats: DeliverableStats{Critical: 1}}, time.Unix(1, 0))
+	if context.Conclusion.Critical != 1 {
+		t.Fatalf("critical conclusion = %d", context.Conclusion.Critical)
+	}
+}
+
 func TestBuildDocxContextIncludesReportRunSessions(t *testing.T) {
 	project := ProjectMetadata{ReportTitle: "x", ClientUnit: "u", TestObject: "o", Testers: "t"}
 	zones := []ProjectZone{{ZoneID: "I", Name: "I区"}}

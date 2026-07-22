@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var entryHeading = regexp.MustCompile(`^### (.+)（(严重|高|中|低)危）$`)
+var entryHeading = regexp.MustCompile(`^### (.+)（(严重|高危|中危|低危)）$`)
 
 type entryMeta struct {
 	ID      string   `yaml:"id"`
@@ -266,7 +266,7 @@ func validMSFModule(module string) bool {
 }
 
 func parseSeverity(value string) Severity {
-	return map[string]Severity{"严重": SeverityCritical, "高": SeverityHigh, "中": SeverityMedium, "低": SeverityLow}[value]
+	return map[string]Severity{"严重": SeverityCritical, "高危": SeverityHigh, "中危": SeverityMedium, "低危": SeverityLow}[value]
 }
 
 func diagnostic(line int, id, reason string) *Diagnostic {

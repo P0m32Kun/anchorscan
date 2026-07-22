@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/url"
+	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
@@ -14,27 +15,28 @@ import (
 // map[string]any, fusing HTTP plumbing with view shaping. Field names match the
 // former map keys so html/template accesses them unchanged.
 type reportViewModel struct {
-	Run                    store.ScanRun
-	RunMeta                runMetaView
-	Filters                reportFilters
-	Fingerprints           any
-	Findings               any
-	DetectionChecks        []report.DetectionCheck
-	DetectionCoverage      *report.DetectionCoverage
-	Risk                   riskSummary
-	CommandTools           map[string]commandToolsView
-	AssetPage              reportPage
-	FindingPage            reportPage
-	HostPage               reportPage
-	AssetView              string
-	Vulnerabilities        []report.VulnerabilityDelivery
-	PendingVulnerabilities []report.VulnerabilityDelivery
-	CatalogStatus          string
-	CatalogDiagnostics     []knowledgebase.Diagnostic
-	AssetTXTIP             string
-	AssetTXTIPPort         string
-	AssetTXTURL            string
-	ExportHTML             string
+	Run                        store.ScanRun
+	RunMeta                    runMetaView
+	Filters                    reportFilters
+	Fingerprints               any
+	Findings                   any
+	DetectionChecks            []report.DetectionCheck
+	DetectionCoverage          *report.DetectionCoverage
+	Risk                       riskSummary
+	CommandTools               map[string]commandToolsView
+	AssetPage                  reportPage
+	FindingPage                reportPage
+	HostPage                   reportPage
+	AssetView                  string
+	Vulnerabilities            []report.VulnerabilityDelivery
+	PendingVulnerabilities     []report.VulnerabilityDelivery
+	VulnerabilityAssetCopyText string
+	CatalogStatus              string
+	CatalogDiagnostics         []knowledgebase.Diagnostic
+	AssetTXTIP                 string
+	AssetTXTIPPort             string
+	AssetTXTURL                string
+	ExportHTML                 string
 }
 
 // reportViewInput bundles what buildReportViewModel needs. Fingerprints and
@@ -79,26 +81,37 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 	copyBase.Del("findings_size")
 	runID := in.Run.RunID
 	return reportViewModel{
-		Run:                    in.Run,
-		RunMeta:                newRunMetaView(in.Run),
-		Filters:                reportFiltersFromValues(query),
-		Fingerprints:           assetPage.Items,
-		Findings:               findingPage.Items,
-		DetectionChecks:        in.DetectionChecks,
-		DetectionCoverage:      in.DetectionCoverage,
-		Risk:                   summarizeRisk(in.Findings),
-		CommandTools:           in.CommandTools,
-		AssetPage:              assetPage,
-		FindingPage:            findingPage,
-		HostPage:               hostPage,
-		AssetView:              view,
-		Vulnerabilities:        vulnerabilities,
-		PendingVulnerabilities: pendingVulnerabilities,
-		CatalogStatus:          string(in.Catalog.Status()),
-		CatalogDiagnostics:     in.Catalog.Diagnostics(),
-		AssetTXTIP:             "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
-		AssetTXTIPPort:         "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
-		AssetTXTURL:            "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
-		ExportHTML:             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
+		Run:                        in.Run,
+		RunMeta:                    newRunMetaView(in.Run),
+		Filters:                    reportFiltersFromValues(query),
+		Fingerprints:               assetPage.Items,
+		Findings:                   findingPage.Items,
+		DetectionChecks:            in.DetectionChecks,
+		DetectionCoverage:          in.DetectionCoverage,
+		Risk:                       summarizeRisk(in.Findings),
+		CommandTools:               in.CommandTools,
+		AssetPage:                  assetPage,
+		FindingPage:                findingPage,
+		HostPage:                   hostPage,
+		AssetView:                  view,
+		Vulnerabilities:            vulnerabilities,
+		PendingVulnerabilities:     pendingVulnerabilities,
+		VulnerabilityAssetCopyText: vulnerabilityAssetCopyText(vulnerabilities, pendingVulnerabilities),
+		CatalogStatus:              string(in.Catalog.Status()),
+		CatalogDiagnostics:         in.Catalog.Diagnostics(),
+		AssetTXTIP:                 "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
+		AssetTXTIPPort:             "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
+		AssetTXTURL:                "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
+		ExportHTML:                 "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
 	}
+}
+
+func vulnerabilityAssetCopyText(groups ...[]report.VulnerabilityDelivery) string {
+	lines := make([]string, 0)
+	for _, group := range groups {
+		for _, vulnerability := range group {
+			lines = append(lines, strings.Split(vulnerability.AssetCopyText, "\n")...)
+		}
+	}
+	return report.SortedUniqueJoin(lines)
 }

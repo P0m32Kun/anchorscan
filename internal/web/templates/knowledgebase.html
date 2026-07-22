@@ -26,7 +26,7 @@
   {{range .Entries}}
   <a class="knowledgebase-entry" href="/kb/{{.ID}}">
     <span class="knowledgebase-entry-name">{{.Name}}</span>
-    <span class="knowledgebase-entry-severity severity-{{.Severity}}">{{.Severity}}</span>
+    <span class="knowledgebase-entry-severity severity-{{.Severity}}">{{.Severity.Label}}</span>
   </a>
   {{else}}
   <div class="panel knowledgebase-empty">

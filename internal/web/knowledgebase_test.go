@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const knowledgeBaseFixture = "<!-- anchorscan-catalog\nversion: 1\n-->\n\n### SMB 签名未启用（中危）\n\n<!-- anchorscan-entry\nid: smb-signing\naliases: []\nmatch:\n  nuclei: [smb-signing]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\n描述。\n\n#### 验证命令\n\n#### 修复建议\n\n启用签名。\n"
+const knowledgeBaseFixture = "<!-- anchorscan-catalog\nversion: 1\n-->\n\n### SMB 签名未启用（严重）\n\n<!-- anchorscan-entry\nid: smb-signing\naliases: []\nmatch:\n  nuclei: [smb-signing]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\n描述。\n\n#### 验证命令\n\n#### 修复建议\n\n启用签名。\n"
 
 func TestKnowledgeBaseListAndDetail(t *testing.T) {
 	dir := t.TempDir()
@@ -30,6 +30,9 @@ func TestKnowledgeBaseListAndDetail(t *testing.T) {
 		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, path, nil))
 		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "SMB 签名未启用") {
 			t.Fatalf("%s: %d %s", path, res.Code, res.Body.String())
+		}
+		if !strings.Contains(res.Body.String(), ">严重<") || strings.Contains(res.Body.String(), ">critical<") {
+			t.Fatalf("%s: critical severity is not localized: %s", path, res.Body.String())
 		}
 	}
 }
