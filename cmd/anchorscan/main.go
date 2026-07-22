@@ -65,6 +65,13 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 		return runReport(args[1:], stdout, deps)
 	case "import-nmap":
 		return runImportNmap(args[1:], stdout, deps)
+	case "merge-runs":
+		err := runMergeRuns(args[1:], stdout, stderr, deps)
+		if errors.Is(err, errMergeRunsHelp) {
+			printMergeRunsHelp(stdout)
+			return nil
+		}
+		return err
 	case "tools":
 		return runTools(args[1:], stdout)
 	case "version":
@@ -103,6 +110,7 @@ Commands:
   cancel      Cancel a Web-managed scan
   report      Rebuild reports from stored results
   import-nmap Import an existing Nmap XML into an AnchorScan run
+  merge-runs Reassign historical runs into one task project (one-time)
   tools check Verify configured external tools
   version     Print the AnchorScan version
 

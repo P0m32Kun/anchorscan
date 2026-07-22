@@ -309,6 +309,70 @@ def prepare_conclusion(body: etree._Element) -> None:
         body.insert(len(body) - 1, node)
 
 
+def rebuild_toc_field(document: etree._Element) -> None:
+    """Replace the TOC field's cached result so it no longer references bookmarks.
+
+    The source template hard-codes three zone entries (I/II/III) whose PAGEREF
+    targets are deleted once zones become a dynamic loop. We keep the TOC field
+    skeleton (begin/instr/separate ... end) with an empty result plus a hint, so
+    Word/WPS rebuilds the entries from the live Heading paragraphs on open
+    (updateFields is already set).
+    """
+    body = document.find("w:body", NS)
+    children = list(body)
+    toc_begin_idx = None
+    for i, node in enumerate(children):
+        instr = "".join(t.text or "" for t in node.iter(w("instrText")))
+        if "TOC" in instr and node.findall(".//w:fldChar[@w:fldCharType='begin']", NS):
+            toc_begin_idx = i
+            break
+    if toc_begin_idx is None:
+        return
+
+    depth = 0
+    toc_end_idx = None
+    for j in range(toc_begin_idx, len(children)):
+        node = children[j]
+        if node.tag != w("p"):
+            continue
+        depth += len(node.findall(".//w:fldChar[@w:fldCharType='begin']", NS))
+        depth -= len(node.findall(".//w:fldChar[@w:fldCharType='end']", NS))
+        if j > toc_begin_idx and depth == 0:
+            toc_end_idx = j
+            break
+    if toc_end_idx is None:
+        return
+
+    begin_para = children[toc_begin_idx]
+    properties = begin_para.find("w:pPr", NS)
+    for child in list(begin_para):
+        if child is not properties:
+            begin_para.remove(child)
+
+    def add_run(*xml_children: etree._Element) -> None:
+        run = etree.Element(w("r"))
+        for child in xml_children:
+            run.append(child)
+        begin_para.append(run)
+
+    begin = etree.Element(w("fldChar"))
+    begin.set(w("fldCharType"), "begin")
+    add_run(begin)
+    instr = etree.Element(w("instrText"))
+    instr.text = ' TOC \\o "1-2" \\h \\u '
+    instr.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    add_run(instr)
+    separate = etree.Element(w("fldChar"))
+    separate.set(w("fldCharType"), "separate")
+    add_run(separate)
+    hint = etree.Element(w("t"))
+    hint.text = "右键此处选择「更新域」以生成目录"
+    add_run(hint)
+
+    for node in children[toc_begin_idx + 1 : toc_end_idx]:
+        body.remove(node)
+
+
 def prepare_template() -> None:
     """Rewrite only the copied experimental template; never touch the user source."""
     shutil.copyfile(SOURCE, TEMPLATE)
@@ -366,6 +430,7 @@ def prepare_template() -> None:
         replace_labeled_slot(body, old, label, slot, time_value_run)
     prepare_network_zone_block(body, untouched)
     prepare_conclusion(body)
+    rebuild_toc_field(document)
 
     if not settings.xpath("w:updateFields", namespaces=NS):
         update = etree.SubElement(settings, w("updateFields"))

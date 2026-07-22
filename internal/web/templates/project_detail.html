@@ -17,102 +17,128 @@
   </div>
 </section>
 
+<nav class="project-tabs" aria-label="项目视图">
+  <a class="project-tab active" href="/projects/{{.Project.ID}}" aria-current="page">概览</a>
+  <a class="project-tab" href="/projects/{{.Project.ID}}#runs">扫描任务</a>
+  <a class="project-tab" href="/projects/{{.Project.ID}}/workbench">验证工作台</a>
+  <a class="project-tab" href="/projects/{{.Project.ID}}/report.html" target="_blank">正式报告</a>
+</nav>
+
 <section class="panel">
   <div class="panel-heading">
     <div>
-      <p class="eyebrow">资产范围</p>
-      <h3>项目配置</h3>
+      <p class="eyebrow">任务信息</p>
+      <h3>报告元数据</h3>
+    </div>
+    <div class="header-actions">
+      <a class="button button-secondary" href="/projects/{{.Project.ID}}/report.html" target="_blank">预览 HTML 报告</a>
+      <button class="button button-primary" type="button" onclick="anchorscanDownloadDocx('{{.Project.ID}}')">导出 DOCX 报告</button>
     </div>
   </div>
   <div class="config-layout">
-    <!-- 默认目标 -->
     <div class="config-row-card">
       <div class="config-card-header">
         <span class="config-card-title">
           <svg class="config-title-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-.778.099-1.533.284-2.253" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h18.75a.75.75 0 00.75-.75v-15a.75.75 0 00-.75-.75H3.75a.75.75 0 00-.75.75v15a.75.75 0 00.75.75zM6 18h12M6 15h12M6 12h12M6 9h12" />
           </svg>
-          <span>默认目标 (Default Targets)</span>
+          <span>被测单位</span>
         </span>
-        {{if .Project.DefaultTargets}}
-        <button class="copy-btn" data-copy-target="default-targets-content">
-          <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125v-9.75a1.125 1.125 0 011.125-1.125h3.375m1.5 1.5h9.75a1.125 1.125 0 011.125 1.125v-9.75a1.125 1.125 0 01-1.125-1.125h-9.75a1.125 1.125 0 01-1.125 1.125v9.75s0 .375.375.375h.75" />
-          </svg>
-          <span>复制</span>
-        </button>
-        {{end}}
       </div>
-      <div class="config-card-body" id="default-targets-content" data-raw-value="{{.Project.DefaultTargets}}">{{if .Project.DefaultTargets}}{{.Project.DefaultTargets}}{{else}}<span class="muted">未设置</span>{{end}}</div>
+      <div class="config-card-body">{{if .Project.ClientUnit}}{{.Project.ClientUnit}}{{else}}<span class="muted">未设置</span>{{end}}</div>
     </div>
 
-    <!-- 排除目标 -->
     <div class="config-row-card">
       <div class="config-card-header">
         <span class="config-card-title">
-          <svg class="config-title-icon config-title-icon-danger" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <svg class="config-title-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
-          <span>排除目标 (Exclude Targets)</span>
+          <span>报告标题</span>
         </span>
-        {{if .Project.ExcludeTargets}}
-        <button class="copy-btn" data-copy-target="exclude-targets-content">
-          <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125v-9.75a1.125 1.125 0 011.125-1.125h3.375m1.5 1.5h9.75a1.125 1.125 0 011.125 1.125v-9.75a1.125 1.125 0 01-1.125-1.125h-9.75a1.125 1.125 0 01-1.125 1.125v9.75s0 .375.375.375h.75" />
-          </svg>
-          <span>复制</span>
-        </button>
-        {{end}}
       </div>
-      <div class="config-card-body" id="exclude-targets-content" data-raw-value="{{.Project.ExcludeTargets}}">{{if .Project.ExcludeTargets}}{{.Project.ExcludeTargets}}{{else}}<span class="muted">无</span>{{end}}</div>
+      <div class="config-card-body">{{if .Project.ReportTitle}}{{.Project.ReportTitle}}{{else}}<span class="muted">未设置</span>{{end}}</div>
     </div>
 
-    <!-- 三栏并排：默认端口、排除端口、扫描档位 -->
+    <div class="config-row-card">
+      <div class="config-card-header">
+        <span class="config-card-title">
+          <svg class="config-title-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+          </svg>
+          <span>测试对象</span>
+        </span>
+      </div>
+      <div class="config-card-body">{{if .Project.TestObject}}{{.Project.TestObject}}{{else}}<span class="muted">未设置</span>{{end}}</div>
+    </div>
+
     <div class="config-summary-grid">
-      <!-- 默认端口 -->
       <div class="config-column-card">
         <span class="config-card-title">
           <svg class="config-title-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a3 3 0 013-3v-5.625c0-.621.504-1.125 1.125-1.125h9.75c.621 0 1.125.504 1.125 1.125v5.625m-12 0h12" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
           </svg>
-          <span>默认端口</span>
+          <span>测试周期</span>
         </span>
-        <div class="project-port-summary" data-ports-render="{{.Project.DefaultPorts}}" data-port-type="default">
-          {{if .Project.DefaultPorts}}{{.Project.DefaultPorts}}{{else}}<span class="muted">未设置</span>{{end}}
+        <div class="project-date-summary">
+          {{if .Project.StartDate}}{{.Project.StartDate}}{{else}}<span class="muted">未设置</span>{{end}}
+          <span class="muted"> 至 </span>
+          {{if .Project.EndDate}}{{.Project.EndDate}}{{else}}<span class="muted">未设置</span>{{end}}
         </div>
       </div>
 
-      <!-- 排除端口 -->
       <div class="config-column-card">
         <span class="config-card-title">
-          <svg class="config-title-icon config-title-icon-danger" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+          <svg class="config-title-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.295-2.16-.81-3.084M15 19.128v.106A12.318 12.318 0 0118.8 21M12.75 7.478a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z" />
           </svg>
-          <span>排除端口</span>
+          <span>测试人员</span>
         </span>
-        <div class="project-port-summary" data-ports-render="{{.Project.ExcludePorts}}" data-port-type="exclude">
-          {{if .Project.ExcludePorts}}{{.Project.ExcludePorts}}{{else}}<span class="muted">无</span>{{end}}
-        </div>
-      </div>
-
-      <!-- 扫描档位 -->
-      <div class="config-column-card">
-        <span class="config-card-title">
-          <svg class="config-title-icon config-title-icon-success" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-          </svg>
-          <span>扫描档位</span>
-        </span>
-        <div class="project-profile-summary">
-          <span class="status-badge project-profile">
-            {{if .Project.DefaultProfile}}{{.Project.DefaultProfile}}{{else}}<span class="muted">全局默认</span>{{end}}
-          </span>
+        <div class="project-testers-summary">
+          {{if .Project.Testers}}{{.Project.Testers}}{{else}}<span class="muted">未设置</span>{{end}}
         </div>
       </div>
     </div>
   </div>
 </section>
 
+<section class="panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">网络分区</p>
+      <h3>Zones</h3>
+    </div>
+  </div>
+  <div class="project-zones">
+    {{if .Zones}}
+    <ul class="project-zone-list">
+      {{range .Zones}}
+      <li class="project-zone-item">
+        <span class="project-zone-name">{{.Name}}</span>
+        <span class="project-zone-id muted">{{.ZoneID}}</span>
+        <form class="project-zone-delete-form" method="post" action="/projects/{{.ProjectID}}/zones/{{.ZoneID}}">
+          <input type="hidden" name="_method" value="delete">
+          <button class="link-button danger" type="submit" onclick="return confirm('确定要删除该分区吗？')">删除</button>
+        </form>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="muted">该项目暂无分区。新建项目会自动创建 I、II、III 区。</p>
+    {{end}}
+  </div>
+
+  <form class="form-inline project-zone-form" method="post" action="/projects/{{.Project.ID}}/zones">
+    <label>
+      <span>新增分区</span>
+      <input name="name" placeholder="例如：DMZ" required>
+    </label>
+    <button class="button button-secondary" type="submit">添加</button>
+  </form>
+</section>
+
+{{$zoneNames := .ZoneNames}}
+{{$runs := .Runs}}
 <section class="panel project-runs-panel">
   <div class="panel-heading project-runs-heading">
     <div>
@@ -120,124 +146,87 @@
       <h3>项目扫描历史</h3>
     </div>
   </div>
-  <table class="data-table run-history-table">
-    <thead>
-      <tr>
-        <th class="project-run-col-id">扫描任务ID (Run ID)</th>
-        <th class="run-col-status">任务状态</th>
-        <th class="project-run-col-target">目标资产</th>
-        <th class="run-col-profile">扫描档位</th>
-        <th class="run-col-actions">操作</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Runs}}
-      <tr>
-        <td>
-          <a href="/runs/{{.RunID}}" class="run-id-link">
-            {{.RunID}}
-          </a>
-        </td>
-        <td>
-          <span class="status-badge status-{{.Status}}">{{.Status}}</span>
-        </td>
-        <td class="run-target" title="{{.Target}}">
-          {{.Target}}
-        </td>
-        <td>
-          <span class="status-badge run-profile">
-            {{.Profile}}
-          </span>
-        </td>
-        <td class="run-actions">
-          {{if eq .Status "completed"}}
-          <a class="button button-secondary run-report-action" href="/reports/{{.RunID}}">
-            <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span>查看报告</span>
-          </a>
-          {{else if eq .Status "running"}}
-          <a class="button button-secondary run-monitor-action" href="/runs/{{.RunID}}">
-            <svg class="button-icon is-running" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            <span>监控中</span>
-          </a>
-          {{else}}
-          <a class="button button-secondary project-run-detail" href="/runs/{{.RunID}}">详情</a>
-          {{end}}
-        </td>
-      </tr>
-      {{else}}
-      <tr>
-        <td colspan="5" class="muted projects-empty-state">
-          <strong>该项目暂无扫描记录</strong>
-          <span>点击右上角“新建扫描”发起第一次扫描。</span>
-        </td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+
+  {{range .Zones}}
+  {{$zoneID := .ZoneID}}
+  {{$zoneName := .Name}}
+  <div class="project-zone-runs">
+    <h4 class="project-zone-runs-title">{{$zoneName}} <span class="muted">{{$zoneID}}</span></h4>
+    <table class="data-table run-history-table">
+      <thead>
+        <tr>
+          <th class="project-run-col-id">扫描任务ID (Run ID)</th>
+          <th class="run-col-status">任务状态</th>
+          <th class="project-run-col-target">目标资产</th>
+          <th class="run-col-profile">扫描档位</th>
+          <th class="project-run-col-include">纳入报告</th>
+          <th class="run-col-actions">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range $runs}}
+        {{if eq .ZoneID $zoneID}}
+        <tr>
+          <td>
+            <a href="/runs/{{.RunID}}" class="run-id-link">
+              {{.RunID}}
+            </a>
+            {{if .Label}}<br><span class="muted project-run-label">{{.Label}}</span>{{end}}
+          </td>
+          <td>
+            <span class="status-badge status-{{.Status}}">{{.Status}}</span>
+          </td>
+          <td class="run-target" title="{{.Target}}">
+            {{.Target}}
+          </td>
+          <td>
+            <span class="status-badge run-profile">
+              {{.Profile}}
+            </span>
+          </td>
+          <td>
+            {{if eq .Status "completed"}}
+            <form class="run-include-form" method="post" action="/runs/{{.RunID}}/include">
+              <label class="toggle-switch">
+                <input type="checkbox" name="include" value="1" {{if .IncludeInReport}}checked{{end}} onchange="this.form.submit()">
+                <span class="toggle-slider"></span>
+              </label>
+            </form>
+            {{else}}
+            <span class="muted">—</span>
+            {{end}}
+          </td>
+          <td class="run-actions">
+            {{if eq .Status "completed"}}
+            <a class="button button-secondary run-report-action" href="/reports/{{.RunID}}">
+              <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>查看报告</span>
+            </a>
+            {{else if eq .Status "running"}}
+            <a class="button button-secondary run-monitor-action" href="/runs/{{.RunID}}">
+              <svg class="button-icon is-running" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <span>监控中</span>
+            </a>
+            {{else}}
+            <a class="button button-secondary project-run-detail" href="/runs/{{.RunID}}">详情</a>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <p class="muted projects-empty-state">
+    <strong>该项目暂无扫描记录</strong>
+    <span>点击右上角“新建扫描”发起第一次扫描。</span>
+  </p>
+  {{end}}
 </section>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // 1. 一键复制功能
-  document.querySelectorAll('.copy-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      const targetId = this.getAttribute('data-copy-target');
-      const targetEl = document.getElementById(targetId);
-      if (!targetEl) return;
-      
-      const textToCopy = targetEl.getAttribute('data-raw-value') || targetEl.textContent || '';
-      if (!textToCopy) return;
-
-      navigator.clipboard.writeText(textToCopy).then(() => {
-        const originalText = this.innerHTML;
-        this.innerHTML = `
-          <svg class="copy-success-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-          </svg>
-          <span class="copy-success-label">已复制!</span>
-        `;
-        setTimeout(() => {
-          this.innerHTML = originalText;
-        }, 1500);
-      }).catch(err => {
-        console.error('Failed to copy: ', err);
-      });
-    });
-  });
-
-  // 2. 端口列表转为 Badge 渲染
-  document.querySelectorAll('[data-ports-render]').forEach(el => {
-    const raw = el.getAttribute('data-ports-render').trim();
-    if (!raw || raw === '未设置' || raw === '无') {
-      return;
-    }
-    
-    // 按逗号或换行/空白切分
-    const ports = raw.split(/[\n,\s]+/).map(p => p.trim()).filter(Boolean);
-    if (ports.length === 0) return;
-    
-    el.innerHTML = '';
-    const container = document.createElement('div');
-    container.className = 'ports-badge-container';
-    
-    const isExclude = el.getAttribute('data-port-type') === 'exclude';
-    
-    ports.forEach(port => {
-      const badge = document.createElement('span');
-      badge.className = 'port-badge' + (isExclude ? ' exclude' : '');
-      badge.textContent = port;
-      container.appendChild(badge);
-    });
-    
-    el.appendChild(container);
-  });
-});
-</script>
 {{end}}

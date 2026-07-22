@@ -10,6 +10,16 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+type runDetailView struct {
+	Run            store.ScanRun
+	RunMeta        runMetaView
+	CanRerun       bool
+	IsToolRun      bool
+	ReturnURL      string
+	VerificationID string
+	EvidenceURL    string
+}
+
 func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/runs/")
 	if strings.HasSuffix(path, "/cancel") {
@@ -24,6 +34,25 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = s.store.AppendScanEvent(store.ScanEvent{RunID: id, Time: s.opts.Now(), Level: "info", Stage: "cancel", Message: "cancel requested"})
 		http.Redirect(w, r, "/runs/"+id, http.StatusSeeOther)
+		return
+	}
+	if strings.HasSuffix(path, "/include") {
+		id := strings.TrimSuffix(path, "/include")
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		run, err := s.store.GetScanRun(id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		include := r.FormValue("include") == "1"
+		if err := s.store.UpdateScanRunIncludeInReport(id, include); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/projects/"+run.ProjectID, http.StatusSeeOther)
 		return
 	}
 	if r.Method == http.MethodPost && r.FormValue("_method") == "delete" {
@@ -62,10 +91,37 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	render(w, "templates/run.html", map[string]any{
-		"Run":      run,
-		"RunMeta":  newRunMetaView(run),
-		"CanRerun": (run.Status == "interrupted" || run.Status == "completed_with_errors") && run.ProjectID != "" && isScanProfile(run.Profile),
+	isToolRun := run.Kind == "tool"
+	returnURL := strings.TrimSpace(r.URL.Query().Get("return"))
+	verificationID := strings.TrimSpace(r.URL.Query().Get("verification_id"))
+	if returnURL == "" || verificationID == "" {
+		var snapshot struct {
+			ReturnURL      string `json:"return_url"`
+			VerificationID string `json:"verification_id"`
+		}
+		_ = json.Unmarshal([]byte(run.ConfigSnapshot), &snapshot)
+		if returnURL == "" {
+			returnURL = snapshot.ReturnURL
+		}
+		if verificationID == "" {
+			verificationID = snapshot.VerificationID
+		}
+	}
+	if !isSafeReturnURL(returnURL) {
+		returnURL = ""
+	}
+	var evidenceURL string
+	if isToolRun && verificationID != "" && run.ProjectID != "" {
+		evidenceURL = "/projects/" + run.ProjectID + "/verifications/" + verificationID + "/evidence"
+	}
+	render(w, "templates/run.html", runDetailView{
+		Run:            run,
+		RunMeta:        newRunMetaView(run),
+		CanRerun:       (run.Status == "interrupted" || run.Status == "completed_with_errors") && run.ProjectID != "" && isScanProfile(run.Profile),
+		IsToolRun:      isToolRun,
+		ReturnURL:      returnURL,
+		VerificationID: verificationID,
+		EvidenceURL:    evidenceURL,
 	})
 }
 

@@ -3,6 +3,7 @@ package doctor
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -18,9 +19,10 @@ type Check struct {
 }
 
 type Options struct {
-	ConfigPath string
-	DBPath     string
-	ReportDir  string
+	ConfigPath        string
+	DBPath            string
+	ReportDir         string
+	DocxRenderProject string
 }
 
 func Run(opts Options) []Check {
@@ -58,6 +60,7 @@ func Run(opts Options) []Check {
 	checks = append(checks,
 		databaseCheck(opts.DBPath),
 		writableDirCheck("reports", opts.ReportDir),
+		docxtplCheck(opts.DocxRenderProject),
 	)
 	return checks
 }
@@ -92,6 +95,32 @@ func rdpscanCheck(path string) Check {
 		return check
 	}
 	return Check{Name: "rdpscan", OK: true, Message: rdpscanInstallHint()}
+}
+
+// docxtplCheck reports whether the DOCX sidecar can import docxtpl. It is
+// non-blocking: when unavailable it stays OK=true and explains that DOCX
+// export will be disabled, leaving HTML export unaffected.
+func docxtplCheck(projectDir string) Check {
+	const name = "docxtpl (docx export)"
+	if projectDir == "" {
+		return Check{Name: name, OK: true, Message: "not configured: DOCX export disabled, HTML export unaffected"}
+	}
+	if _, err := os.Stat(projectDir); err != nil {
+		return Check{Name: name, OK: true, Message: "tools/docx-render not found: DOCX export disabled, HTML export unaffected"}
+	}
+	cmd := exec.Command("uv", "run", "--project", projectDir, "python", "-c", "import docxtpl")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return Check{Name: name, OK: true, Message: "docxtpl missing: run `uv sync --project " + projectDir + "`; DOCX export disabled, HTML export unaffected: " + trimCmdOutput(out)}
+	}
+	return Check{Name: name, OK: true, Message: "ok"}
+}
+
+func trimCmdOutput(out []byte) string {
+	s := string(out)
+	if len(s) > 120 {
+		s = s[:120] + "..."
+	}
+	return s
 }
 
 func rdpscanInstallHint() string {

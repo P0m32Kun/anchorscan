@@ -4,11 +4,11 @@
 
 **Blocked by:** 01 — 建立任务型 Project 与 Network Zones；03 — 构建 Project 聚合读模型。
 
-**Status:** draft
+**Status:** done
 
-- [ ] 建立 report_verifications、verification_assets、verification_sources、verification_evidence。
-- [ ] outcome 只允许 confirmed/not_observed/inconclusive。
-- [ ] Evidence 文件位于 Project 受管理目录，SQLite 不存 BLOB。
-- [ ] 只接受经过签名和尺寸验证的 PNG/JPEG，限制请求大小并生成服务端文件名。
-- [ ] 上传失败不留下数据库记录或孤儿临时文件；删除不触碰 Artifact。
-- [ ] confirmed/not_observed 缺少 Evidence 时保持未完成状态。
+- [x] 建立 report_verifications、verification_assets、verification_sources、verification_evidence。
+- [x] outcome 只允许 confirmed/not_observed/inconclusive。
+- [x] Evidence 文件位于 Project 受管理目录，SQLite 不存 BLOB。
+- [x] 只接受经过签名和尺寸验证的 PNG/JPEG，限制请求大小并生成服务端文件名。
+- [x] 上传失败不留下数据库记录或孤儿临时文件；删除不触碰 Artifact。
+- [x] confirmed/not_observed 缺少 Evidence 时保持未完成状态（由 store 完整性检查支持）。

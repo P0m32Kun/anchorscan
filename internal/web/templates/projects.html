@@ -16,10 +16,9 @@
   <table class="data-table projects-table">
     <thead>
       <tr>
-        <th class="project-col-name">项目名称</th>
-        <th class="project-col-targets">默认目标</th>
-        <th class="project-col-ports">默认端口</th>
-        <th class="project-col-profile">扫描档位</th>
+        <th class="project-col-name">任务名称</th>
+        <th class="project-col-client">被测单位</th>
+        <th class="project-col-title">报告标题</th>
         <th class="project-col-actions">操作</th>
       </tr>
     </thead>
@@ -30,14 +29,11 @@
           <a href="/projects/{{.ID}}" class="project-name-link">{{.Name}}</a>
           <div class="project-id">ID: {{.ID}}</div>
         </td>
-        <td class="project-targets" title="{{.DefaultTargets}}">
-          {{.DefaultTargets}}
+        <td class="project-client-unit" title="{{.ClientUnit}}">
+          {{if .ClientUnit}}{{.ClientUnit}}{{else}}<span class="muted">未设置</span>{{end}}
         </td>
-        <td class="project-ports">{{.DefaultPorts}}</td>
-        <td>
-          <span class="status-badge project-profile">
-            {{.DefaultProfile}}
-          </span>
+        <td class="project-report-title" title="{{.ReportTitle}}">
+          {{if .ReportTitle}}{{.ReportTitle}}{{else}}<span class="muted">未设置</span>{{end}}
         </td>
         <td class="project-actions">
           <a class="button button-secondary project-edit-action" href="/projects/{{.ID}}/edit">
@@ -50,7 +46,7 @@
       </tr>
       {{else}}
       <tr>
-        <td colspan="5" class="muted projects-empty-state">
+        <td colspan="4" class="muted projects-empty-state">
           <strong>暂无项目</strong>
           <span>点击上方按钮新建一个项目。</span>
         </td>

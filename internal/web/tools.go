@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,11 +16,17 @@ import (
 )
 
 type toolPageData struct {
-	Projects      []store.Project
-	Tools         []manualTool
-	Tool          manualTool
-	HighriskPorts string
-	RawArgs       string
+	Projects          []store.Project
+	Zones             []store.ProjectZone
+	Tools             []manualTool
+	Tool              manualTool
+	HighriskPorts     string
+	RawArgs           string
+	SelectedProjectID string
+	SelectedZoneID    string
+	ReturnURL         string
+	VerificationID    string
+	Verification      *store.Verification
 }
 
 type manualTool struct {
@@ -65,8 +72,56 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	selectedProjectID := strings.TrimSpace(r.URL.Query().Get("project_id"))
+	selectedZoneID := strings.TrimSpace(r.URL.Query().Get("zone_id"))
+	returnURL := strings.TrimSpace(r.URL.Query().Get("return"))
+	verificationID := strings.TrimSpace(r.URL.Query().Get("verification_id"))
+	if !isSafeReturnURL(returnURL) {
+		returnURL = ""
+	}
+	var zones []store.ProjectZone
+	if selectedProjectID != "" {
+		zones, _ = s.store.ListProjectZones(selectedProjectID)
+	}
+	var verification *store.Verification
+	if verificationID != "" && selectedProjectID != "" {
+		if v, err := s.store.GetVerification(verificationID); err == nil && v.Verification.ProjectID == selectedProjectID {
+			verification = &v.Verification
+		}
+	}
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-	render(w, "templates/tool_page.html", toolPageData{Projects: projects, Tool: tool, HighriskPorts: highriskPorts, RawArgs: strings.TrimSpace(r.URL.Query().Get("raw_args"))})
+	render(w, "templates/tool_page.html", toolPageData{
+		Projects:          projects,
+		Zones:             zones,
+		Tool:              tool,
+		HighriskPorts:     highriskPorts,
+		RawArgs:           strings.TrimSpace(r.URL.Query().Get("raw_args")),
+		SelectedProjectID: selectedProjectID,
+		SelectedZoneID:    selectedZoneID,
+		ReturnURL:         returnURL,
+		VerificationID:    verificationID,
+		Verification:      verification,
+	})
+}
+
+func isSafeReturnURL(value string) bool {
+	if value == "" {
+		return true
+	}
+	u, err := url.Parse(value)
+	if err != nil {
+		return false
+	}
+	if u.IsAbs() || u.Host != "" || strings.HasPrefix(value, "//") {
+		return false
+	}
+	if !strings.HasPrefix(value, "/projects/") {
+		return false
+	}
+	if strings.Contains(value, "..") || strings.Contains(value, "\\") {
+		return false
+	}
+	return true
 }
 
 func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +161,12 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 	mode := coalesce(strings.TrimSpace(r.FormValue("mode")), "service")
 	portsValue := strings.TrimSpace(r.FormValue("ports"))
 	projectID := strings.TrimSpace(r.FormValue("project_id"))
+	zoneID := strings.TrimSpace(r.FormValue("zone_id"))
+	verificationID := strings.TrimSpace(r.FormValue("verification_id"))
+	returnURL := strings.TrimSpace(r.FormValue("return"))
+	if !isSafeReturnURL(returnURL) {
+		returnURL = ""
+	}
 	targetValue := strings.TrimSpace(r.FormValue("target"))
 	urlValue := strings.TrimSpace(r.FormValue("url"))
 	tagsValue := r.FormValue("tags")
@@ -134,17 +195,19 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	opts := app.ToolRunOptions{
-		RunID:         runID,
-		ProjectID:     projectID,
-		Tool:          toolName,
-		Mode:          mode,
-		Target:        targetValue,
-		Ports:         portsValue,
-		UseNativeArgs: useNativeArgs,
-		NativeArgs:    nativeArgs,
-		URL:           urlValue,
-		Tags:          splitCSV(tagsValue),
-		Template:      templateValue,
+		RunID:          runID,
+		ProjectID:      projectID,
+		ZoneID:         zoneID,
+		VerificationID: verificationID,
+		Tool:           toolName,
+		Mode:           mode,
+		Target:         targetValue,
+		Ports:          portsValue,
+		UseNativeArgs:  useNativeArgs,
+		NativeArgs:     nativeArgs,
+		URL:            urlValue,
+		Tags:           splitCSV(tagsValue),
+		Template:       templateValue,
 		Tools: app.ToolPaths{
 			Rustscan: cfg.Tools.Rustscan,
 			Nmap:     cfg.Tools.Nmap,
@@ -164,7 +227,18 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"run_id": runID})
 		return
 	}
-	http.Redirect(w, r, "/runs/"+runID, http.StatusSeeOther)
+	redirectURL := "/runs/" + runID
+	q := url.Values{}
+	if returnURL != "" {
+		q.Set("return", returnURL)
+	}
+	if verificationID != "" {
+		q.Set("verification_id", verificationID)
+	}
+	if len(q) > 0 {
+		redirectURL += "?" + q.Encode()
+	}
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func isManualTool(toolName string) bool {
@@ -272,4 +346,13 @@ func splitCSV(value string) []string {
 		}
 	}
 	return out
+}
+
+func coalesce(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }

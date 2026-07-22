@@ -17,6 +17,7 @@ type PrepareScanRequest struct {
 	ExcludePorts   string
 	RunID          string
 	ProjectID      string
+	ZoneID         string
 	DBPath         string
 	JSONReportPath string
 	ArtifactRoot   string
@@ -99,6 +100,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	prepared.Options = ScanOptions{
 		RunID:          req.RunID,
 		ProjectID:      req.ProjectID,
+		ZoneID:         req.ZoneID,
 		Targets:        targets,
 		Ports:          resolvedPorts,
 		Tools:          toolPaths,

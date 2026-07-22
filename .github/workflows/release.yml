@@ -1,6 +1,5 @@
-# 打 tag (v*) 时自动交叉编译多平台裸二进制并发布到 GitHub Release。
-# 纯 Go 无 cgo，交叉编译零障碍。下载后直接运行 anchorscan doctor 即可
-# 自动生成配置（工具路径从 PATH 检测）和数据库目录，无需额外文件。
+# 打 tag (v*) 时自动交叉编译多平台归档并发布到 GitHub Release。
+# 归档包含可执行文件、DOCX sidecar 与正式模板；外部扫描器仍由用户安装。
 name: release
 
 on:
@@ -38,23 +37,18 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Build binary
+      - name: Build release archive
         env:
           CGO_ENABLED: 0
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: |
-          BINARY=anchorscan-${{ matrix.goos }}-${{ matrix.goarch }}
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            BINARY="${BINARY}.exe"
-          fi
-          go build -trimpath -ldflags="-s -w" -o "$BINARY" ./cmd/anchorscan
+        run: make package VERSION="${GITHUB_REF_NAME}" BUILD_FLAGS=-trimpath LDFLAGS="-s -w"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: anchorscan-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: anchorscan-*
+          path: dist/anchorscan-*.tar.gz
           if-no-files-found: error
 
   release:
@@ -79,6 +73,6 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/anchorscan-*
+          files: dist/anchorscan-*.tar.gz
           prerelease: ${{ steps.pre.outputs.is_prerelease }}
           generate_release_notes: true

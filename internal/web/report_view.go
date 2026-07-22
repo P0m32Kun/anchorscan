@@ -34,10 +34,7 @@ type reportViewModel struct {
 	AssetTXTIP             string
 	AssetTXTIPPort         string
 	AssetTXTURL            string
-	AssetCSV               string
-	ExportJSON             string
 	ExportHTML             string
-	ExportCSV              string
 }
 
 // reportViewInput bundles what buildReportViewModel needs. Fingerprints and
@@ -102,9 +99,6 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 		AssetTXTIP:             "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip"),
 		AssetTXTIPPort:         "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "ip_port"),
 		AssetTXTURL:            "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
-		AssetCSV:               "/reports/" + runID + "/assets.csv?" + copyBase.Encode(),
-		ExportJSON:             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "json"),
 		ExportHTML:             "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
-		ExportCSV:              "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "csv"),
 	}
 }

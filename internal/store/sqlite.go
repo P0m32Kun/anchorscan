@@ -13,7 +13,8 @@ import (
 )
 
 type Store struct {
-	db *sql.DB
+	db       *sql.DB
+	dataRoot string
 }
 
 func Open(path string) (*Store, error) {
@@ -38,7 +39,11 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 
-	return &Store{db: db}, nil
+	return &Store{db: db, dataRoot: filepath.Dir(path)}, nil
+}
+
+func (s *Store) managedProjectDir(projectID string) string {
+	return filepath.Join(s.dataRoot, "projects", projectID)
 }
 
 func (s *Store) Close() error {

@@ -38,14 +38,6 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		assetExport = "txt"
 		runID = strings.TrimSuffix(path, "/assets.txt")
 	}
-	if strings.HasSuffix(path, "/assets.csv") {
-		assetExport = "csv"
-		runID = strings.TrimSuffix(path, "/assets.csv")
-	}
-	if assetExport == "" && strings.HasSuffix(path, ".json") {
-		format = "json"
-		runID = strings.TrimSuffix(path, ".json")
-	}
 	if assetExport == "" && strings.HasSuffix(path, ".html") {
 		format = "html"
 		runID = strings.TrimSuffix(path, ".html")
@@ -93,9 +85,6 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		report.EnrichFindingsWithVulnerabilityDetails(&filteredBuilt, s.catalog)
 	}
 	switch format {
-	case "json":
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(filteredBuilt)
 	case "html":
 		tmp := filepath.Join(os.TempDir(), "anchorscan-report-"+runID+".html")
 		if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
@@ -105,55 +94,27 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		defer os.Remove(tmp)
 		http.ServeFile(w, r, tmp)
 	default:
-		if exportFormat != "" {
+		if exportFormat == "html" {
 			filename := "anchorscan-" + runID
-			switch exportFormat {
-			case "json":
-				w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.json"`)
-				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(filteredBuilt)
-				return
-			case "html":
-				tmp := filepath.Join(os.TempDir(), "anchorscan-export-"+runID+".html")
-				if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				defer os.Remove(tmp)
-				w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.html"`)
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				http.ServeFile(w, r, tmp)
-				return
-			case "csv":
-				data, err := exportFindingsCSV(filteredFindings, filteredFingerprints)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.csv"`)
-				w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-				_, _ = io.WriteString(w, data)
-				return
-			default:
-				http.Error(w, "unknown export format", http.StatusBadRequest)
+			tmp := filepath.Join(os.TempDir(), "anchorscan-export-"+runID+".html")
+			if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			defer os.Remove(tmp)
+			w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`.html"`)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			http.ServeFile(w, r, tmp)
+			return
+		}
+		if exportFormat != "" {
+			http.Error(w, "unknown export format", http.StatusBadRequest)
+			return
 		}
 		if assetExport == "txt" {
 			w.Header().Set("Content-Disposition", `attachment; filename="`+runID+`-assets.txt"`)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			_, _ = io.WriteString(w, exportAssetsTXT(filteredFingerprints, r.URL.Query().Get("kind")))
-			return
-		}
-		if assetExport == "csv" {
-			data, err := exportAssetsCSV(filteredFingerprints)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Disposition", `attachment; filename="`+runID+`-assets.csv"`)
-			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-			_, _ = io.WriteString(w, data)
 			return
 		}
 		render(w, "templates/report.html", buildReportViewModel(reportViewInput{

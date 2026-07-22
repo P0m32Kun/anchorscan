@@ -30,9 +30,10 @@ func runDoctor(args []string, stdout io.Writer) error {
 	}
 
 	checks := doctor.Run(doctor.Options{
-		ConfigPath: *configPath,
-		DBPath:     *dbPath,
-		ReportDir:  *reportsDir,
+		ConfigPath:        *configPath,
+		DBPath:            *dbPath,
+		ReportDir:         *reportsDir,
+		DocxRenderProject: filepath.Join("tools", "docx-render"),
 	})
 	for _, check := range checks {
 		status := "fail"
@@ -61,11 +62,13 @@ func runWeb(args []string, stdout io.Writer, _ io.Writer, deps cliDeps) error {
 		return err
 	}
 	handler, err := web.NewServer(web.ServerOptions{
-		ConfigPath: *configPath,
-		DBPath:     *dbPath,
-		Listen:     *listen,
-		Runner:     deps.newRunner(),
-		Now:        deps.now,
+		ConfigPath:        *configPath,
+		DBPath:            *dbPath,
+		Listen:            *listen,
+		Runner:            deps.newRunner(),
+		Now:               deps.now,
+		DocxTemplatePath:  filepath.Join("tools", "docx-render", "templates", "project-report.docx"),
+		DocxRenderProject: filepath.Join("tools", "docx-render"),
 	})
 	if err != nil {
 		return err

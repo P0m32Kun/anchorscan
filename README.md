@@ -6,15 +6,17 @@
 
 ## 快速开始
 
-### 方式一：下载预编译二进制（推荐）
+### 方式一：下载预编译归档（推荐）
 
-到 [Releases 页面](../../releases) 下载对应平台的二进制（支持 linux/amd64、darwin/arm64、windows/amd64），无需安装 Go 环境。
+到 [Releases 页面](../../releases) 下载并解压对应平台的 `.tar.gz` 归档（支持 linux/amd64、darwin/arm64、windows/amd64），无需安装 Go 环境。归档内包含 DOCX 导出 sidecar 与正式模板；使用 DOCX 导出还需安装 [uv](https://docs.astral.sh/uv/)。
 
 ```bash
 # Linux / macOS 示例
-chmod +x anchorscan-linux-amd64
-./anchorscan-linux-amd64 doctor    # 自动生成配置、检测工具路径
-./anchorscan-linux-amd64 web       # 启动 Web 控制台
+tar -xzf anchorscan-v1.9.0-linux-amd64.tar.gz
+cd anchorscan-v1.9.0-linux-amd64
+chmod +x anchorscan
+./anchorscan doctor    # 自动生成配置、检测工具路径
+./anchorscan web       # 启动 Web 控制台
 ```
 
 ### 方式二：从源码编译

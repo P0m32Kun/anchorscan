@@ -3,76 +3,61 @@
   <div>
     <p class="eyebrow">项目库</p>
     <h2>{{.Title}}</h2>
-    <p class="meta-line project-form-intro">集中维护项目资产范围、默认扫描策略与排除规则。</p>
+    <p class="meta-line project-form-intro">一个项目对应一次渗透测试任务，按网络分区（Zone）组织多次扫描并最终生成一份交付报告。</p>
   </div>
   <a class="button button-secondary" href="/projects">返回列表</a>
 </section>
 
 <section class="panel">
-  <form class="form-grid project-form-grid" method="post" action="{{.Action}}" enctype="multipart/form-data">
+  <form class="form-grid project-form-grid" method="post" action="{{.Action}}">
     <label class="full-width">
-      <span>项目名称 *</span>
-      <input name="name" value="{{.Project.Name}}" placeholder="起一个容易识别的项目名，例如: 某某系统资产测试" required>
-    </label>
-    
-    <label class="full-width">
-      <span>说明</span>
-      <input name="description" value="{{.Project.Description}}" placeholder="简短描述项目背景">
-    </label>
-    
-    <label class="project-form-targets">
-      <span>默认扫描目标</span>
-      <textarea name="default_targets" rows="6" placeholder="支持英文逗号或换行分隔多个目标，例如：
-192.168.1.1
-192.168.2.0/24
-10.0.0.1-10.0.0.50
-192.168.3.10,192.168.3.11">{{.Project.DefaultTargets}}</textarea>
-    </label>
-    
-    <label class="project-form-support">
-      <div>
-        <span>导入目标文件</span>
-        <div class="project-form-file-help">支持上传 txt、list、csv 格式的文件，系统将解析并追加到目标列表中。</div>
-        <input type="file" name="targets_file" accept=".txt,.list,.csv">
-      </div>
-      
-      <div class="project-form-profile">
-        <span>默认扫描档位</span>
-        <select name="default_profile">
-          <option value="slow" {{if eq .Project.DefaultProfile "slow"}}selected{{end}}>slow (适合脆弱网络/老旧设备)</option>
-          <option value="normal" {{if eq .Project.DefaultProfile "normal"}}selected{{end}}>normal (默认中速)</option>
-          <option value="fast" {{if eq .Project.DefaultProfile "fast"}}selected{{end}}>fast (适合健康高速网络)</option>
-        </select>
-      </div>
+      <span>任务名称 *</span>
+      <input name="name" value="{{.Project.Name}}" placeholder="例如：甘肃电力内网安全检查任务" required>
     </label>
 
     <label class="full-width">
-      <span>默认扫描端口</span>
-      <textarea name="default_ports" rows="3" placeholder="支持 top1000、100-1000 或 80,443,8080">{{.Project.DefaultPorts}}</textarea>
-      <p class="meta-line project-form-port-help">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
-      <button class="link-button" type="button" data-insert-ports="{{.HighriskPorts}}" data-insert-target="default_ports">
-        ＋ 插入高危端口列表
-      </button>
+      <span>任务说明</span>
+      <textarea name="description" rows="3" placeholder="简短描述任务背景与范围">{{.Project.Description}}</textarea>
     </label>
-    
+
+    <label class="full-width">
+      <span>被测单位 *</span>
+      <input name="client_unit" value="{{.Project.ClientUnit}}" placeholder="例如：甘肃电力" required>
+    </label>
+
+    <label class="full-width">
+      <span>报告标题</span>
+      <input name="report_title" value="{{.Project.ReportTitle}}" placeholder="留空时由被测单位自动生成">
+    </label>
+
+    <label class="full-width">
+      <span>测试对象</span>
+      <input name="test_object" value="{{.Project.TestObject}}" placeholder="例如：信息内网 / 生产控制大区">
+    </label>
+
     <label>
-      <span>排除目标</span>
-      <textarea name="exclude_targets" rows="4" placeholder="扫描时需要排除的目标IP/网段，支持英文逗号或换行分隔">{{.Project.ExcludeTargets}}</textarea>
+      <span>测试开始日期</span>
+      <input type="date" name="start_date" value="{{.Project.StartDate}}">
     </label>
-    
+
     <label>
-      <span>排除端口</span>
-      <input class="project-form-exclude-ports" name="exclude_ports" value="{{.Project.ExcludePorts}}" placeholder="例如: 22,3306（仅数字端口 CSV）">
+      <span>测试结束日期</span>
+      <input type="date" name="end_date" value="{{.Project.EndDate}}">
     </label>
-    
+
+    <label class="full-width">
+      <span>测试人员</span>
+      <input name="testers" value="{{.Project.Testers}}" placeholder="例如：张三, 李四">
+    </label>
+
     <div class="form-actions full-width project-form-actions">
       <button class="button button-primary" type="submit">
         <svg class="button-icon project-form-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>
-        <span>保存项目设置</span>
+        <span>保存项目</span>
       </button>
-      
+
       {{if .Project.ID}}
       <button class="button button-danger" type="button" onclick="confirmDelete()">
         <svg class="button-icon project-form-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">

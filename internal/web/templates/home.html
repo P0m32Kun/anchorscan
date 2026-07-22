@@ -39,7 +39,7 @@
       {{range .Projects}}
       <li>
         <a href="/projects/{{.ID}}">{{.Name}}</a>
-        <span class="meta-line dashboard-project-profile">{{.DefaultProfile}}</span>
+        <span class="meta-line dashboard-project-client">{{if .ClientUnit}}{{.ClientUnit}}{{else}}未设置被测单位{{end}}</span>
       </li>
       {{else}}
       <li class="muted">暂无项目。</li>

@@ -6,14 +6,26 @@ adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 →
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-07-22
+
+v1.9.0 新增项目级渗透测试交付流程，并提供与正式模板一致的 HTML 和 DOCX 报告导出。
+
 ### Added
+- 项目任务、Network Zone、项目 Scan Run、人工 Verification 与 Evidence 的完整管理流程。
+- 跨 Runs 聚合的项目报告，支持正式单文件 HTML 与基于 docxtpl 模板的 DOCX 下载。
+- 甘肃历史 Runs 的显式、可预览合并命令。
 - 可选外部检测引擎 rdpscan：当配置 `tools.rdpscan` 路径后，完整扫描对归一化为 `rdp` 的服务指纹执行 BlueKeep (CVE-2019-0708) 检测；`VULNERABLE` 产出 `source=rdpscan` 的 critical Finding，未配置或 `SAFE`/`UNKNOWN` 时跳过或仅保留执行事实。
 - `doctor` 对 rdpscan 给出分平台编译/安装提示（Linux/macOS 通过 make；Windows 说明 MSVC+OpenSSL 门槛并给出 WSL/Docker 替代），且未安装时仍显示 OK 以避免误报失败。
 - Web 配置页新增 rdpscan 路径与超时输入。
 
 ### Changed
+- GitHub Release 改为发布包含可执行文件、DOCX sidecar 和正式模板的多平台归档。
 - `config.ToolPaths`、`config.ToolTimeouts` 和 `config.ToolDurations` 新增 `Rdpscan` 字段。
 - 扫描预检（preflight）将 rdpscan 列为可选工具，未配置不影响扫描启动。
+
+### Fixed
+- 项目汇总表按稳定漏洞键跨分区合并，纳入报告的接入记录进入 HTML/DOCX，证据缺失时拒绝导出。
+- WPS 目录域不再引用动态内容删除后的旧书签；WPS 中按导出提示手动刷新目录。
 
 ## [1.7.2] - 2026-07-13
 

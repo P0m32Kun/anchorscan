@@ -230,6 +230,179 @@ FROM detection_checks_legacy WHERE engine <> 'builtin'`,
 			return nil
 		},
 	},
+	{
+		version: 10,
+		name:    "add_project_report_metadata_and_zones",
+		up: func(tx *sql.Tx) error {
+			columns := []struct {
+				table string
+				name  string
+				def   string
+			}{
+				{"projects", "client_unit", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "report_title", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "test_object", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "start_date", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "end_date", "TEXT NOT NULL DEFAULT ''"},
+				{"projects", "testers", "TEXT NOT NULL DEFAULT ''"},
+				{"scan_runs", "zone_id", "TEXT NOT NULL DEFAULT ''"},
+			}
+			for _, col := range columns {
+				if !hasTable(tx, col.table) {
+					continue
+				}
+				if hasColumn(tx, col.table, col.name) {
+					continue
+				}
+				if _, err := tx.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s %s`, col.table, col.name, col.def)); err != nil {
+					return err
+				}
+			}
+			if !hasTable(tx, "project_zones") {
+				for _, stmt := range []string{
+					`CREATE TABLE IF NOT EXISTS project_zones (
+  project_id TEXT NOT NULL,
+  zone_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (project_id, zone_id)
+)`,
+					`CREATE INDEX IF NOT EXISTS idx_project_zones_project ON project_zones (project_id)`,
+				} {
+					if _, err := tx.Exec(stmt); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		},
+	},
+	{
+		version: 11,
+		name:    "add_scan_run_zone_fields",
+		up: func(tx *sql.Tx) error {
+			if !hasTable(tx, "scan_runs") {
+				return nil
+			}
+			for _, col := range []struct {
+				name string
+				def  string
+			}{
+				{"kind", "TEXT NOT NULL DEFAULT 'scan'"},
+				{"label", "TEXT NOT NULL DEFAULT ''"},
+				{"access_point", "TEXT NOT NULL DEFAULT ''"},
+				{"tester_ip", "TEXT NOT NULL DEFAULT ''"},
+				{"notes", "TEXT NOT NULL DEFAULT ''"},
+				{"include_in_report", "INTEGER NOT NULL DEFAULT 0"},
+			} {
+				if hasColumn(tx, "scan_runs", col.name) {
+					continue
+				}
+				if _, err := tx.Exec(fmt.Sprintf(`ALTER TABLE scan_runs ADD COLUMN %s %s`, col.name, col.def)); err != nil {
+					return err
+				}
+			}
+			// Existing completed scans default into the report; tool/failed/running do not.
+			if _, err := tx.Exec(`UPDATE scan_runs SET include_in_report = 1 WHERE status IN ('completed', 'completed_with_errors') AND profile NOT LIKE 'tool:%'`); err != nil {
+				return err
+			}
+			return nil
+		},
+	},
+	{
+		version: 12,
+		name:    "create_report_verifications_and_evidence",
+		up: func(tx *sql.Tx) error {
+			_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS report_verifications (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  zone_id TEXT NOT NULL,
+  vulnerability_key TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK(outcome IN ('confirmed','not_observed','inconclusive')),
+  title TEXT NOT NULL,
+  severity TEXT NOT NULL,
+  description TEXT NOT NULL,
+  remediation TEXT NOT NULL,
+  notes TEXT NOT NULL,
+  included INTEGER NOT NULL,
+  position INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_report_verifications_project ON report_verifications(project_id);
+CREATE INDEX IF NOT EXISTS idx_report_verifications_zone ON report_verifications(project_id, zone_id);
+
+CREATE TABLE IF NOT EXISTS verification_assets (
+  verification_id TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  protocol TEXT NOT NULL,
+  asset_name TEXT NOT NULL DEFAULT '',
+  position INTEGER NOT NULL,
+  PRIMARY KEY (verification_id, ip, port, protocol),
+  FOREIGN KEY (verification_id) REFERENCES report_verifications(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS verification_sources (
+  verification_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  source TEXT NOT NULL,
+  finding_id TEXT NOT NULL,
+  ip TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  protocol TEXT NOT NULL,
+  PRIMARY KEY (verification_id, run_id, source, finding_id, ip, port, protocol),
+  FOREIGN KEY (verification_id) REFERENCES report_verifications(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS verification_evidence (
+  id TEXT PRIMARY KEY,
+  verification_id TEXT NOT NULL,
+  relative_path TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  caption TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (verification_id) REFERENCES report_verifications(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_verification_evidence_verification ON verification_evidence(verification_id);`)
+			return err
+		},
+	},
+}
+
+func hasTable(tx *sql.Tx, table string) bool {
+	row := tx.QueryRow(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, table)
+	var one int
+	if err := row.Scan(&one); err != nil {
+		return false
+	}
+	return true
+}
+
+func hasColumn(tx *sql.Tx, table, column string) bool {
+	rows, err := tx.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
 }
 
 func runMigrations(db *sql.DB) error {

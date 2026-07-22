@@ -4,11 +4,11 @@
 
 **Blocked by:** 08 — 生成项目正式单文件 HTML。
 
-**Status:** draft
+**Status:** done
 
-- [ ] 删除报告页 ExportJSON、ExportCSV 和资产 CSV 按钮/视图字段。
-- [ ] 删除 Web JSON/CSV export handler 分支与不再使用的 CSV helper/tests。
-- [ ] 保留 Run HTML 与 Project HTML。
-- [ ] 保留内部 WriteJSON/report.json、SQLite、CLI 所需兼容行为。
-- [ ] 保留复制 IP/IP:port/URL 与批量命令依赖的 TXT 文件。
-- [ ] 回归测试证明用户格式收敛没有破坏扫描完成和报告重建。
+- [x] 删除报告页 ExportJSON、ExportCSV 和资产 CSV 按钮/视图字段。
+- [x] 删除 Web JSON/CSV export handler 分支与不再使用的 CSV helper/tests。
+- [x] 保留 Run HTML 与 Project HTML。
+- [x] 保留内部 WriteJSON/report.json、SQLite、CLI 所需兼容行为。
+- [x] 保留复制 IP/IP:port/URL 与批量命令依赖的 TXT 文件。
+- [x] 回归测试证明用户格式收敛没有破坏扫描完成和报告重建。

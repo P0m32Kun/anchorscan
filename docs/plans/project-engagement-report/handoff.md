@@ -1,17 +1,17 @@
 # Handoff — 项目级渗透测试与 HTML 与 DOCX 报告
 
-## 当前状态：最终封面下划线修复已进入模板和 fake 报告，待用户在 WPS 复核
+## 当前状态：01–11 已完成，正式 HTML/DOCX 导出进入 v1.9.0 发布
 
 用户在第三轮复核中要求统一封面三条下划线、保留其格式刷后的月份位置，并为每个有负向验证的分区增加三级标题和图片前说明。随后进一步确认：该标题位于所属分区全部 confirmed 漏洞之后、下一个分区之前，沿用 Heading 3 大纲级别但不显示或占用 3.x.y 编号。`template-slot-contract.md` 与 `tools/docx-render/out/project-report-placeholder-template.docx` 已同步修订；`tools/docx-render/out/project-report-fake.docx` 已按新契约生成并完成自动检查和 11 页逐页核对。
 
 当前硬边界：业务模板只保留表 3-1 一张表；Network Zone、Verification 和 Evidence 都是第三节中的段落区块；第四节之后不得再出现任何网络分区或测试结果内容；模板中不得放示例图片。每个 Project Scan Run 必须归属 I区、II区、III区或自定义分区，报告只生成实际有纳入内容的分区。
 
-## 从这里继续
+## 后续维护入口
 
 1. 读 `CONTEXT.md` 中 Project、Network Zone、Verification、Evidence、Run Report、Project Report。
 2. 读 `docs/adr/0004-model-project-as-pentest-engagement.md` 与 `docs/adr/0005-docx-rendering-via-docxtpl.md`。
 3. 读本目录 `template-analysis.md`、`spec.md`、`product-design.md`、`technical-design.md`、`docx-rendering-research.md`。
-4. 按 `tickets/` 阻塞边推进；当前全部为 draft，先让用户批准 spec，再把 01 标记为 `ready-for-agent`。
+4. 01–11 已完成；后续变更先新增 ticket，沿 `docs/agents/issue-tracker.md` 的 ready frontier 推进。
 
 ## 本轮已确认
 
@@ -69,19 +69,19 @@
 
 原型位于 `tools/docx-render/`。它把用户简化模板复制为 `fixtures/source-template.docx`（SHA-256 仍为 `e5f6a896...a2c6e5`），只改写 `out/` 下的实验模板和产物；固定输入为 `fixtures/project_report.json`，不接数据库或 Web。Python 3.12.12、`docxtpl==0.20.2` 及传递依赖由 `uv.lock` 锁定。
 
-1. **文本槽：自动通过、待用户复核。** `out/project-report-placeholder-template.docx` 的封面三个值槽均复用源模板“测试时间”的字符格式；每条线只有一个 `w:u=thick` run，内容同时包含左右补齐空格和数据，不含 `w:tabs`。渲染器按模板 14 磅宋体的实际字符宽度补齐，三条线连续且近似等长；月份段落复制用户格式刷后保存版本的 `pPr`（含缩进与 East Asia 字体提示），不再添加自定义居中样式。
+1. **文本槽：通过。** `out/project-report-placeholder-template.docx` 的封面三个值槽均复用源模板“测试时间”的字符格式；每条线只有一个 `w:u=single` run，内容同时包含左右补齐空格和数据，不含 `w:tabs`。渲染器按模板 14 磅宋体的实际字符宽度补齐，三条线连续且近似等长；月份段落复制用户格式刷后保存版本的 `pPr`（含缩进与 East Asia 字体提示），不再添加自定义居中样式。
 2. **表 3-1：通过。** `{%tr for r in summary_rows %}` 可生成 0、1、3 条数据行；0 条时显示跨四列空状态，控制行在结果中删除。模板内使用短别名 `r.no/r.title/r.assets/r.level`，避免窄列把长字段路径拆得无法辨认。
 3. **网络分区与负向验证结构：模板与 fake 报告通过。** `network_zones[]` 内先重复 Scan Run 和全部 confirmed，再在 `not_observed` 非空时生成“`{{ network_zone.name }}`其它漏洞验证不存在的截图：”Heading 3；每条负向验证在 Evidence 前显示漏洞名和端口。该标题保持与 confirmed 漏洞名相同的大纲级别，但通过直接编号覆盖关闭显示编号，不占用 3.x.y；负向区块结束后才进入下一个分区。fake 数据覆盖 I区、III区和互联网接入区，每区均按“confirmed 漏洞 → 其它漏洞不存在 → 下一区/第四节”的顺序生成。
 4. **漏洞内容与 Evidence：通过。** “漏洞描述 / 修改建议”只保留 `verification.description/remediation`，正式实现来源明确为现有 `VulnerabilityDelivery` 知识库字段；“漏洞详情”标题下直接循环 `{{ evidence.image }}`。模板无 `verification.detail`、无“证据截图”标题、无 caption，正文图片为 0。fixture 的 3 张测试 PNG 按红（宽）→蓝（高）→绿（宽）插入，最大宽高框内的 OOXML 尺寸比为 2:1、1:2、2:1，顺序正确且未拉伸。
 5. **保留结构：通过。** 自动检查以未改源副本为基线，确认实验模板及 0/1/3 行渲染结果仍有 3 个 `sectPr`、3 个 header part、7 个 footer part，`footer6.xml` 的 1 个 `wp:anchor` 和 `wps:wsp` 仍在；document/header/footer 域签名不变，`settings.xml` 已有 `w:updateFields w:val="true"`，第二节文本顺序与源副本一致。
 6. **逐页渲染：占位符模板通过（LibreOffice 环境）。** 使用 documents skill 的标准渲染脚本渲染模板并逐页检查：三条封面下划线起止一致、粗细一致；月份位置按用户保存的源格式恢复；负向验证标题位于所属分区末尾、保持 Heading 3 大纲级别但不显示编号，说明位于图片槽之前；模板正文无示例图。当前 LibreOffice 环境缺少源模板使用的中文字体，中文字形不据此验收，固定文本、编号覆盖和槽位顺序由 OOXML 检查覆盖。
-7. **WPS 验收：未完成。** 当前会话无法读取 WPS GUI，因此不能声称“无修复提示打开”或“目录和页码已刷新”。模板保留原域结构并设置 `updateFields`；仍需用户在可交互 WPS 中打开，选择更新整个目录并确认无修复提示。
+7. **WPS 兼容性：接受手动刷新目录。** WPS 不响应模板的 `updateFields`，导出界面会提示用户打开文档后手动更新整个目录；自动结构门校验目录域、书签和模板结构。
 
 `check_structure.py` 是保留的最小结构门：校验源副本哈希、显式槽位、正文示例图为 0、第二节不变、网络分区/第四节顺序、缺失 II 区不输出、自定义分区输出、模板域/页脚结构、0/1/多表格行、文本 run 属性、`updateFields` 与 Evidence 顺序/纵横比；`out/` 被忽略，不进入正式交付。
 
-第三轮修改已进入占位符模板、结构门、槽位契约和 fake fixture。`out/project-report-fake.docx` 共 11 页，包含 3 个动态分区、3 条 confirmed、3 条 not_observed 和 7 张按顺序插入且保持纵横比的 fake Evidence；自动结构检查与逐页渲染检查均通过。下一步由用户在 WPS 中审阅实际版式；WPS GUI 的无修复提示、目录和页码刷新仍是人工验收门。
+第三轮修改已进入占位符模板、结构门、槽位契约和 fake fixture。`out/project-report-fake.docx` 共 11 页，包含 3 个动态分区、3 条 confirmed、3 条 not_observed 和 7 张按顺序插入且保持纵横比的 fake Evidence；自动结构检查与逐页渲染检查均通过。正式模板已固化到 `tools/docx-render/templates/project-report.docx`；WPS 目录手动刷新是已接受的兼容性限制。
 
-最终封面修复：已删除三条数据线的制表位和下划线引导符，改为“左侧不换行空格 + 数据 + 右侧不换行空格”共用一个 `w:u=thick` run。结构门锁定“无 `w:tabs`、单一粗下划线 run、左右均有补齐空格、三条宽度单位一致”；模板和 fake 报告已重新生成并完成 11 页渲染检查，LibreOffice 渲染中三条线连续、同高同粗，长度差处于字体取整范围内。
+最终封面修复：已删除三条数据线的制表位和下划线引导符，改为“左侧不换行空格 + 数据 + 右侧不换行空格”共用一个 `w:u=single` run。结构门锁定“无 `w:tabs`、单一默认粗细下划线 run、左右均有补齐空格、三条宽度单位一致”；模板和 fake 报告已重新生成并完成 11 页渲染检查，LibreOffice 渲染中三条线连续、同高同粗，长度差处于字体取整范围内。
 
 ## 不要做
 
