@@ -21,7 +21,6 @@
   <a class="project-tab active" href="/projects/{{.Project.ID}}" aria-current="page">概览</a>
   <a class="project-tab" href="/projects/{{.Project.ID}}#runs">扫描任务</a>
   <a class="project-tab" href="/projects/{{.Project.ID}}/workbench">验证工作台</a>
-  <a class="project-tab" href="/projects/{{.Project.ID}}/report.html" target="_blank">正式报告</a>
 </nav>
 
 <section class="panel">
@@ -139,7 +138,7 @@
 
 {{$zoneNames := .ZoneNames}}
 {{$runs := .Runs}}
-<section class="panel project-runs-panel">
+<section class="panel project-runs-panel" id="runs">
   <div class="panel-heading project-runs-heading">
     <div>
       <p class="eyebrow">执行队列</p>
