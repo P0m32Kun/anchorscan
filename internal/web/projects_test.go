@@ -326,7 +326,7 @@ func TestProjectDetailRendersMetadataAndZones(t *testing.T) {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	for _, want := range []string{"甘肃任务", "甘肃电力", "甘肃电力内网安全检查报告", "信息内网", "2026-07-01", "2026-07-15", "张三, 李四", "I区", "II区", "III区", "DMZ"} {
+	for _, want := range []string{"甘肃任务", "甘肃电力", "甘肃电力内网安全检查报告", "信息内网", "2026-07-01", "2026-07-15", "张三, 李四", "I区", "II区", "III区", "DMZ", "导出 DOCX 报告", `anchorscanDownloadDocx('p1')`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body, got %s", want, body)
 		}

@@ -30,6 +30,10 @@
       <p class="eyebrow">任务信息</p>
       <h3>报告元数据</h3>
     </div>
+    <div class="header-actions">
+      <a class="button button-secondary" href="/projects/{{.Project.ID}}/report.html" target="_blank">预览 HTML 报告</a>
+      <button class="button button-primary" type="button" onclick="anchorscanDownloadDocx('{{.Project.ID}}')">导出 DOCX 报告</button>
+    </div>
   </div>
   <div class="config-layout">
     <div class="config-row-card">
