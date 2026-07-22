@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -233,15 +234,12 @@ func TestToolCreateSavesZoneAndVerification(t *testing.T) {
 
 	scanStore, _ = store.Open(dbPath)
 	defer scanStore.Close()
+	runID := path.Base(strings.SplitN(location, "?", 2)[0])
 	var run store.ScanRun
 	for range 200 {
-		runs, err := scanStore.ListScanRuns(10)
-		if err != nil {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		if len(runs) == 1 && runs[0].Status == "completed" {
-			run = runs[0]
+		r, err := scanStore.GetScanRun(runID)
+		if err == nil && r.Status == "completed" {
+			run = r
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -300,13 +298,11 @@ func TestToolCreateRunsNativeRawArgs(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 	for range 200 {
-		runs, err := scanStore.ListScanRuns(10)
-		if err != nil {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		if runner.hasArgs("/opt/nmap", "-sn", "192.0.2.10", "--min-rate", "50") && len(runs) == 1 && runs[0].Status == "completed" {
-			return
+		r, err := scanStore.GetScanRun(body["run_id"])
+		if err == nil && r.Status == "completed" {
+			if runner.hasArgs("/opt/nmap", "-sn", "192.0.2.10", "--min-rate", "50") {
+				return
+			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -351,15 +347,12 @@ func TestToolCreateStartsRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
+	runID := path.Base(strings.SplitN(location, "?", 2)[0])
 	var run store.ScanRun
 	for range 200 {
-		runs, err := scanStore.ListScanRuns(10)
-		if err != nil {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		if len(runs) == 1 && runs[0].Status == "completed" {
-			run = runs[0]
+		r, err := scanStore.GetScanRun(runID)
+		if err == nil && r.Status == "completed" {
+			run = r
 			break
 		}
 		time.Sleep(10 * time.Millisecond)

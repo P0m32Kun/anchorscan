@@ -19,6 +19,10 @@
     {{if .VerificationID}}<input type="hidden" name="verification_id" value="{{.VerificationID}}">{{end}}
     {{if .ReturnURL}}<input type="hidden" name="return" value="{{.ReturnURL}}">{{end}}
 
+    <div class="panel" style="background: var(--color-surface-2); margin-bottom: 1rem;">
+      <p class="meta-line">单工具调用不会计入扫描任务，也不会出现在首页/项目的扫描历史列表中。</p>
+    </div>
+
     {{if .Verification}}
     <div class="panel verification-summary" style="margin-bottom: 1rem;">
       <p class="eyebrow">绑定验证项</p>

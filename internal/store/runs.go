@@ -2,8 +2,16 @@ package store
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 )
+
+func normalizedRunKind(run ScanRun) string {
+	if strings.TrimSpace(run.Kind) == "" {
+		return "scan"
+	}
+	return run.Kind
+}
 
 func (s *Store) SaveScanRun(run ScanRun) error {
 	_, err := s.db.Exec(
@@ -32,7 +40,7 @@ func (s *Store) SaveScanRun(run ScanRun) error {
 		run.RunID,
 		run.ProjectID,
 		run.ZoneID,
-		run.Kind,
+		normalizedRunKind(run),
 		run.Label,
 		run.AccessPoint,
 		run.TesterIP,
@@ -68,6 +76,7 @@ func (s *Store) ListScanRuns(limit int) ([]ScanRun, error) {
 		`SELECT run_id, project_id, zone_id, kind, label, access_point, tester_ip, notes, include_in_report,
 			target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
+		 WHERE kind = 'scan'
 		 ORDER BY started_at DESC
 		 LIMIT ?`,
 		limit,
@@ -85,7 +94,7 @@ func (s *Store) ListProjectScanRuns(projectID string, limit int) ([]ScanRun, err
 		`SELECT run_id, project_id, zone_id, kind, label, access_point, tester_ip, notes, include_in_report,
 			target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
 		 FROM scan_runs
-		 WHERE project_id = ?
+		 WHERE project_id = ? AND kind = 'scan'
 		 ORDER BY started_at DESC
 		 LIMIT ?`,
 		projectID,

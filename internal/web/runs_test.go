@@ -209,6 +209,40 @@ func TestDeleteScanRunRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 	}
 }
 
+func TestListScanRunsFiltersByScanKind(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "scan-1", ProjectID: "p1", Kind: "scan", Status: "completed", StartedAt: time.Unix(2, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "tool-1", ProjectID: "p1", Kind: "tool", Status: "completed", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+
+	runs, err := scanStore.ListScanRuns(10)
+	if err != nil {
+		t.Fatalf("ListScanRuns returned error: %v", err)
+	}
+	if len(runs) != 1 || runs[0].RunID != "scan-1" {
+		t.Fatalf("expected only scan runs, got %#v", runs)
+	}
+
+	projectRuns, err := scanStore.ListProjectScanRuns("p1", 10)
+	if err != nil {
+		t.Fatalf("ListProjectScanRuns returned error: %v", err)
+	}
+	if len(projectRuns) != 1 || projectRuns[0].RunID != "scan-1" {
+		t.Fatalf("expected only scan runs for project, got %#v", projectRuns)
+	}
+}
+
 func TestRunEventsAPI(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
