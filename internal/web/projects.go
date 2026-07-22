@@ -53,16 +53,12 @@ func (s *server) projects(w http.ResponseWriter, r *http.Request) {
 			Name:        name,
 			Description: r.FormValue("description"),
 			ClientUnit:  strings.TrimSpace(r.FormValue("client_unit")),
-			ReportTitle: strings.TrimSpace(r.FormValue("report_title")),
 			TestObject:  strings.TrimSpace(r.FormValue("test_object")),
 			StartDate:   strings.TrimSpace(r.FormValue("start_date")),
 			EndDate:     strings.TrimSpace(r.FormValue("end_date")),
 			Testers:     strings.TrimSpace(r.FormValue("testers")),
 			CreatedAt:   now,
 			UpdatedAt:   now,
-		}
-		if project.ReportTitle == "" && project.ClientUnit != "" {
-			project.ReportTitle = project.ClientUnit + "内网安全检查报告"
 		}
 		if err := s.store.SaveProject(project); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -219,7 +215,6 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 		project.Name = strings.TrimSpace(r.FormValue("name"))
 		project.Description = r.FormValue("description")
 		project.ClientUnit = strings.TrimSpace(r.FormValue("client_unit"))
-		project.ReportTitle = strings.TrimSpace(r.FormValue("report_title"))
 		project.TestObject = strings.TrimSpace(r.FormValue("test_object"))
 		project.StartDate = strings.TrimSpace(r.FormValue("start_date"))
 		project.EndDate = strings.TrimSpace(r.FormValue("end_date"))
@@ -227,9 +222,6 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 		if project.Name == "" {
 			http.Error(w, "name is required", http.StatusBadRequest)
 			return
-		}
-		if project.ReportTitle == "" && project.ClientUnit != "" {
-			project.ReportTitle = project.ClientUnit + "内网安全检查报告"
 		}
 		project.UpdatedAt = s.opts.Now()
 		if err := s.store.SaveProject(project); err != nil {

@@ -101,7 +101,7 @@
   {{if or .Sessions .Confirmed .NotObserved}}
   <h3>{{.Zone.Name}}</h3>
   {{range .Sessions}}
-  <p><strong>接入记录：</strong>{{.Label}}；<strong>接入点：</strong>{{.AccessPoint}}；<strong>测试机 IP：</strong>{{.TesterIP}}；<strong>测试范围：</strong>{{.Targets}}{{if .Exclusions}}；<strong>排除范围：</strong>{{.Exclusions}}{{end}}{{if .Notes}}；<strong>备注：</strong>{{.Notes}}{{end}}</p>
+  <p><strong>测试设备接入点：</strong>{{.AccessPoint}}；<strong>测试设备 IP：</strong>{{.TesterIP}}；<strong>测试范围：</strong>{{.Targets}}{{if .Exclusions}}；<strong>排除范围：</strong>{{.Exclusions}}{{end}}{{if .Notes}}；<strong>备注：</strong>{{.Notes}}{{end}}</p>
   {{end}}
   {{range .Confirmed}}
   <h4>{{.Title}}（{{.Severity}}）</h4>

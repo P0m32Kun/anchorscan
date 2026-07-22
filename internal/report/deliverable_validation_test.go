@@ -45,8 +45,8 @@ func TestValidateProjectDeliverableRejectsMissingFormalFields(t *testing.T) {
 		edit func(*ProjectDeliverable)
 	}{
 		{name: "created at", want: "项目创建时间", edit: func(d *ProjectDeliverable) { d.Project.CreatedAt = time.Time{} }},
-		{name: "access point", want: "接入点", edit: func(d *ProjectDeliverable) { d.Zones[0].Sessions[0].AccessPoint = "" }},
-		{name: "tester ip", want: "测试机 IP", edit: func(d *ProjectDeliverable) { d.Zones[0].Sessions[0].TesterIP = "" }},
+		{name: "access point", want: "测试设备接入点", edit: func(d *ProjectDeliverable) { d.Zones[0].Sessions[0].AccessPoint = "" }},
+		{name: "tester ip", want: "测试设备 IP", edit: func(d *ProjectDeliverable) { d.Zones[0].Sessions[0].TesterIP = "" }},
 		{name: "description", want: "漏洞描述", edit: func(d *ProjectDeliverable) { d.Zones[0].Confirmed[0].Description = "" }},
 		{name: "remediation", want: "修改建议", edit: func(d *ProjectDeliverable) { d.Zones[0].Confirmed[0].Remediation = "" }},
 		{name: "confirmed asset", want: "关联资产", edit: func(d *ProjectDeliverable) { d.Zones[0].Confirmed[0].Assets = nil }},

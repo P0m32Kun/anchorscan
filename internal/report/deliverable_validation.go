@@ -30,10 +30,10 @@ func ValidateProjectDeliverable(deliverable ProjectDeliverable) error {
 	for _, zone := range deliverable.Zones {
 		for _, session := range zone.Sessions {
 			if strings.TrimSpace(session.AccessPoint) == "" {
-				return fmt.Errorf("纳入报告的运行“%s”缺少接入点", session.Label)
+				return fmt.Errorf("纳入报告的运行“%s”缺少测试设备接入点", session.Label)
 			}
 			if strings.TrimSpace(session.TesterIP) == "" {
-				return fmt.Errorf("纳入报告的运行“%s”缺少测试机 IP", session.Label)
+				return fmt.Errorf("纳入报告的运行“%s”缺少测试设备 IP", session.Label)
 			}
 			if strings.TrimSpace(session.Targets) == "" {
 				return fmt.Errorf("纳入报告的运行“%s”缺少测试范围", session.Label)

@@ -209,10 +209,10 @@ func validateScanForm(form scanForm, zones []store.ProjectZone) *scanFormError {
 		return &scanFormError{Field: "ports", Message: "端口不能为空"}
 	}
 	if form.AccessPoint == "" {
-		return &scanFormError{Field: "access_point", Message: "接入点不能为空"}
+		return &scanFormError{Field: "access_point", Message: "测试设备接入点不能为空"}
 	}
 	if form.TesterIP == "" {
-		return &scanFormError{Field: "tester_ip", Message: "测试机 IP 不能为空"}
+		return &scanFormError{Field: "tester_ip", Message: "测试设备 IP 不能为空"}
 	}
 	if !isScanProfile(form.Profile) {
 		return &scanFormError{Field: "profile", Message: "请选择有效的扫描档位"}

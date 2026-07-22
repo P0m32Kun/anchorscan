@@ -124,7 +124,6 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 		"data:image/png;base64,",
 		"弱口令证据",
 		"Redis未授权访问",
-		"核心交换机",
 		"SW-01",
 		"10.0.0.10",
 		"10.0.1.0/24",
@@ -276,7 +275,7 @@ func TestProjectReportHTMLRejectsIncompleteIncludedRun(t *testing.T) {
 	closeServer(t, handler)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
-	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "测试机 IP") {
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "测试设备 IP") {
 		t.Fatalf("expected run validation error, got %d %s", res.Code, res.Body.String())
 	}
 }
@@ -330,5 +329,29 @@ func TestProjectReportHTMLRejectsIncludedVerificationWithoutEvidence(t *testing.
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
 	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "缺少证据") {
 		t.Fatalf("expected missing-evidence error, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestReportTitleFallsBackToClientUnit(t *testing.T) {
+	if got := reportTitle(store.Project{ClientUnit: "甘肃电力"}); got != "甘肃电力安全渗透测试分析报告" {
+		t.Fatalf("expected fallback title, got %q", got)
+	}
+}
+
+func TestReportTitleUsesExistingReportTitle(t *testing.T) {
+	if got := reportTitle(store.Project{ReportTitle: "自定义标题", ClientUnit: "甘肃电力"}); got != "自定义标题" {
+		t.Fatalf("expected existing title, got %q", got)
+	}
+}
+
+func TestReportTitleFallsBackToName(t *testing.T) {
+	if got := reportTitle(store.Project{Name: "某任务", ClientUnit: ""}); got != "某任务安全渗透测试分析报告" {
+		t.Fatalf("expected name fallback title, got %q", got)
+	}
+}
+
+func TestReportTitleBareFallback(t *testing.T) {
+	if got := reportTitle(store.Project{}); got != "安全渗透测试分析报告" {
+		t.Fatalf("expected bare fallback title, got %q", got)
 	}
 }

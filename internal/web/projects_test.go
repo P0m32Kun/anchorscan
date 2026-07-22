@@ -93,8 +93,8 @@ func TestCreateProjectFromWeb(t *testing.T) {
 	if project.ClientUnit != "Client A" || project.TestObject != "internal" || project.Testers != "Alice, Bob" {
 		t.Fatalf("unexpected project metadata: %#v", project)
 	}
-	if project.ReportTitle != "Client A内网安全检查报告" {
-		t.Fatalf("expected default report title, got %q", project.ReportTitle)
+	if project.ReportTitle != "" {
+		t.Fatalf("expected empty report title, got %q", project.ReportTitle)
 	}
 	if project.DefaultTargets != "" || project.DefaultPorts != "" || project.DefaultProfile != "" {
 		t.Fatalf("legacy scan default fields should not be set for new project: %#v", project)
@@ -326,7 +326,7 @@ func TestProjectDetailRendersMetadataAndZones(t *testing.T) {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	for _, want := range []string{"甘肃任务", "甘肃电力", "甘肃电力内网安全检查报告", "信息内网", "2026-07-01", "2026-07-15", "张三, 李四", "I区", "II区", "III区", "DMZ", "导出 DOCX 报告", `anchorscanDownloadDocx('p1')`} {
+	for _, want := range []string{"甘肃任务", "甘肃电力", "信息内网", "2026-07-01", "2026-07-15", "张三, 李四", "I区", "II区", "III区", "DMZ", "导出 DOCX 报告", `anchorscanDownloadDocx('p1')`} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body, got %s", want, body)
 		}

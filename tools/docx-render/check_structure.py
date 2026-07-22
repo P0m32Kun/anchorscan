@@ -208,7 +208,6 @@ def verify_template_slots(source: Path, template: Path) -> None:
         "{%p for network_zone in network_zones %}",
         "{{ network_zone.name }}",
         "{%p for session in network_zone.sessions %}",
-        "{{ session.label }}",
         "{{ session.access_point }}",
         "{{ session.tester_ip }}",
         "{{ session.targets_text }}",
