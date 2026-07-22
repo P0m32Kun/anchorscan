@@ -22,19 +22,23 @@ nuclei -version
 
 ## 2. 获取程序
 
-### 方式一：下载预编译二进制（推荐）
+### 方式一：下载预编译归档（推荐）
 
-到 [Releases 页面](https://github.com/P0m32Kun/anchorscan/releases) 下载对应平台的二进制：
+到 [Releases 页面](https://github.com/P0m32Kun/anchorscan/releases) 下载对应平台的 `.tar.gz` 归档：
 
-- `anchorscan-linux-amd64`（Linux x86_64）
-- `anchorscan-darwin-arm64`（macOS Apple Silicon）
-- `anchorscan-windows-amd64.exe`（Windows x86_64）
+- `anchorscan-vX.Y.Z-linux-amd64.tar.gz`（Linux x86_64）
+- `anchorscan-vX.Y.Z-darwin-arm64.tar.gz`（macOS Apple Silicon）
+- `anchorscan-vX.Y.Z-windows-amd64.tar.gz`（Windows x86_64）
 
-无需安装 Go 环境。下载后赋予执行权限：
+无需安装 Go 环境。解压后进入归档目录；Linux/macOS 需赋予执行权限：
 
 ```bash
-chmod +x anchorscan-linux-amd64
+tar -xzf anchorscan-vX.Y.Z-linux-amd64.tar.gz
+cd anchorscan-vX.Y.Z-linux-amd64
+chmod +x anchorscan
 ```
+
+归档包含 DOCX 导出所需的 `tools/docx-render/` sidecar 与正式模板。使用 DOCX 导出还需安装 [uv](https://docs.astral.sh/uv/)；启动程序时保留归档目录结构，并从归档根目录运行 `anchorscan`（Windows 为 `anchorscan.exe`）。
 
 ### 方式二：从源码编译
 

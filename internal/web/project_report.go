@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -55,6 +56,11 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return report.ProjectDeliverable{}, store.Project{}, err
 	}
+	runs, err := s.store.ListProjectScanRuns(projectID, 10000)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return report.ProjectDeliverable{}, store.Project{}, err
+	}
 
 	reportZones := make([]report.ProjectZone, 0, len(zones))
 	for _, z := range zones {
@@ -79,6 +85,11 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return report.ProjectDeliverable{}, store.Project{}, err
 		}
+		if len(evidenceRows) == 0 {
+			err := fmt.Errorf("纳入报告的验证项“%s”缺少证据", v.Title)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return report.ProjectDeliverable{}, store.Project{}, err
+		}
 		delAssets := make([]report.DeliverableAsset, 0, len(assets))
 		for _, a := range assets {
 			delAssets = append(delAssets, report.DeliverableAsset{IP: a.IP, Port: a.Port, Display: assetDisplay(a.IP, a.Port)})
@@ -93,16 +104,26 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 			delEvidence = append(delEvidence, report.DeliverableEvidence{DataURI: dataURI, FilePath: s.store.EvidenceFilePath(e, projectID), MediaType: e.MediaType, Caption: e.Caption, Width: e.Width, Height: e.Height})
 		}
 		deliverableVerifications = append(deliverableVerifications, report.DeliverableVerification{
-			ID:          v.ID,
-			ZoneID:      v.ZoneID,
-			Title:       v.Title,
-			Severity:    v.Severity,
-			Outcome:     v.Outcome,
-			Description: v.Description,
-			Remediation: v.Remediation,
-			Assets:      delAssets,
-			Evidence:    delEvidence,
-			Position:    v.Position,
+			ID:               v.ID,
+			VulnerabilityKey: v.VulnerabilityKey,
+			ZoneID:           v.ZoneID,
+			Title:            v.Title,
+			Severity:         v.Severity,
+			Outcome:          v.Outcome,
+			Description:      v.Description,
+			Remediation:      v.Remediation,
+			Assets:           delAssets,
+			Evidence:         delEvidence,
+			Position:         v.Position,
+		})
+	}
+	reportRuns := make([]report.ProjectRun, 0, len(runs))
+	for _, run := range runs {
+		excludeTargets, excludePorts := reportRunExclusions(run.ConfigSnapshot)
+		reportRuns = append(reportRuns, report.ProjectRun{
+			RunID: run.RunID, ZoneID: run.ZoneID, Status: run.Status, IncludeInReport: run.IncludeInReport,
+			Label: run.Label, AccessPoint: run.AccessPoint, TesterIP: run.TesterIP, Target: run.Target,
+			ExcludeTargets: excludeTargets, Ports: run.Ports, ExcludePorts: excludePorts, Profile: run.Profile, Notes: run.Notes,
 		})
 	}
 
@@ -116,9 +137,25 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 		StartDate:   project.StartDate,
 		EndDate:     project.EndDate,
 		Testers:     project.Testers,
+		CreatedAt:   project.CreatedAt,
 	}
-	deliverable := report.BuildProjectDeliverable(metadata, reportZones, deliverableVerifications, s.opts.Now())
+	deliverable := report.BuildProjectDeliverable(metadata, reportZones, reportRuns, deliverableVerifications, s.opts.Now())
+	if err := report.ValidateProjectDeliverable(deliverable); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return report.ProjectDeliverable{}, store.Project{}, err
+	}
 	return deliverable, project, nil
+}
+
+func reportRunExclusions(snapshot string) (string, string) {
+	var values struct {
+		ExcludeTargets string `json:"exclude_targets"`
+		ExcludePorts   string `json:"exclude_ports"`
+	}
+	if json.Unmarshal([]byte(snapshot), &values) != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(values.ExcludeTargets), strings.TrimSpace(values.ExcludePorts)
 }
 
 func (s *server) evidenceDataURI(projectID string, evidence store.VerificationEvidence) (string, error) {
@@ -141,6 +178,12 @@ func projectReportMissingMetadata(project store.Project) []string {
 	}
 	if strings.TrimSpace(project.TestObject) == "" {
 		missing = append(missing, "测试对象")
+	}
+	if strings.TrimSpace(project.StartDate) == "" {
+		missing = append(missing, "测试开始日期")
+	}
+	if strings.TrimSpace(project.EndDate) == "" {
+		missing = append(missing, "测试结束日期")
 	}
 	if strings.TrimSpace(project.Testers) == "" {
 		missing = append(missing, "测试人员")

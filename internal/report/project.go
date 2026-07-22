@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
@@ -48,6 +49,7 @@ type ProjectMetadata struct {
 	StartDate   string
 	EndDate     string
 	Testers     string
+	CreatedAt   time.Time
 }
 
 // ProjectZone describes a network zone inside a project.
@@ -67,7 +69,9 @@ type ProjectRun struct {
 	AccessPoint     string
 	TesterIP        string
 	Target          string
+	ExcludeTargets  string
 	Ports           string
+	ExcludePorts    string
 	Profile         string
 	Notes           string
 }

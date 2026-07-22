@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
@@ -58,7 +57,7 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	}
 	outPath := filepath.Join(tmpDir, safeReportFilename(project)+".docx")
 
-	cmd := exec.Command("uv", "run", "--project", s.opts.DocxRenderProject, "python", "render_docx.py",
+	cmd := exec.Command("uv", "run", "--project", s.opts.DocxRenderProject, "python", filepath.Join(s.opts.DocxRenderProject, "render_docx.py"),
 		"--template", s.opts.DocxTemplatePath,
 		"--context", contextPath,
 		"--out", outPath,
@@ -73,5 +72,4 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.docx"`, safeReportFilename(project)))
 	http.ServeFile(w, r, outPath)
-	_ = time.Now
 }

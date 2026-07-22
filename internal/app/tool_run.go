@@ -111,16 +111,16 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 	snapshot, _ := json.Marshal(map[string]any{
-		"tool":           opts.Tool,
-		"mode":           opts.Mode,
-		"target":         opts.Target,
-		"url":            opts.URL,
-		"ports":          opts.Ports,
-		"tags":           opts.Tags,
-		"template":       opts.Template,
-		"use_native":     opts.UseNativeArgs,
-		"native_args":    opts.NativeArgs,
-		"zone_id":        opts.ZoneID,
+		"tool":            opts.Tool,
+		"mode":            opts.Mode,
+		"target":          opts.Target,
+		"url":             opts.URL,
+		"ports":           opts.Ports,
+		"tags":            opts.Tags,
+		"template":        opts.Template,
+		"use_native":      opts.UseNativeArgs,
+		"native_args":     opts.NativeArgs,
+		"zone_id":         opts.ZoneID,
 		"verification_id": opts.VerificationID,
 	})
 	return scanStore.SaveScanRun(store.ScanRun{

@@ -17,13 +17,13 @@ type DocxContext struct {
 }
 
 type docxReport struct {
-	Title                string `json:"title"`
-	ClientName           string `json:"client_name"`
-	TestSubject          string `json:"test_subject"`
-	ProjectCreatedDate   string `json:"project_created_date"`
-	ProjectCreatedMonth  string `json:"project_created_month"`
-	TestersText          string `json:"testers_text"`
-	TestPeriod           string `json:"test_period"`
+	Title               string `json:"title"`
+	ClientName          string `json:"client_name"`
+	TestSubject         string `json:"test_subject"`
+	ProjectCreatedDate  string `json:"project_created_date"`
+	ProjectCreatedMonth string `json:"project_created_month"`
+	TestersText         string `json:"testers_text"`
+	TestPeriod          string `json:"test_period"`
 }
 
 type docxSummaryRow struct {
@@ -34,10 +34,10 @@ type docxSummaryRow struct {
 }
 
 type docxZone struct {
-	Name         string            `json:"name"`
-	Sessions     []docxSession     `json:"sessions"`
-	Confirmed    []docxVerification `json:"confirmed"`
-	NotObserved  []docxVerification `json:"not_observed"`
+	Name        string             `json:"name"`
+	Sessions    []docxSession      `json:"sessions"`
+	Confirmed   []docxVerification `json:"confirmed"`
+	NotObserved []docxVerification `json:"not_observed"`
 }
 
 type docxSession struct {
@@ -50,12 +50,12 @@ type docxSession struct {
 }
 
 type docxVerification struct {
-	Heading     string       `json:"heading,omitempty"`
-	Title       string       `json:"title,omitempty"`
-	Description string       `json:"description,omitempty"`
-	AssetsText  string       `json:"assets_text,omitempty"`
-	Remediation string       `json:"remediation,omitempty"`
-	PortsText   string       `json:"ports_text,omitempty"`
+	Heading     string         `json:"heading,omitempty"`
+	Title       string         `json:"title,omitempty"`
+	Description string         `json:"description,omitempty"`
+	AssetsText  string         `json:"assets_text,omitempty"`
+	Remediation string         `json:"remediation,omitempty"`
+	PortsText   string         `json:"ports_text,omitempty"`
 	Evidence    []docxEvidence `json:"evidence"`
 }
 
@@ -74,8 +74,7 @@ type docxConclusion struct {
 
 // BuildDocxContext projects a deliverable into the sidecar's JSON contract.
 // The cover date/month default to the generation time when the project did not
-// record explicit dates. Sessions are left empty: the deliverable does not
-// carry per-run access metadata, and the template renders an empty loop.
+// record an explicit creation timestamp.
 func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext {
 	reportCtx := docxReport{
 		Title:       deliverable.Project.ReportTitle,
@@ -87,11 +86,13 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 	end := strings.TrimSpace(deliverable.Project.EndDate)
 	if period != "" && end != "" {
 		reportCtx.TestPeriod = period + " 至 " + end
-		reportCtx.ProjectCreatedDate = period
-	} else {
-		reportCtx.ProjectCreatedDate = now.Format("2006年1月2日")
 	}
-	reportCtx.ProjectCreatedMonth = chineseYearMonth(now)
+	createdAt := deliverable.Project.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = now
+	}
+	reportCtx.ProjectCreatedDate = createdAt.Format("2006年1月2日")
+	reportCtx.ProjectCreatedMonth = chineseYearMonth(createdAt)
 
 	summaryRows := make([]docxSummaryRow, 0, len(deliverable.Summary))
 	for _, row := range deliverable.Summary {
@@ -105,15 +106,20 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 
 	zones := make([]docxZone, 0, len(deliverable.Zones))
 	for _, z := range deliverable.Zones {
-		if len(z.Confirmed) == 0 && len(z.NotObserved) == 0 {
+		if len(z.Sessions) == 0 && len(z.Confirmed) == 0 && len(z.NotObserved) == 0 {
 			continue
 		}
 		zone := docxZone{Name: z.Zone.Name}
+		for _, session := range z.Sessions {
+			zone.Sessions = append(zone.Sessions, docxSession{
+				Label: session.Label, AccessPoint: session.AccessPoint, TesterIP: session.TesterIP, TargetsText: session.Targets, ExclusionsText: session.Exclusions, Notes: session.Notes,
+			})
+		}
 		for _, v := range z.Confirmed {
 			zone.Confirmed = append(zone.Confirmed, docxVerification{
 				Heading:     v.Title + "（" + severityLabel(v.Severity) + "）",
 				Description: v.Description,
-				AssetsText:  joinAssets(v.Assets),
+				AssetsText:  v.AssetsText,
 				Remediation: v.Remediation,
 				Evidence:    evidencePaths(v.Evidence),
 			})
@@ -121,7 +127,7 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 		for _, v := range z.NotObserved {
 			zone.NotObserved = append(zone.NotObserved, docxVerification{
 				Title:     v.Title,
-				PortsText: joinAssets(v.Assets),
+				PortsText: v.PortsText,
 				Evidence:  evidencePaths(v.Evidence),
 			})
 		}
@@ -139,7 +145,7 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 			High:                 deliverable.Stats.High,
 			Medium:               deliverable.Stats.Medium,
 			Low:                  deliverable.Stats.Low,
-			FocusText:            focusText(deliverable),
+			FocusText:            deliverable.FocusText,
 		},
 	}
 }
@@ -152,25 +158,6 @@ func evidencePaths(items []DeliverableEvidence) []docxEvidence {
 		}
 	}
 	return out
-}
-
-func focusText(deliverable ProjectDeliverable) string {
-	seen := map[string]struct{}{}
-	var titles []string
-	for _, z := range deliverable.Zones {
-		for _, v := range z.Confirmed {
-			title := strings.TrimSpace(v.Title)
-			if title == "" {
-				continue
-			}
-			if _, ok := seen[title]; ok {
-				continue
-			}
-			seen[title] = struct{}{}
-			titles = append(titles, title)
-		}
-	}
-	return strings.Join(titles, "、")
 }
 
 func chineseYearMonth(t time.Time) string {

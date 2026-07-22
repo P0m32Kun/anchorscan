@@ -260,4 +260,3 @@ func (s *Store) ReorderEvidence(verificationID string, ids []string) error {
 
 	return tx.Commit()
 }
-

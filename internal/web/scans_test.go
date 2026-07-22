@@ -54,7 +54,7 @@ func TestNewScanPageRenders(t *testing.T) {
 	if !strings.Contains(body, `<select name="zone_id"`) {
 		t.Fatalf("expected zone selector, got body=%s", body)
 	}
-	for _, want := range []string{"I区 (I)", "II区 (II)", "III区 (III)", "网络分区", "目标资产", "端口范围", "扫描档位"} {
+	for _, want := range []string{"I区 (I)", "II区 (II)", "III区 (III)", "网络分区", "目标资产", "排除目标", "端口范围", "排除端口", "扫描档位"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected scan form copy %q, got body=%s", want, body)
 		}
@@ -90,7 +90,7 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=top1000&profile=normal")
+	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=top1000&profile=normal&access_point=lab&tester_ip=127.0.0.2")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -134,7 +134,7 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=top1000&profile=normal")
+	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=top1000&profile=normal&access_point=lab&tester_ip=127.0.0.2")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -184,7 +184,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=100-1000&profile=normal")
+	body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=100-1000&profile=normal&access_point=lab&tester_ip=127.0.0.2")
 	req := httptest.NewRequest(http.MethodPost, "/scan", body)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -228,7 +228,7 @@ func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
 	closeServer(t, handler)
 
 	for _, ports := range []string{"full", "highrisk", "80,100-200"} {
-		body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=" + ports + "&profile=normal")
+		body := strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=" + ports + "&profile=normal&access_point=lab&tester_ip=127.0.0.2")
 		req := httptest.NewRequest(http.MethodPost, "/scan", body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		rec := httptest.NewRecorder()
@@ -257,7 +257,7 @@ func TestScanCreateDoesNotStartManagerWhenPreparationReturnsOrdinaryError(t *tes
 	}
 	closeServer(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=full"))
+	req := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader("project_id=p1&zone_id=I&target=127.0.0.1&ports=full&access_point=lab&tester_ip=127.0.0.2"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
@@ -293,7 +293,7 @@ func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	form := "project_id=p1&zone_id=I&target=127.0.0.1&ports=80"
+	form := "project_id=p1&zone_id=I&target=127.0.0.1&ports=80&access_point=lab&tester_ip=127.0.0.2"
 	first := httptest.NewRecorder()
 	firstReq := httptest.NewRequest(http.MethodPost, "/scan", strings.NewReader(form))
 	firstReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -347,7 +347,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	}
 	closeServer(t, handler)
 
-	form := strings.NewReader("project_id=p1&zone_id=I&label=segment-a&target=127.0.0.1&ports=80,8080&profile=normal&access_point=core-sw-a&tester_ip=10.0.0.5&notes=lab")
+	form := strings.NewReader("project_id=p1&zone_id=I&label=segment-a&target=127.0.0.1&exclude_targets=192.0.2.1&ports=80,8080&exclude_ports=22&profile=normal&access_point=core-sw-a&tester_ip=10.0.0.5&notes=lab")
 	req := httptest.NewRequest(http.MethodPost, "/scan", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := httptest.NewRecorder()
@@ -376,6 +376,9 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	}
 	if run.AccessPoint != "core-sw-a" || run.TesterIP != "10.0.0.5" || run.Notes != "lab" {
 		t.Fatalf("unexpected run context fields: %#v", run)
+	}
+	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) {
+		t.Fatalf("expected exclusions in snapshot: %s", run.ConfigSnapshot)
 	}
 	if run.Kind != "scan" {
 		t.Fatalf("expected kind scan, got %q", run.Kind)

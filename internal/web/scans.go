@@ -19,19 +19,21 @@ import (
 // scanForm is the small, explicitly allowed subset of a prior scan that can
 // be shown again for user-confirmed reruns.
 type scanForm struct {
-	ZoneID       string `json:"zone_id"`
-	Target       string `json:"target"`
-	Ports        string `json:"ports"`
-	Profile      string `json:"profile"`
-	Label        string `json:"label"`
-	AccessPoint  string `json:"access_point"`
-	TesterIP     string `json:"tester_ip"`
-	Notes        string `json:"notes"`
-	RustscanArgs string `json:"rustscan_args"`
-	NmapArgs     string `json:"nmap_args"`
-	HttpxArgs    string `json:"httpx_args"`
-	NucleiArgs   string `json:"nuclei_args"`
-	IsRerun      bool   `json:"-"`
+	ZoneID         string `json:"zone_id"`
+	Target         string `json:"target"`
+	ExcludeTargets string `json:"exclude_targets"`
+	Ports          string `json:"ports"`
+	ExcludePorts   string `json:"exclude_ports"`
+	Profile        string `json:"profile"`
+	Label          string `json:"label"`
+	AccessPoint    string `json:"access_point"`
+	TesterIP       string `json:"tester_ip"`
+	Notes          string `json:"notes"`
+	RustscanArgs   string `json:"rustscan_args"`
+	NmapArgs       string `json:"nmap_args"`
+	HttpxArgs      string `json:"httpx_args"`
+	NucleiArgs     string `json:"nuclei_args"`
+	IsRerun        bool   `json:"-"`
 }
 
 // renderProjectScanForm renders the in-project scan form with the project
@@ -104,8 +106,8 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		ConfigPath:     s.opts.ConfigPath,
 		TargetSpec:     form.Target,
 		PortSpec:       form.Ports,
-		ExcludeTargets: "",
-		ExcludePorts:   "",
+		ExcludeTargets: form.ExcludeTargets,
+		ExcludePorts:   form.ExcludePorts,
 		Overrides: config.Overrides{
 			ProfileName:  form.Profile,
 			RustscanArgs: form.RustscanArgs,
@@ -164,18 +166,20 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 
 func scanFormFromRequest(r *http.Request) scanForm {
 	return scanForm{
-		ZoneID:       strings.TrimSpace(r.FormValue("zone_id")),
-		Target:       strings.TrimSpace(r.FormValue("target")),
-		Ports:        strings.TrimSpace(r.FormValue("ports")),
-		Profile:      strings.TrimSpace(r.FormValue("profile")),
-		Label:        strings.TrimSpace(r.FormValue("label")),
-		AccessPoint:  strings.TrimSpace(r.FormValue("access_point")),
-		TesterIP:     strings.TrimSpace(r.FormValue("tester_ip")),
-		Notes:        strings.TrimSpace(r.FormValue("notes")),
-		RustscanArgs: r.FormValue("rustscan_args"),
-		NmapArgs:     r.FormValue("nmap_args"),
-		HttpxArgs:    r.FormValue("httpx_args"),
-		NucleiArgs:   r.FormValue("nuclei_args"),
+		ZoneID:         strings.TrimSpace(r.FormValue("zone_id")),
+		Target:         strings.TrimSpace(r.FormValue("target")),
+		ExcludeTargets: strings.TrimSpace(r.FormValue("exclude_targets")),
+		Ports:          strings.TrimSpace(r.FormValue("ports")),
+		ExcludePorts:   strings.TrimSpace(r.FormValue("exclude_ports")),
+		Profile:        strings.TrimSpace(r.FormValue("profile")),
+		Label:          strings.TrimSpace(r.FormValue("label")),
+		AccessPoint:    strings.TrimSpace(r.FormValue("access_point")),
+		TesterIP:       strings.TrimSpace(r.FormValue("tester_ip")),
+		Notes:          strings.TrimSpace(r.FormValue("notes")),
+		RustscanArgs:   r.FormValue("rustscan_args"),
+		NmapArgs:       r.FormValue("nmap_args"),
+		HttpxArgs:      r.FormValue("httpx_args"),
+		NucleiArgs:     r.FormValue("nuclei_args"),
 	}
 }
 
@@ -203,6 +207,12 @@ func validateScanForm(form scanForm, zones []store.ProjectZone) *scanFormError {
 	}
 	if form.Ports == "" {
 		return &scanFormError{Field: "ports", Message: "端口不能为空"}
+	}
+	if form.AccessPoint == "" {
+		return &scanFormError{Field: "access_point", Message: "接入点不能为空"}
+	}
+	if form.TesterIP == "" {
+		return &scanFormError{Field: "tester_ip", Message: "测试机 IP 不能为空"}
 	}
 	if !isScanProfile(form.Profile) {
 		return &scanFormError{Field: "profile", Message: "请选择有效的扫描档位"}

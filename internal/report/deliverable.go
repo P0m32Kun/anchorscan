@@ -2,6 +2,7 @@ package report
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -28,16 +29,19 @@ type DeliverableAsset struct {
 // DeliverableVerification is one included verification projected for the formal
 // report, carrying its assets and ordered evidence.
 type DeliverableVerification struct {
-	ID          string
-	ZoneID      string
-	Title       string
-	Severity    string
-	Outcome     string
-	Description string
-	Remediation string
-	Assets      []DeliverableAsset
-	Evidence    []DeliverableEvidence
-	Position    int
+	ID               string
+	VulnerabilityKey string
+	ZoneID           string
+	Title            string
+	Severity         string
+	Outcome          string
+	Description      string
+	Remediation      string
+	Assets           []DeliverableAsset
+	AssetsText       string
+	PortsText        string
+	Evidence         []DeliverableEvidence
+	Position         int
 }
 
 // DeliverableZoneInfo is the minimal zone identity needed by the report.
@@ -47,10 +51,21 @@ type DeliverableZoneInfo struct {
 	SortOrder int
 }
 
+// DeliverableSession is one included run's on-site context.
+type DeliverableSession struct {
+	Label       string
+	AccessPoint string
+	TesterIP    string
+	Targets     string
+	Exclusions  string
+	Notes       string
+}
+
 // DeliverableZone groups the confirmed and not-observed verifications for one
 // network zone.
 type DeliverableZone struct {
 	Zone        DeliverableZoneInfo
+	Sessions    []DeliverableSession
 	Confirmed   []DeliverableVerification
 	NotObserved []DeliverableVerification
 }
@@ -82,6 +97,7 @@ type ProjectDeliverable struct {
 	Summary     []DeliverableSummaryRow
 	Stats       DeliverableStats
 	ZoneNames   string
+	FocusText   string
 	GeneratedAt time.Time
 }
 
@@ -91,15 +107,33 @@ type ProjectDeliverable struct {
 // and inconclusive verifications are excluded from both the summary and the
 // statistics. The builder is pure: evidence must already be loaded as data URIs
 // by the caller.
-func BuildProjectDeliverable(project ProjectMetadata, zones []ProjectZone, verifications []DeliverableVerification, now time.Time) ProjectDeliverable {
+func BuildProjectDeliverable(project ProjectMetadata, zones []ProjectZone, runs []ProjectRun, verifications []DeliverableVerification, now time.Time) ProjectDeliverable {
 	zoneIndex := make(map[string]int, len(zones))
 	deliverableZones := make([]DeliverableZone, len(zones))
 	for i, z := range zones {
 		zoneIndex[z.ZoneID] = i
 		deliverableZones[i] = DeliverableZone{Zone: DeliverableZoneInfo{ZoneID: z.ZoneID, Name: z.Name, SortOrder: z.SortOrder}}
 	}
+	for _, run := range runs {
+		idx, ok := zoneIndex[run.ZoneID]
+		if !ok || !run.IncludeInReport || (run.Status != "completed" && run.Status != "completed_with_errors") {
+			continue
+		}
+		label := strings.TrimSpace(run.Label)
+		if label == "" {
+			label = run.RunID
+		}
+		deliverableZones[idx].Sessions = append(deliverableZones[idx].Sessions, DeliverableSession{
+			Label: label, AccessPoint: run.AccessPoint, TesterIP: run.TesterIP, Targets: run.Target,
+			Exclusions: formatExclusions(run.ExcludeTargets, run.ExcludePorts), Notes: run.Notes,
+		})
+	}
 
-	for _, v := range verifications {
+	for _, input := range verifications {
+		v := input
+		v.Assets = normalizeDeliverableAssets(v.Assets)
+		v.AssetsText = joinAssets(v.Assets)
+		v.PortsText = joinPorts(v.Assets)
 		idx, ok := zoneIndex[v.ZoneID]
 		if !ok {
 			continue
@@ -112,58 +146,163 @@ func BuildProjectDeliverable(project ProjectMetadata, zones []ProjectZone, verif
 		}
 	}
 
-	summary := []DeliverableSummaryRow{}
+	type summaryGroup struct {
+		verification DeliverableVerification
+		assets       map[string]DeliverableAsset
+	}
+	summaryGroups := map[string]*summaryGroup{}
+	var summaryOrder []string
 	stats := DeliverableStats{}
-	number := 0
 	var zoneNames []string
 	for i := range deliverableZones {
 		zone := &deliverableZones[i]
 		sortVerifications(zone.Confirmed)
 		sortVerifications(zone.NotObserved)
-		if len(zone.Confirmed) > 0 || len(zone.NotObserved) > 0 {
+		if len(zone.Sessions) > 0 || len(zone.Confirmed) > 0 || len(zone.NotObserved) > 0 {
 			zoneNames = append(zoneNames, zone.Zone.Name)
 		}
 		for _, v := range zone.Confirmed {
-			number++
-			summary = append(summary, DeliverableSummaryRow{
-				Number:   number,
-				Title:    strings.TrimSpace(v.Title),
-				Assets:   joinAssets(v.Assets),
-				Severity: severityLabel(v.Severity),
-			})
-			stats.Total++
-			switch strings.ToLower(v.Severity) {
-			case "critical":
-				stats.Critical++
-			case "high":
-				stats.High++
-			case "medium":
-				stats.Medium++
-			case "low":
-				stats.Low++
+			key := strings.TrimSpace(v.VulnerabilityKey)
+			if key == "" {
+				key = v.ID
+			}
+			group := summaryGroups[key]
+			if group == nil {
+				group = &summaryGroup{verification: v, assets: map[string]DeliverableAsset{}}
+				summaryGroups[key] = group
+				summaryOrder = append(summaryOrder, key)
+			}
+			for _, asset := range v.Assets {
+				group.assets[asset.IP+"\x00"+strconv.Itoa(asset.Port)] = asset
 			}
 		}
 	}
 
+	summary := make([]DeliverableSummaryRow, 0, len(summaryOrder))
+	for i, key := range summaryOrder {
+		group := summaryGroups[key]
+		assets := make([]DeliverableAsset, 0, len(group.assets))
+		for _, asset := range group.assets {
+			assets = append(assets, asset)
+		}
+		sort.Slice(assets, func(i, j int) bool {
+			if assets[i].IP != assets[j].IP {
+				return assets[i].IP < assets[j].IP
+			}
+			return assets[i].Port < assets[j].Port
+		})
+		summary = append(summary, DeliverableSummaryRow{
+			Number:   i + 1,
+			Title:    strings.TrimSpace(group.verification.Title),
+			Assets:   joinAssets(assets),
+			Severity: severityLabel(group.verification.Severity),
+		})
+		stats.Total++
+		switch strings.ToLower(group.verification.Severity) {
+		case "critical":
+			stats.Critical++
+		case "high":
+			stats.High++
+		case "medium":
+			stats.Medium++
+		case "low":
+			stats.Low++
+		}
+	}
+
+	focusTitles := make([]string, 0, len(summary))
+	for _, row := range summary {
+		focusTitles = append(focusTitles, row.Title)
+	}
 	return ProjectDeliverable{
 		Project:     project,
 		Zones:       deliverableZones,
 		Summary:     summary,
 		Stats:       stats,
 		ZoneNames:   strings.Join(zoneNames, "、"),
+		FocusText:   strings.Join(focusTitles, `\`),
 		GeneratedAt: now,
 	}
 }
 
-// zoneIDOf is no longer needed: the zone id is carried on DeliverableVerification.ZoneID.
-
 func sortVerifications(items []DeliverableVerification) {
 	sort.SliceStable(items, func(i, j int) bool {
+		if severityRank(items[i].Severity) != severityRank(items[j].Severity) {
+			return severityRank(items[i].Severity) < severityRank(items[j].Severity)
+		}
 		if items[i].Position != items[j].Position {
 			return items[i].Position < items[j].Position
 		}
 		return items[i].Title < items[j].Title
 	})
+}
+
+func severityRank(value string) int {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "critical":
+		return 0
+	case "high":
+		return 1
+	case "medium":
+		return 2
+	case "low":
+		return 3
+	default:
+		return 4
+	}
+}
+
+func normalizeDeliverableAssets(assets []DeliverableAsset) []DeliverableAsset {
+	byKey := make(map[string]DeliverableAsset, len(assets))
+	for _, asset := range assets {
+		key := asset.IP + "\x00" + strconv.Itoa(asset.Port)
+		if _, exists := byKey[key]; !exists {
+			byKey[key] = asset
+		}
+	}
+	out := make([]DeliverableAsset, 0, len(byKey))
+	for _, asset := range byKey {
+		out = append(out, asset)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].IP != out[j].IP {
+			return out[i].IP < out[j].IP
+		}
+		return out[i].Port < out[j].Port
+	})
+	return out
+}
+
+func joinPorts(assets []DeliverableAsset) string {
+	seen := map[int]struct{}{}
+	ports := make([]int, 0, len(assets))
+	for _, asset := range assets {
+		if asset.Port <= 0 {
+			continue
+		}
+		if _, exists := seen[asset.Port]; exists {
+			continue
+		}
+		seen[asset.Port] = struct{}{}
+		ports = append(ports, asset.Port)
+	}
+	sort.Ints(ports)
+	parts := make([]string, len(ports))
+	for i, port := range ports {
+		parts[i] = strconv.Itoa(port)
+	}
+	return strings.Join(parts, "、")
+}
+
+func formatExclusions(targets, ports string) string {
+	var parts []string
+	if targets = strings.TrimSpace(targets); targets != "" {
+		parts = append(parts, "目标："+targets)
+	}
+	if ports = strings.TrimSpace(ports); ports != "" {
+		parts = append(parts, "端口："+ports)
+	}
+	return strings.Join(parts, "；")
 }
 
 func joinAssets(assets []DeliverableAsset) string {

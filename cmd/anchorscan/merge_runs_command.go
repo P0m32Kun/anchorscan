@@ -232,12 +232,12 @@ type runAssignment struct {
 }
 
 type mergeRunsFlags struct {
-	dbPath                 string
-	toProject              string
-	runAssignments         []runAssignment
-	include                bool
-	apply                  bool
-	backupDir              string
+	dbPath                    string
+	toProject                 string
+	runAssignments            []runAssignment
+	include                   bool
+	apply                     bool
+	backupDir                 string
 	deleteEmptySourceProjects bool
 }
 

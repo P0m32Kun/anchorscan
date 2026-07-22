@@ -13,20 +13,6 @@ var projectReportTemplates embed.FS
 
 func projectReportFuncs() template.FuncMap {
 	return template.FuncMap{
-		"sevLabel": func(severity string) string {
-			switch severity {
-			case "严重":
-				return "严重"
-			case "高危":
-				return "高危"
-			case "中危":
-				return "中危"
-			case "低危":
-				return "低危"
-			default:
-				return severity
-			}
-		},
 		"rfc3339": func(t time.Time) string {
 			return t.Format("2006-01-02 15:04:05")
 		},

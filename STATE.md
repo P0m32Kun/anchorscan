@@ -2,24 +2,9 @@
 
 Plan: docs/plans/project-engagement-report/spec.md and tickets 01–11
 
-## Doing
-
-## Done
-- [x] 01 — 建立任务型 Project 与 Network Zones
-- [x] 02 — 创建归属 Zone 的 Scan Runs
-- [x] 03 — 构建跨 Runs 的 Project 聚合读模型
-- [x] 04 — 持久化 Verification 与 Evidence
-- [x] 05 — 交付正向漏洞验证工作台
-- [x] 06 — 交付负向验证候选与结论
-- [x] 07 — 打通命令、工具页与 Evidence 返回链路
-- [x] 08 — 生成项目正式单文件 HTML
-- [x] 09 — 收敛用户导出为 HTML
-- [x] 10 — 迁移甘肃历史 Runs
-- [x] 11 — 导出项目 DOCX 报告
-
-## Blocked (needs human)
-
+Status: complete. Tickets 01–11 已交付；正式 HTML/DOCX 报告共享项目聚合模型，DOCX 通过受版本管理的 docxtpl 模板导出。
 
 ## Decisions Log
+- 2026-07-22 — WPS 不响应 `updateFields` 的行为作为已知兼容性限制接受；导出界面明确提示手动刷新目录，自动结构门负责防止残留书签和占位符。 — re: ticket 11 acceptance
 - 2026-07-21 — 用户批准 project-engagement-report spec；占位符模板已确认并固化为 tools/docx-render/templates/project-report.docx；WPS 可手动刷新目录；下划线已改回默认粗细。 — re: plan baseline
 - 2026-07-21 — 用户授权用 run-plan 自动推进 01–11 号 ticket。 — re: run mode

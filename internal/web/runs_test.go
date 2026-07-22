@@ -26,16 +26,16 @@ func TestToolRunDetailShowsReturnAndEvidenceLinks(t *testing.T) {
 		t.Fatalf("SaveProject returned error: %v", err)
 	}
 	if err := scanStore.SaveScanRun(store.ScanRun{
-		RunID:          "tool-nmap-20260701-120000.000000000",
-		ProjectID:      "p1",
-		ZoneID:         "I",
-		Kind:           "tool",
-		Profile:        "tool:nmap",
-		Target:         "192.0.2.10",
-		Status:         "completed",
-		ConfigSnapshot:   `{"tool":"nmap","mode":"alive","target":"192.0.2.10","verification_id":"v1"}`,
-		StartedAt:      time.Unix(1, 0),
-		FinishedAt:     time.Unix(2, 0),
+		RunID:           "tool-nmap-20260701-120000.000000000",
+		ProjectID:       "p1",
+		ZoneID:          "I",
+		Kind:            "tool",
+		Profile:         "tool:nmap",
+		Target:          "192.0.2.10",
+		Status:          "completed",
+		ConfigSnapshot:  `{"tool":"nmap","mode":"alive","target":"192.0.2.10","verification_id":"v1"}`,
+		StartedAt:       time.Unix(1, 0),
+		FinishedAt:      time.Unix(2, 0),
 		IncludeInReport: false,
 	}); err != nil {
 		t.Fatalf("SaveScanRun returned error: %v", err)
@@ -348,7 +348,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 		Ports:          "80,443",
 		Profile:        "normal",
 		Status:         "interrupted",
-		ConfigSnapshot: `{"zone_id":"I","target":"198.51.100.10","ports":"80,443","profile":"fast","rustscan_args":"--ulimit 5000","nmap_args":"-sV"}`,
+		ConfigSnapshot: `{"zone_id":"I","target":"198.51.100.10","exclude_targets":"198.51.100.20","ports":"80,443","exclude_ports":"22","profile":"fast","rustscan_args":"--ulimit 5000","nmap_args":"-sV"}`,
 		StartedAt:      time.Unix(1, 0),
 	}); err != nil {
 		t.Fatalf("SaveScanRun returned error: %v", err)
@@ -375,7 +375,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 		t.Fatalf("rerun page status: %d %s", rerun.Code, rerun.Body.String())
 	}
 	body := rerun.Body.String()
-	for _, want := range []string{`name="zone_id"`, `value="I" selected`, `name="target"`, "198.51.100.10", `name="ports"`, "80,443", `value="fast" selected`, "--ulimit 5000", "-sV"} {
+	for _, want := range []string{`name="zone_id"`, `value="I" selected`, `name="target"`, "198.51.100.10", `name="exclude_targets"`, "198.51.100.20", `name="ports"`, "80,443", `name="exclude_ports"`, "22", `value="fast" selected`, "--ulimit 5000", "-sV"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("rerun page missing %q: %s", want, body)
 		}

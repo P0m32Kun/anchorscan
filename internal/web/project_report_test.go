@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -46,6 +47,13 @@ func seedProjectReportFixtures(t *testing.T, st *store.Store) {
 	}
 	zones, _ := st.ListProjectZones("p1")
 	zoneI := zones[0].ZoneID
+	if err := st.SaveScanRun(store.ScanRun{
+		RunID: "r1", ProjectID: "p1", ZoneID: zoneI, Kind: "scan", Status: "completed", IncludeInReport: true,
+		Label: "核心交换机", AccessPoint: "SW-01", TesterIP: "10.0.0.10", Target: "10.0.1.0/24", Notes: "夜间窗口",
+		ConfigSnapshot: `{"exclude_targets":"10.0.1.99","exclude_ports":"22"}`,
+	}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
 
 	// Confirmed verification with one PNG evidence.
 	if err := st.CreateVerification(store.Verification{
@@ -53,7 +61,7 @@ func seedProjectReportFixtures(t *testing.T, st *store.Store) {
 		Title: "弱口令", Severity: "high", Description: "发现可被爆破的弱口令",
 		Remediation: "修改默认密码并启用强密码策略", Included: true, Position: 1,
 		CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0),
-	}, []store.VerificationAsset{{VerificationID: "v1", IP: "10.0.0.1", Port: 22, Position: 1}}, nil); err != nil {
+	}, []store.VerificationAsset{{VerificationID: "v1", IP: "10.0.0.1", Port: 22, Position: 1}, {VerificationID: "v1", IP: "10.0.0.2", Port: 443, Position: 2}}, nil); err != nil {
 		t.Fatalf("CreateVerification returned error: %v", err)
 	}
 	_, err := st.CreateEvidence("p1", store.CreateEvidenceInput{
@@ -112,12 +120,23 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 		"弱口令",
 		"修改默认密码并启用强密码策略",
 		"10.0.0.1:22",
+		"10.0.0.1:22, 10.0.0.2:443",
 		"data:image/png;base64,",
 		"弱口令证据",
 		"Redis未授权访问",
+		"核心交换机",
+		"SW-01",
+		"10.0.0.10",
+		"10.0.1.0/24",
+		"排除范围",
+		"目标：10.0.1.99；端口：22",
+		"渗透测试概念",
+		"Hscan",
+		"测试过程介绍",
 		"序号",
 		"渗透测试结论",
 		"高危漏洞1个",
+		"Redis未授权访问不存在证明，端口（6379）",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body", want)
@@ -130,6 +149,13 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 	}
 	if !strings.Contains(res.Header().Get("Content-Type"), "text/html") {
 		t.Fatalf("content type = %s", res.Header().Get("Content-Type"))
+	}
+	results := strings.Index(body, "三、测试结果与分析")
+	summary := strings.Index(body, "渗透测试结果汇总表")
+	zone := strings.Index(body, "<h3>I区</h3>")
+	conclusion := strings.Index(body, "四、渗透测试结论")
+	if results < 0 || summary < results || zone < summary || conclusion < zone || strings.Contains(body, "五、渗透测试结论") {
+		t.Fatalf("unexpected report section order")
 	}
 }
 
@@ -155,6 +181,53 @@ func TestProjectReportDOCXReturnsClearErrorWhenUnconfigured(t *testing.T) {
 	}
 }
 
+func TestProjectReportDOCXRunsConfiguredSidecarScript(t *testing.T) {
+	dir := t.TempDir()
+	st := newProjectReportStore(t, dir)
+	seedProjectReportFixtures(t, st)
+	st.Close()
+
+	sidecarDir := filepath.Join(dir, "tools", "docx-render")
+	if err := os.MkdirAll(sidecarDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	renderScript := filepath.Join(sidecarDir, "render_docx.py")
+	writeFile(t, renderScript, "# renderer fixture\n")
+	templatePath := filepath.Join(sidecarDir, "project-report.docx")
+	writeFile(t, templatePath, "template")
+	binDir := filepath.Join(dir, "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	uvPath := filepath.Join(binDir, "uv")
+	uvScript := `#!/bin/sh
+if [ "$1" != "run" ] || [ "$2" != "--project" ] || [ "$4" != "python" ] || [ "$5" != "$3/render_docx.py" ]; then
+  exit 42
+fi
+shift 10
+printf 'fake-docx' > "$1"
+`
+	if err := os.WriteFile(uvPath, []byte(uvScript), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	handler, err := NewServer(ServerOptions{
+		ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"),
+		DocxRenderProject: sidecarDir, DocxTemplatePath: templatePath,
+	})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.docx", nil))
+	if res.Code != http.StatusOK || res.Body.String() != "fake-docx" {
+		t.Fatalf("unexpected response: %d %q", res.Code, res.Body.String())
+	}
+}
+
 func TestProjectReportHTMLRejectsMissingMetadata(t *testing.T) {
 	dir := t.TempDir()
 	st := newProjectReportStore(t, dir)
@@ -175,9 +248,87 @@ func TestProjectReportHTMLRejectsMissingMetadata(t *testing.T) {
 		t.Fatalf("expected 400 for missing metadata, got %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	for _, want := range []string{"被测单位", "测试对象", "测试人员"} {
+	for _, want := range []string{"被测单位", "测试对象", "测试开始日期", "测试结束日期", "测试人员"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in error body: %s", want, body)
 		}
+	}
+}
+
+func TestProjectReportHTMLRejectsIncompleteIncludedRun(t *testing.T) {
+	dir := t.TempDir()
+	st := newProjectReportStore(t, dir)
+	seedProjectReportFixtures(t, st)
+	run, err := st.GetScanRun("r1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run.TesterIP = ""
+	if err := st.SaveScanRun(run); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "测试机 IP") {
+		t.Fatalf("expected run validation error, got %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestProjectReportHTMLRejectsCriticalUntilConclusionWordingIsApproved(t *testing.T) {
+	dir := t.TempDir()
+	st := newProjectReportStore(t, dir)
+	seedProjectReportFixtures(t, st)
+	full, err := st.GetVerification("v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	full.Verification.Severity = "critical"
+	if err := st.UpdateVerification(full.Verification); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "critical") {
+		t.Fatalf("expected critical validation error, got %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestProjectReportHTMLRejectsIncludedVerificationWithoutEvidence(t *testing.T) {
+	dir := t.TempDir()
+	st := newProjectReportStore(t, dir)
+	seedProjectReportFixtures(t, st)
+	evidence, err := st.ListVerificationEvidence("v1")
+	if err != nil || len(evidence) != 1 {
+		t.Fatalf("ListVerificationEvidence = %#v, %v", evidence, err)
+	}
+	if err := st.DeleteEvidence(evidence[0].ID); err != nil {
+		t.Fatalf("DeleteEvidence returned error: %v", err)
+	}
+	st.Close()
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "缺少证据") {
+		t.Fatalf("expected missing-evidence error, got %d body=%s", res.Code, res.Body.String())
 	}
 }

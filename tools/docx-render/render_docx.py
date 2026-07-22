@@ -17,12 +17,11 @@ from __future__ import annotations
 import argparse
 import copy
 import json
-import struct
 import unicodedata
-import zlib
 from pathlib import Path
 
 from docxtpl import DocxTemplate, InlineImage
+from docx.image.image import Image
 from docx.shared import Mm
 from jinja2 import Environment
 
@@ -38,11 +37,8 @@ def cover_line(value: object, width: float = 52) -> str:
 
 
 def image_box(path: Path, max_width_mm: float = 150, max_height_mm: float = 180) -> tuple[float, float]:
-    data = path.read_bytes()
-    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-        # JPEG or unknown: fall back to the max box; docxtpl still embeds it.
-        return max_width_mm, max_height_mm
-    width, height = struct.unpack(">II", data[16:24])
+    image = Image.from_file(str(path))
+    width, height = image.px_width, image.px_height
     scale = min(max_width_mm / width, max_height_mm / height)
     return width * scale, height * scale
 
@@ -51,6 +47,15 @@ def render(context: dict, template_path: Path, destination: Path) -> None:
     template = DocxTemplate(template_path)
     context = copy.deepcopy(context)
     context["summary_empty"] = not context.get("summary_rows")
+    context["summary_rows"] = [
+        {
+            "no": row["number"],
+            "title": row["title"],
+            "assets": row["assets_text"],
+            "level": row["severity_label"],
+        }
+        for row in context.get("summary_rows", [])
+    ]
 
     def attach(zone: dict, key: str) -> None:
         for verification in zone.get(key, []):

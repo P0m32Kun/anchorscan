@@ -110,6 +110,17 @@ async function seedRun(sql) {
   assert.equal(code, 0, 'sqlite fixture setup failed');
 }
 
+async function waitForRunStatus(page, status, timeout = 30_000) {
+  const deadline = Date.now() + timeout;
+  const statusText = page.getByText(status, { exact: true });
+  while (Date.now() < deadline) {
+    if (await statusText.count() > 0) return;
+    await page.waitForTimeout(250);
+    await page.reload({ waitUntil: 'networkidle' });
+  }
+  throw new Error(`run did not reach ${status} within ${timeout}ms`);
+}
+
 try {
   await fs.access(binary);
   await fs.access(fixture);
@@ -137,18 +148,17 @@ try {
   await page.goto(baseURL, { waitUntil: 'networkidle' });
   await page.getByRole('link', { name: '项目管理' }).click();
   await page.getByRole('link', { name: '新建项目' }).click();
-  await page.getByLabel(/项目名称/).fill('Browser gate project');
-  await page.locator('textarea[name="default_targets"]').fill('192.0.2.10');
-  await page.locator('textarea[name="default_ports"]').fill('80,443');
-  await page.getByRole('button', { name: '保存项目设置' }).click();
-  await page.waitForURL(`${baseURL}/projects`);
-  const projectLink = page.getByRole('link', { name: 'Browser gate project' });
-  await assert.doesNotReject(() => projectLink.waitFor());
-  const projectURL = await projectLink.getAttribute('href');
-  await projectLink.click();
+  await page.getByLabel(/任务名称/).fill('Browser gate project');
+  await page.getByLabel(/被测单位/).fill('Browser gate client');
+  await page.getByRole('button', { name: '保存项目' }).click();
+  await page.waitForURL(/\/projects\/project-/);
+  const projectURL = new URL(page.url()).pathname;
   await page.getByRole('link', { name: /发起扫描|新建扫描/ }).click();
-  await page.getByText('本次扫描覆盖设置').click();
+  await page.locator('select[name="zone_id"]').selectOption({ index: 1 });
+  await page.locator('textarea[name="target"]').fill('192.0.2.10');
   await page.locator('textarea[name="ports"]').fill('invalid');
+  await page.locator('input[name="access_point"]').fill('Browser lab switch');
+  await page.locator('input[name="tester_ip"]').fill('192.0.2.250');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
   await assert.doesNotReject(() => page.getByText('预检失败').waitFor());
   await page.setViewportSize({ width: 1280, height: 960 });
@@ -173,20 +183,22 @@ try {
   await assert.doesNotReject(() => page.getByText('canceled').waitFor({ timeout: 5_000 }));
 
   await page.goto(`${baseURL}${projectURL}/scans/new`, { waitUntil: 'networkidle' });
-  await page.getByText('本次扫描覆盖设置').click();
+  await page.locator('select[name="zone_id"]').selectOption({ index: 1 });
   await page.locator('textarea[name="target"]').fill('192.0.2.20');
   await page.locator('textarea[name="ports"]').fill('80');
+  await page.locator('input[name="access_point"]').fill('Browser lab switch');
+  await page.locator('input[name="tester_ip"]').fill('192.0.2.250');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
   await page.waitForURL(/\/runs\/run-/);
-  await assert.doesNotReject(() => page.getByText('completed').waitFor({ timeout: 10_000 }));
+  await waitForRunStatus(page, 'completed');
   await page.getByRole('link', { name: '查看扫描报告' }).click();
   await assert.doesNotReject(() => page.getByText('检测执行覆盖').waitFor());
   await assert.doesNotReject(() => page.getByRole('cell', { name: 'anchorscan-test' }).waitFor());
 
   const projectID = projectURL.split('/').pop();
-  await seedRun(`INSERT INTO scan_runs (run_id, project_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
-    ('browser-errors', '${projectID}', '192.0.2.30', '443', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"target":"192.0.2.30","ports":"443","profile":"normal"}', ''),
-    ('browser-interrupted', '${projectID}', '192.0.2.31', '80,443', 'normal', 'interrupted', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"target":"192.0.2.31","ports":"80,443","profile":"fast"}', '');
+  await seedRun(`INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
+    ('browser-errors', '${projectID}', 'I', '192.0.2.30', '443', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.30","ports":"443","profile":"normal"}', ''),
+    ('browser-interrupted', '${projectID}', 'I', '192.0.2.31', '80,443', 'normal', 'interrupted', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.31","ports":"80,443","profile":"fast"}', '');
     INSERT INTO detection_checks (run_id, ip, port, protocol, engine, status, reason_code, detail, started_at, finished_at) VALUES
     ('browser-errors', '192.0.2.30', 443, 'tcp', 'nuclei', 'failed', 'command_failed', 'fixture failure', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z');`);
   await page.goto(`${baseURL}/runs/browser-errors`, { waitUntil: 'networkidle' });
@@ -202,6 +214,8 @@ try {
   await page.locator('textarea[name="target"]').focus();
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'target');
   await page.locator('textarea[name="target"]').press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'exclude_targets');
+  await page.locator('textarea[name="exclude_targets"]').press('Tab');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'ports');
 
   await page.getByRole('link', { name: '扫描历史' }).click();

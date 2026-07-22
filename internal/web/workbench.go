@@ -139,8 +139,8 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 
 type projectCommandResponse struct {
 	Commands []report.CandidateCommand `json:"commands"`
-	Warning  string                      `json:"warning"`
-	ToolLink string                      `json:"tool_link"`
+	Warning  string                    `json:"warning"`
+	ToolLink string                    `json:"tool_link"`
 }
 
 func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request, projectID string, key string) {
@@ -247,4 +247,3 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }
-

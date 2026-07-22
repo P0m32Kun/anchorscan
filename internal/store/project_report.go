@@ -1,6 +1,9 @@
 package store
 
 import (
+	"encoding/json"
+	"strings"
+
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
@@ -39,10 +42,12 @@ func (s *Store) BuildProjectReportInput(projectID string, catalog *knowledgebase
 	}
 	inputRuns := make([]report.ProjectRun, len(runs))
 	for i, r := range runs {
+		excludeTargets, excludePorts := projectRunExclusions(r.ConfigSnapshot)
 		inputRuns[i] = report.ProjectRun{
 			RunID: r.RunID, ZoneID: r.ZoneID, Status: r.Status, IncludeInReport: r.IncludeInReport,
 			Label: r.Label, AccessPoint: r.AccessPoint, TesterIP: r.TesterIP, Target: r.Target,
-			Ports: r.Ports, Profile: r.Profile, Notes: r.Notes,
+			ExcludeTargets: excludeTargets, Ports: r.Ports, ExcludePorts: excludePorts,
+			Profile: r.Profile, Notes: r.Notes,
 		}
 	}
 
@@ -51,7 +56,7 @@ func (s *Store) BuildProjectReportInput(projectID string, catalog *knowledgebase
 			ID: project.ID, Name: project.Name, Description: project.Description,
 			ClientUnit: project.ClientUnit, ReportTitle: project.ReportTitle,
 			TestObject: project.TestObject, StartDate: project.StartDate,
-			EndDate: project.EndDate, Testers: project.Testers,
+			EndDate: project.EndDate, Testers: project.Testers, CreatedAt: project.CreatedAt,
 		},
 		Zones:           inputZones,
 		Runs:            inputRuns,
@@ -60,6 +65,17 @@ func (s *Store) BuildProjectReportInput(projectID string, catalog *knowledgebase
 		DetectionChecks: checks,
 		Catalog:         catalog,
 	}, nil
+}
+
+func projectRunExclusions(snapshot string) (string, string) {
+	var values struct {
+		ExcludeTargets string `json:"exclude_targets"`
+		ExcludePorts   string `json:"exclude_ports"`
+	}
+	if json.Unmarshal([]byte(snapshot), &values) != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(values.ExcludeTargets), strings.TrimSpace(values.ExcludePorts)
 }
 
 // ListProjectFindings returns all findings from the project's included
