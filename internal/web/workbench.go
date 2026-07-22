@@ -6,11 +6,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
 
 // workbenchViewModel is the data passed to the verification workbench template.
@@ -21,9 +25,16 @@ type workbenchCandidate struct {
 	ZoneID string `json:"zone_id"`
 }
 
-type negativeWorkbenchItem struct {
-	report.ProjectNegativeCandidate
-	ZoneID string `json:"zone_id"`
+type negativeFingerprintGroup struct {
+	Key           string                `json:"key"`
+	Title         string                `json:"title"`
+	Service       string                `json:"service"`
+	Product       string                `json:"product"`
+	Port          int                   `json:"port"`
+	ZoneID        string                `json:"zone_id"`
+	Assets        []report.ProjectAsset `json:"assets"`
+	NmapCommand   string                `json:"nmap_command"`
+	NucleiCommand string                `json:"nuclei_command"`
 }
 
 type incompleteWorkbenchItem struct {
@@ -32,20 +43,139 @@ type incompleteWorkbenchItem struct {
 }
 
 type workbenchViewModel struct {
-	Project                store.Project
-	Zones                  []store.ProjectZone
-	ZoneNames              map[string]string
-	Report                 report.ProjectReport
-	Verifications          []store.Verification
-	VerificationMap        map[string]store.Verification
-	CandidatesJSON         template.JS
-	NegativeCandidatesJSON template.JS
-	IncompleteChecksJSON   template.JS
-	PositiveCount          int
-	NegativeCount          int
-	IncompleteCount        int
-	CatalogStatus          string
-	CatalogDiagnostics     []string
+	Project              store.Project
+	Zones                []store.ProjectZone
+	ZoneNames            map[string]string
+	Report               report.ProjectReport
+	Verifications        []store.Verification
+	VerificationMap      map[string]store.Verification
+	NegativeGroups       []negativeFingerprintGroup
+	CandidatesJSON       template.JS
+	NegativeGroupsJSON   template.JS
+	IncompleteChecksJSON template.JS
+	PositiveCount        int
+	NegativeCount        int
+	IncompleteCount      int
+	CatalogStatus        string
+	CatalogDiagnostics   []string
+}
+
+func negativeFingerprintKey(fp report.ProjectNegativeCandidate) string {
+	service := strings.TrimSpace(fp.Fingerprint.Service)
+	product := strings.TrimSpace(fp.Fingerprint.Product)
+	if service == "" {
+		service = "unknown"
+	}
+	parts := []string{service}
+	if product != "" {
+		parts = append(parts, product)
+	}
+	parts = append(parts, strconv.Itoa(fp.Asset.Port))
+	return strings.Join(parts, "|")
+}
+
+func groupNegativeCandidates(negatives []report.ProjectNegativeCandidate, nseRules map[string][]string, tagRules []vuln.TagRule) []negativeFingerprintGroup {
+	groups := map[string]*negativeFingerprintGroup{}
+	for _, n := range negatives {
+		key := negativeFingerprintKey(n)
+		g, ok := groups[key]
+		if !ok {
+			fp := n.Fingerprint
+			title := "未发现 " + fp.Service
+			if fp.Product != "" {
+				title += " / " + fp.Product
+			}
+			if fp.Port != 0 {
+				title += "（端口 " + strconv.Itoa(fp.Port) + "）"
+			}
+			g = &negativeFingerprintGroup{
+				Key:     key,
+				Title:   title,
+				Service: fp.Service,
+				Product: fp.Product,
+				Port:    fp.Port,
+				ZoneID:  n.ZoneID,
+				Assets:  []report.ProjectAsset{},
+			}
+			groups[key] = g
+		}
+		g.Assets = append(g.Assets, n.Asset)
+	}
+	result := make([]negativeFingerprintGroup, 0, len(groups))
+	for _, g := range groups {
+		sort.Slice(g.Assets, func(i, j int) bool {
+			if g.Assets[i].IP != g.Assets[j].IP {
+				return g.Assets[i].IP < g.Assets[j].IP
+			}
+			return g.Assets[i].Port < g.Assets[j].Port
+		})
+
+		ips := make([]string, 0, len(g.Assets))
+		urls := make([]string, 0, len(g.Assets))
+		for _, a := range g.Assets {
+			ips = append(ips, a.IP)
+			if a.Target != "" {
+				urls = append(urls, a.Target)
+			} else if a.Protocol == "http" || a.Protocol == "https" {
+				urls = append(urls, a.Protocol+"://"+net.JoinHostPort(a.IP, strconv.Itoa(a.Port)))
+			}
+		}
+
+		normalized := strings.ToLower(strings.TrimSpace(g.Service))
+		if scripts, ok := nseRules[normalized]; ok && len(scripts) > 0 {
+			if g.Port != 0 {
+				g.NmapCommand = "nmap -p " + strconv.Itoa(g.Port) + " --script " + strings.Join(scripts, ",") + " " + strings.Join(ips, " ")
+			} else {
+				g.NmapCommand = "nmap --script " + strings.Join(scripts, ",") + " " + strings.Join(ips, " ")
+			}
+		}
+
+		first := g.Assets[0]
+		match := vuln.MatchNucleiTags(
+			fingerprintFromAsset(first, g),
+			vuln.HTTPResult{URL: first.Target},
+			tagRules,
+		)
+		if len(match.Tags) > 0 {
+			tags := strings.Join(match.Tags, ",")
+			var parts []string
+			parts = append(parts, "nuclei", "-tags", tags)
+			if len(match.ExcludeTags) > 0 {
+				parts = append(parts, "-exclude-tags", strings.Join(match.ExcludeTags, ","))
+			}
+			if match.Target == "url" && len(urls) > 0 {
+				parts = append(parts, "-u", strings.Join(urls, ","))
+			} else {
+				parts = append(parts, "-target", strings.Join(ips, ","))
+			}
+			g.NucleiCommand = strings.Join(parts, " ")
+		}
+
+		result = append(result, *g)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Service != result[j].Service {
+			return result[i].Service < result[j].Service
+		}
+		if result[i].Product != result[j].Product {
+			return result[i].Product < result[j].Product
+		}
+		return result[i].Port < result[j].Port
+	})
+	return result
+}
+
+func fingerprintFromAsset(asset report.ProjectAsset, g *negativeFingerprintGroup) fingerprint.ServiceFingerprint {
+	return fingerprint.ServiceFingerprint{
+		IP:         asset.IP,
+		Port:       asset.Port,
+		Protocol:   asset.Protocol,
+		Service:    g.Service,
+		Product:    g.Product,
+		Normalized: strings.ToLower(strings.TrimSpace(g.Service)),
+		IsWeb:      asset.Protocol == "http" || asset.Protocol == "https" || asset.Target != "",
+		URL:        asset.Target,
+	}
 }
 
 func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -83,7 +213,7 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 		verificationMap[v.VulnerabilityKey] = v
 	}
 	var candidates []workbenchCandidate
-	var negatives []negativeWorkbenchItem
+	var negatives []report.ProjectNegativeCandidate
 	var incompletes []incompleteWorkbenchItem
 	var posCount, negCount, incCount int
 	for _, zone := range projReport.Zones {
@@ -92,7 +222,7 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 			posCount++
 		}
 		for _, nc := range zone.NegativeCandidates {
-			negatives = append(negatives, negativeWorkbenchItem{ProjectNegativeCandidate: nc, ZoneID: zone.Zone.ZoneID})
+			negatives = append(negatives, nc)
 			negCount++
 		}
 		for _, ic := range zone.IncompleteChecks {
@@ -100,12 +230,16 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 			incCount++
 		}
 	}
+	nseRules, _ := config.LoadNSERulesForConfig(s.opts.ConfigPath)
+	tagRules, _ := config.LoadTagRulesForConfig(s.opts.ConfigPath)
+	negativeGroups := groupNegativeCandidates(negatives, nseRules, tagRules)
+
 	candidatesJSON, err := json.Marshal(candidates)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	negativesJSON, err := json.Marshal(negatives)
+	negativeGroupsJSON, err := json.Marshal(negativeGroups)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -120,20 +254,21 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 		diagnostics = append(diagnostics, d.Reason)
 	}
 	render(w, "templates/workbench.html", workbenchViewModel{
-		Project:                project,
-		Zones:                  zones,
-		ZoneNames:              zoneNames,
-		Report:                 projReport,
-		Verifications:          verifications,
-		VerificationMap:        verificationMap,
-		CandidatesJSON:         template.JS(candidatesJSON),
-		NegativeCandidatesJSON: template.JS(negativesJSON),
-		IncompleteChecksJSON:   template.JS(incompletesJSON),
-		PositiveCount:          posCount,
-		NegativeCount:          negCount,
-		IncompleteCount:        incCount,
-		CatalogStatus:          string(s.catalog.Status()),
-		CatalogDiagnostics:     diagnostics,
+		Project:              project,
+		Zones:                zones,
+		ZoneNames:            zoneNames,
+		Report:               projReport,
+		Verifications:        verifications,
+		VerificationMap:      verificationMap,
+		NegativeGroups:       negativeGroups,
+		CandidatesJSON:       template.JS(candidatesJSON),
+		NegativeGroupsJSON:   template.JS(negativeGroupsJSON),
+		IncompleteChecksJSON: template.JS(incompletesJSON),
+		PositiveCount:        posCount,
+		NegativeCount:        len(negativeGroups),
+		IncompleteCount:      incCount,
+		CatalogStatus:        string(s.catalog.Status()),
+		CatalogDiagnostics:   diagnostics,
 	})
 }
 

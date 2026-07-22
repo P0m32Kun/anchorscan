@@ -1,9 +1,13 @@
 const projectID = window.location.pathname.split('/')[2];
 const candidates = JSON.parse(document.getElementById('workbench-data')?.textContent || '[]');
-const negativeItems = JSON.parse(document.getElementById('negative-data')?.textContent || '[]');
+const negativeGroups = JSON.parse(document.getElementById('negative-groups-data')?.textContent || '[]');
 
 function candidateByKey(key){
   return candidates.find(c => c.GroupKey === key);
+}
+
+function negativeGroupByKey(key){
+  return negativeGroups.find(g => g.Key === key);
 }
 
 function netHostPort(ip, port){
@@ -416,6 +420,14 @@ verifyForm?.addEventListener('submit', async (e) => {
   }
 });
 
+document.querySelectorAll('.command-copy-btn').forEach(btn => btn.addEventListener('click', async () => {
+  const text = btn.dataset.command || '';
+  await navigator.clipboard.writeText(text);
+  const original = btn.textContent;
+  btn.textContent = '已复制';
+  setTimeout(() => btn.textContent = original, 1200);
+}));
+
 document.querySelectorAll('.verify-btn').forEach(btn => btn.addEventListener('click', () => openVerifyDialog(btn.dataset.key)));
 
 document.getElementById('verify-cancel')?.addEventListener('click', () => verifyDialog.close());
@@ -427,7 +439,7 @@ const negativeSelectedCount = document.getElementById('negative-selected-count')
 function updateNegativeSelection(){
   const checked = document.querySelectorAll('.negative-select:checked');
   const n = checked.length;
-  negativeSelectedCount.textContent = '已选 ' + n + ' 个端点';
+  negativeSelectedCount.textContent = '已选 ' + n + ' 组';
   if(negativeSubmitBtn) negativeSubmitBtn.disabled = n === 0;
 }
 
@@ -449,6 +461,7 @@ const negEvidenceFile = document.getElementById('neg-evidence-file');
 // Pending evidence for negative dialog before verification is created
 let negPendingFiles = [];  // [{file, caption}]
 let negVerificationID = null;
+let selectedNegativeGroup = null;
 
 function resetNegDialog(){
   negativeForm.reset();
@@ -456,6 +469,7 @@ function resetNegDialog(){
   negEvidenceList.innerHTML = '';
   negPendingFiles = [];
   negVerificationID = null;
+  selectedNegativeGroup = null;
 }
 
 function renderNegEvidenceList(){
@@ -511,16 +525,18 @@ negativeSubmitBtn?.addEventListener('click', () => {
 
   resetNegDialog();
 
-  // Derive zone from first selected card
-  const firstCard = checked[0].closest('.candidate-card');
-  negZoneId.value = firstCard?.dataset.zone || '';
+  // Use the single selected group (multi-group not supported)
+  const card = checked[0].closest('.candidate-card');
+  const group = negativeGroupByKey(card?.dataset.key);
+  if(!group) return;
+  selectedNegativeGroup = group;
 
-  // Populate assets list
-  negAssetsList.innerHTML = checked.map(cb => {
-    const card = cb.closest('.candidate-card');
-    const ip = card?.dataset.ip || '';
-    const port = card?.dataset.port || '';
-    return '<li><code>' + ip + ':' + port + '</code></li>';
+  negZoneId.value = group.ZoneID || card?.dataset.zone || '';
+  negTitle.value = group.Title || '未发现 ' + (group.Service || '服务');
+
+  // Populate assets list from the group
+  negAssetsList.innerHTML = (group.Assets || []).map(a => {
+    return '<li><code>' + netHostPort(a.IP, a.Port) + '</code></li>';
   }).join('');
 
   negativeDialog.showModal();
@@ -534,22 +550,18 @@ negativeForm?.addEventListener('submit', async (e) => {
     return;
   }
 
-  const checked = [...document.querySelectorAll('.negative-select:checked')];
-  if(checked.length === 0){
-    alert('没有已选端点。');
+  if(!selectedNegativeGroup || !selectedNegativeGroup.Assets || selectedNegativeGroup.Assets.length === 0){
+    alert('没有已选指纹组。');
     return;
   }
 
-  const assets = checked.map((cb, i) => {
-    const card = cb.closest('.candidate-card');
-    return {
-      ip: card?.dataset.ip || '',
-      port: parseInt(card?.dataset.port || '0', 10),
-      protocol: card?.dataset.protocol || 'tcp',
-      asset_name: (card?.dataset.ip || '') + ':' + (card?.dataset.port || ''),
-      position: i,
-    };
-  });
+  const assets = selectedNegativeGroup.Assets.map((a, i) => ({
+    ip: a.IP,
+    port: a.Port,
+    protocol: a.Protocol || 'tcp',
+    asset_name: netHostPort(a.IP, a.Port),
+    position: i,
+  }));
 
   // Derive a stable vulnerability key from the title
   const vulnKey = 'neg:' + negTitle.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');

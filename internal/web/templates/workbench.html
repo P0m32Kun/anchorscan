@@ -146,47 +146,52 @@
 <div id="queue-negative" role="tabpanel" aria-labelledby="tab-negative" hidden>
   <section class="panel">
     <p class="meta-line" style="margin-bottom:0.5rem;">
-      以下端点满足：NSE 与 nuclei 双检查已完成、不存在非 info 发现。
-      勾选一组同类端点后，填写验证项名称并上传共享截图，提交"本次验证未发现"结论。
+      以下按服务指纹分组。每组代表一个已完成 NSE + nuclei 双检查且无高危/中危/低危发现的指纹；选择一组后上传共享截图，提交"本次验证未发现"结论。
     </p>
     <div class="negative-toolbar">
-      <button class="button button-primary" id="negative-submit-btn" disabled>提交所选负向结论…</button>
-      <span id="negative-selected-count" class="meta-line">已选 0 个端点</span>
+      <button class="button button-primary" id="negative-submit-btn" disabled>提交所选指纹组…</button>
+      <span id="negative-selected-count" class="meta-line">已选 0 组</span>
     </div>
   </section>
 
   <section class="panel workbench-candidates" id="negative-container">
     {{$zoneNames := .ZoneNames}}
-    {{range .Report.Zones}}
-    {{$zoneID := .Zone.ZoneID}}
-    {{range .NegativeCandidates}}
+    {{range .NegativeGroups}}
+    {{$zoneID := .ZoneID}}
     <article class="candidate-card negative-card"
       data-zone="{{$zoneID}}"
-      data-ip="{{.Asset.IP}}"
-      data-port="{{.Asset.Port}}"
-      data-protocol="{{.Asset.Protocol}}"
-      data-run="{{.RunID}}">
+      data-key="{{.Key}}"
+      data-service="{{.Service}}"
+      data-product="{{.Product}}"
+      data-port="{{.Port}}">
       <label class="candidate-select-row">
-        <input type="checkbox" class="negative-select" aria-label="选择 {{.Asset.IP}}:{{.Asset.Port}}">
+        <input type="checkbox" class="negative-select" aria-label="选择 {{.Title}}">
         <div class="candidate-header" style="margin-bottom:0">
-          <h3 style="font-size:0.95rem">
-            <code>{{.Asset.IP}}:{{.Asset.Port}}</code>
-            {{if .Fingerprint.Service}}<span class="meta-line" style="margin-left:0.5rem">{{.Fingerprint.Service}}{{if .Fingerprint.Product}} / {{.Fingerprint.Product}}{{end}}</span>{{end}}
-          </h3>
+          <h3 style="font-size:0.95rem">{{.Title}}</h3>
           <div class="candidate-meta">
             <span>分区：{{index $zoneNames $zoneID}}</span>
-            <span>协议：{{.Asset.Protocol}}</span>
-            <span>Run：{{.RunID}}</span>
+            <span>端点：{{len .Assets}}</span>
           </div>
         </div>
       </label>
+      <details class="asset-details">
+        <summary>覆盖端点 ({{len .Assets}})</summary>
+        <ul class="asset-list">
+          {{range .Assets}}
+          <li class="asset-item"><code>{{.IP}}:{{.Port}}</code></li>
+          {{end}}
+        </ul>
+      </details>
+      {{if or .NmapCommand .NucleiCommand}}
+      <div class="candidate-actions" style="margin-top:0.5rem">
+        {{if .NmapCommand}}<button class="button button-small command-copy-btn" type="button" data-command="{{.NmapCommand}}">复制 Nmap</button>{{end}}
+        {{if .NucleiCommand}}<button class="button button-small command-copy-btn" type="button" data-command="{{.NucleiCommand}}">复制 Nuclei</button>{{end}}
+      </div>
+      {{end}}
     </article>
     {{end}}
-    {{end}}
-    {{$hasNeg := false}}
-    {{range .Report.Zones}}{{if .NegativeCandidates}}{{$hasNeg = true}}{{end}}{{end}}
-    {{if not $hasNeg}}
-    <p class="no-data">当前没有满足双引擎已完成且无非 info 发现的待负向验证端点。</p>
+    {{if not .NegativeGroups}}
+    <p class="no-data">当前没有满足双引擎已完成且无非 info 发现的待负向验证指纹组。</p>
     {{end}}
   </section>
 </div>
@@ -355,7 +360,7 @@
 </dialog>
 
 <script id="workbench-data" type="application/json">{{.CandidatesJSON}}</script>
-<script id="negative-data" type="application/json">{{.NegativeCandidatesJSON}}</script>
+<script id="negative-groups-data" type="application/json">{{.NegativeGroupsJSON}}</script>
 <script id="incomplete-data" type="application/json">{{.IncompleteChecksJSON}}</script>
 <script src="/static/workbench.js" defer></script>
 {{end}}

@@ -14,6 +14,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
 
 func writeTestCatalog(t *testing.T, dir string) string {
@@ -559,7 +560,7 @@ func TestWorkbenchIncompleteCheckExcludedFromNegative(t *testing.T) {
 	body := res.Body.String()
 
 	// Extract the JSON embedded in the page.
-	negStart := strings.Index(body, `id="negative-data"`)
+	negStart := strings.Index(body, `id="negative-groups-data"`)
 	incStart := strings.Index(body, `id="incomplete-data"`)
 	if negStart < 0 || incStart < 0 {
 		t.Fatalf("expected embedded JSON blocks, got: (truncated)")
@@ -583,25 +584,29 @@ func TestWorkbenchIncompleteCheckExcludedFromNegative(t *testing.T) {
 		return strings.TrimSpace(rest[:close])
 	}
 
-	negJSON := extractJSON(`id="negative-data"`)
+	negJSON := extractJSON(`id="negative-groups-data"`)
 	incJSON := extractJSON(`id="incomplete-data"`)
 
-	var negItems []map[string]any
+	var negGroups []map[string]any
 	var incItems []map[string]any
-	if err := json.Unmarshal([]byte(negJSON), &negItems); err != nil {
-		t.Fatalf("unmarshal negative-data returned error: %v — json: %s", err, negJSON)
+	if err := json.Unmarshal([]byte(negJSON), &negGroups); err != nil {
+		t.Fatalf("unmarshal negative-groups-data returned error: %v — json: %s", err, negJSON)
 	}
 	if err := json.Unmarshal([]byte(incJSON), &incItems); err != nil {
 		t.Fatalf("unmarshal incomplete-data returned error: %v — json: %s", err, incJSON)
 	}
 
-	// Negative queue: only port 80 (both completed)
-	if len(negItems) != 1 {
-		t.Fatalf("expected 1 negative item, got %d", len(negItems))
+	// Negative queue: only port 80 (both completed) grouped by fingerprint
+	if len(negGroups) != 1 {
+		t.Fatalf("expected 1 negative group, got %d", len(negGroups))
 	}
-	asset := negItems[0]["Asset"].(map[string]any)
+	assets := negGroups[0]["assets"].([]any)
+	if len(assets) != 1 {
+		t.Fatalf("expected 1 asset in negative group, got %d", len(assets))
+	}
+	asset := assets[0].(map[string]any)
 	if int(asset["Port"].(float64)) != 80 {
-		t.Fatalf("expected port 80 in negative queue, got %v", asset["Port"])
+		t.Fatalf("expected port 80 in negative group, got %v", asset["Port"])
 	}
 
 	// Incomplete queue: only port 443 (nuclei failed)
@@ -611,5 +616,44 @@ func TestWorkbenchIncompleteCheckExcludedFromNegative(t *testing.T) {
 	incAsset := incItems[0]["Asset"].(map[string]any)
 	if int(incAsset["Port"].(float64)) != 443 {
 		t.Fatalf("expected port 443 in incomplete queue, got %v", incAsset["Port"])
+	}
+}
+
+func TestGroupNegativeCandidatesByFingerprint(t *testing.T) {
+	negatives := []report.ProjectNegativeCandidate{
+		{
+			Asset:       report.ProjectAsset{IP: "10.0.0.1", Port: 6379, Protocol: "tcp"},
+			Fingerprint: fingerprint.ServiceFingerprint{Service: "redis"},
+			ZoneID:      "I",
+		},
+		{
+			Asset:       report.ProjectAsset{IP: "10.0.0.2", Port: 6379, Protocol: "tcp"},
+			Fingerprint: fingerprint.ServiceFingerprint{Service: "redis"},
+			ZoneID:      "I",
+		},
+		{
+			Asset:       report.ProjectAsset{IP: "10.0.0.3", Port: 443, Protocol: "tcp"},
+			Fingerprint: fingerprint.ServiceFingerprint{Service: "https", Product: "nginx"},
+			ZoneID:      "I",
+		},
+	}
+	nseRules := map[string][]string{"redis": {"redis-info"}}
+	tagRules := []vuln.TagRule{{Name: "redis", Service: []string{"redis"}, NucleiTags: []string{"redis"}, Target: "hostport"}}
+	groups := groupNegativeCandidates(negatives, nseRules, tagRules)
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 groups, got %d: %#v", len(groups), groups)
+	}
+	redisGroup := groups[0]
+	if groups[1].Service == "redis" {
+		redisGroup = groups[1]
+	}
+	if len(redisGroup.Assets) != 2 {
+		t.Fatalf("expected 2 assets in redis group, got %d", len(redisGroup.Assets))
+	}
+	if !strings.Contains(redisGroup.NmapCommand, "redis-info") {
+		t.Fatalf("expected NmapCommand to use redis-info, got %q", redisGroup.NmapCommand)
+	}
+	if !strings.Contains(redisGroup.NucleiCommand, "-tags redis") {
+		t.Fatalf("expected NucleiCommand to use -tags redis, got %q", redisGroup.NucleiCommand)
 	}
 }
