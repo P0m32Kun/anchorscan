@@ -21,7 +21,7 @@ func EnrichWeb(ctx context.Context, runner Runner, binaryPath string, fp fingerp
 }
 
 func EnrichWebWithOutput(ctx context.Context, runner Runner, binaryPath string, fp fingerprint.ServiceFingerprint, extraArgs []string) (HTTPResult, []byte, error) {
-	args := []string{"-json", "-status-code", "-title", "-tech-detect", "-follow-redirects", "-u", fp.URL}
+	args := []string{"-json", "-silent", "-status-code", "-title", "-tech-detect", "-follow-redirects", "-u", fp.URL}
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)
@@ -30,6 +30,11 @@ func EnrichWebWithOutput(ctx context.Context, runner Runner, binaryPath string, 
 	}
 
 	line := lastJSONLine(string(out))
+	if !strings.HasPrefix(line, "{") {
+		// httpx 探测失败时退出码仍为 0 且没有 JSON 行（Windows 实测）；
+		// 此时输出只剩 banner，视为无增强结果而不是解析错误。
+		return HTTPResult{}, out, nil
+	}
 	var payload struct {
 		HTTPResult
 		LegacyStatusCode int `json:"status-code"`
