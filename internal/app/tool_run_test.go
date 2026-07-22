@@ -12,6 +12,43 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+func TestNormalizeToolOutput(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "plain text unchanged",
+			in:   "hello\nworld\n",
+			want: "hello\nworld",
+		},
+		{
+			name: "ansi escape stripped",
+			in:   "\x1b[31mred\x1b[0m\x1b[1mbold\x1b[0m",
+			want: "redbold",
+		},
+		{
+			name: "carriage return keeps final state",
+			in:   "progress 0%\rprogress 50%\rprogress 100%",
+			want: "progress 100%",
+		},
+		{
+			name: "ansi and cr combined",
+			in:   "\x1b[2K\rdone",
+			want: "done",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeToolOutput(tt.in)
+			if got != tt.want {
+				t.Fatalf("normalizeToolOutput(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 type toolRunnerFunc func(binary string, args []string) ([]byte, error)
 
 func (f toolRunnerFunc) Run(_ context.Context, binary string, args []string) ([]byte, error) {

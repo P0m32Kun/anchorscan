@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -146,7 +147,7 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 	emitTool(opts, scanStore, "info", opts.Tool, "%s", displayCommand(binary, opts.NativeArgs))
 	toolCtx, cancel := toolRunContext(ctx, opts)
 	out, err := runner.Run(toolCtx, binary, opts.NativeArgs)
-	output := string(out)
+	output := normalizeToolOutput(string(out))
 	if strings.TrimSpace(output) != "" {
 		emitTool(opts, scanStore, "info", opts.Tool, "%s", strings.TrimRight(output, "\n"))
 	}
@@ -168,6 +169,37 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		return nil, err
 	}
 	return []report.Finding{finding}, nil
+}
+
+var ansiEscapeRe = regexp.MustCompile("\x1b\\[[0-9;]*[A-Za-z]")
+
+// normalizeToolOutput strips ANSI escape sequences and resolves \r progress
+// overwrites so only the final line state remains. The \r handling keeps the
+// last segment before a newline, which is the typical terminal behavior for
+// progress bars.
+func normalizeToolOutput(s string) string {
+	// ponytail: single-pass \r resolver; if tools start using multi-line \r
+	// updates, switch to per-line last-\r-segment extraction.
+	var lines []string
+	var line []rune
+	for _, r := range s {
+		switch r {
+		case '\r':
+			line = line[:0]
+		case '\n':
+			lines = append(lines, string(line))
+			line = line[:0]
+		default:
+			line = append(line, r)
+		}
+	}
+	if len(line) > 0 {
+		lines = append(lines, string(line))
+	}
+	for i, l := range lines {
+		lines[i] = ansiEscapeRe.ReplaceAllString(l, "")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func displayCommand(binary string, args []string) string {

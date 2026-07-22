@@ -59,7 +59,7 @@
   --radius-sm: 8px;
 
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  --mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", "Fira Code", Consolas, "Liberation Mono", Menlo, "DejaVu Sans Mono", "Courier New", monospace;
 }
 
 * {
