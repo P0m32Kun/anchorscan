@@ -6,6 +6,24 @@ adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 →
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-07-22
+
+报告风险等级与 Nuclei 对齐，并修复多项报告可用性问题。
+
+### Added
+- 扫描报告风险摘要分别显示严重/高危/中危/低危实际计数（低危不再被省略）。
+- 项目 DOCX 结论显示严重漏洞数量；知识库手册明确严重（critical）等级。
+- 漏洞聚合页支持按漏洞名称或漏洞 ID 筛选，并可一键复制当前过滤结果的全部 IP:port。
+
+### Fixed
+- 级联流水线终端轮询不再破坏用户正在进行的文本选择与复制。
+- Windows 下 httpx 探测失败时 banner 输出不再报 JSON 解析错误（invalid character '_'）。
+
+## [1.9.1] - 2026-07-22
+
+### Fixed
+- Release 实验室检查与当前扫描器对齐；e2e 测试读取受管报告产物。
+
 ## [1.9.0] - 2026-07-22
 
 v1.9.0 新增项目级渗透测试交付流程，并提供与正式模板一致的 HTML 和 DOCX 报告导出。
