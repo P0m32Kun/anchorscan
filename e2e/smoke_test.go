@@ -289,29 +289,15 @@ func TestWebProjectScanAppliesExclusionsAndDeleteCleanup(t *testing.T) {
 		t.Fatalf("expected only non-excluded port 8080, got %q", run.Ports)
 	}
 
-	reportResp, err := client.Get(baseURL + "/reports/" + runID + ".json")
-	if err != nil {
-		t.Fatalf("GET report json returned error: %v", err)
-	}
-	defer reportResp.Body.Close()
-	if reportResp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(reportResp.Body)
-		t.Fatalf("expected report 200, got %d body=%s", reportResp.StatusCode, string(body))
-	}
-	var scanReport report.ScanReport
-	if err := json.NewDecoder(reportResp.Body).Decode(&scanReport); err != nil {
-		t.Fatalf("Decode report returned error: %v", err)
-	}
+	projectDir := filepath.Join(work, "projects", project.ID)
+	reportPath := filepath.Join(projectDir, "runs", runID, "report.json")
+	scanReport := readReport(t, reportPath)
 	assertHostPorts(t, scanReport, map[string][]int{
 		lab.tomcatIP: {8080},
 	})
 	if hostPorts(scanReport, lab.redisIP) != nil {
 		t.Fatalf("expected excluded redis target %s to be absent from report: %#v", lab.redisIP, scanReport.Hosts)
 	}
-
-	projectDir := filepath.Join(work, "projects", project.ID)
-	reportPath := filepath.Join(projectDir, "runs", runID, "report.json")
-	assertFileExists(t, reportPath)
 
 	deleteResp, err := client.PostForm(baseURL+"/projects/"+project.ID, url.Values{
 		"_method": {"delete"},
