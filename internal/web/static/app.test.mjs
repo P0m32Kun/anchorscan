@@ -1049,3 +1049,37 @@ assert.equal(mockProgressBar.style.width, '80%');
   assert.equal(textSpan.textContent, '关键词: <img src=x onerror=alert(1)>');
   assert.equal(textSpan._innerHTML, ''); // should not set raw innerHTML of the text span!
 }
+
+// Test imagesFromClipboardData (clipboard image extraction helper used by workbench.js)
+{
+  let domContentLoadedCallback = null;
+  const helperContext = {
+    window: { location: { pathname: '/' } },
+    document: {
+      addEventListener(event, handler) {
+        if (event === 'DOMContentLoaded') domContentLoadedCallback = handler;
+      },
+      querySelectorAll() { return []; },
+      querySelector() { return null; },
+      getElementById() { return null; }
+    },
+    setInterval() {}
+  };
+  vm.createContext(helperContext);
+  vm.runInContext(source, helperContext);
+
+  const fileA = { name: 'a.png' };
+  const fileB = { name: 'b.png' };
+  const items = [
+    { type: 'text/plain', getAsFile: () => null },
+    { type: 'image/png', getAsFile: () => fileA },
+    { type: 'image/jpeg', getAsFile: () => fileB },
+    { type: 'image/svg+xml', getAsFile: () => null },
+  ];
+  const result = helperContext.imagesFromClipboardData(items);
+  assert.equal(result.length, 2);
+  assert.equal(result[0], fileA);
+  assert.equal(result[1], fileB);
+  assert.equal(helperContext.imagesFromClipboardData(null).length, 0);
+  assert.equal(helperContext.imagesFromClipboardData([]).length, 0);
+}

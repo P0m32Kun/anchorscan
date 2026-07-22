@@ -199,14 +199,17 @@ const verifyRemediation = document.getElementById('verify-remediation');
 const verifyAssets = document.getElementById('verify-assets');
 const verifyEvidenceList = document.getElementById('verify-evidence-list');
 const verifyFileInput = document.getElementById('verify-evidence-file');
-const verifyPasteHint = document.getElementById('verify-paste-hint');
 
 let currentVerification = null;
+let verifyPendingFiles = [];
+let verifyVerificationID = null;
 
 function resetVerifyDialog(){
   verifyForm.reset();
   verifyAssets.innerHTML = '';
   verifyEvidenceList.innerHTML = '';
+  verifyPendingFiles = [];
+  verifyVerificationID = null;
   currentVerification = null;
 }
 
@@ -234,6 +237,61 @@ function buildVerificationPayload(c){
   };
 }
 
+function stageVerifyFile(file){
+  if(!file) return;
+  verifyPendingFiles.push({file, caption: ''});
+  renderVerifyEvidenceList();
+}
+
+function renderVerifyEvidenceList(){
+  const items = [];
+  verifyPendingFiles.forEach((f, i) => {
+    items.push({type: 'pending', idx: i, url: URL.createObjectURL(f.file), caption: f.caption || '待上传'});
+  });
+  const vid = verifyVerificationID || verifyId.value;
+  if(vid && currentVerification){
+    (currentVerification.Evidence || []).forEach(e => {
+      items.push({type: 'server', id: e.ID, url: '/projects/' + projectID + '/verifications/' + vid + '/evidence/' + e.ID, caption: e.Caption || '无说明'});
+    });
+  }
+  verifyEvidenceList.innerHTML = items.map(item => {
+    if(item.type === 'pending'){
+      return '<li class="evidence-item">' +
+        '<img src="' + item.url + '" alt="" style="max-height:80px;object-fit:cover">' +
+        '<span>' + item.caption + '</span>' +
+        '<button class="button button-small" type="button" data-verify-pending-idx="' + item.idx + '">删除</button>' +
+        '</li>';
+    }
+    return '<li class="evidence-item">' +
+      '<img src="' + item.url + '" alt="" loading="lazy">' +
+      '<span>' + item.caption + '</span>' +
+      '<button class="button button-small" type="button" data-evidence-id="' + item.id + '">删除</button>' +
+      '</li>';
+  }).join('');
+  verifyEvidenceList.querySelectorAll('button[data-verify-pending-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.verifyPendingIdx, 10);
+      verifyPendingFiles.splice(idx, 1);
+      renderVerifyEvidenceList();
+    });
+  });
+  verifyEvidenceList.querySelectorAll('button[data-evidence-id]').forEach(btn => btn.addEventListener('click', async () => {
+    if(!confirm('确定删除这张截图？')) return;
+    const eid = btn.dataset.evidenceId;
+    const delVid = verifyVerificationID || verifyId.value;
+    const res = await fetch('/projects/' + projectID + '/verifications/' + delVid + '/evidence/' + eid, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({_method: 'delete'}),
+    });
+    if(res.ok){
+      btn.closest('li').remove();
+    } else {
+      alert('删除失败');
+    }
+  }));
+}
+
 async function openVerifyDialog(key){
   const c = candidateByKey(key);
   if(!c) return;
@@ -255,6 +313,7 @@ async function openVerifyDialog(key){
   const vid = btn?.dataset.verificationId;
   if(vid){
     verifyId.value = vid;
+    verifyVerificationID = vid;
     try {
       const res = await fetch('/projects/' + projectID + '/verifications/' + vid);
       if(res.ok){
@@ -266,37 +325,13 @@ async function openVerifyDialog(key){
         verifyIncluded.checked = v.Verification.Included;
         verifyDescription.value = v.Verification.Description || '';
         verifyRemediation.value = v.Verification.Remediation || '';
-        renderEvidenceList(v.Evidence || []);
+        renderVerifyEvidenceList();
       }
     } catch(e) {
       // ignore
     }
   }
   verifyDialog.showModal();
-}
-
-function renderEvidenceList(list){
-  verifyEvidenceList.innerHTML = list.map(e => {
-    return '<li class="evidence-item">' +
-      '<img src="/projects/' + projectID + '/verifications/' + verifyId.value + '/evidence/' + e.ID + '" alt="" loading="lazy">' +
-      '<span>' + (e.Caption || '无说明') + '</span>' +
-      '<button class="button button-small" type="button" data-evidence-id="' + e.ID + '">删除</button>' +
-      '</li>';
-  }).join('');
-  verifyEvidenceList.querySelectorAll('button[data-evidence-id]').forEach(btn => btn.addEventListener('click', async () => {
-    if(!confirm('确定删除这张截图？')) return;
-    const eid = btn.dataset.evidenceId;
-    const res = await fetch('/projects/' + projectID + '/verifications/' + verifyId.value + '/evidence/' + eid, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: new URLSearchParams({_method: 'delete'}),
-    });
-    if(res.ok){
-      btn.closest('li').remove();
-    } else {
-      alert('删除失败');
-    }
-  }));
 }
 
 async function uploadEvidenceFile(file, caption, verificationIDOverride){
@@ -313,33 +348,26 @@ async function uploadEvidenceFile(file, caption, verificationIDOverride){
   return res.json();
 }
 
-async function handleFile(file){
-  if(!file) return;
-  const caption = prompt('截图说明（覆盖范围）：') || '';
-  await uploadEvidenceFile(file, caption);
-  if(verifyId.value){
-    const res = await fetch('/projects/' + projectID + '/verifications/' + verifyId.value);
-    if(res.ok){
-      const v = await res.json();
-      renderEvidenceList(v.Evidence || []);
-    }
-  }
-}
-
 verifyFileInput?.addEventListener('change', () => {
-  handleFile(verifyFileInput.files[0]);
+  stageVerifyFile(verifyFileInput.files[0]);
   verifyFileInput.value = '';
 });
 
-verifyPasteHint?.addEventListener('paste', async (e) => {
+verifyDialog?.addEventListener('paste', async (e) => {
+  if(e.target?.closest('input, textarea')) return;
+  const files = imagesFromClipboardData(e.clipboardData?.items);
+  if(files.length === 0) return;
   e.preventDefault();
-  const items = e.clipboardData?.items;
-  if(!items) return;
-  for(const item of items){
-    if(item.type.startsWith('image/')){
-      const file = item.getAsFile();
-      if(file) await handleFile(file);
-    }
+  files.forEach(stageVerifyFile);
+});
+
+verifyDialog?.addEventListener('dragover', e => e.preventDefault());
+verifyDialog?.addEventListener('drop', e => {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if(!files) return;
+  for(const file of files){
+    if(file.type.startsWith('image/')) stageVerifyFile(file);
   }
 });
 
@@ -377,9 +405,14 @@ verifyForm?.addEventListener('submit', async (e) => {
       if(res.ok){
         const created = await res.json();
         verifyId.value = created.ID;
+        verifyVerificationID = created.ID;
       }
     }
     if(!res.ok) throw new Error((await res.text()).trim() || '保存失败');
+    const uploadVid = verifyVerificationID || verifyId.value;
+    for(const f of verifyPendingFiles){
+      await uploadEvidenceFile(f.file, f.caption, uploadVid);
+    }
     window.location.reload();
   } catch(err){
     alert(err.message || String(err));
@@ -415,7 +448,6 @@ const negDescription = document.getElementById('neg-description');
 const negAssetsList = document.getElementById('neg-assets-list');
 const negEvidenceList = document.getElementById('neg-evidence-list');
 const negEvidenceFile = document.getElementById('neg-evidence-file');
-const negPasteHint = document.getElementById('neg-paste-hint');
 
 // Pending evidence for negative dialog before verification is created
 let negPendingFiles = [];  // [{file, caption}]
@@ -447,27 +479,32 @@ function renderNegEvidenceList(){
   });
 }
 
-async function handleNegFile(file){
+function stageNegFile(file){
   if(!file) return;
-  const caption = prompt('截图说明（说明本次验证覆盖的端点范围）：') || '';
-  negPendingFiles.push({file, caption});
+  negPendingFiles.push({file, caption: ''});
   renderNegEvidenceList();
 }
 
 negEvidenceFile?.addEventListener('change', () => {
-  handleNegFile(negEvidenceFile.files[0]);
+  stageNegFile(negEvidenceFile.files[0]);
   negEvidenceFile.value = '';
 });
 
-negPasteHint?.addEventListener('paste', async (e) => {
+negativeDialog?.addEventListener('paste', async (e) => {
+  if(e.target?.closest('input, textarea')) return;
+  const files = imagesFromClipboardData(e.clipboardData?.items);
+  if(files.length === 0) return;
   e.preventDefault();
-  const items = e.clipboardData?.items;
-  if(!items) return;
-  for(const item of items){
-    if(item.type.startsWith('image/')){
-      const file = item.getAsFile();
-      if(file) await handleNegFile(file);
-    }
+  files.forEach(stageNegFile);
+});
+
+negativeDialog?.addEventListener('dragover', e => e.preventDefault());
+negativeDialog?.addEventListener('drop', e => {
+  e.preventDefault();
+  const files = e.dataTransfer?.files;
+  if(!files) return;
+  for(const file of files){
+    if(file.type.startsWith('image/')) stageNegFile(file);
   }
 });
 

@@ -1,3 +1,15 @@
+function imagesFromClipboardData(items){
+  const files = [];
+  if(!items) return files;
+  for(const item of items){
+    if(item.type?.startsWith('image/')){
+      const file = item.getAsFile();
+      if(file) files.push(file);
+    }
+  }
+  return files;
+}
+
 function setActiveNavigation(path, items = document.querySelectorAll('.nav-item')) {
   const activeID = path === '/' || path === '' ? 'nav-home'
     : path.startsWith('/projects') ? 'nav-projects'
