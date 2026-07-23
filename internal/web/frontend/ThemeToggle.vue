@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { getTheme, setTheme, type ThemePreference } from './theme';
 
 const current = ref<ThemePreference>('system');
@@ -9,8 +9,17 @@ function select(theme: ThemePreference) {
   setTheme(theme);
 }
 
+function onThemeChange(e: Event) {
+  current.value = (e as CustomEvent).detail as ThemePreference;
+}
+
 onMounted(() => {
   current.value = getTheme();
+  window.addEventListener('anchor-theme-changed', onThemeChange);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('anchor-theme-changed', onThemeChange);
 });
 const labels: Record<ThemePreference, string> = {
   light: '浅色',

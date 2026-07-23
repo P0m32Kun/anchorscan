@@ -18,6 +18,9 @@ function runWithThemeContext(initialStorage = {}, prefersDark = false) {
         addEventListener: () => {},
         addListener: () => {},
       }),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => {},
     },
     document: {
       documentElement: {
@@ -25,6 +28,12 @@ function runWithThemeContext(initialStorage = {}, prefersDark = false) {
         style: {},
         setAttribute(key, value) { this.attributes[key] = value; },
       },
+    },
+    CustomEvent: class {
+      constructor(type, options = {}) {
+        this.type = type;
+        this.detail = options.detail;
+      }
     },
   };
   vm.createContext(ctx);

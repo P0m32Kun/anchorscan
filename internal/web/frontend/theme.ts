@@ -35,6 +35,9 @@ export function setTheme(pref: ThemePreference): void {
     }
   }
   applyTheme(resolveTheme(pref));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('anchor-theme-changed', { detail: pref }));
+  }
 }
 
 export function initTheme(): ThemePreference {

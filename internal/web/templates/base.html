@@ -6,17 +6,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AnchorScan - 内网安全扫描控制台</title>
   <script>
-    // Mirrors internal/web/frontend/theme.ts resolution; keep default/system rules in sync.
+    // Keep in sync with internal/web/frontend/theme.ts getTheme / resolveTheme.
     (function () {
+      var pref = 'system';
       try {
         var stored = window.localStorage.getItem('anchor-theme');
-        var pref = stored || 'system';
-        var theme = pref === 'system'
-          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-          : pref;
-        document.documentElement.setAttribute('data-theme', theme);
-        document.documentElement.style.colorScheme = theme;
+        if (stored === 'light' || stored === 'dark' || stored === 'system') pref = stored;
       } catch (e) {}
+      var theme = pref === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : pref;
+      document.documentElement.setAttribute('data-theme', theme);
+      document.documentElement.style.colorScheme = theme;
     })();
   </script>
   <link rel="stylesheet" href="/static/style.css">
