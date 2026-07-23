@@ -1,6 +1,8 @@
 package report
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -71,6 +73,24 @@ func TestBuildDocxContextCarriesCriticalConclusion(t *testing.T) {
 	context := BuildDocxContext(ProjectDeliverable{Stats: DeliverableStats{Critical: 1}}, time.Unix(1, 0))
 	if context.Conclusion.Critical != 1 {
 		t.Fatalf("critical conclusion = %d", context.Conclusion.Critical)
+	}
+}
+
+func TestBuildDocxContextNeverEmitsNullSlices(t *testing.T) {
+	project := ProjectMetadata{ReportTitle: "x", ClientUnit: "u", TestObject: "o", Testers: "t"}
+	// Zone has only a confirmed verification; not_observed stays empty (nil).
+	verifications := []DeliverableVerification{
+		{ID: "v1", ZoneID: "I", Outcome: "confirmed", Title: "弱口令", Severity: "high", Position: 1},
+	}
+	deliverable := BuildProjectDeliverable(project, []ProjectZone{{ZoneID: "I", Name: "I区"}}, nil, verifications, time.Unix(1, 0))
+	context := BuildDocxContext(deliverable, time.Unix(1, 0))
+
+	encoded, err := json.Marshal(context)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(encoded), ":null") {
+		t.Fatalf("context JSON contains null array/object — sidecar expects [] or omitted: %s", encoded)
 	}
 }
 

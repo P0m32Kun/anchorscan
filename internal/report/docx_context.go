@@ -35,9 +35,9 @@ type docxSummaryRow struct {
 
 type docxZone struct {
 	Name        string             `json:"name"`
-	Sessions    []docxSession      `json:"sessions"`
-	Confirmed   []docxVerification `json:"confirmed"`
-	NotObserved []docxVerification `json:"not_observed"`
+	Sessions    []docxSession      `json:"sessions,omitempty"`
+	Confirmed   []docxVerification `json:"confirmed,omitempty"`
+	NotObserved []docxVerification `json:"not_observed,omitempty"`
 }
 
 type docxSession struct {

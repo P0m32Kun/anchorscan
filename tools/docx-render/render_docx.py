@@ -58,7 +58,7 @@ def render(context: dict, template_path: Path, destination: Path) -> None:
     ]
 
     def attach(zone: dict, key: str) -> None:
-        for verification in zone.get(key, []):
+        for verification in zone.get(key) or []:  # ponytail: key 存在但为 null 时 get 仍返回 None
             for evidence in verification.get("evidence", []):
                 path = Path(evidence["path"])
                 width, height = image_box(path)
