@@ -310,6 +310,22 @@ type workbenchPropsResponse struct {
 	CatalogDiagnostics []string                   `json:"catalog_diagnostics"`
 }
 
+func toWorkbenchPropsResponse(data workbenchData) workbenchPropsResponse {
+	return workbenchPropsResponse{
+		ProjectID:          data.ProjectID,
+		ProjectName:        data.ProjectName,
+		Zones:              data.Zones,
+		ZoneNames:          data.ZoneNames,
+		Candidates:         data.Candidates,
+		NegativeGroups:     data.NegativeGroups,
+		IncompleteChecks:   data.IncompleteChecks,
+		Verifications:      data.Verifications,
+		Counts:             workbenchCounts{Positive: data.PositiveCount, Negative: data.NegativeCount, Incomplete: data.IncompleteCount},
+		CatalogStatus:      data.CatalogStatus,
+		CatalogDiagnostics: data.CatalogDiagnostics,
+	}
+}
+
 func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {
 	project, err := s.store.GetProject(projectID)
 	if err != nil {
@@ -323,19 +339,7 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 	}
 	data.ProjectID = project.ID
 	data.ProjectName = project.Name
-	props := workbenchPropsResponse{
-		ProjectID:          data.ProjectID,
-		ProjectName:        data.ProjectName,
-		Zones:              data.Zones,
-		ZoneNames:          data.ZoneNames,
-		Candidates:         data.Candidates,
-		NegativeGroups:     data.NegativeGroups,
-		IncompleteChecks:   data.IncompleteChecks,
-		Verifications:      data.Verifications,
-		Counts:             workbenchCounts{Positive: data.PositiveCount, Negative: data.NegativeCount, Incomplete: data.IncompleteCount},
-		CatalogStatus:      data.CatalogStatus,
-		CatalogDiagnostics: data.CatalogDiagnostics,
-	}
+	props := toWorkbenchPropsResponse(data)
 	propsJSON, err := json.Marshal(props)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -364,19 +368,7 @@ func (s *server) projectWorkbenchAPI(w http.ResponseWriter, r *http.Request, pro
 	}
 	data.ProjectID = project.ID
 	data.ProjectName = project.Name
-	resp := workbenchPropsResponse{
-		ProjectID:          data.ProjectID,
-		ProjectName:        data.ProjectName,
-		Zones:              data.Zones,
-		ZoneNames:          data.ZoneNames,
-		Candidates:         data.Candidates,
-		NegativeGroups:     data.NegativeGroups,
-		IncompleteChecks:   data.IncompleteChecks,
-		Verifications:      data.Verifications,
-		Counts:             workbenchCounts{Positive: data.PositiveCount, Negative: data.NegativeCount, Incomplete: data.IncompleteCount},
-		CatalogStatus:      data.CatalogStatus,
-		CatalogDiagnostics: data.CatalogDiagnostics,
-	}
+	resp := toWorkbenchPropsResponse(data)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
 }

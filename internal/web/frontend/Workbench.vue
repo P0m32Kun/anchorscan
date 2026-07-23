@@ -1086,6 +1086,6 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
 .command-pre { white-space: pre-wrap; background: var(--code-bg); padding: 0.75rem; border-radius: var(--radius-sm); overflow: auto; max-height: 40vh; font-family: var(--mono); font-size: 0.85rem; }
 .toast-container { position: fixed; bottom: 1.25rem; right: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; z-index: 200; }
 .toast { padding: 0.65rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem; font-weight: 600; box-shadow: var(--shadow); }
-.toast-success { background: var(--success-soft); color: #167546; border: 1px solid var(--success-border); }
-.toast-error { background: var(--danger-soft); color: #b42318; border: 1px solid var(--danger-border); }
+.toast-success { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
+.toast-error { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
 </style>
