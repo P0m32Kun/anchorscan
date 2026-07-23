@@ -78,12 +78,15 @@ async function startServer(configPath) {
 async function writeTestConfig(workDir) {
   const source = await fs.readFile(path.join(repoRoot, 'config', 'default.yaml.example'), 'utf8');
   const quotedFixture = JSON.stringify(fixture);
-  const config = ['rustscan', 'nmap', 'httpx', 'nuclei'].reduce(
+  let config = ['rustscan', 'nmap', 'httpx', 'nuclei'].reduce(
     (text, name) => text.replace(new RegExp(`^(\\s*${name}:).*$`, 'm'), `$1 ${quotedFixture}`),
     source,
   );
+  config = config.replace(/^(\s*knowledge_base:\s*\n\s*path:).*/m, '$1 "catalog.md"');
+  const catalog = `<!-- anchorscan-catalog version: 1 -->\n\n### SMB 签名未启用（严重）\n\n<!-- anchorscan-entry\nid: smb-signing\naliases: []\nmatch:\n  nuclei: [smb-signing]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\nSMB 签名未启用描述。\n\n#### 验证命令\n\n##### Nuclei\n\n\`\`\`\nnuclei -t smb-signing -u {{host}}:{{port}}\n\`\`\`\n\n##### Nmap NSE\n\n\`\`\`\nnmap -p {{port}} --script smb-security-mode {{host}}\n\`\`\`\n\n#### 修复建议\n\n启用 SMB 签名。\n`;
   const configPath = path.join(workDir, 'config.yaml');
   await fs.writeFile(configPath, config);
+  await fs.writeFile(path.join(workDir, 'catalog.md'), catalog);
   await Promise.all(['nse.yaml', 'service-tags.yaml'].map(async (name) => {
     await fs.copyFile(path.join(repoRoot, 'config', name), path.join(workDir, name));
   }));
@@ -316,14 +319,14 @@ try {
   // the candidate renders, the verify dialog opens, and the first focusable control
   // inside the dialog is keyboard-reachable.
   await seedRun(`INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir, include_in_report) VALUES
-    ('browser-workbench', '${projectID}', 'dmz', '192.0.2.50', '6379', 'normal', 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{}', '', 1);
+    ('browser-workbench', '${projectID}', 'dmz', '192.0.2.50', '445', 'normal', 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{}', '', 1);
     INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url, protocol, cpe, extrainfo, tunnel) VALUES
-    ('browser-workbench', '192.0.2.50', 6379, 'redis', '', '', 'redis', 0, '', 'tcp', '', '', '');
+    ('browser-workbench', '192.0.2.50', 445, 'smb', '', '', 'smb', 0, '', 'tcp', '', '', '');
     INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output, protocol, scope) VALUES
-    ('browser-workbench', '192.0.2.50', 6379, 'nuclei', 'redis-default-login', 'high', 'Workbench smoke finding', '192.0.2.50:6379', '', 'tcp', '');`);
+    ('browser-workbench', '192.0.2.50', 445, 'nuclei', 'smb-signing', 'high', 'Workbench smoke finding', '192.0.2.50:445', '', 'tcp', '');`);
   await page.goto(`${baseURL}${projectURL}/workbench`, { waitUntil: 'networkidle' });
   await page.locator('[data-workbench][data-mounted="true"]').waitFor();
-  await assert.doesNotReject(() => page.getByText('Workbench smoke finding').waitFor());
+  await assert.doesNotReject(() => page.getByRole('heading', { name: 'SMB 签名未启用' }).waitFor());
   await page.getByRole('button', { name: '验证 / 编辑' }).first().click();
   const dialog = page.locator('dialog.verify-dialog');
   await assert.doesNotReject(() => dialog.waitFor());
@@ -335,6 +338,21 @@ try {
   assert.ok(focusedName === 'title' || focusedName === 'INPUT', `verify dialog first focusable should be reachable, got ${focusedName}`);
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
+
+  // Workbench command dialog regression: generated command text should render.
+  await page.locator('details.context-actions summary').first().click();
+  await page.getByRole('button', { name: 'Nuclei 命令' }).first().click();
+  const commandDialog = page.locator('dialog').filter({ has: page.locator('pre.command-pre') });
+  await assert.doesNotReject(() => commandDialog.waitFor());
+  const commandPre = commandDialog.locator('pre.command-pre');
+  await assert.doesNotReject(() => commandPre.filter({ hasText: /nuclei|nmap/i }).waitFor({ timeout: 10_000 }));
+  const commandText = await commandPre.textContent();
+  assert.ok(
+    /nuclei|nmap/i.test(commandText || ''),
+    `command dialog should show a non-empty nuclei/nmap command, got: ${commandText}`,
+  );
+  await page.keyboard.press('Escape');
+  await assert.doesNotReject(() => commandDialog.waitFor({ state: 'hidden' }));
 
   await page.goto(`${baseURL}/config`);
   assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'theme preference should persist on config page');

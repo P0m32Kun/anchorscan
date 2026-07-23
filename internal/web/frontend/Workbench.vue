@@ -96,7 +96,7 @@ type Zone = {
 };
 
 type CommandResult = {
-  commands: { Tool: string; ToolArgs: string; FullCommand: string; TargetFile: string }[];
+  commands: { full_command: string; tool_args: string; target_file?: string }[];
   warning: string;
   tool_link: string;
 };
@@ -118,6 +118,11 @@ const props = defineProps<{
 }>();
 
 const tab = ref<'positive' | 'negative' | 'incomplete'>('positive');
+const tabItems = computed(() => [
+  { key: 'positive' as const, label: '待确认漏洞', count: props.counts?.positive ?? 0 },
+  { key: 'negative' as const, label: '待负向验证', count: props.counts?.negative ?? 0 },
+  { key: 'incomplete' as const, label: '检查未完成', count: props.counts?.incomplete ?? 0 },
+]);
 const zoneFilter = ref('');
 const statusFilter = ref('');
 const keywordFilter = ref('');
@@ -290,7 +295,7 @@ async function runCommand(key: string, tool: string, asset: string) {
   const v = verificationMap.value[key];
   try {
     const data = await fetchCommand(key, tool, asset, v?.ID || '');
-    commandBody.value = (data.commands || []).map((c) => c.FullCommand).join('\n\n');
+    commandBody.value = (data.commands || []).map((c) => c.full_command).join('\n\n');
     commandWarning.value = data.warning || '';
     commandToolLink.value = data.tool_link || '';
   } catch (e: any) {
@@ -444,7 +449,7 @@ function buildVerificationPayload(c: Candidate): VerificationDetail['Verificatio
     Position: 0,
     assets,
     sources,
-  } as any;
+  };
 }
 
 async function saveVerification() {
@@ -670,13 +675,21 @@ function onTabKey(e: KeyboardEvent) {
 
 // ---------- Hash-based queue tab ----------
 const queueNameFromHash = (hash: string) => hash.replace('#', '');
-const validTabs = new Set(['positive', 'negative', 'incomplete']);
+const validTabs = new Set<'positive' | 'negative' | 'incomplete'>(['positive', 'negative', 'incomplete']);
 watch(tab, (t) => {
   history.replaceState(null, '', `#${t}`);
 });
 if (typeof window !== 'undefined') {
   const initial = queueNameFromHash(window.location.hash);
-  if (validTabs.has(initial)) tab.value = initial as any;
+  if (validTabs.has(initial as 'positive' | 'negative' | 'incomplete')) tab.value = initial as 'positive' | 'negative' | 'incomplete';
+}
+
+function onFileInputKeydown(e: KeyboardEvent, target: 'verify' | 'negative') {
+  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    const input = (e.currentTarget as HTMLLabelElement).querySelector<HTMLInputElement>('input[type=file]');
+    input?.click();
+  }
 }
 
 function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
@@ -693,11 +706,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
     <!-- Queue tabs -->
     <div class="workbench-queue-tabs" role="tablist" aria-label="验证队列">
       <button
-        v-for="(t, i) in [
-          { key: 'positive', label: '待确认漏洞', count: counts?.positive ?? 0 },
-          { key: 'negative', label: '待负向验证', count: counts?.negative ?? 0 },
-          { key: 'incomplete', label: '检查未完成', count: counts?.incomplete ?? 0 },
-        ]"
+        v-for="(t, i) in tabItems"
         :key="t.key"
         ref="tabRefs"
         type="button"
@@ -707,7 +716,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
         :aria-selected="tab === t.key"
         :aria-controls="`queue-${t.key}`"
         :id="`tab-${t.key}`"
-        @click="tab = t.key as any"
+        @click="tab = t.key"
         @keydown="onTabKey"
       >
         {{ t.label }} <span class="queue-count">{{ t.count }}</span>
@@ -806,7 +815,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
             <div class="candidate-actions">
               <button type="button" class="button button-secondary" @click="openVerifyDialog(c.GroupKey)">验证 / 编辑</button>
               <details class="context-actions">
-                <summary type="button" class="button button-secondary">更多操作</summary>
+                <summary class="button button-secondary">更多操作</summary>
                 <div class="context-menu">
                   <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'nuclei', 'all')">Nuclei 命令</button>
                   <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'nmap', 'all')">Nmap 命令</button>
@@ -946,7 +955,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
         <div class="full-width">
           <p class="eyebrow">证据截图</p>
           <p class="meta-line">confirmed / not_observed 验证必须至少上传一张截图。</p>
-          <label class="file-input-label">
+          <label class="file-input-label" tabindex="0" role="button" @keydown="(e) => onFileInputKeydown(e, 'verify')">
             <input type="file" accept="image/png,image/jpeg" multiple @change="(e) => onFileChange('verify', (e.target as HTMLInputElement).files)">
             <span>选择一张或多张 PNG/JPEG 截图</span>
           </label>
@@ -1008,7 +1017,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
         <div class="full-width">
           <p class="eyebrow">共享截图（必须至少一张，可多张）</p>
           <p class="meta-line">截图将进入正式报告。可以点击选择，也可以把图片拖到本弹窗内，或在下方区域按 Ctrl/Cmd+V 粘贴。</p>
-          <label class="file-input-label">
+          <label class="file-input-label" tabindex="0" role="button" @keydown="(e) => onFileInputKeydown(e, 'negative')">
             <input type="file" accept="image/png,image/jpeg" multiple @change="(e) => onFileChange('negative', (e.target as HTMLInputElement).files)">
             <span>选择一张或多张 PNG/JPEG 截图</span>
           </label>

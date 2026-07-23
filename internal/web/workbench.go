@@ -53,7 +53,7 @@ type workbenchData struct {
 	NegativeGroups     []negativeFingerprintGroup
 	IncompleteChecks   []incompleteWorkbenchItem
 	Verifications      []store.Verification
-	VerificationMap  map[string]store.Verification
+	VerificationMap    map[string]store.Verification
 	PositiveCount      int
 	NegativeCount      int
 	IncompleteCount    int
@@ -294,6 +294,22 @@ func (s *server) buildWorkbenchData(projectID string) (workbenchData, error) {
 	}, nil
 }
 
+// workbenchPropsResponse is the serialized shape shared by the server-rendered
+// workbench page and the JSON API.
+type workbenchPropsResponse struct {
+	ProjectID          string                     `json:"project_id"`
+	ProjectName        string                     `json:"project_name"`
+	Zones              []store.ProjectZone        `json:"zones"`
+	ZoneNames          map[string]string          `json:"zone_names"`
+	Candidates         []workbenchCandidate       `json:"candidates"`
+	NegativeGroups     []negativeFingerprintGroup `json:"negative_groups"`
+	IncompleteChecks   []incompleteWorkbenchItem  `json:"incomplete_checks"`
+	Verifications      []store.Verification       `json:"verifications"`
+	Counts             workbenchCounts            `json:"counts"`
+	CatalogStatus      string                     `json:"catalog_status"`
+	CatalogDiagnostics []string                   `json:"catalog_diagnostics"`
+}
+
 func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {
 	project, err := s.store.GetProject(projectID)
 	if err != nil {
@@ -307,19 +323,7 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 	}
 	data.ProjectID = project.ID
 	data.ProjectName = project.Name
-	props := struct {
-		ProjectID          string                     `json:"project_id"`
-		ProjectName        string                     `json:"project_name"`
-		Zones              []store.ProjectZone        `json:"zones"`
-		ZoneNames          map[string]string          `json:"zone_names"`
-		Candidates         []workbenchCandidate       `json:"candidates"`
-		NegativeGroups     []negativeFingerprintGroup `json:"negative_groups"`
-		IncompleteChecks   []incompleteWorkbenchItem  `json:"incomplete_checks"`
-		Verifications      []store.Verification       `json:"verifications"`
-		Counts             workbenchCounts            `json:"counts"`
-		CatalogStatus      string                     `json:"catalog_status"`
-		CatalogDiagnostics []string                   `json:"catalog_diagnostics"`
-	}{
+	props := workbenchPropsResponse{
 		ProjectID:          data.ProjectID,
 		ProjectName:        data.ProjectName,
 		Zones:              data.Zones,
@@ -360,19 +364,7 @@ func (s *server) projectWorkbenchAPI(w http.ResponseWriter, r *http.Request, pro
 	}
 	data.ProjectID = project.ID
 	data.ProjectName = project.Name
-	resp := struct {
-		ProjectID          string                     `json:"project_id"`
-		ProjectName        string                     `json:"project_name"`
-		Zones              []store.ProjectZone        `json:"zones"`
-		ZoneNames          map[string]string          `json:"zone_names"`
-		Candidates         []workbenchCandidate       `json:"candidates"`
-		NegativeGroups     []negativeFingerprintGroup `json:"negative_groups"`
-		IncompleteChecks   []incompleteWorkbenchItem  `json:"incomplete_checks"`
-		Verifications      []store.Verification       `json:"verifications"`
-		Counts             workbenchCounts            `json:"counts"`
-		CatalogStatus      string                     `json:"catalog_status"`
-		CatalogDiagnostics []string                   `json:"catalog_diagnostics"`
-	}{
+	resp := workbenchPropsResponse{
 		ProjectID:          data.ProjectID,
 		ProjectName:        data.ProjectName,
 		Zones:              data.Zones,
