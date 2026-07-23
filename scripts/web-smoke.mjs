@@ -203,6 +203,14 @@ try {
   await page.waitForURL(/\/projects\/project-/);
   const projectURL = new URL(page.url()).pathname;
   await page.getByRole('link', { name: /发起扫描|新建扫描/ }).click();
+  await page.locator('[data-scan-create][data-mounted="true"]').waitFor();
+  assert.equal(await page.locator('select[name="zone_id"]').inputValue(), '', 'multiple Zones must require an explicit choice');
+  const options = page.locator('[data-scan-create-options]');
+  assert.equal(await options.evaluate((element) => element.open), false, 'optional settings should start collapsed');
+  await options.locator('summary').click();
+  await page.locator('input[name="label"]').fill('Browser smoke label');
+  await assert.doesNotReject(() => options.getByText('已修改 1 项').waitFor());
+  await options.locator('summary').click();
   await page.locator('select[name="zone_id"]').selectOption({ index: 1 });
   await page.locator('textarea[name="target"]').fill('192.0.2.10');
   await page.locator('textarea[name="ports"]').fill('invalid');
@@ -210,6 +218,7 @@ try {
   await page.locator('input[name="tester_ip"]').fill('192.0.2.250');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
   await assert.doesNotReject(() => page.getByText('预检失败').waitFor());
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'ports', 'server validation should return focus to the invalid field');
   await page.setViewportSize({ width: 1280, height: 960 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
   await page.setViewportSize({ width: 1440, height: 960 });
@@ -269,6 +278,12 @@ try {
 
   await page.getByRole('link', { name: '扫描历史' }).click();
   await page.waitForURL(`${baseURL}/runs`);
+
+  await seedRun(`DELETE FROM project_zones WHERE project_id = '${projectID}';
+    INSERT INTO project_zones (project_id, zone_id, name, sort_order) VALUES ('${projectID}', 'dmz', 'DMZ', 1);`);
+  await page.goto(`${baseURL}${projectURL}/scans/new`, { waitUntil: 'networkidle' });
+  await page.locator('[data-scan-create][data-mounted="true"]').waitFor();
+  assert.equal(await page.locator('select[name="zone_id"]').inputValue(), 'dmz', 'a single Zone should be selected automatically');
 
   await page.getByRole('link', { name: '导入 Nmap XML' }).click();
   await page.locator('input[name="xml_file"]').setInputFiles(xmlPath);

@@ -45,25 +45,60 @@ func TestNewScanPageRenders(t *testing.T) {
 		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	if !strings.Contains(body, `<input type="hidden" name="project_id" value="p1">`) {
-		t.Fatalf("expected bound project_id hidden input, got body=%s", body)
+	if !strings.Contains(body, `data-scan-create-props=`) {
+		t.Fatalf("expected Vue scan-create props, got body=%s", body)
 	}
 	if !strings.Contains(body, "Local Lab") {
 		t.Fatalf("expected project name in body, got body=%s", body)
 	}
-	if !strings.Contains(body, `<select name="zone_id"`) {
-		t.Fatalf("expected zone selector, got body=%s", body)
-	}
-	for _, want := range []string{"I区 (I)", "II区 (II)", "III区 (III)", "网络分区", "目标资产", "排除目标", "端口范围", "排除端口", "扫描档位"} {
+	for _, want := range []string{"I区", "II区", "III区", "projectId", "highriskPorts"} {
 		if !strings.Contains(body, want) {
-			t.Fatalf("expected scan form copy %q, got body=%s", want, body)
+			t.Fatalf("expected scan-create prop %q, got body=%s", want, body)
 		}
 	}
-	if !strings.Contains(body, `name="artifact_root"`) {
-		t.Fatalf("expected artifact root input, got body=%s", body)
+	if !strings.Contains(body, "21,22,3306") {
+		t.Fatalf("expected highrisk ports in props, got body=%s", body)
 	}
-	if !strings.Contains(body, `data-insert-ports="21,22,3306"`) {
-		t.Fatalf("expected highrisk button to insert CSV, got body=%s", body)
+}
+
+func TestNewScanPageProvidesSingleZoneDefaultToVue(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	configPath := filepath.Join(dir, "config.yaml")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	project := store.Project{ID: "p1", Name: "Single Zone", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}
+	if err := scanStore.SaveProject(project); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := scanStore.CreateProjectZone(store.ProjectZone{ProjectID: project.ID, ZoneID: "dmz", Name: "DMZ", SortOrder: 1}); err != nil {
+		t.Fatalf("CreateProjectZone returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusOK)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, `data-scan-create`) {
+		t.Fatalf("expected Vue scan-create mount point, got body=%s", body)
+	}
+	if !strings.Contains(body, `data-default-zone-id="dmz"`) {
+		t.Fatalf("expected single zone default in page props, got body=%s", body)
+	}
+}
+
+func TestScanCreateErrorsReturnsEmptyArray(t *testing.T) {
+	if got := scanCreateErrors(nil); got == nil || len(got) != 0 {
+		t.Fatalf("scanCreateErrors(nil) = %#v, want empty array", got)
 	}
 }
 
@@ -100,8 +135,8 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "预检失败") || !strings.Contains(rec.Body.String(), "rustscan") {
-		t.Fatalf("expected preflight errors in body, got %q", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `data-scan-create-props=`) || !strings.Contains(rec.Body.String(), "rustscan") {
+		t.Fatalf("expected preflight errors in scan-create props, got %q", rec.Body.String())
 	}
 }
 

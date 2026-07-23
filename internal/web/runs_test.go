@@ -462,7 +462,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 		t.Fatalf("rerun page status: %d %s", rerun.Code, rerun.Body.String())
 	}
 	body := rerun.Body.String()
-	for _, want := range []string{`name="zone_id"`, `value="I" selected`, `name="target"`, "198.51.100.10", `name="exclude_targets"`, "198.51.100.20", `name="ports"`, "80,443", `name="exclude_ports"`, "22", `value="fast" selected`, "--ulimit 5000", "-sV"} {
+	for _, want := range []string{`data-scan-create-props=`, "isRerun", "zone_id", "198.51.100.10", "exclude_targets", "198.51.100.20", "ports", "80,443", "exclude_ports", "22", "fast", "--ulimit 5000", "-sV"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("rerun page missing %q: %s", want, body)
 		}
@@ -533,7 +533,7 @@ func TestInterruptedLegacyProjectScanPrefillsPersistedFields(t *testing.T) {
 
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new?rerun=legacy", nil))
-	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "198.51.100.20") || !strings.Contains(res.Body.String(), ">443</textarea>") || !strings.Contains(res.Body.String(), `value="normal" selected`) {
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `data-scan-create-props=`) || !strings.Contains(res.Body.String(), "198.51.100.20") || !strings.Contains(res.Body.String(), "443") || !strings.Contains(res.Body.String(), "normal") {
 		t.Fatalf("legacy rerun page: %d %s", res.Code, res.Body.String())
 	}
 }

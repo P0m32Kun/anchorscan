@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Vue 构建基础与全局主题。
 
-**Status:** proposed
+**Status:** ready-for-agent
 
 **Execution skills:** `tdd`、`frontend-visual-design`、`browser:control-in-app-browser`、`code-review`、`ponytail`。
 

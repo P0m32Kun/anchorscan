@@ -36,20 +36,71 @@ type scanForm struct {
 	IsRerun        bool   `json:"-"`
 }
 
+type scanCreateProps struct {
+	ProjectID     string            `json:"projectId"`
+	Zones         []scanCreateZone  `json:"zones"`
+	Form          scanForm          `json:"form"`
+	ArtifactRoot  string            `json:"artifactRoot"`
+	HighriskPorts string            `json:"highriskPorts"`
+	IsRerun       bool              `json:"isRerun"`
+	Errors        []scanCreateError `json:"errors"`
+	Warnings      []scanCreateError `json:"warnings"`
+}
+
+type scanCreateZone struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type scanCreateError struct {
+	Field   string `json:"field"`
+	Message string `json:"message"`
+}
+
 // renderProjectScanForm renders the in-project scan form with the project
 // context and an optional preflight result used to surface validation errors
 // when a scan submission is rejected. Scans are always bound to a project.
 func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, zones []store.ProjectZone, preflightResult preflight.Result, form scanForm) {
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
+	props := scanCreateProps{
+		ProjectID:     project.ID,
+		Form:          form,
+		ArtifactRoot:  "",
+		HighriskPorts: highriskPorts,
+		IsRerun:       form.IsRerun,
+		Errors:        scanCreateErrors(preflightResult.Errors),
+		Warnings:      scanCreateErrors(preflightResult.Warnings),
+	}
+	for _, zone := range zones {
+		props.Zones = append(props.Zones, scanCreateZone{ID: zone.ZoneID, Name: zone.Name})
+	}
+	propsJSON, _ := json.Marshal(props)
+	defaultZoneID := ""
+	if len(zones) == 1 {
+		defaultZoneID = zones[0].ZoneID
+	}
 	render(w, "templates/scan_project.html", map[string]any{
-		"Title":         "发起扫描",
-		"Project":       project,
-		"Zones":         zones,
-		"ArtifactRoot":  "",
-		"Form":          form,
-		"Preflight":     preflightResult,
-		"HighriskPorts": highriskPorts,
+		"Title":           "发起扫描",
+		"Project":         project,
+		"Zones":           zones,
+		"ArtifactRoot":    "",
+		"Form":            form,
+		"Preflight":       preflightResult,
+		"HighriskPorts":   highriskPorts,
+		"ScanCreateProps": string(propsJSON),
+		"DefaultZoneID":   defaultZoneID,
 	})
+}
+
+func scanCreateErrors(messages []preflight.Message) []scanCreateError {
+	if len(messages) == 0 {
+		return []scanCreateError{}
+	}
+	errors := make([]scanCreateError, 0, len(messages))
+	for _, message := range messages {
+		errors = append(errors, scanCreateError{Field: message.Field, Message: message.Message})
+	}
+	return errors
 }
 
 func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
