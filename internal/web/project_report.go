@@ -207,10 +207,7 @@ func assetDisplay(ip string, port int) string {
 }
 
 func safeReportFilename(project store.Project) string {
-	name := strings.TrimSpace(project.ReportTitle)
-	if name == "" {
-		name = strings.TrimSpace(project.Name)
-	}
+	name := strings.TrimSpace(project.Name)
 	if name == "" {
 		name = "project-report"
 	}

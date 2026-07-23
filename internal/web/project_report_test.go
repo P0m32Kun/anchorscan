@@ -360,6 +360,9 @@ func TestReportTitleIgnoresLegacyReportTitle(t *testing.T) {
 	if got := reportTitle(store.Project{ReportTitle: "自定义标题", ClientUnit: "甘肃电力"}); got != "甘肃电力安全渗透测试分析报告" {
 		t.Fatalf("expected client-unit title, got %q", got)
 	}
+	if got := safeReportFilename(store.Project{ReportTitle: "自定义标题", Name: "甘肃任务"}); got != "甘肃任务" {
+		t.Fatalf("expected filename to ignore legacy title, got %q", got)
+	}
 }
 
 func TestReportTitleFallsBackToName(t *testing.T) {

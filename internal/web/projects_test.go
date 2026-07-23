@@ -331,6 +331,9 @@ func TestProjectDetailRendersMetadataAndZones(t *testing.T) {
 			t.Fatalf("expected %q in body, got %s", want, body)
 		}
 	}
+	if strings.Contains(body, "甘肃电力内网安全检查报告") {
+		t.Fatalf("legacy report title must not be rendered: %s", body)
+	}
 }
 
 func TestAddAndDeleteProjectZone(t *testing.T) {
