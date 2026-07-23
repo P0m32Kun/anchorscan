@@ -3,10 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:web": "vue-tsc --noEmit && vite build",
+    "typecheck:web": "vue-tsc --noEmit",
     "test:web": "node scripts/web-smoke.mjs"
   },
   "devDependencies": {
-    "playwright": "1.61.1"
+    "@vitejs/plugin-vue": "5.1.0",
+    "playwright": "1.61.1",
+    "typescript": "5.5.4",
+    "vite": "5.3.5",
+    "vue": "3.4.34",
+    "vue-tsc": "2.0.29"
   },
   "engines": {
     "node": ">=20"

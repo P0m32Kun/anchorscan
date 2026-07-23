@@ -110,6 +110,11 @@ async function seedRun(sql) {
   assert.equal(code, 0, 'sqlite fixture setup failed');
 }
 
+async function captureThemeScreenshot(suffix) {
+  await fs.mkdir(artifactDir, { recursive: true });
+  await page.screenshot({ path: path.join(artifactDir, `theme-${suffix}.png`), fullPage: true });
+}
+
 async function waitForRunStatus(page, status, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   const statusText = page.getByText(status, { exact: true });
@@ -145,7 +150,51 @@ try {
   });
   page.on('pageerror', (error) => consoleLogs.push(`pageerror: ${error.message}`));
 
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(baseURL, { waitUntil: 'networkidle' });
+
+  // Theme smoke: toggle should apply data-theme immediately and persist across pages.
+  assert.ok(['light', 'dark'].includes(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))), 'initial theme not set');
+  assert.equal(await page.evaluate(() => document.documentElement.style.colorScheme), await page.evaluate(() => document.documentElement.getAttribute('data-theme')));
+
+  await page.getByRole('button', { name: '深色' }).click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+  await captureThemeScreenshot('dark');
+
+  // Keyboard path: Space/Enter on a theme button updates the theme.
+  const lightButton = page.getByRole('button', { name: '浅色' });
+  await lightButton.focus();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-pressed')), 'false');
+  await lightButton.press('Space');
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-pressed')), 'true');
+  await captureThemeScreenshot('light');
+
+  const darkButton = page.getByRole('button', { name: '深色' });
+  await darkButton.focus();
+  await darkButton.press('Enter');
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+
+  // Explicit preference survives a page refresh.
+  await page.reload({ waitUntil: 'networkidle' });
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+
+  // System preference follows OS color-scheme changes at runtime.
+  await page.getByRole('button', { name: '跟随系统' }).first().click();
+  await page.waitForTimeout(150);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'system should follow dark OS preference');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light', 'system should follow light OS preference');
+
+  await page.getByRole('button', { name: '深色' }).click();
+  await page.waitForTimeout(150);
+
   await page.getByRole('link', { name: '项目管理' }).click();
   await page.getByRole('link', { name: '新建项目' }).click();
   await page.getByLabel(/任务名称/).fill('Browser gate project');
@@ -236,8 +285,12 @@ try {
 
   await page.setViewportSize({ width: 1280, height: 960 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
-  await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`${baseURL}/config`);
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'theme preference should persist on config page');
+  await page.getByRole('button', { name: '跟随系统' }).first().click();
+  await page.waitForTimeout(150);
+  assert.ok(['light', 'dark'].includes(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))), 'system theme did not resolve');
+
   assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '0');
   await page.locator('input[name="timeout_rustscan"]').fill('30s');
   await page.locator('input[name="timeout_rustscan"]').focus();

@@ -14,16 +14,19 @@ PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
 
 test:
 	go test ./...
-	node --test internal/web/static/app.test.mjs
+	node --test internal/web/static/*.test.mjs
 
 docx-test:
 	uv run --project tools/docx-render python -m unittest discover -s tools/docx-render -p 'test_*.py'
 
-build:
+web:
+	npm run build:web
+
+build: web
 	mkdir -p $(DIST_DIR)
 	go build $(BUILD_FLAGS) $(if $(LDFLAGS),-ldflags="$(LDFLAGS)") -o $(DIST_DIR)/$(BINARY) $(CMD)
 
-package:
+package: web
 	rm -rf $(PACKAGE_DIR)
 	mkdir -p $(PACKAGE_DIR)/config $(PACKAGE_DIR)/docs $(PACKAGE_DIR)/tools/docx-render/templates
 	go build $(BUILD_FLAGS) $(if $(LDFLAGS),-ldflags="$(LDFLAGS)") -o $(PACKAGE_DIR)/$(BINARY) $(CMD)

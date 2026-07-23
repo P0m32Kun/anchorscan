@@ -19,7 +19,9 @@
 # 临时 AI 草稿
 .scratch/
 
-# Python sidecar 虚拟环境与产物
+# Frontend build output
+/internal/web/static/dist/
+
 tools/docx-render/.venv/
 tools/docx-render/out/
 

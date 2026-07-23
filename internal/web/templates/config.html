@@ -3,9 +3,22 @@
   <div>
     <p class="eyebrow">配置管理</p>
     <h2>全局扫描器配置</h2>
-    <p class="meta-line config-intro">维护工具路径、默认扫描策略和高级 YAML 配置。</p>
+    <p class="meta-line config-intro">维护工具路径、默认扫描策略、外观主题和高级 YAML 配置。</p>
   </div>
   <a class="button button-secondary" href="/">返回面板</a>
+</section>
+
+<section class="config-grid config-workspace">
+  <article class="panel config-panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">外观</p>
+        <h3>控制台主题</h3>
+        <p class="meta-line">选择后会在当前浏览器中记住，不影响导出的报告样式。</p>
+      </div>
+    </div>
+    <div class="config-card-body" data-theme-control></div>
+  </article>
 </section>
 
 {{if .Error}}

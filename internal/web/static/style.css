@@ -51,9 +51,17 @@
   --sev-info-soft: rgba(148, 163, 184, 0.06);
   --sev-info-border: rgba(148, 163, 184, 0.25);
   
-  --shadow: 0 12px 32px rgba(25, 25, 30, 0.08);
+  /* Derived surfaces that are theme-aware */
+  --code-bg: #f2f2f7;
+  --scrollbar-thumb: rgba(0, 113, 227, 0.18);
+  --scrollbar-thumb-hover: rgba(0, 113, 227, 0.32);
+  --shadow-color: rgba(25, 25, 30, 0.08);
+  --shadow: 0 12px 32px var(--shadow-color);
   --surface-shadow: 0 1px 2px rgba(25, 25, 30, 0.04), 0 14px 34px rgba(25, 25, 30, 0.045);
   --surface-shadow-hover: 0 2px 4px rgba(25, 25, 30, 0.05), 0 20px 42px rgba(25, 25, 30, 0.075);
+  --surface-overlay: rgba(60, 60, 67, 0.03);
+  --surface-overlay-hover: rgba(60, 60, 67, 0.06);
+
   --radius-lg: 14px;
   --radius-md: 10px;
   --radius-sm: 8px;
@@ -65,7 +73,7 @@
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 113, 227, 0.18) transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 /* Custom Scrollbar for Webkit */
@@ -77,11 +85,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 113, 227, 0.18);
+  background: var(--scrollbar-thumb);
   border-radius: var(--radius-sm);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 113, 227, 0.32);
+  background: var(--scrollbar-thumb-hover);
 }
 
 html {
@@ -431,7 +439,7 @@ button[type="submit"]:hover {
 }
 
 .button-secondary:hover {
-  background: #ececf0;
+  background: var(--bg-accent);
   color: var(--text);
   border-color: var(--muted);
 }
@@ -614,7 +622,7 @@ input[type="file"]::file-selector-button {
 }
 
 input[type="file"]::file-selector-button:hover {
-  background: #ececf0;
+  background: var(--bg-accent);
   border-color: var(--muted);
   color: var(--text);
 }
@@ -622,7 +630,7 @@ input[type="file"]::file-selector-button:hover {
 /* Code editor block */
 .code-editor {
   min-height: 24rem;
-  background: #f2f2f7;
+  background: var(--code-bg);
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
@@ -835,7 +843,7 @@ input[type="file"]::file-selector-button:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.015);
+  background: var(--surface-overlay);
   color: var(--muted);
   user-select: none;
   transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
@@ -850,7 +858,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .severity-filter-chip:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-overlay-hover);
   border-color: var(--border-strong);
   color: var(--text);
 }
@@ -1001,7 +1009,7 @@ input[type="file"]::file-selector-button:hover {
   text-align: center;
   padding: 2rem 1rem;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.01);
+  background: var(--surface-overlay);
 }
 
 .muted {
@@ -1229,7 +1237,7 @@ input[type="file"]::file-selector-button:hover {
 .evidence-block {
   margin: 0;
   padding: 1rem 1.15rem;
-  background: #f2f2f7;
+  background: var(--code-bg);
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.82rem;
@@ -1474,7 +1482,7 @@ input[type="file"]::file-selector-button:hover {
 .config-card-body {
   font-family: var(--mono);
   font-size: 0.85rem;
-  background: #f2f2f7;
+  background: var(--code-bg);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
@@ -1494,11 +1502,11 @@ input[type="file"]::file-selector-button:hover {
   background: transparent;
 }
 .config-card-body::-webkit-scrollbar-thumb {
-  background: #c7c7cc;
+  background: var(--scrollbar-thumb);
   border-radius: var(--radius-sm);
 }
 .config-card-body::-webkit-scrollbar-thumb:hover {
-  background: #aeaeb2;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .copy-btn {
@@ -1518,7 +1526,7 @@ input[type="file"]::file-selector-button:hover {
 .copy-btn:hover {
   color: var(--primary);
   border-color: var(--primary-glow);
-  background: rgba(100, 116, 139, 0.05);
+  background: var(--surface-overlay-hover);
 }
 
 /* Three columns layout for summary cards */
@@ -1560,11 +1568,11 @@ input[type="file"]::file-selector-button:hover {
   background: transparent;
 }
 .ports-badge-container::-webkit-scrollbar-thumb {
-  background: #c7c7cc;
+  background: var(--scrollbar-thumb);
   border-radius: 2px;
 }
 .ports-badge-container::-webkit-scrollbar-thumb:hover {
-  background: #aeaeb2;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .port-badge {
@@ -1598,7 +1606,7 @@ input[type="file"]::file-selector-button:hover {
   height: 10px;
   border-radius: 5px;
   overflow: hidden;
-  background: #e8e8ed;
+  background: var(--bg-accent);
   border: 1px solid rgba(255, 255, 255, 0.03);
 }
 .vuln-bar-segment {
@@ -1736,7 +1744,7 @@ input[type="file"]::file-selector-button:hover {
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-top: 0.75rem;
-  background: #f2f2f7;
+  background: var(--code-bg);
   text-align: left;
 }
 .evidence-header {

@@ -5,8 +5,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AnchorScan - 内网安全扫描控制台</title>
+  <script>
+    // Mirrors internal/web/frontend/theme.ts resolution; keep default/system rules in sync.
+    (function () {
+      try {
+        var stored = window.localStorage.getItem('anchor-theme');
+        var pref = stored || 'system';
+        var theme = pref === 'system'
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : pref;
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = theme;
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/dark.css">
+  <link rel="stylesheet" href="/static/dist/assets/main.css">
   <script src="/static/app.js" defer></script>
+  <script type="module" src="/static/dist/assets/main.js"></script>
 </head>
 <body class="app-shell">
   <aside class="sidebar">
@@ -61,7 +78,8 @@
     </nav>
     
     <div class="sidebar-footer">
-      AnchorScan Console v{{version}}
+      <div data-theme-control></div>
+      <div>AnchorScan Console v{{version}}</div>
     </div>
   </aside>
   
