@@ -48,6 +48,9 @@ func TestNewScanPageRenders(t *testing.T) {
 	if !strings.Contains(body, `data-scan-create-props=`) {
 		t.Fatalf("expected Vue scan-create props, got body=%s", body)
 	}
+	if !strings.Contains(body, "<noscript>") || !strings.Contains(body, `name="project_id" value="p1"`) {
+		t.Fatalf("expected no-script scan fallback, got body=%s", body)
+	}
 	if !strings.Contains(body, "Local Lab") {
 		t.Fatalf("expected project name in body, got body=%s", body)
 	}

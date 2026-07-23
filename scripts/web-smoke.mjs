@@ -208,6 +208,9 @@ try {
   const options = page.locator('[data-scan-create-options]');
   assert.equal(await options.evaluate((element) => element.open), false, 'optional settings should start collapsed');
   await options.locator('summary').click();
+  await page.locator('input[name="label"]').focus();
+  await page.locator('input[name="label"]').press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'notes', 'expanded optional settings should stay keyboard reachable');
   await page.locator('input[name="label"]').fill('Browser smoke label');
   await assert.doesNotReject(() => options.getByText('已修改 1 项').waitFor());
   await options.locator('summary').click();
@@ -272,9 +275,9 @@ try {
   await page.locator('textarea[name="target"]').focus();
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'target');
   await page.locator('textarea[name="target"]').press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'exclude_targets');
-  await page.locator('textarea[name="exclude_targets"]').press('Tab');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'ports');
+  await page.locator('textarea[name="ports"]').press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'access_point');
 
   await page.getByRole('link', { name: '扫描历史' }).click();
   await page.waitForURL(`${baseURL}/runs`);

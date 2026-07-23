@@ -37,7 +37,9 @@ const form = ref({ ...props.form });
 const artifactRoot = ref(props.artifactRoot);
 const submitting = ref(false);
 const optionalOpen = ref(false);
+const errorSummary = ref<HTMLElement>();
 const optionalFields = ['label', 'exclude_targets', 'exclude_ports', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
+const formFields = ['zone_id', 'target', 'exclude_targets', 'ports', 'exclude_ports', 'profile', 'label', 'access_point', 'tester_ip', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
 
 const optionalChangedCount = computed(() => {
   const values = [...optionalFields.slice(0, -1).map((field) => form.value[field as keyof FormValues]), artifactRoot.value];
@@ -45,6 +47,10 @@ const optionalChangedCount = computed(() => {
 });
 
 const firstErrorField = computed(() => props.errors[0]?.field);
+
+function fieldError(field: string) {
+  return props.errors.find((error) => error.field === field)?.message;
+}
 
 function insertHighriskPorts() {
   form.value.ports = props.highriskPorts;
@@ -68,14 +74,17 @@ onMounted(() => {
   if (props.zones.length === 1 && !form.value.zone_id) form.value.zone_id = props.defaultZoneId;
   if (optionalChangedCount.value > 0 || props.errors.some(({ field }) => optionalFields.includes(field))) optionalOpen.value = true;
   if (firstErrorField.value) {
-    nextTick(() => document.getElementsByName(firstErrorField.value!)[0]?.focus());
+    nextTick(() => {
+      if (formFields.includes(firstErrorField.value!)) document.getElementsByName(firstErrorField.value!)[0]?.focus();
+      else errorSummary.value?.focus();
+    });
   }
 });
 </script>
 
 <template>
   <div class="scan-create">
-    <div v-if="errors.length" class="alert alert-error" role="alert">
+    <div v-if="errors.length" ref="errorSummary" class="alert alert-error" role="alert" tabindex="-1">
       <strong>预检失败</strong>
       <ul>
         <li v-for="error in errors" :key="`${error.field}:${error.message}`">{{ error.field }}: {{ error.message }}</li>
@@ -94,41 +103,47 @@ onMounted(() => {
 
       <label>
         <span>网络分区 (Zone) <span class="required">*</span></span>
-        <select v-model="form.zone_id" name="zone_id" required>
+        <select v-model="form.zone_id" name="zone_id" required :aria-describedby="fieldError('zone_id') ? 'error-zone_id' : undefined">
           <option value="">请选择 Zone</option>
           <option v-for="zone in zones" :key="zone.id" :value="zone.id">{{ zone.name }} ({{ zone.id }})</option>
         </select>
+        <p v-if="fieldError('zone_id')" id="error-zone_id" class="field-error">{{ fieldError('zone_id') }}</p>
       </label>
 
       <label>
         <span>扫描档位 <span class="required">*</span></span>
-        <select v-model="form.profile" name="profile" required>
+        <select v-model="form.profile" name="profile" required :aria-describedby="fieldError('profile') ? 'error-profile' : undefined">
           <option value="slow">slow (轻载/低速率)</option>
           <option value="normal">normal (均衡/默认值)</option>
           <option value="fast">fast (极速/多路并发)</option>
         </select>
+        <p v-if="fieldError('profile')" id="error-profile" class="field-error">{{ fieldError('profile') }}</p>
       </label>
 
       <label class="full-width">
         <span>目标资产 <span class="required">*</span></span>
-        <textarea v-model="form.target" name="target" rows="4" required placeholder="支持 IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔" />
+        <textarea v-model="form.target" name="target" rows="4" required placeholder="支持 IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔" :aria-describedby="fieldError('target') ? 'error-target' : undefined" />
+        <p v-if="fieldError('target')" id="error-target" class="field-error">{{ fieldError('target') }}</p>
       </label>
 
       <label class="full-width">
         <span>端口范围 <span class="required">*</span></span>
-        <textarea v-model="form.ports" name="ports" rows="3" required placeholder="支持: top1000、100-1000 或 80,443,8080" />
+        <textarea v-model="form.ports" name="ports" rows="3" required placeholder="支持: top1000、100-1000 或 80,443,8080" :aria-describedby="fieldError('ports') ? 'error-ports' : undefined" />
         <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
         <button class="link-button" type="button" @click="insertHighriskPorts">＋ 插入高危端口列表</button>
+        <p v-if="fieldError('ports')" id="error-ports" class="field-error">{{ fieldError('ports') }}</p>
       </label>
 
       <label>
         <span>测试设备接入点 <span class="required">*</span></span>
-        <input v-model="form.access_point" name="access_point" required placeholder="XX 屏柜/xxx 交换机">
+        <input v-model="form.access_point" name="access_point" required placeholder="XX 屏柜/xxx 交换机" :aria-describedby="fieldError('access_point') ? 'error-access_point' : undefined">
+        <p v-if="fieldError('access_point')" id="error-access_point" class="field-error">{{ fieldError('access_point') }}</p>
       </label>
 
       <label>
         <span>测试设备 IP <span class="required">*</span></span>
-        <input v-model="form.tester_ip" name="tester_ip" required placeholder="例如：10.0.0.5">
+        <input v-model="form.tester_ip" name="tester_ip" required placeholder="例如：10.0.0.5" :aria-describedby="fieldError('tester_ip') ? 'error-tester_ip' : undefined">
+        <p v-if="fieldError('tester_ip')" id="error-tester_ip" class="field-error">{{ fieldError('tester_ip') }}</p>
       </label>
 
       <details :open="optionalOpen" class="details-block full-width" data-scan-create-options @toggle="optionalOpen = ($event.currentTarget as HTMLDetailsElement).open">
@@ -140,7 +155,7 @@ onMounted(() => {
           </label>
           <label>
             <span>备注</span>
-            <input v-model="form.notes" name="notes" placeholder="本次扫描的特殊说明">
+            <textarea v-model="form.notes" name="notes" rows="2" placeholder="本次扫描的特殊说明" />
           </label>
           <label class="full-width">
             <span>排除目标</span>
@@ -185,4 +200,5 @@ onMounted(() => {
 <style scoped>
 .alert ul { margin: 0.45rem 0 0; padding-left: 1.25rem; }
 .details-block summary span { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.field-error { color: var(--danger); font-size: 0.8rem; margin: 0; }
 </style>
