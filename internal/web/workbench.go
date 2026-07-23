@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/json"
-	"html/template"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,14 +16,14 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
 
-// workbenchViewModel is the data passed to the verification workbench template.
-// It contains the aggregated project report and existing verifications so the UI
-// can render positive candidates, negative candidates and incomplete checks.
+// workbenchCandidate wraps a positive candidate with its parent zone.
 type workbenchCandidate struct {
 	report.ProjectVulnerabilityCandidate
 	ZoneID string
 }
 
+// negativeFingerprintGroup aggregates assets that share the same service fingerprint
+// within one zone for negative verification.
 type negativeFingerprintGroup struct {
 	Key           string
 	Title         string
@@ -37,27 +36,43 @@ type negativeFingerprintGroup struct {
 	PortsText     string
 }
 
+// incompleteWorkbenchItem wraps an incomplete check with its parent zone.
 type incompleteWorkbenchItem struct {
 	report.ProjectIncompleteCheck
 	ZoneID string `json:"zone_id"`
 }
 
-type workbenchViewModel struct {
-	Project              store.Project
-	Zones                []store.ProjectZone
-	ZoneNames            map[string]string
-	Report               report.ProjectReport
-	Verifications        []store.Verification
-	VerificationMap      map[string]store.Verification
-	NegativeGroups       []negativeFingerprintGroup
-	CandidatesJSON       template.JS
-	NegativeGroupsJSON   template.JS
-	IncompleteChecksJSON template.JS
-	PositiveCount        int
-	NegativeCount        int
-	IncompleteCount      int
-	CatalogStatus        string
-	CatalogDiagnostics   []string
+// workbenchData is the shared aggregation result for both the HTML page and the
+// JSON API. It is serialized into props for the Vue workbench component.
+type workbenchData struct {
+	ProjectID          string
+	ProjectName        string
+	Zones              []store.ProjectZone
+	ZoneNames          map[string]string
+	Candidates         []workbenchCandidate
+	NegativeGroups     []negativeFingerprintGroup
+	IncompleteChecks   []incompleteWorkbenchItem
+	Verifications      []store.Verification
+	VerificationMap  map[string]store.Verification
+	PositiveCount      int
+	NegativeCount      int
+	IncompleteCount    int
+	CatalogStatus      string
+	CatalogDiagnostics []string
+}
+
+// workbenchPageData is the minimal data the server-rendered workbench template
+// needs: project metadata for the header and JSON props for Vue.
+type workbenchPageData struct {
+	Project   store.Project
+	PropsJSON string
+}
+
+// workbenchCounts mirrors the queue tab counters.
+type workbenchCounts struct {
+	Positive   int `json:"positive"`
+	Negative   int `json:"negative"`
+	Incomplete int `json:"incomplete"`
 }
 
 func negativeFingerprintKey(fp report.ProjectNegativeCandidate) string {
@@ -204,31 +219,23 @@ func fingerprintFromAsset(asset report.ProjectAsset, g *negativeFingerprintGroup
 	})
 }
 
-func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {
-	project, err := s.store.GetProject(projectID)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
+func (s *server) buildWorkbenchData(projectID string) (workbenchData, error) {
+	var data workbenchData
 	zones, err := s.store.ListProjectZones(projectID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return data, err
 	}
 	input, err := s.store.BuildProjectReportInput(projectID, s.catalog)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return data, err
 	}
 	projReport, err := report.BuildProjectReport(input)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return data, err
 	}
 	verifications, err := s.store.ListProjectVerifications(projectID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return data, err
 	}
 	zoneNames := make(map[string]string, len(zones))
 	for _, z := range zones {
@@ -258,52 +265,128 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 	}
 	nseRules, err := config.LoadNSERulesForConfig(s.opts.ConfigPath)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return data, err
 	}
 	tagRules, err := config.LoadTagRulesForConfig(s.opts.ConfigPath)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return data, err
 	}
 	negativeGroups := groupNegativeCandidates(negatives, nseRules, tagRules)
 
-	candidatesJSON, err := json.Marshal(candidates)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	negativeGroupsJSON, err := json.Marshal(negativeGroups)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	incompletesJSON, err := json.Marshal(incompletes)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	diagnostics := make([]string, 0, len(s.catalog.Diagnostics()))
 	for _, d := range s.catalog.Diagnostics() {
 		diagnostics = append(diagnostics, d.Reason)
 	}
-	render(w, "templates/workbench.html", workbenchViewModel{
-		Project:              project,
-		Zones:                zones,
-		ZoneNames:            zoneNames,
-		Report:               projReport,
-		Verifications:        verifications,
-		VerificationMap:      verificationMap,
-		NegativeGroups:       negativeGroups,
-		CandidatesJSON:       template.JS(candidatesJSON),
-		NegativeGroupsJSON:   template.JS(negativeGroupsJSON),
-		IncompleteChecksJSON: template.JS(incompletesJSON),
-		PositiveCount:        posCount,
-		NegativeCount:        len(negativeGroups),
-		IncompleteCount:      incCount,
-		CatalogStatus:        string(s.catalog.Status()),
-		CatalogDiagnostics:   diagnostics,
+
+	return workbenchData{
+		Zones:              zones,
+		ZoneNames:          zoneNames,
+		Candidates:         candidates,
+		NegativeGroups:     negativeGroups,
+		IncompleteChecks:   incompletes,
+		Verifications:      verifications,
+		VerificationMap:    verificationMap,
+		PositiveCount:      posCount,
+		NegativeCount:      len(negativeGroups),
+		IncompleteCount:    incCount,
+		CatalogStatus:      string(s.catalog.Status()),
+		CatalogDiagnostics: diagnostics,
+	}, nil
+}
+
+func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {
+	project, err := s.store.GetProject(projectID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := s.buildWorkbenchData(projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data.ProjectID = project.ID
+	data.ProjectName = project.Name
+	props := struct {
+		ProjectID          string                     `json:"project_id"`
+		ProjectName        string                     `json:"project_name"`
+		Zones              []store.ProjectZone        `json:"zones"`
+		ZoneNames          map[string]string          `json:"zone_names"`
+		Candidates         []workbenchCandidate       `json:"candidates"`
+		NegativeGroups     []negativeFingerprintGroup `json:"negative_groups"`
+		IncompleteChecks   []incompleteWorkbenchItem  `json:"incomplete_checks"`
+		Verifications      []store.Verification       `json:"verifications"`
+		Counts             workbenchCounts            `json:"counts"`
+		CatalogStatus      string                     `json:"catalog_status"`
+		CatalogDiagnostics []string                   `json:"catalog_diagnostics"`
+	}{
+		ProjectID:          data.ProjectID,
+		ProjectName:        data.ProjectName,
+		Zones:              data.Zones,
+		ZoneNames:          data.ZoneNames,
+		Candidates:         data.Candidates,
+		NegativeGroups:     data.NegativeGroups,
+		IncompleteChecks:   data.IncompleteChecks,
+		Verifications:      data.Verifications,
+		Counts:             workbenchCounts{Positive: data.PositiveCount, Negative: data.NegativeCount, Incomplete: data.IncompleteCount},
+		CatalogStatus:      data.CatalogStatus,
+		CatalogDiagnostics: data.CatalogDiagnostics,
+	}
+	propsJSON, err := json.Marshal(props)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	render(w, "templates/workbench.html", workbenchPageData{
+		Project:   project,
+		PropsJSON: string(propsJSON),
 	})
+}
+
+func (s *server) projectWorkbenchAPI(w http.ResponseWriter, r *http.Request, projectID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	project, err := s.store.GetProject(projectID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := s.buildWorkbenchData(projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data.ProjectID = project.ID
+	data.ProjectName = project.Name
+	resp := struct {
+		ProjectID          string                     `json:"project_id"`
+		ProjectName        string                     `json:"project_name"`
+		Zones              []store.ProjectZone        `json:"zones"`
+		ZoneNames          map[string]string          `json:"zone_names"`
+		Candidates         []workbenchCandidate       `json:"candidates"`
+		NegativeGroups     []negativeFingerprintGroup `json:"negative_groups"`
+		IncompleteChecks   []incompleteWorkbenchItem  `json:"incomplete_checks"`
+		Verifications      []store.Verification       `json:"verifications"`
+		Counts             workbenchCounts            `json:"counts"`
+		CatalogStatus      string                     `json:"catalog_status"`
+		CatalogDiagnostics []string                   `json:"catalog_diagnostics"`
+	}{
+		ProjectID:          data.ProjectID,
+		ProjectName:        data.ProjectName,
+		Zones:              data.Zones,
+		ZoneNames:          data.ZoneNames,
+		Candidates:         data.Candidates,
+		NegativeGroups:     data.NegativeGroups,
+		IncompleteChecks:   data.IncompleteChecks,
+		Verifications:      data.Verifications,
+		Counts:             workbenchCounts{Positive: data.PositiveCount, Negative: data.NegativeCount, Incomplete: data.IncompleteCount},
+		CatalogStatus:      data.CatalogStatus,
+		CatalogDiagnostics: data.CatalogDiagnostics,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 type projectCommandResponse struct {
@@ -334,11 +417,13 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 	}
 
 	var cand *report.ProjectVulnerabilityCandidate
+	var candZoneID string
 	for _, zone := range projReport.Zones {
 		for i := range zone.PositiveCandidates {
 			if zone.PositiveCandidates[i].GroupKey == key {
 				c := zone.PositiveCandidates[i]
 				cand = &c
+				candZoneID = zone.Zone.ZoneID
 				break
 			}
 		}
@@ -399,7 +484,13 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 		if returnPath == "" {
 			returnPath = "/projects/" + projectID + "/workbench"
 		}
+		verificationID := strings.TrimSpace(r.FormValue("verification_id"))
 		q := url.Values{}
+		q.Set("project_id", projectID)
+		q.Set("zone_id", candZoneID)
+		if verificationID != "" {
+			q.Set("verification_id", verificationID)
+		}
 		q.Set("raw_args", commands[0].ToolArgs)
 		q.Set("return", returnPath)
 		resp.ToolLink = "/tools/" + tool + "?" + q.Encode()

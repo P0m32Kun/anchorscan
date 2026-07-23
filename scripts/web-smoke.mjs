@@ -215,6 +215,7 @@ try {
   await assert.doesNotReject(() => options.getByText('已修改 1 项').waitFor());
   await options.locator('summary').click();
   await page.locator('select[name="zone_id"]').selectOption({ index: 1 });
+  await page.locator('select[name="profile"]').selectOption('normal');
   await page.locator('textarea[name="target"]').fill('192.0.2.10');
   await page.locator('textarea[name="ports"]').fill('invalid');
   await page.locator('input[name="access_point"]').fill('Browser lab switch');
@@ -245,6 +246,7 @@ try {
 
   await page.goto(`${baseURL}${projectURL}/scans/new`, { waitUntil: 'networkidle' });
   await page.locator('select[name="zone_id"]').selectOption({ index: 1 });
+  await page.locator('select[name="profile"]').selectOption('normal');
   await page.locator('textarea[name="target"]').fill('192.0.2.20');
   await page.locator('textarea[name="ports"]').fill('80');
   await page.locator('input[name="access_point"]').fill('Browser lab switch');
@@ -274,10 +276,16 @@ try {
   assert.equal(await page.locator('select[name="profile"]').inputValue(), 'fast');
   await page.locator('textarea[name="target"]').focus();
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'target');
-  await page.locator('textarea[name="target"]').press('Tab');
+  await page.keyboard.press('Tab');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'ports');
-  await page.locator('textarea[name="ports"]').press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'access_point');
+  await page.keyboard.press('Tab');
+  // The "insert high-risk ports" shortcut is a focusable button between ports and access_point.
+  let activeName = await page.evaluate(() => document.activeElement?.getAttribute('name'));
+  if (activeName !== 'access_point') {
+    await page.keyboard.press('Tab');
+    activeName = await page.evaluate(() => document.activeElement?.getAttribute('name'));
+  }
+  assert.equal(activeName, 'access_point');
 
   await page.getByRole('link', { name: '扫描历史' }).click();
   await page.waitForURL(`${baseURL}/runs`);
@@ -303,6 +311,31 @@ try {
 
   await page.setViewportSize({ width: 1280, height: 960 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+
+  // Workbench regression: seed a completed run with a non-info finding and verify
+  // the candidate renders, the verify dialog opens, and the first focusable control
+  // inside the dialog is keyboard-reachable.
+  await seedRun(`INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir, include_in_report) VALUES
+    ('browser-workbench', '${projectID}', 'dmz', '192.0.2.50', '6379', 'normal', 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{}', '', 1);
+    INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url, protocol, cpe, extrainfo, tunnel) VALUES
+    ('browser-workbench', '192.0.2.50', 6379, 'redis', '', '', 'redis', 0, '', 'tcp', '', '', '');
+    INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output, protocol, scope) VALUES
+    ('browser-workbench', '192.0.2.50', 6379, 'nuclei', 'redis-default-login', 'high', 'Workbench smoke finding', '192.0.2.50:6379', '', 'tcp', '');`);
+  await page.goto(`${baseURL}${projectURL}/workbench`, { waitUntil: 'networkidle' });
+  await page.locator('[data-workbench][data-mounted="true"]').waitFor();
+  await assert.doesNotReject(() => page.getByText('Workbench smoke finding').waitFor());
+  await page.getByRole('button', { name: '验证 / 编辑' }).first().click();
+  const dialog = page.locator('dialog.verify-dialog');
+  await assert.doesNotReject(() => dialog.waitFor());
+  await page.waitForFunction(() => {
+    const active = document.activeElement;
+    return active?.tagName === 'INPUT' || active?.tagName === 'SELECT' || active?.tagName === 'TEXTAREA';
+  });
+  const focusedName = await page.evaluate(() => document.activeElement?.getAttribute('name') || document.activeElement?.tagName || '');
+  assert.ok(focusedName === 'title' || focusedName === 'INPUT', `verify dialog first focusable should be reachable, got ${focusedName}`);
+  await page.keyboard.press('Escape');
+  await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
+
   await page.goto(`${baseURL}/config`);
   assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'theme preference should persist on config page');
   await page.getByRole('button', { name: '跟随系统' }).first().click();

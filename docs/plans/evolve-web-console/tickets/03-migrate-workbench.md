@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — 简化扫描创建流程。
 
-**Status:** proposed
+**Status:** done
 
 **Execution skills:** `tdd`、`frontend-visual-design`、`browser:control-in-app-browser`、`code-review`、`ponytail`。
 

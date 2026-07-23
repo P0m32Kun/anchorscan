@@ -1064,7 +1064,7 @@ assert.equal(mockProgressBar.style.width, '80%');
   assert.equal(textSpan._innerHTML, ''); // should not set raw innerHTML of the text span!
 }
 
-// Test imagesFromClipboardData (clipboard image extraction helper used by workbench.js)
+// Test imagesFromClipboardData (clipboard image extraction helper)
 {
   let domContentLoadedCallback = null;
   const helperContext = {

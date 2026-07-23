@@ -74,6 +74,20 @@ func (s *server) projects(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *server) projectAPI(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/projects/")
+	segments := strings.Split(strings.Trim(path, "/"), "/")
+	if len(segments) == 0 || segments[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	id := segments[0]
+	if len(segments) == 2 && segments[1] == "workbench" {
+		s.projectWorkbenchAPI(w, r, id)
+		return
+	}
+	http.NotFound(w, r)
+}
 func (s *server) projectNew(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

@@ -149,6 +149,36 @@ func setupWorkbenchProject(t *testing.T) (http.Handler, string, string, string) 
 	return handler, project.ID, run.RunID, dbPath
 }
 
+func TestWorkbenchAPIReturnsWorkbenchData(t *testing.T) {
+	handler, projectID, _, _ := setupWorkbenchProject(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/projects/"+projectID+"/workbench", nil)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal returned error: %v", err)
+	}
+	if payload["project_id"] != projectID {
+		t.Fatalf("expected project_id %s, got %v", projectID, payload["project_id"])
+	}
+	candidates, ok := payload["candidates"].([]any)
+	if !ok || len(candidates) == 0 {
+		t.Fatalf("expected candidates array, got %#v", payload["candidates"])
+	}
+	first := candidates[0].(map[string]any)
+	if first["Title"] != "Redis 默认登录" {
+		t.Fatalf("expected Redis candidate title, got %v", first["Title"])
+	}
+	counts := payload["counts"].(map[string]any)
+	if counts["positive"] != float64(1) {
+		t.Fatalf("expected positive count 1, got %v", counts["positive"])
+	}
+}
+
 func TestWorkbenchPageListsPositiveCandidate(t *testing.T) {
 	handler, projectID, _, _ := setupWorkbenchProject(t)
 
@@ -159,11 +189,14 @@ func TestWorkbenchPageListsPositiveCandidate(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
+	if !strings.Contains(body, `data-workbench`) {
+		t.Fatalf("expected vue mount point in body, got: %s", body)
+	}
 	if !strings.Contains(body, "Redis 默认登录") {
-		t.Fatalf("expected candidate title in body, got: %s", body)
+		t.Fatalf("expected candidate title in serialized props, got: %s", body)
 	}
 	if !strings.Contains(body, "192.168.1.10:6379") {
-		t.Fatalf("expected asset in body, got: %s", body)
+		t.Fatalf("expected asset in serialized props, got: %s", body)
 	}
 }
 
@@ -194,8 +227,11 @@ func TestWorkbenchCandidateCommandGeneratesToolLink(t *testing.T) {
 		t.Fatalf("expected tool_link, got empty: %#v", payload)
 	}
 	toolLink := payload["tool_link"].(string)
-	if strings.Contains(toolLink, "project_id=") || strings.Contains(toolLink, "zone_id=") || strings.Contains(toolLink, "verification_id=") {
-		t.Fatalf("tool link must not pre-bind project context: %s", toolLink)
+	if !strings.Contains(toolLink, "project_id=") || !strings.Contains(toolLink, "zone_id=") {
+		t.Fatalf("tool link must carry project context: %s", toolLink)
+	}
+	if !strings.Contains(toolLink, "raw_args=") || !strings.Contains(toolLink, "return=") {
+		t.Fatalf("tool link must carry raw_args and return: %s", toolLink)
 	}
 }
 
@@ -425,8 +461,8 @@ func setupNegativeWorkbenchProject(t *testing.T) (http.Handler, string, string) 
 }
 
 // TestWorkbenchPageRendersNegativeAndIncomplete verifies that the workbench page
-// includes the negative candidate section and the incomplete check section when
-// the appropriate detection check data is present.
+// includes the serialized negative candidate and incomplete check data in the
+// Vue mount point props.
 func TestWorkbenchPageRendersNegativeAndIncomplete(t *testing.T) {
 	handler, projectID, _ := setupNegativeWorkbenchProject(t)
 
@@ -437,20 +473,36 @@ func TestWorkbenchPageRendersNegativeAndIncomplete(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	// negative candidate port 80 should appear
-	if !strings.Contains(body, "10.0.0.1:80") {
-		t.Fatalf("expected negative candidate 10.0.0.1:80 in body")
+	if !strings.Contains(body, `data-workbench`) {
+		t.Fatalf("expected vue mount point in body")
 	}
-	// incomplete check port 443 should appear
-	if !strings.Contains(body, "10.0.0.1:443") {
-		t.Fatalf("expected incomplete check 10.0.0.1:443 in body")
+
+	// Assert via the JSON API that both queues contain the expected endpoints.
+	apiReq := httptest.NewRequest(http.MethodGet, "/api/projects/"+projectID+"/workbench", nil)
+	apiRes := httptest.NewRecorder()
+	handler.ServeHTTP(apiRes, apiReq)
+	if apiRes.Code != http.StatusOK {
+		t.Fatalf("expected api 200, got %d: %s", apiRes.Code, apiRes.Body.String())
 	}
-	// queue tabs should be rendered
-	if !strings.Contains(body, "queue-negative") {
-		t.Fatalf("expected queue-negative panel in body")
+	var payload map[string]any
+	if err := json.Unmarshal(apiRes.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal api returned error: %v", err)
 	}
-	if !strings.Contains(body, "queue-incomplete") {
-		t.Fatalf("expected queue-incomplete panel in body")
+	negGroups, ok := payload["negative_groups"].([]any)
+	if !ok || len(negGroups) == 0 {
+		t.Fatalf("expected negative groups, got %#v", payload["negative_groups"])
+	}
+	negAssets := negGroups[0].(map[string]any)["Assets"].([]any)
+	if len(negAssets) == 0 || negAssets[0].(map[string]any)["IP"] != "10.0.0.1" || int(negAssets[0].(map[string]any)["Port"].(float64)) != 80 {
+		t.Fatalf("expected negative candidate 10.0.0.1:80, got %#v", negAssets)
+	}
+	incItems, ok := payload["incomplete_checks"].([]any)
+	if !ok || len(incItems) == 0 {
+		t.Fatalf("expected incomplete items, got %#v", payload["incomplete_checks"])
+	}
+	incAsset := incItems[0].(map[string]any)["Asset"].(map[string]any)
+	if incAsset["IP"] != "10.0.0.1" || int(incAsset["Port"].(float64)) != 443 {
+		t.Fatalf("expected incomplete check 10.0.0.1:443, got %#v", incAsset)
 	}
 }
 
@@ -555,56 +607,26 @@ func TestWorkbenchSubmitNegativeVerification(t *testing.T) {
 func TestWorkbenchIncompleteCheckExcludedFromNegative(t *testing.T) {
 	handler, projectID, _ := setupNegativeWorkbenchProject(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/projects/"+projectID+"/workbench", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/projects/"+projectID+"/workbench", nil)
 	res := httptest.NewRecorder()
 	handler.ServeHTTP(res, req)
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
 	}
-	body := res.Body.String()
 
-	// Extract the JSON embedded in the page.
-	negStart := strings.Index(body, `id="negative-groups-data"`)
-	incStart := strings.Index(body, `id="incomplete-data"`)
-	if negStart < 0 || incStart < 0 {
-		t.Fatalf("expected embedded JSON blocks, got: (truncated)")
+	var payload map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal api returned error: %v", err)
 	}
-
-	extractJSON := func(marker string) string {
-		start := strings.Index(body, marker)
-		if start < 0 {
-			return ""
-		}
-		after := body[start:]
-		open := strings.Index(after, ">")
-		if open < 0 {
-			return ""
-		}
-		rest := after[open+1:]
-		close := strings.Index(rest, "</script>")
-		if close < 0 {
-			return ""
-		}
-		return strings.TrimSpace(rest[:close])
-	}
-
-	negJSON := extractJSON(`id="negative-groups-data"`)
-	incJSON := extractJSON(`id="incomplete-data"`)
-
-	var negGroups []map[string]any
-	var incItems []map[string]any
-	if err := json.Unmarshal([]byte(negJSON), &negGroups); err != nil {
-		t.Fatalf("unmarshal negative-groups-data returned error: %v — json: %s", err, negJSON)
-	}
-	if err := json.Unmarshal([]byte(incJSON), &incItems); err != nil {
-		t.Fatalf("unmarshal incomplete-data returned error: %v — json: %s", err, incJSON)
-	}
+	negGroups := payload["negative_groups"].([]any)
+	incItems := payload["incomplete_checks"].([]any)
 
 	// Negative queue: only port 80 (both completed) grouped by fingerprint
 	if len(negGroups) != 1 {
 		t.Fatalf("expected 1 negative group, got %d", len(negGroups))
 	}
-	assets := negGroups[0]["Assets"].([]any)
+	g := negGroups[0].(map[string]any)
+	assets := g["Assets"].([]any)
 	if len(assets) != 1 {
 		t.Fatalf("expected 1 asset in negative group, got %d", len(assets))
 	}
@@ -617,7 +639,8 @@ func TestWorkbenchIncompleteCheckExcludedFromNegative(t *testing.T) {
 	if len(incItems) != 1 {
 		t.Fatalf("expected 1 incomplete item, got %d", len(incItems))
 	}
-	incAsset := incItems[0]["Asset"].(map[string]any)
+	inc := incItems[0].(map[string]any)
+	incAsset := inc["Asset"].(map[string]any)
 	if int(incAsset["Port"].(float64)) != 443 {
 		t.Fatalf("expected port 443 in incomplete queue, got %v", incAsset["Port"])
 	}
@@ -714,6 +737,6 @@ func TestWorkbenchJSONUsesFieldNamesConsumedByJavaScript(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(candidateJSON), `"ZoneID":"I"`) || !strings.Contains(string(groupJSON), `"Key":"I|redis"`) || !strings.Contains(string(groupJSON), `"ZoneID":"I"`) {
-		t.Fatalf("JSON fields do not match workbench.js: candidate=%s group=%s", candidateJSON, groupJSON)
+		t.Fatalf("JSON fields must match Vue prop contract: candidate=%s group=%s", candidateJSON, groupJSON)
 	}
 }

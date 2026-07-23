@@ -79,6 +79,7 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServerFS(assets))
 	mux.HandleFunc("/projects", s.projects)
+	mux.HandleFunc("/api/projects/", s.projectAPI)
 	mux.HandleFunc("/projects/new", s.projectNew)
 	mux.HandleFunc("/projects/", s.projectDetail)
 	mux.HandleFunc("/scan", s.scanCreate)
