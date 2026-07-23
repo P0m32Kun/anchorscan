@@ -66,7 +66,7 @@ func negativeFingerprintKey(fp report.ProjectNegativeCandidate) string {
 	if service == "" {
 		service = "unknown"
 	}
-	parts := []string{service}
+	parts := []string{strings.TrimSpace(fp.ZoneID), service}
 	if product != "" {
 		parts = append(parts, product)
 	}
@@ -230,8 +230,16 @@ func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projec
 			incCount++
 		}
 	}
-	nseRules, _ := config.LoadNSERulesForConfig(s.opts.ConfigPath)
-	tagRules, _ := config.LoadTagRulesForConfig(s.opts.ConfigPath)
+	nseRules, err := config.LoadNSERulesForConfig(s.opts.ConfigPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tagRules, err := config.LoadTagRulesForConfig(s.opts.ConfigPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	negativeGroups := groupNegativeCandidates(negatives, nseRules, tagRules)
 
 	candidatesJSON, err := json.Marshal(candidates)
@@ -300,13 +308,11 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 	}
 
 	var cand *report.ProjectVulnerabilityCandidate
-	var zoneID string
 	for _, zone := range projReport.Zones {
 		for i := range zone.PositiveCandidates {
 			if zone.PositiveCandidates[i].GroupKey == key {
 				c := zone.PositiveCandidates[i]
 				cand = &c
-				zoneID = zone.Zone.ZoneID
 				break
 			}
 		}
@@ -363,19 +369,13 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 
 	resp := projectCommandResponse{Commands: commands, Warning: warning}
 	if len(commands) == 1 && commands[0].TargetFile == "" && (tool == "nuclei" || tool == "nmap") {
-		verificationID := strings.TrimSpace(r.FormValue("verification_id"))
 		returnPath := strings.TrimSpace(r.FormValue("return"))
 		if returnPath == "" {
 			returnPath = "/projects/" + projectID + "/workbench"
 		}
 		q := url.Values{}
 		q.Set("raw_args", commands[0].ToolArgs)
-		q.Set("project_id", projectID)
-		q.Set("zone_id", zoneID)
 		q.Set("return", returnPath)
-		if verificationID != "" {
-			q.Set("verification_id", verificationID)
-		}
 		resp.ToolLink = "/tools/" + tool + "?" + q.Encode()
 	}
 

@@ -150,7 +150,7 @@
     </p>
     <div class="negative-toolbar">
       <button class="button button-primary" id="negative-submit-btn" disabled>提交所选指纹组…</button>
-      <span id="negative-selected-count" class="meta-line">已选 0 组</span>
+      <span id="negative-selected-count" class="meta-line">请选择 1 组</span>
     </div>
   </section>
 
@@ -165,7 +165,7 @@
       data-product="{{.Product}}"
       data-port="{{.Port}}">
       <label class="candidate-select-row">
-        <input type="checkbox" class="negative-select" aria-label="选择 {{.Title}}">
+        <input type="radio" name="negative-group" class="negative-select" aria-label="选择 {{.Title}}">
         <div class="candidate-header" style="margin-bottom:0">
           <h3 style="font-size:0.95rem">{{.Title}}</h3>
           <div class="candidate-meta">

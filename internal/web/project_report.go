@@ -189,9 +189,6 @@ func projectReportMissingMetadata(project store.Project) []string {
 }
 
 func reportTitle(project store.Project) string {
-	if title := strings.TrimSpace(project.ReportTitle); title != "" {
-		return title
-	}
 	unit := strings.TrimSpace(project.ClientUnit)
 	if unit == "" {
 		unit = strings.TrimSpace(project.Name)

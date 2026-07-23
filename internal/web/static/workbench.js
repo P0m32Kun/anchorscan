@@ -355,7 +355,6 @@ verifyFileInput?.addEventListener('change', () => {
 });
 
 verifyDialog?.addEventListener('paste', async (e) => {
-  if(e.target?.closest('input, textarea')) return;
   const files = imagesFromClipboardData(e.clipboardData?.items);
   if(files.length === 0) return;
   e.preventDefault();
@@ -439,7 +438,7 @@ const negativeSelectedCount = document.getElementById('negative-selected-count')
 function updateNegativeSelection(){
   const checked = document.querySelectorAll('.negative-select:checked');
   const n = checked.length;
-  negativeSelectedCount.textContent = '已选 ' + n + ' 组';
+  negativeSelectedCount.textContent = n === 1 ? '已选 1 组' : '请选择 1 组';
   if(negativeSubmitBtn) negativeSubmitBtn.disabled = n === 0;
 }
 
@@ -502,7 +501,6 @@ negEvidenceFile?.addEventListener('change', () => {
 });
 
 negativeDialog?.addEventListener('paste', async (e) => {
-  if(e.target?.closest('input, textarea')) return;
   const files = imagesFromClipboardData(e.clipboardData?.items);
   if(files.length === 0) return;
   e.preventDefault();
@@ -525,7 +523,6 @@ negativeSubmitBtn?.addEventListener('click', () => {
 
   resetNegDialog();
 
-  // Use the single selected group (multi-group not supported)
   const card = checked[0].closest('.candidate-card');
   const group = negativeGroupByKey(card?.dataset.key);
   if(!group) return;

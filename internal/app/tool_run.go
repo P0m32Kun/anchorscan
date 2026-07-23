@@ -171,7 +171,7 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 	return []report.Finding{finding}, nil
 }
 
-var ansiEscapeRe = regexp.MustCompile("\x1b\\[[0-9;]*[A-Za-z]")
+var ansiEscapeRe = regexp.MustCompile("(?:\x1b)?\\[[0-9;]*[A-Za-z]")
 
 // normalizeToolOutput strips ANSI escape sequences and resolves \r progress
 // overwrites so only the final line state remains. The \r handling keeps the
@@ -444,5 +444,6 @@ func firstNonEmpty(values ...string) string {
 }
 
 func emitTool(opts ToolRunOptions, scanStore *store.Store, level string, stage string, format string, args ...any) {
-	storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}.Emit(level, stage, format, args...)
+	message := normalizeToolOutput(fmt.Sprintf(format, args...))
+	storeProgress{runID: opts.RunID, log: opts.Logf, store: scanStore, now: time.Now}.Emit(level, stage, "%s", message)
 }

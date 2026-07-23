@@ -193,6 +193,10 @@ func TestWorkbenchCandidateCommandGeneratesToolLink(t *testing.T) {
 	if payload["tool_link"] == "" {
 		t.Fatalf("expected tool_link, got empty: %#v", payload)
 	}
+	toolLink := payload["tool_link"].(string)
+	if strings.Contains(toolLink, "project_id=") || strings.Contains(toolLink, "zone_id=") || strings.Contains(toolLink, "verification_id=") {
+		t.Fatalf("tool link must not pre-bind project context: %s", toolLink)
+	}
 }
 
 func TestWorkbenchCreateConfirmedAutoIncludes(t *testing.T) {
@@ -655,5 +659,20 @@ func TestGroupNegativeCandidatesByFingerprint(t *testing.T) {
 	}
 	if !strings.Contains(redisGroup.NucleiCommand, "-tags redis") {
 		t.Fatalf("expected NucleiCommand to use -tags redis, got %q", redisGroup.NucleiCommand)
+	}
+}
+
+func TestGroupNegativeCandidatesKeepsZonesSeparate(t *testing.T) {
+	negatives := []report.ProjectNegativeCandidate{
+		{Asset: report.ProjectAsset{IP: "10.0.0.1", Port: 6379, Protocol: "tcp"}, Fingerprint: fingerprint.ServiceFingerprint{Service: "redis"}, ZoneID: "I"},
+		{Asset: report.ProjectAsset{IP: "10.0.1.1", Port: 6379, Protocol: "tcp"}, Fingerprint: fingerprint.ServiceFingerprint{Service: "redis"}, ZoneID: "E"},
+	}
+
+	groups := groupNegativeCandidates(negatives, nil, nil)
+	if len(groups) != 2 {
+		t.Fatalf("expected separate groups for each zone, got %d: %#v", len(groups), groups)
+	}
+	if groups[0].ZoneID == groups[1].ZoneID || len(groups[0].Assets) != 1 || len(groups[1].Assets) != 1 {
+		t.Fatalf("unexpected zone grouping: %#v", groups)
 	}
 }

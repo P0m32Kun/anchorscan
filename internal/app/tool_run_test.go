@@ -38,6 +38,11 @@ func TestNormalizeToolOutput(t *testing.T) {
 			in:   "\x1b[2K\rdone",
 			want: "done",
 		},
+		{
+			name: "literal ansi residue stripped",
+			in:   "[[34mINF[0m] running",
+			want: "[INF] running",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -46,6 +51,19 @@ func TestNormalizeToolOutput(t *testing.T) {
 				t.Fatalf("normalizeToolOutput(%q) = %q, want %q", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEmitToolNormalizesOutput(t *testing.T) {
+	st := newToolRunStore(t)
+	emitTool(ToolRunOptions{RunID: "run-output"}, st, "info", "nuclei", "%s", "[[34mINF[0m] running")
+
+	events, err := st.ListScanEvents("run-output", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Message != "[INF] running" {
+		t.Fatalf("events = %#v", events)
 	}
 }
 
