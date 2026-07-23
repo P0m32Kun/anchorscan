@@ -142,8 +142,8 @@ type ProjectAsset struct {
 	RunIDs   []string
 }
 
-// ProjectNegativeCandidate is a fingerprint endpoint whose NSE and nuclei
-// checks both completed and has no non-info findings.
+// ProjectNegativeCandidate is a fingerprint endpoint covered by at least one
+// completed detection engine, with no incomplete applicable checks or non-info findings.
 type ProjectNegativeCandidate struct {
 	Asset       ProjectAsset
 	Fingerprint fingerprint.ServiceFingerprint
@@ -152,8 +152,7 @@ type ProjectNegativeCandidate struct {
 }
 
 // ProjectIncompleteCheck is a fingerprint endpoint that cannot be treated as a
-// negative candidate because at least one required detection check is missing,
-// failed, skipped, canceled or interrupted.
+// negative candidate because an applicable check is missing or ended abnormally.
 type ProjectIncompleteCheck struct {
 	Asset       ProjectAsset
 	Fingerprint fingerprint.ServiceFingerprint
@@ -433,24 +432,19 @@ func buildNegativeAndIncomplete(input ProjectReportInput, allowedRuns map[string
 		checks := checksByRunPort[fp.RunID][portKey]
 		asset := ProjectAsset{IP: assetHost, Port: fp.Port, Protocol: fp.Protocol, RunIDs: []string{fp.RunID}}
 
-		nse := checks["nse"]
-		nuclei := checks["nuclei"]
-		if nse.Status == "completed" && nuclei.Status == "completed" {
-			negative[idx] = append(negative[idx], ProjectNegativeCandidate{
-				Asset:       asset,
-				Fingerprint: fp.ServiceFingerprint,
-				RunID:       fp.RunID,
-				ZoneID:      zoneID,
-			})
-			continue
-		}
-
 		engines := []ProjectEngineStatus{}
+		hasCompleted := false
+		for _, check := range checks {
+			if check.Status == "completed" {
+				hasCompleted = true
+				break
+			}
+		}
 		for _, engine := range []string{"nse", "nuclei"} {
 			check, ok := checks[engine]
 			if !ok {
 				engines = append(engines, ProjectEngineStatus{Engine: engine, Status: "missing"})
-			} else if check.Status != "completed" {
+			} else if check.Status != "completed" && !isNonApplicableCheck(check) {
 				engines = append(engines, ProjectEngineStatus{Engine: engine, Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail})
 			}
 		}
@@ -458,11 +452,18 @@ func buildNegativeAndIncomplete(input ProjectReportInput, allowedRuns map[string
 			if engine == "nse" || engine == "nuclei" {
 				continue
 			}
-			if check.Status != "completed" {
+			if check.Status != "completed" && !isNonApplicableCheck(check) {
 				engines = append(engines, ProjectEngineStatus{Engine: engine, Status: check.Status, ReasonCode: check.ReasonCode, Detail: check.Detail})
 			}
 		}
-		if len(engines) > 0 {
+		if len(engines) == 0 && hasCompleted {
+			negative[idx] = append(negative[idx], ProjectNegativeCandidate{
+				Asset:       asset,
+				Fingerprint: fp.ServiceFingerprint,
+				RunID:       fp.RunID,
+				ZoneID:      zoneID,
+			})
+		} else if len(engines) > 0 {
 			incomplete[idx] = append(incomplete[idx], ProjectIncompleteCheck{
 				Asset:       asset,
 				Fingerprint: fp.ServiceFingerprint,
@@ -496,6 +497,10 @@ func buildNegativeAndIncomplete(input ProjectReportInput, allowedRuns map[string
 		})
 	}
 	return negative, incomplete
+}
+
+func isNonApplicableCheck(check ProjectDetectionCheck) bool {
+	return check.Status == "skipped" && check.ReasonCode == "no_matching_rule"
 }
 
 func sortAssets(assets map[string]ProjectAsset) []ProjectAsset {

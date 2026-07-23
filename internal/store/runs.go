@@ -89,6 +89,24 @@ func (s *Store) ListScanRuns(limit int) ([]ScanRun, error) {
 	return scanRunsFromRows(rows)
 }
 
+func (s *Store) ListToolRuns(limit int) ([]ScanRun, error) {
+	rows, err := s.db.Query(
+		`SELECT run_id, project_id, zone_id, kind, label, access_point, tester_ip, notes, include_in_report,
+			target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir
+		 FROM scan_runs
+		 WHERE kind = 'tool'
+		 ORDER BY started_at DESC
+		 LIMIT ?`,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanRunsFromRows(rows)
+}
+
 func (s *Store) ListProjectScanRuns(projectID string, limit int) ([]ScanRun, error) {
 	rows, err := s.db.Query(
 		`SELECT run_id, project_id, zone_id, kind, label, access_point, tester_ip, notes, include_in_report,

@@ -153,7 +153,7 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 		"序号",
 		"渗透测试结论",
 		"高危漏洞1个",
-		"Redis未授权访问不存在证明，端口（6379）",
+		"Redis未授权访问相关漏洞不存在证明，端口（6379）",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body", want)
@@ -173,6 +173,32 @@ func TestProjectReportHTMLRendersIncludedVerificationsAndEvidence(t *testing.T) 
 	conclusion := strings.Index(body, "四、渗透测试结论")
 	if results < 0 || summary < results || zone < summary || conclusion < zone || strings.Contains(body, "五、渗透测试结论") {
 		t.Fatalf("unexpected report section order")
+	}
+}
+
+func TestProjectReportHTMLRecoversLegacyUndefinedVerificationZone(t *testing.T) {
+	dir := t.TempDir()
+	st := newProjectReportStore(t, dir)
+	seedProjectReportFixtures(t, st)
+	full, err := st.GetVerification("v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	full.Verification.ZoneID = "undefined"
+	if err := st.UpdateVerification(full.Verification); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "弱口令") || !strings.Contains(res.Body.String(), "弱口令证据") {
+		t.Fatalf("legacy verification was omitted: %d %s", res.Code, res.Body.String())
 	}
 }
 

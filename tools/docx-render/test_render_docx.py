@@ -55,6 +55,18 @@ class RenderDocxTests(unittest.TestCase):
                 ["3", "不安全默认配置", "172.16.1.30:80", "低危"],
             ],
         )
+        text = "".join(document.itertext())
+        self.assertIn("\u3000\u3000\u3000\u300010.10.1.10", text)
+        remediation_paragraphs = [
+            paragraph
+            for paragraph in document.findall(".//w:p", NS)
+            if "".join(paragraph.itertext()).startswith(("第一条：", "第二条：", "第三条："))
+        ]
+        self.assertEqual(len(remediation_paragraphs), 3)
+        for paragraph in remediation_paragraphs:
+            indent = paragraph.find("w:pPr/w:ind", NS)
+            self.assertIsNotNone(indent)
+            self.assertEqual(indent.get(f"{{{W}}}firstLineChars"), "200")
 
     def test_runtime_renders_critical_conclusion(self) -> None:
         context = json.loads((ROOT / "fixtures/project_report.json").read_text())
@@ -71,6 +83,7 @@ class RenderDocxTests(unittest.TestCase):
 
         text = "".join(document.itertext())
         self.assertIn("其中严重漏洞1个、高危漏洞0个、中危漏洞1个、低危漏洞1个", text)
+        self.assertIn("Redis 未授权访问漏洞相关漏洞不存在证明，端口（6379）", text)
 
     def test_jpeg_images_keep_landscape_and_portrait_aspect_ratios(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

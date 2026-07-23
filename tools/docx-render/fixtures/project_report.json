@@ -36,7 +36,7 @@
           "label": "生产控制区扫描任务",
           "access_point": "调度数据网接入点",
           "tester_ip": "10.10.1.250",
-          "targets_text": "10.10.1.0/24",
+          "targets_text": "\n　　　　10.10.1.10\n　　　　10.10.1.11",
           "exclusions_text": "10.10.1.1",
           "notes": ""
         }
@@ -46,7 +46,11 @@
           "heading": "弱口令（严重）",
           "description": "目标服务使用了容易猜测的认证口令。",
           "assets_text": "10.10.1.10:22",
-          "remediation": "修改为符合单位口令策略的强口令，并限制管理端访问来源。",
+          "remediation_lines": [
+            "第一条：修改为符合单位口令策略的强口令。",
+            "第二条：限制管理端访问来源。",
+            "第三条：定期审计异常登录。"
+          ],
           "evidence": [
             {
               "image": "evidence-01-wide"
@@ -86,7 +90,7 @@
           "heading": "过期组件（中危）",
           "description": "目标使用的组件版本已停止安全维护。",
           "assets_text": "10.10.3.20:443",
-          "remediation": "评估兼容性后升级到仍受支持的稳定版本。",
+          "remediation_lines": ["评估兼容性后升级到仍受支持的稳定版本。"],
           "evidence": [
             {
               "image": "evidence-03-wide"
@@ -123,7 +127,7 @@
           "heading": "不安全默认配置（低危）",
           "description": "目标服务保留了不必要的默认配置。",
           "assets_text": "172.16.1.30:80",
-          "remediation": "删除示例配置并关闭不需要的默认功能。",
+          "remediation_lines": ["删除示例配置并关闭不需要的默认功能。"],
           "evidence": [
             {
               "image": "evidence-02-tall"

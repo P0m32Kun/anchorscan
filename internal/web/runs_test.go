@@ -243,6 +243,59 @@ func TestListScanRunsFiltersByScanKind(t *testing.T) {
 	}
 }
 
+func TestRunsPageListsOnlyToolRunsWhenRequested(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	for _, run := range []store.ScanRun{
+		{RunID: "scan-visible-only-on-default", Kind: "scan", Profile: "normal", Status: "completed", StartedAt: time.Unix(2, 0)},
+		{RunID: "tool-visible-in-history", Kind: "tool", Profile: "tool:nuclei", Status: "completed", StartedAt: time.Unix(1, 0)},
+	} {
+		if err := scanStore.SaveScanRun(run); err != nil {
+			t.Fatalf("SaveScanRun returned error: %v", err)
+		}
+	}
+	if err := scanStore.Close(); err != nil {
+		t.Fatalf("Close returned error: %v", err)
+	}
+
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/runs?kind=tool", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "工具运行历史") || !strings.Contains(body, "tool-visible-in-history") || strings.Contains(body, "scan-visible-only-on-default") {
+		t.Fatalf("unexpected tool history page: %s", body)
+	}
+}
+
+func TestToolPagesLinkToToolRunHistory(t *testing.T) {
+	dir := t.TempDir()
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	for _, path := range []string{"/tools/new", "/tools/nuclei"} {
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, path, nil))
+		if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `href="/runs?kind=tool"`) {
+			t.Fatalf("%s does not link to tool history: %d %s", path, res.Code, res.Body.String())
+		}
+	}
+}
+
 func TestRunEventsAPI(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

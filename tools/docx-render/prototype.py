@@ -125,6 +125,18 @@ def without_numbering(paragraph_node: etree._Element) -> etree._Element:
     return paragraph_node
 
 
+def with_first_line_chars(paragraph_node: etree._Element, chars: int) -> etree._Element:
+    properties = paragraph_node.find("w:pPr", NS)
+    if properties is None:
+        properties = etree.Element(w("pPr"))
+        paragraph_node.insert(0, properties)
+    indent = properties.find("w:ind", NS)
+    if indent is None:
+        indent = etree.SubElement(properties, w("ind"))
+    indent.set(w("firstLineChars"), str(chars))
+    return paragraph_node
+
+
 def replace_paragraph(body: etree._Element, old_text: str, new_text: str) -> None:
     matches = [p for p in body.xpath("./w:p", namespaces=NS) if node_text(p) == old_text]
     if len(matches) != 1:
@@ -241,6 +253,7 @@ def prepare_network_zone_block(body: etree._Element, untouched: dict[str, bytes]
         untouched.pop(f"word/{target}")
 
     p = lambda text: with_text(normal, text)
+    remediation_p = lambda text: with_first_line_chars(with_text(normal, text), 200)
     h3 = lambda text: with_text(heading3, text)
     h4 = lambda text: with_text(heading4, text)
     zone_nodes = [
@@ -268,12 +281,14 @@ def prepare_network_zone_block(body: etree._Element, untouched: dict[str, bytes]
         h4("关联资产"),
         p("{{ verification.assets_text }}"),
         h4("修改建议"),
-        p("{{ verification.remediation }}"),
+        paragraph("{%p for remediation_line in verification.remediation_lines %}"),
+        remediation_p("{{ remediation_line }}"),
+        paragraph("{%p endfor %}"),
         paragraph("{%p endfor %}"),
         paragraph("{%p if network_zone.not_observed %}"),
         without_numbering(h3("{{ network_zone.name }}其它漏洞验证不存在的截图：")),
         paragraph("{%p for verification in network_zone.not_observed %}"),
-        p("{{ verification.title }}不存在证明，端口（{{ verification.ports_text }}）"),
+        p("{{ verification.title }}相关漏洞不存在证明，端口（{{ verification.ports_text }}）"),
         paragraph("{%p for evidence in verification.evidence %}"),
         p("{{ evidence.image }}"),
         paragraph("{%p endfor %}"),

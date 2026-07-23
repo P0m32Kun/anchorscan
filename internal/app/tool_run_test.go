@@ -24,9 +24,9 @@ func TestNormalizeToolOutput(t *testing.T) {
 			want: "hello\nworld",
 		},
 		{
-			name: "ansi escape stripped",
+			name: "ansi escape preserved",
 			in:   "\x1b[31mred\x1b[0m\x1b[1mbold\x1b[0m",
-			want: "redbold",
+			want: "\x1b[31mred\x1b[0m\x1b[1mbold\x1b[0m",
 		},
 		{
 			name: "carriage return keeps final state",
@@ -39,9 +39,9 @@ func TestNormalizeToolOutput(t *testing.T) {
 			want: "done",
 		},
 		{
-			name: "literal ansi residue stripped",
+			name: "literal ansi residue preserved",
 			in:   "[[34mINF[0m] running",
-			want: "[INF] running",
+			want: "[[34mINF[0m] running",
 		},
 	}
 	for _, tt := range tests {
@@ -62,7 +62,7 @@ func TestEmitToolNormalizesOutput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(events) != 1 || events[0].Message != "[INF] running" {
+	if len(events) != 1 || events[0].Message != "[[34mINF[0m] running" {
 		t.Fatalf("events = %#v", events)
 	}
 }

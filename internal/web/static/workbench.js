@@ -28,8 +28,10 @@ document.querySelectorAll('.queue-tab').forEach(tab => {
     document.querySelectorAll('[role="tabpanel"]').forEach(p => {
       p.hidden = p.id !== panelId;
     });
+    history.replaceState(null, '', '#' + panelId.replace('queue-', ''));
   });
 });
+document.getElementById('tab-' + queueNameFromHash(window.location.hash))?.click();
 
 // ---------- Filtering (positive) ----------
 const filterForm = document.getElementById('workbench-filter-form');
@@ -350,7 +352,7 @@ async function uploadEvidenceFile(file, caption, verificationIDOverride){
 }
 
 verifyFileInput?.addEventListener('change', () => {
-  stageVerifyFile(verifyFileInput.files[0]);
+  [...verifyFileInput.files].forEach(stageVerifyFile);
   verifyFileInput.value = '';
 });
 
@@ -431,21 +433,6 @@ document.querySelectorAll('.verify-btn').forEach(btn => btn.addEventListener('cl
 
 document.getElementById('verify-cancel')?.addEventListener('click', () => verifyDialog.close());
 
-// ---------- Negative multi-select ----------
-const negativeSubmitBtn = document.getElementById('negative-submit-btn');
-const negativeSelectedCount = document.getElementById('negative-selected-count');
-
-function updateNegativeSelection(){
-  const checked = document.querySelectorAll('.negative-select:checked');
-  const n = checked.length;
-  negativeSelectedCount.textContent = n === 1 ? '已选 1 组' : '请选择 1 组';
-  if(negativeSubmitBtn) negativeSubmitBtn.disabled = n === 0;
-}
-
-document.querySelectorAll('.negative-select').forEach(cb => {
-  cb.addEventListener('change', updateNegativeSelection);
-});
-
 // ---------- Negative dialog ----------
 const negativeDialog = document.getElementById('negative-dialog');
 const negativeForm = document.getElementById('negative-form');
@@ -496,7 +483,7 @@ function stageNegFile(file){
 }
 
 negEvidenceFile?.addEventListener('change', () => {
-  stageNegFile(negEvidenceFile.files[0]);
+  [...negEvidenceFile.files].forEach(stageNegFile);
   negEvidenceFile.value = '';
 });
 
@@ -517,19 +504,16 @@ negativeDialog?.addEventListener('drop', e => {
   }
 });
 
-negativeSubmitBtn?.addEventListener('click', () => {
-  const checked = [...document.querySelectorAll('.negative-select:checked')];
-  if(checked.length === 0) return;
-
+document.querySelectorAll('.negative-open-btn').forEach(button => button.addEventListener('click', () => {
   resetNegDialog();
 
-  const card = checked[0].closest('.candidate-card');
-  const group = negativeGroupByKey(card?.dataset.key);
+  const card = button.closest('.candidate-card');
+  const group = negativeGroupByKey(button.dataset.key);
   if(!group) return;
   selectedNegativeGroup = group;
 
   negZoneId.value = group.ZoneID || card?.dataset.zone || '';
-  negTitle.value = group.Title || '未发现 ' + (group.Service || '服务');
+  negTitle.value = group.Title || group.Service || '服务';
 
   // Populate assets list from the group
   negAssetsList.innerHTML = (group.Assets || []).map(a => {
@@ -537,7 +521,7 @@ negativeSubmitBtn?.addEventListener('click', () => {
   }).join('');
 
   negativeDialog.showModal();
-});
+}));
 
 negativeForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -594,6 +578,7 @@ negativeForm?.addEventListener('submit', async (e) => {
       await uploadEvidenceFile(f.file, f.caption, negVerificationID);
     }
 
+    window.location.hash = 'negative';
     window.location.reload();
   } catch(err){
     alert(err.message || String(err));

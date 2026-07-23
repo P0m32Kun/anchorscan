@@ -2,6 +2,7 @@ package report
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +12,7 @@ func TestBuildDocxContextProducesSidecarContract(t *testing.T) {
 	project := ProjectMetadata{ReportTitle: "示例电力安全渗透测试分析报告", ClientUnit: "示例电力有限公司", TestObject: "生产控制系统", StartDate: "2026-07-01", EndDate: "2026-07-05", Testers: "张三、李四", CreatedAt: time.Date(2026, 6, 3, 0, 0, 0, 0, time.UTC)}
 	zones := []ProjectZone{{ZoneID: "I", Name: "I区", SortOrder: 0}}
 	verifications := []DeliverableVerification{
-		{ID: "v1", ZoneID: "I", Outcome: "confirmed", Title: "弱口令", Severity: "high", Description: "弱口令描述", Remediation: "改密码", Position: 1,
+		{ID: "v1", ZoneID: "I", Outcome: "confirmed", Title: "弱口令", Severity: "high", Description: "弱口令描述", Remediation: "第一条建议\n第二条建议\n第三条建议", Position: 1,
 			Assets:   []DeliverableAsset{{IP: "10.0.0.1", Port: 22, Display: "10.0.0.1:22"}},
 			Evidence: []DeliverableEvidence{{FilePath: "/data/projects/p1/evidence/a.png"}}},
 		{ID: "v2", ZoneID: "I", Outcome: "not_observed", Title: "Redis未授权", Severity: "high", Position: 2,
@@ -44,6 +45,9 @@ func TestBuildDocxContextProducesSidecarContract(t *testing.T) {
 	}
 	if zone.Confirmed[0].Evidence[0].Path != "/data/projects/p1/evidence/a.png" {
 		t.Fatalf("evidence path = %#v", zone.Confirmed[0].Evidence)
+	}
+	if got := zone.Confirmed[0].RemediationLines; !reflect.DeepEqual(got, []string{"第一条建议", "第二条建议", "第三条建议"}) {
+		t.Fatalf("remediation lines = %#v", got)
 	}
 	if len(zone.NotObserved) != 1 || zone.NotObserved[0].PortsText != "6379" {
 		t.Fatalf("not observed = %#v", zone.NotObserved)
@@ -98,7 +102,7 @@ func TestBuildDocxContextIncludesReportRunSessions(t *testing.T) {
 	project := ProjectMetadata{ReportTitle: "x", ClientUnit: "u", TestObject: "o", Testers: "t"}
 	zones := []ProjectZone{{ZoneID: "I", Name: "I区"}}
 	runs := []ProjectRun{
-		{RunID: "r1", ZoneID: "I", Status: "completed", IncludeInReport: true, Label: "核心交换机", AccessPoint: "SW-01", TesterIP: "10.0.0.10", Target: "10.0.1.0/24", ExcludeTargets: "10.0.1.99", ExcludePorts: "22", Notes: "夜间窗口"},
+		{RunID: "r1", ZoneID: "I", Status: "completed", IncludeInReport: true, Label: "核心交换机", AccessPoint: "SW-01", TesterIP: "10.0.0.10", Target: "10.0.1.1,10.0.1.2 10.0.1.3", ExcludeTargets: "10.0.1.99", ExcludePorts: "22", Notes: "夜间窗口"},
 		{RunID: "r2", ZoneID: "I", Status: "completed", IncludeInReport: false, Label: "不纳入"},
 	}
 	deliverable := BuildProjectDeliverable(project, zones, runs, nil, time.Unix(1, 0))
@@ -108,7 +112,7 @@ func TestBuildDocxContextIncludesReportRunSessions(t *testing.T) {
 		t.Fatalf("zones = %#v", context.NetworkZones)
 	}
 	session := context.NetworkZones[0].Sessions[0]
-	if session.Label != "核心交换机" || session.AccessPoint != "SW-01" || session.TesterIP != "10.0.0.10" || session.TargetsText != "10.0.1.0/24" || session.ExclusionsText != "目标：10.0.1.99；端口：22" || session.Notes != "夜间窗口" {
+	if session.Label != "核心交换机" || session.AccessPoint != "SW-01" || session.TesterIP != "10.0.0.10" || session.TargetsText != "\n\u3000\u3000\u3000\u300010.0.1.1\n\u3000\u3000\u3000\u300010.0.1.2\n\u3000\u3000\u3000\u300010.0.1.3" || session.ExclusionsText != "目标：10.0.1.99；端口：22" || session.Notes != "夜间窗口" {
 		t.Fatalf("session = %#v", session)
 	}
 }

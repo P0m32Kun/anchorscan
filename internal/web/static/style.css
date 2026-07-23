@@ -1148,11 +1148,16 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .tool-preview-window {
-  margin-top: 1rem;
+  margin-top: 0;
 }
 
 .tool-command-preview {
-  height: 8rem;
+  height: 50vh;
+  min-height: 24rem;
+}
+
+.tool-output-panel {
+  margin-top: 1.25rem;
 }
 
 .tool-project-note {

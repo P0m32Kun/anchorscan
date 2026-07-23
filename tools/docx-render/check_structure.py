@@ -217,7 +217,8 @@ def verify_template_slots(source: Path, template: Path) -> None:
         "{{ verification.heading }}",
         "{{ verification.description }}",
         "{{ verification.assets_text }}",
-        "{{ verification.remediation }}",
+        "{%p for remediation_line in verification.remediation_lines %}",
+        "{{ remediation_line }}",
         "{%p for verification in network_zone.not_observed %}",
         "{{ verification.title }}",
         "{{ verification.ports_text }}",
@@ -238,6 +239,7 @@ def verify_template_slots(source: Path, template: Path) -> None:
     assert chapter_two_signature(template) == chapter_two_signature(source), "chapter 2 changed"
     assert "南京南瑞信息通信科技有限公司" in template_text
     assert "{{ verification.detail }}" not in template_text
+    assert "{{ verification.title }}相关漏洞不存在证明，端口（{{ verification.ports_text }}）" in template_text
     assert "{{ evidence.caption }}" not in template_text
     assert "证据截图" not in template_text
     assert "{{ conclusion.text }}" not in template_text

@@ -107,6 +107,19 @@ func TestEvidenceUploadStoresFileAndReturnsMetadata(t *testing.T) {
 	}
 }
 
+func TestCreateVerificationRejectsUnknownProjectZone(t *testing.T) {
+	dir := t.TempDir()
+	handler, projectID, _, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db")})
+	body := bytes.NewBufferString(`{"zone_id":"undefined","outcome":"confirmed","title":"bad zone"}`)
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+projectID+"/verifications", body)
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", res.Code, res.Body.String())
+	}
+}
+
 func TestEvidenceUploadRejectsNonImage(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

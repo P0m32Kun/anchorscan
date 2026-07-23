@@ -118,7 +118,7 @@
   {{if .NotObserved}}
   <h4>{{.Zone.Name}}其它漏洞验证不存在的截图：</h4>
   {{range .NotObserved}}
-  <p>{{.Title}}不存在证明，端口（{{.PortsText}}）</p>
+  <p>{{.Title}}相关漏洞不存在证明，端口（{{.PortsText}}）</p>
   <div class="evidence">
     {{range .Evidence}}
     <img src="{{.DataURI | safeURL}}" alt="{{.Caption}}">

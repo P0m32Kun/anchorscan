@@ -22,19 +22,19 @@ import (
 // can render positive candidates, negative candidates and incomplete checks.
 type workbenchCandidate struct {
 	report.ProjectVulnerabilityCandidate
-	ZoneID string `json:"zone_id"`
+	ZoneID string
 }
 
 type negativeFingerprintGroup struct {
-	Key           string                `json:"key"`
-	Title         string                `json:"title"`
-	Service       string                `json:"service"`
-	Product       string                `json:"product"`
-	Port          int                   `json:"port"`
-	ZoneID        string                `json:"zone_id"`
-	Assets        []report.ProjectAsset `json:"assets"`
-	NmapCommand   string                `json:"nmap_command"`
-	NucleiCommand string                `json:"nuclei_command"`
+	Key           string
+	Title         string
+	Service       string
+	Product       string
+	ZoneID        string
+	Assets        []report.ProjectAsset
+	NmapCommand   string
+	NucleiCommand string
+	PortsText     string
 }
 
 type incompleteWorkbenchItem struct {
@@ -66,11 +66,10 @@ func negativeFingerprintKey(fp report.ProjectNegativeCandidate) string {
 	if service == "" {
 		service = "unknown"
 	}
-	parts := []string{strings.TrimSpace(fp.ZoneID), service}
+	parts := []string{strings.TrimSpace(fp.ZoneID), strings.ToLower(service)}
 	if product != "" {
-		parts = append(parts, product)
+		parts = append(parts, strings.ToLower(product))
 	}
-	parts = append(parts, strconv.Itoa(fp.Asset.Port))
 	return strings.Join(parts, "|")
 }
 
@@ -81,25 +80,33 @@ func groupNegativeCandidates(negatives []report.ProjectNegativeCandidate, nseRul
 		g, ok := groups[key]
 		if !ok {
 			fp := n.Fingerprint
-			title := "未发现 " + fp.Service
+			title := fp.Service
+			if title == "" {
+				title = "unknown"
+			}
 			if fp.Product != "" {
 				title += " / " + fp.Product
-			}
-			if fp.Port != 0 {
-				title += "（端口 " + strconv.Itoa(fp.Port) + "）"
 			}
 			g = &negativeFingerprintGroup{
 				Key:     key,
 				Title:   title,
 				Service: fp.Service,
 				Product: fp.Product,
-				Port:    fp.Port,
 				ZoneID:  n.ZoneID,
 				Assets:  []report.ProjectAsset{},
 			}
 			groups[key] = g
 		}
-		g.Assets = append(g.Assets, n.Asset)
+		duplicate := false
+		for _, asset := range g.Assets {
+			if asset.IP == n.Asset.IP && asset.Port == n.Asset.Port && asset.Protocol == n.Asset.Protocol && asset.Target == n.Asset.Target {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			g.Assets = append(g.Assets, n.Asset)
+		}
 	}
 	result := make([]negativeFingerprintGroup, 0, len(groups))
 	for _, g := range groups {
@@ -111,20 +118,40 @@ func groupNegativeCandidates(negatives []report.ProjectNegativeCandidate, nseRul
 		})
 
 		ips := make([]string, 0, len(g.Assets))
+		portNumbers := make([]int, 0, len(g.Assets))
 		urls := make([]string, 0, len(g.Assets))
+		seenIPs := map[string]bool{}
+		seenPorts := map[int]bool{}
+		seenURLs := map[string]bool{}
 		for _, a := range g.Assets {
-			ips = append(ips, a.IP)
-			if a.Target != "" {
-				urls = append(urls, a.Target)
-			} else if a.Protocol == "http" || a.Protocol == "https" {
-				urls = append(urls, a.Protocol+"://"+net.JoinHostPort(a.IP, strconv.Itoa(a.Port)))
+			if !seenIPs[a.IP] {
+				seenIPs[a.IP] = true
+				ips = append(ips, a.IP)
+			}
+			if a.Port != 0 && !seenPorts[a.Port] {
+				seenPorts[a.Port] = true
+				portNumbers = append(portNumbers, a.Port)
+			}
+			endpoint := a.Target
+			if endpoint == "" && (a.Protocol == "http" || a.Protocol == "https") {
+				endpoint = a.Protocol + "://" + net.JoinHostPort(a.IP, strconv.Itoa(a.Port))
+			}
+			if endpoint != "" && !seenURLs[endpoint] {
+				seenURLs[endpoint] = true
+				urls = append(urls, endpoint)
 			}
 		}
+		sort.Ints(portNumbers)
+		ports := make([]string, 0, len(portNumbers))
+		for _, port := range portNumbers {
+			ports = append(ports, strconv.Itoa(port))
+		}
+		g.PortsText = strings.Join(ports, "、")
 
-		normalized := strings.ToLower(strings.TrimSpace(g.Service))
+		normalized := fingerprint.Classify(fingerprint.ServiceFingerprint{Service: g.Service, Product: g.Product}).Normalized
 		if scripts, ok := nseRules[normalized]; ok && len(scripts) > 0 {
-			if g.Port != 0 {
-				g.NmapCommand = "nmap -p " + strconv.Itoa(g.Port) + " --script " + strings.Join(scripts, ",") + " " + strings.Join(ips, " ")
+			if len(ports) > 0 {
+				g.NmapCommand = "nmap -p " + strings.Join(ports, ",") + " --script " + strings.Join(scripts, ",") + " " + strings.Join(ips, " ")
 			} else {
 				g.NmapCommand = "nmap --script " + strings.Join(scripts, ",") + " " + strings.Join(ips, " ")
 			}
@@ -160,22 +187,21 @@ func groupNegativeCandidates(negatives []report.ProjectNegativeCandidate, nseRul
 		if result[i].Product != result[j].Product {
 			return result[i].Product < result[j].Product
 		}
-		return result[i].Port < result[j].Port
+		return result[i].Key < result[j].Key
 	})
 	return result
 }
 
 func fingerprintFromAsset(asset report.ProjectAsset, g *negativeFingerprintGroup) fingerprint.ServiceFingerprint {
-	return fingerprint.ServiceFingerprint{
-		IP:         asset.IP,
-		Port:       asset.Port,
-		Protocol:   asset.Protocol,
-		Service:    g.Service,
-		Product:    g.Product,
-		Normalized: strings.ToLower(strings.TrimSpace(g.Service)),
-		IsWeb:      asset.Protocol == "http" || asset.Protocol == "https" || asset.Target != "",
-		URL:        asset.Target,
-	}
+	return fingerprint.Classify(fingerprint.ServiceFingerprint{
+		IP:       asset.IP,
+		Port:     asset.Port,
+		Protocol: asset.Protocol,
+		Service:  g.Service,
+		Product:  g.Product,
+		IsWeb:    asset.Protocol == "http" || asset.Protocol == "https" || asset.Target != "",
+		URL:      asset.Target,
+	})
 }
 
 func (s *server) projectWorkbench(w http.ResponseWriter, r *http.Request, projectID string) {

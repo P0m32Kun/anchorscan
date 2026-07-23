@@ -195,7 +195,7 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 		"ssh", "ftp", "telnet", "smtp", "ldap", "domain", "snmp",
 		"rdp", "vnc", "redis", "mysql", "postgresql", "ms-sql",
 		"mongodb", "memcached", "amqp", "mqtt", "smb", "nfs",
-		"rpc", "rsync", "docker",
+		"rpc", "rpcbind", "rsync", "docker",
 	} {
 		if len(nseRules[service]) == 0 {
 			t.Fatalf("expected NSE rules for %s: %#v", service, nseRules)

@@ -89,6 +89,9 @@ nfs:
 rpc:
   - rpcinfo
   - rpc-grind
+rpcbind:
+  - rpcinfo
+  - rpc-grind
 rsync:
   - rsync-list-modules
 

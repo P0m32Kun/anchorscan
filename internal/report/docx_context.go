@@ -50,13 +50,13 @@ type docxSession struct {
 }
 
 type docxVerification struct {
-	Heading     string         `json:"heading,omitempty"`
-	Title       string         `json:"title,omitempty"`
-	Description string         `json:"description,omitempty"`
-	AssetsText  string         `json:"assets_text,omitempty"`
-	Remediation string         `json:"remediation,omitempty"`
-	PortsText   string         `json:"ports_text,omitempty"`
-	Evidence    []docxEvidence `json:"evidence"`
+	Heading          string         `json:"heading,omitempty"`
+	Title            string         `json:"title,omitempty"`
+	Description      string         `json:"description,omitempty"`
+	AssetsText       string         `json:"assets_text,omitempty"`
+	RemediationLines []string       `json:"remediation_lines,omitempty"`
+	PortsText        string         `json:"ports_text,omitempty"`
+	Evidence         []docxEvidence `json:"evidence"`
 }
 
 type docxEvidence struct {
@@ -113,16 +113,16 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 		zone := docxZone{Name: z.Zone.Name}
 		for _, session := range z.Sessions {
 			zone.Sessions = append(zone.Sessions, docxSession{
-				Label: session.Label, AccessPoint: session.AccessPoint, TesterIP: session.TesterIP, TargetsText: session.Targets, ExclusionsText: session.Exclusions, Notes: session.Notes,
+				Label: session.Label, AccessPoint: session.AccessPoint, TesterIP: session.TesterIP, TargetsText: docxTargetsText(session.Targets), ExclusionsText: session.Exclusions, Notes: session.Notes,
 			})
 		}
 		for _, v := range z.Confirmed {
 			zone.Confirmed = append(zone.Confirmed, docxVerification{
-				Heading:     v.Title + "（" + severityLabel(v.Severity) + "）",
-				Description: v.Description,
-				AssetsText:  v.AssetsText,
-				Remediation: v.Remediation,
-				Evidence:    evidencePaths(v.Evidence),
+				Heading:          v.Title + "（" + severityLabel(v.Severity) + "）",
+				Description:      v.Description,
+				AssetsText:       v.AssetsText,
+				RemediationLines: docxRemediationLines(v.Remediation),
+				Evidence:         evidencePaths(v.Evidence),
 			})
 		}
 		for _, v := range z.NotObserved {
@@ -150,6 +150,28 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 			FocusText:            deliverable.FocusText,
 		},
 	}
+}
+
+func docxTargetsText(targets string) string {
+	items := strings.FieldsFunc(targets, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\r' || r == '\t' || r == ' '
+	})
+	if len(items) == 0 {
+		return ""
+	}
+	indent := strings.Repeat("\u3000", 4)
+	return "\n" + indent + strings.Join(items, "\n"+indent)
+}
+
+func docxRemediationLines(value string) []string {
+	lines := strings.Split(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
+	result := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line = strings.TrimSpace(line); line != "" {
+			result = append(result, line)
+		}
+	}
+	return result
 }
 
 func evidencePaths(items []DeliverableEvidence) []docxEvidence {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -171,12 +170,8 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 	return []report.Finding{finding}, nil
 }
 
-var ansiEscapeRe = regexp.MustCompile("(?:\x1b)?\\[[0-9;]*[A-Za-z]")
-
-// normalizeToolOutput strips ANSI escape sequences and resolves \r progress
-// overwrites so only the final line state remains. The \r handling keeps the
-// last segment before a newline, which is the typical terminal behavior for
-// progress bars.
+// normalizeToolOutput resolves \r progress overwrites while preserving ANSI
+// color sequences for the browser terminal renderer.
 func normalizeToolOutput(s string) string {
 	// ponytail: single-pass \r resolver; if tools start using multi-line \r
 	// updates, switch to per-line last-\r-segment extraction.
@@ -195,9 +190,6 @@ func normalizeToolOutput(s string) string {
 	}
 	if len(line) > 0 {
 		lines = append(lines, string(line))
-	}
-	for i, l := range lines {
-		lines[i] = ansiEscapeRe.ReplaceAllString(l, "")
 	}
 	return strings.Join(lines, "\n")
 }

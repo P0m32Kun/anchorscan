@@ -11,7 +11,7 @@ func TestBuildProjectDeliverableProjectsConfirmedAndNegativeByZone(t *testing.T)
 	verifications := []DeliverableVerification{
 		{ID: "v1", ZoneID: "I", Outcome: "confirmed", Title: "弱口令", Severity: "high", Position: 2, Assets: []DeliverableAsset{{IP: "10.0.0.1", Port: 22, Display: "10.0.0.1:22"}}, Evidence: []DeliverableEvidence{{DataURI: "data:image/png;base64,AAAA"}}},
 		{ID: "v2", ZoneID: "I", Outcome: "confirmed", Title: "过期组件", Severity: "medium", Position: 1, Assets: []DeliverableAsset{{IP: "10.0.0.2", Port: 443, Display: "10.0.0.2:443"}}},
-		{ID: "v3", ZoneID: "III", Outcome: "not_observed", Title: "SQL注入不存在", Severity: "high", Assets: []DeliverableAsset{{IP: "10.0.0.3", Port: 80, Display: "10.0.0.3:80"}}},
+		{ID: "v3", ZoneID: "III", Outcome: "not_observed", Title: "未发现 ssh / OpenSSH", Severity: "high", Assets: []DeliverableAsset{{IP: "10.0.0.3", Port: 2222, Display: "10.0.0.3:2222"}}},
 		{ID: "v4", ZoneID: "I", Outcome: "inconclusive", Title: "无法判定项", Severity: "high"},
 	}
 
@@ -29,6 +29,9 @@ func TestBuildProjectDeliverableProjectsConfirmedAndNegativeByZone(t *testing.T)
 	}
 	if len(deliverable.Zones[1].NotObserved) != 1 {
 		t.Fatalf("zone III not observed = %d", len(deliverable.Zones[1].NotObserved))
+	}
+	if got := deliverable.Zones[1].NotObserved[0].Title; got != "ssh / OpenSSH" {
+		t.Fatalf("negative proof service title = %q", got)
 	}
 
 	if len(deliverable.Summary) != 2 {

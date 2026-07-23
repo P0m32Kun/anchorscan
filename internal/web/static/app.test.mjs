@@ -41,6 +41,20 @@ assert.equal(navItems[0].classList.active, false);
 assert.equal(navItems[1].classList.active, true);
 assert.equal(navItems[2].classList.active, false);
 
+assert.equal(context.queueNameFromHash('#negative'), 'negative');
+assert.equal(context.queueNameFromHash('#unknown'), 'positive');
+assert.equal(context.queueNameFromHash(''), 'positive');
+
+const ansi = context.ansiSegments('[[34mINF[0m] [[92mlatest[0m] [[38;5;208mhigh[0m] <img>');
+assert.equal(ansi.map(segment => segment.text).join(''), '[INF] [latest] [high] <img>');
+assert.ok(ansi.some(segment => segment.text === 'INF' && segment.color));
+assert.ok(ansi.some(segment => segment.text === 'latest' && segment.color));
+assert.ok(ansi.some(segment => segment.text === 'high' && segment.color));
+const ansiMarkup = context.ansiHTML('\x1b[31mred\x1b[0m <img>');
+assert.ok(ansiMarkup.includes('style="color:#cd3131"'));
+assert.ok(ansiMarkup.includes('&lt;img&gt;'));
+assert.equal(ansiMarkup.includes('<img>'), false);
+
 assert.equal(
   context.formatEventTime('2026-07-09T03:16:55.614Z'),
   '2026-07-09 11:16:55',

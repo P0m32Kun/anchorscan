@@ -142,6 +142,7 @@ func BuildProjectDeliverable(project ProjectMetadata, zones []ProjectZone, runs 
 		case "confirmed":
 			deliverableZones[idx].Confirmed = append(deliverableZones[idx].Confirmed, v)
 		case "not_observed":
+			v.Title = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(v.Title), "未发现 "))
 			deliverableZones[idx].NotObserved = append(deliverableZones[idx].NotObserved, v)
 		}
 	}

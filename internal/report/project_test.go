@@ -489,6 +489,70 @@ func TestProjectReportIncompleteChecks(t *testing.T) {
 	}
 }
 
+func TestProjectReportClassifiesPerEngineCoverage(t *testing.T) {
+	dir := t.TempDir()
+	s, err := store.Open(filepath.Join(dir, "scan.db"))
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer s.Close()
+
+	now := time.Unix(1, 0)
+	if err := s.SaveProject(store.Project{ID: "p1", Name: "Task", CreatedAt: now, UpdatedAt: now}); err != nil {
+		t.Fatalf("SaveProject returned error: %v", err)
+	}
+	if err := s.CreateDefaultProjectZones("p1"); err != nil {
+		t.Fatalf("CreateDefaultProjectZones returned error: %v", err)
+	}
+	if err := s.SaveScanRun(store.ScanRun{RunID: "run1", ProjectID: "p1", ZoneID: "I", Target: "10.0.0.1", Ports: "111,112,3389", Profile: "normal", Status: "completed", IncludeInReport: true, StartedAt: now, FinishedAt: now}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	for _, fp := range []fingerprint.ServiceFingerprint{
+		{IP: "10.0.0.1", Port: 111, Protocol: "tcp", Service: "rpcbind", Product: "rpcbind", Normalized: "rpcbind"},
+		{IP: "10.0.0.1", Port: 112, Protocol: "tcp", Service: "unknown", Normalized: "unknown"},
+		{IP: "10.0.0.1", Port: 3389, Protocol: "tcp", Service: "rdp", Normalized: "rdp"},
+	} {
+		if err := s.SaveFingerprint("run1", fp); err != nil {
+			t.Fatalf("SaveFingerprint returned error: %v", err)
+		}
+	}
+	for _, check := range []store.DetectionCheck{
+		{RunID: "run1", IP: "10.0.0.1", Port: 111, Protocol: "tcp", Engine: "nse", Status: "skipped", ReasonCode: "no_matching_rule", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 111, Protocol: "tcp", Engine: "nuclei", Status: "completed", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 111, Protocol: "tcp", Engine: "rdpscan", Status: "skipped", ReasonCode: "no_matching_rule", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 112, Protocol: "tcp", Engine: "nse", Status: "skipped", ReasonCode: "no_matching_rule", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 112, Protocol: "tcp", Engine: "nuclei", Status: "skipped", ReasonCode: "no_matching_rule", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 112, Protocol: "tcp", Engine: "rdpscan", Status: "skipped", ReasonCode: "no_matching_rule", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 3389, Protocol: "tcp", Engine: "nse", Status: "completed", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 3389, Protocol: "tcp", Engine: "nuclei", Status: "canceled", StartedAt: now, FinishedAt: now},
+		{RunID: "run1", IP: "10.0.0.1", Port: 3389, Protocol: "tcp", Engine: "rdpscan", Status: "interrupted", StartedAt: now, FinishedAt: now},
+	} {
+		if err := s.UpsertDetectionCheck(check); err != nil {
+			t.Fatalf("UpsertDetectionCheck returned error: %v", err)
+		}
+	}
+
+	result, _ := report.BuildProjectReport(projectReportInput(t, s, "p1", loadCatalog(t, dir)))
+	if got := len(result.Zones[0].NegativeCandidates); got != 1 {
+		t.Fatalf("one completed engine covers the service, expected 1 negative candidate, got %d", got)
+	}
+	if got := result.Zones[0].NegativeCandidates[0].Asset.Port; got != 111 {
+		t.Fatalf("all engines without matching rules must not produce negative proof, got port %d", got)
+	}
+	if got := len(result.Zones[0].IncompleteChecks); got != 1 {
+		t.Fatalf("expected only the endpoint with abnormal engine states to be incomplete, got %d", got)
+	}
+	incomplete := result.Zones[0].IncompleteChecks[0]
+	if incomplete.Asset.Port != 3389 || len(incomplete.Engines) != 2 {
+		t.Fatalf("unexpected incomplete check: %#v", incomplete)
+	}
+	statuses := []string{incomplete.Engines[0].Status, incomplete.Engines[1].Status}
+	sort.Strings(statuses)
+	if statuses[0] != "canceled" || statuses[1] != "interrupted" {
+		t.Fatalf("canceled and interrupted engines must remain incomplete, got %v", statuses)
+	}
+}
+
 func TestProjectReportExcludesNonIncludedRuns(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

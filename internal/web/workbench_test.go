@@ -604,7 +604,7 @@ func TestWorkbenchIncompleteCheckExcludedFromNegative(t *testing.T) {
 	if len(negGroups) != 1 {
 		t.Fatalf("expected 1 negative group, got %d", len(negGroups))
 	}
-	assets := negGroups[0]["assets"].([]any)
+	assets := negGroups[0]["Assets"].([]any)
 	if len(assets) != 1 {
 		t.Fatalf("expected 1 asset in negative group, got %d", len(assets))
 	}
@@ -631,7 +631,7 @@ func TestGroupNegativeCandidatesByFingerprint(t *testing.T) {
 			ZoneID:      "I",
 		},
 		{
-			Asset:       report.ProjectAsset{IP: "10.0.0.2", Port: 6379, Protocol: "tcp"},
+			Asset:       report.ProjectAsset{IP: "10.0.0.2", Port: 6380, Protocol: "tcp"},
 			Fingerprint: fingerprint.ServiceFingerprint{Service: "redis"},
 			ZoneID:      "I",
 		},
@@ -657,8 +657,35 @@ func TestGroupNegativeCandidatesByFingerprint(t *testing.T) {
 	if !strings.Contains(redisGroup.NmapCommand, "redis-info") {
 		t.Fatalf("expected NmapCommand to use redis-info, got %q", redisGroup.NmapCommand)
 	}
+	if !strings.Contains(redisGroup.NmapCommand, "-p 6379,6380") || !strings.Contains(redisGroup.NmapCommand, "10.0.0.1 10.0.0.2") {
+		t.Fatalf("expected NmapCommand to cover every port and IP in the group, got %q", redisGroup.NmapCommand)
+	}
 	if !strings.Contains(redisGroup.NucleiCommand, "-tags redis") {
 		t.Fatalf("expected NucleiCommand to use -tags redis, got %q", redisGroup.NucleiCommand)
+	}
+}
+
+func TestGroupNegativeCandidatesUsesNormalizedSambaRules(t *testing.T) {
+	negatives := []report.ProjectNegativeCandidate{{
+		Asset:       report.ProjectAsset{IP: "10.0.0.5", Port: 139, Protocol: "tcp"},
+		Fingerprint: fingerprint.ServiceFingerprint{Service: "netbios-ssn", Product: "Samba smbd"},
+		ZoneID:      "I",
+	}}
+	nseRules := map[string][]string{"smb": {"smb-protocols"}}
+	tagRules := []vuln.TagRule{{Name: "smb", Service: []string{"smb"}, NucleiTags: []string{"smb"}, Target: "hostport"}}
+
+	groups := groupNegativeCandidates(negatives, nseRules, tagRules)
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 Samba group, got %d", len(groups))
+	}
+	if !strings.Contains(groups[0].NmapCommand, "smb-protocols") {
+		t.Fatalf("expected Samba Nmap command, got %q", groups[0].NmapCommand)
+	}
+	if !strings.Contains(groups[0].NucleiCommand, "-tags smb") {
+		t.Fatalf("expected Samba nuclei command, got %q", groups[0].NucleiCommand)
+	}
+	if groups[0].Title != "netbios-ssn / Samba smbd" || groups[0].PortsText != "139" {
+		t.Fatalf("unexpected negative proof placeholders: %#v", groups[0])
 	}
 }
 
@@ -674,5 +701,19 @@ func TestGroupNegativeCandidatesKeepsZonesSeparate(t *testing.T) {
 	}
 	if groups[0].ZoneID == groups[1].ZoneID || len(groups[0].Assets) != 1 || len(groups[1].Assets) != 1 {
 		t.Fatalf("unexpected zone grouping: %#v", groups)
+	}
+}
+
+func TestWorkbenchJSONUsesFieldNamesConsumedByJavaScript(t *testing.T) {
+	candidateJSON, err := json.Marshal(workbenchCandidate{ZoneID: "I"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupJSON, err := json.Marshal(negativeFingerprintGroup{Key: "I|redis", ZoneID: "I"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(candidateJSON), `"ZoneID":"I"`) || !strings.Contains(string(groupJSON), `"Key":"I|redis"`) || !strings.Contains(string(groupJSON), `"ZoneID":"I"`) {
+		t.Fatalf("JSON fields do not match workbench.js: candidate=%s group=%s", candidateJSON, groupJSON)
 	}
 }

@@ -42,11 +42,7 @@ async function refreshEvents(){
         cls = 'log-system';
       }
       
-      // Escape HTML entities to prevent rendering issues or XSS
-      const safeMsg = e.message
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      const safeMsg = ansiHTML(e.message);
        
       const safeStage = String(e.stage || '')
         .replace(/&/g, '&amp;')

@@ -125,6 +125,22 @@ func (s *server) createVerification(w http.ResponseWriter, r *http.Request, proj
 		http.Error(w, "title is required", http.StatusBadRequest)
 		return
 	}
+	zones, err := s.store.ListProjectZones(projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	validZone := false
+	for _, zone := range zones {
+		if zone.ZoneID == req.ZoneID {
+			validZone = true
+			break
+		}
+	}
+	if !validZone {
+		http.Error(w, "zone_id is not part of this project", http.StatusBadRequest)
+		return
+	}
 
 	now := s.opts.Now()
 	v := store.Verification{

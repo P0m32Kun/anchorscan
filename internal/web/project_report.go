@@ -87,6 +87,12 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return report.ProjectDeliverable{}, store.Project{}, err
 		}
+		zoneID, ok := projectReportVerificationZone(v.ZoneID, zones, runs)
+		if !ok {
+			err := fmt.Errorf("纳入报告的验证项“%s”没有有效网络分区", v.Title)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return report.ProjectDeliverable{}, store.Project{}, err
+		}
 		delAssets := make([]report.DeliverableAsset, 0, len(assets))
 		for _, a := range assets {
 			delAssets = append(delAssets, report.DeliverableAsset{IP: a.IP, Port: a.Port, Display: assetDisplay(a.IP, a.Port)})
@@ -103,7 +109,7 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 		deliverableVerifications = append(deliverableVerifications, report.DeliverableVerification{
 			ID:               v.ID,
 			VulnerabilityKey: v.VulnerabilityKey,
-			ZoneID:           v.ZoneID,
+			ZoneID:           zoneID,
 			Title:            v.Title,
 			Severity:         v.Severity,
 			Outcome:          v.Outcome,
@@ -142,6 +148,32 @@ func (s *server) buildProjectDeliverable(w http.ResponseWriter, r *http.Request,
 		return report.ProjectDeliverable{}, store.Project{}, err
 	}
 	return deliverable, project, nil
+}
+
+func projectReportVerificationZone(zoneID string, zones []store.ProjectZone, runs []store.ScanRun) (string, bool) {
+	validZones := make(map[string]bool, len(zones))
+	for _, zone := range zones {
+		validZones[zone.ZoneID] = true
+	}
+	if validZones[zoneID] {
+		return zoneID, true
+	}
+
+	activeZones := map[string]bool{}
+	for _, run := range runs {
+		if run.IncludeInReport && (run.Status == "completed" || run.Status == "completed_with_errors") && validZones[run.ZoneID] {
+			activeZones[run.ZoneID] = true
+		}
+	}
+	if len(activeZones) == 1 {
+		for activeZone := range activeZones {
+			return activeZone, true
+		}
+	}
+	if len(zones) == 1 {
+		return zones[0].ZoneID, true
+	}
+	return "", false
 }
 
 func reportRunExclusions(snapshot string) (string, string) {

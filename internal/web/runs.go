@@ -79,7 +79,11 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/runs", http.StatusSeeOther)
+		returnTo := "/runs"
+		if run.Kind == "tool" {
+			returnTo = "/runs?kind=tool"
+		}
+		http.Redirect(w, r, returnTo, http.StatusSeeOther)
 		return
 	}
 	if r.Method != http.MethodGet {
@@ -171,7 +175,14 @@ func (s *server) runs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	runs, err := s.store.ListScanRuns(100)
+	isToolHistory := r.URL.Query().Get("kind") == "tool"
+	var runs []store.ScanRun
+	var err error
+	if isToolHistory {
+		runs, err = s.store.ListToolRuns(100)
+	} else {
+		runs, err = s.store.ListScanRuns(100)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -188,5 +199,6 @@ func (s *server) runs(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/runs.html", map[string]any{
 		"Runs":         runs,
 		"ProjectNames": projectNames,
+		"ToolHistory":  isToolHistory,
 	})
 }

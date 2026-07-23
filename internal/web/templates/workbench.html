@@ -13,7 +13,6 @@
   <a class="project-tab" href="/projects/{{.Project.ID}}">概览</a>
   <a class="project-tab" href="/projects/{{.Project.ID}}#runs">扫描任务</a>
   <a class="project-tab active" href="/projects/{{.Project.ID}}/workbench" aria-current="page">验证工作台</a>
-  <a class="project-tab disabled" href="#" onclick="return false;" aria-disabled="true">正式报告</a>
 </nav>
 
 <!-- Queue tabs -->
@@ -146,12 +145,8 @@
 <div id="queue-negative" role="tabpanel" aria-labelledby="tab-negative" hidden>
   <section class="panel">
     <p class="meta-line" style="margin-bottom:0.5rem;">
-      以下按服务指纹分组。每组代表一个已完成 NSE + nuclei 双检查且无高危/中危/低危发现的指纹；选择一组后上传共享截图，提交"本次验证未发现"结论。
+      以下按服务指纹分组。同分区、同服务/产品的不同 IP 和端口合并为一组；点击该组的“提交负向验证”后上传截图。
     </p>
-    <div class="negative-toolbar">
-      <button class="button button-primary" id="negative-submit-btn" disabled>提交所选指纹组…</button>
-      <span id="negative-selected-count" class="meta-line">请选择 1 组</span>
-    </div>
   </section>
 
   <section class="panel workbench-candidates" id="negative-container">
@@ -162,18 +157,14 @@
       data-zone="{{$zoneID}}"
       data-key="{{.Key}}"
       data-service="{{.Service}}"
-      data-product="{{.Product}}"
-      data-port="{{.Port}}">
-      <label class="candidate-select-row">
-        <input type="radio" name="negative-group" class="negative-select" aria-label="选择 {{.Title}}">
-        <div class="candidate-header" style="margin-bottom:0">
-          <h3 style="font-size:0.95rem">{{.Title}}</h3>
-          <div class="candidate-meta">
-            <span>分区：{{index $zoneNames $zoneID}}</span>
-            <span>端点：{{len .Assets}}</span>
-          </div>
+      data-product="{{.Product}}">
+      <div class="candidate-header" style="margin-bottom:0">
+        <h3 style="font-size:0.95rem">{{.Title}}相关漏洞不存在证明，端口（{{.PortsText}}）</h3>
+        <div class="candidate-meta">
+          <span>分区：{{index $zoneNames $zoneID}}</span>
+          <span>端点：{{len .Assets}}</span>
         </div>
-      </label>
+      </div>
       <details class="asset-details">
         <summary>覆盖端点 ({{len .Assets}})</summary>
         <ul class="asset-list">
@@ -182,12 +173,11 @@
           {{end}}
         </ul>
       </details>
-      {{if or .NmapCommand .NucleiCommand}}
       <div class="candidate-actions" style="margin-top:0.5rem">
         {{if .NmapCommand}}<button class="button button-small command-copy-btn" type="button" data-command="{{.NmapCommand}}">复制 Nmap</button>{{end}}
         {{if .NucleiCommand}}<button class="button button-small command-copy-btn" type="button" data-command="{{.NucleiCommand}}">复制 Nuclei</button>{{end}}
+        <button class="button button-primary negative-open-btn" type="button" data-key="{{.Key}}">提交负向验证 / 粘贴截图</button>
       </div>
-      {{end}}
     </article>
     {{end}}
     {{if not .NegativeGroups}}
@@ -200,7 +190,7 @@
 <div id="queue-incomplete" role="tabpanel" aria-labelledby="tab-incomplete" hidden>
   <section class="panel">
     <p class="meta-line" style="margin-bottom:0.5rem;">
-      以下端点存在 DetectionCheck 缺失、失败、跳过、取消或中断，无法作为负向候选。
+      以下端点存在 DetectionCheck 缺失、失败、非“规则不适用”的跳过、取消或中断，无法作为负向候选。
     </p>
   </section>
 
@@ -300,8 +290,8 @@
       <p class="eyebrow">证据截图</p>
       <p class="meta-line">confirmed / not_observed 验证必须至少上传一张截图。</p>
       <label class="file-input-label">
-        <input type="file" id="verify-evidence-file" accept="image/png,image/jpeg">
-        <span>选择 PNG/JPEG 文件</span>
+        <input type="file" id="verify-evidence-file" accept="image/png,image/jpeg" multiple>
+        <span>选择一张或多张 PNG/JPEG 截图</span>
       </label>
       <div id="verify-paste-hint" class="paste-hint" tabindex="0">或在此 Ctrl+V 粘贴截图</div>
       <ul id="verify-evidence-list" class="evidence-list"></ul>
@@ -323,7 +313,7 @@
     <input type="hidden" id="neg-zone-id">
     <label class="full-width">
       <span>验证项名称 <small class="meta-line">（说明本次验证的漏洞或检查类型，例如"未检出弱口令"）</small></span>
-      <input type="text" id="neg-title" required placeholder="例：HTTP 服务未检出已知漏洞">
+      <input type="text" id="neg-title" required placeholder="例：ssh / OpenSSH">
     </label>
     <label>
       <span>危险等级</span>
@@ -343,13 +333,13 @@
       <ul id="neg-assets-list" class="verify-asset-list"></ul>
     </div>
     <div class="full-width">
-      <p class="eyebrow">共享截图（必须至少一张）</p>
-      <p class="meta-line">一张截图覆盖全部已选端点；说明须写明验证覆盖范围。</p>
+      <p class="eyebrow">共享截图（必须至少一张，可多张）</p>
+      <p class="meta-line">截图将进入正式报告。可以点击选择，也可以把图片拖到本弹窗内，或在下方区域按 Ctrl/Cmd+V 粘贴。</p>
       <label class="file-input-label">
-        <input type="file" id="neg-evidence-file" accept="image/png,image/jpeg">
-        <span>选择 PNG/JPEG 文件</span>
+        <input type="file" id="neg-evidence-file" accept="image/png,image/jpeg" multiple>
+        <span>选择一张或多张 PNG/JPEG 截图</span>
       </label>
-      <div id="neg-paste-hint" class="paste-hint" tabindex="0">或在此 Ctrl+V 粘贴截图</div>
+      <div id="neg-paste-hint" class="paste-hint" tabindex="0">点击这里后按 Ctrl/Cmd+V 粘贴截图；也可直接拖入本弹窗</div>
       <ul id="neg-evidence-list" class="evidence-list"></ul>
     </div>
     <div class="form-actions full-width">

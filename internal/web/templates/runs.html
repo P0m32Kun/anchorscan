@@ -1,14 +1,14 @@
 {{define "content"}}
 <section class="page-header">
   <div>
-    <p class="eyebrow">任务队列</p>
-    <h2>扫描记录历史</h2>
+    <p class="eyebrow">{{if .ToolHistory}}单工具调用{{else}}任务队列{{end}}</p>
+    <h2>{{if .ToolHistory}}工具运行历史{{else}}扫描记录历史{{end}}</h2>
   </div>
-  <a class="button button-primary" href="/projects">
+  <a class="button button-primary" href="{{if .ToolHistory}}/tools/new{{else}}/projects{{end}}">
     <svg class="button-icon runs-primary-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-19.5 0A2.25 2.25 0 002.25 15v4.5a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V15a2.25 2.25 0 00-2.25-2.25m-19.5 0h19.5" />
     </svg>
-    <span>进入项目扫描</span>
+    <span>{{if .ToolHistory}}发起工具调用{{else}}进入项目扫描{{end}}</span>
   </a>
 </section>
 
@@ -16,7 +16,7 @@
   <table class="data-table run-history-table">
     <thead>
       <tr>
-        <th class="run-col-id">扫描任务ID (Run ID)</th>
+        <th class="run-col-id">{{if .ToolHistory}}工具运行 ID{{else}}扫描任务ID (Run ID){{end}}</th>
         <th class="run-col-status">任务状态</th>
         <th class="run-col-target">目标资产</th>
         <th class="run-col-project">项目</th>
@@ -51,7 +51,11 @@
           </span>
         </td>
         <td class="run-actions">
-          {{if eq .Status "completed"}}
+          {{if $.ToolHistory}}
+          <a class="button button-secondary run-report-action" href="/runs/{{.RunID}}">
+            <span>查看结果</span>
+          </a>
+          {{else if eq .Status "completed"}}
           <a class="button button-secondary run-report-action" href="/reports/{{.RunID}}">
             <svg class="button-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
@@ -70,7 +74,7 @@
           <span class="run-no-action">—</span>
           {{end}}
           {{if ne .Status "running"}}
-          <form class="run-delete-form" method="post" action="/runs/{{.RunID}}" onsubmit="return confirm('确认删除该扫描历史？');">
+          <form class="run-delete-form" method="post" action="/runs/{{.RunID}}" onsubmit="return confirm('确认删除该运行历史？');">
             <input type="hidden" name="_method" value="delete">
             <button class="button button-danger run-delete-action" type="submit">删除</button>
           </form>
@@ -80,8 +84,8 @@
       {{else}}
       <tr>
         <td colspan="6" class="muted runs-empty-state">
-          <strong>暂无扫描记录</strong>
-          <span>点击右上角按钮以发起第一次安全扫描。</span>
+          <strong>{{if $.ToolHistory}}暂无工具运行记录{{else}}暂无扫描记录{{end}}</strong>
+          <span>{{if $.ToolHistory}}点击右上角按钮发起第一次工具调用。{{else}}点击右上角按钮以发起第一次安全扫描。{{end}}</span>
         </td>
       </tr>
       {{end}}

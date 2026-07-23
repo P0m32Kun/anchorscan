@@ -1,11 +1,12 @@
 function setupToolForm(){
   const form = document.querySelector('[data-tool-form]');
   const terminal = document.getElementById('tool-output');
+  const detailLink = document.getElementById('tool-run-detail');
   if(!form || !terminal) return;
   const button = form.querySelector('button[type="submit"]');
 
   const write = (text) => {
-    terminal.textContent = text;
+    renderANSI(terminal, text);
     terminal.scrollTop = terminal.scrollHeight;
   };
 
@@ -22,6 +23,10 @@ function setupToolForm(){
       });
       if(!res.ok) throw new Error((await res.text()).trim() || '启动失败');
       const data = await res.json();
+      if(detailLink){
+        detailLink.href = '/runs/' + data.run_id;
+        detailLink.hidden = false;
+      }
       await pollToolOutput(data.run_id, write);
     } catch (err) {
       write(terminal.textContent + (err.message || String(err)) + '\n');
