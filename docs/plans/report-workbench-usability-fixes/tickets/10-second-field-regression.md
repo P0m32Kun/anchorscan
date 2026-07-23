@@ -4,7 +4,7 @@
 
 **Blocked by:** 09-field-regression-closure（done）
 
-**Status:** in-progress
+**Status:** done
 
 ## Review fixed point
 
