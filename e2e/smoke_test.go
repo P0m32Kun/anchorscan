@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -344,8 +345,20 @@ func repoRoot(t *testing.T) string {
 	return root
 }
 
+func labDir() string {
+	if d := os.Getenv("SHARED_LAB_DIR"); d != "" {
+		return d
+	}
+	usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	return filepath.Join(usr.HomeDir, "DEV", "lab")
+}
+
 func ensureLab(t *testing.T, root string) labTargets {
 	t.Helper()
+	ld := labDir()
 	for _, name := range labContainerNames {
 		if !labRunning(root, name) {
 			startExistingLabContainers(t, root)
@@ -354,21 +367,21 @@ func ensureLab(t *testing.T, root string) labTargets {
 	}
 	for _, name := range labContainerNames {
 		if !labRunning(root, name) {
-			runCommand(t, root, 2*time.Minute, "docker", "compose", "-f", "docker-compose.lab.yml", "up", "-d")
+			runCommand(t, ld, 2*time.Minute, "docker", "compose", "-f", filepath.Join(ld, "docker-compose.yml"), "up", "-d", "--build")
 			break
 		}
 	}
 	return labTargets{
-		tomcatIP:  containerIP(t, root, "anchorscan-lab-tomcat"),
-		redisIP:   containerIP(t, root, "anchorscan-lab-redis"),
-		mariadbIP: containerIP(t, root, "anchorscan-lab-mariadb"),
-		sshIP:     containerIP(t, root, "anchorscan-lab-ssh"),
-		smbIP:     containerIP(t, root, "anchorscan-lab-samba"),
-		unknownIP: containerIP(t, root, "anchorscan-lab-unknown"),
+		tomcatIP:  containerIP(t, root, "lab-tomcat"),
+		redisIP:   containerIP(t, root, "lab-redis"),
+		mariadbIP: containerIP(t, root, "lab-mariadb"),
+		sshIP:     containerIP(t, root, "lab-ssh"),
+		smbIP:     containerIP(t, root, "lab-samba"),
+		unknownIP: containerIP(t, root, "lab-unknown"),
 	}
 }
 
-var labContainerNames = []string{"anchorscan-lab-tomcat", "anchorscan-lab-redis", "anchorscan-lab-mariadb", "anchorscan-lab-ssh", "anchorscan-lab-samba", "anchorscan-lab-unknown"}
+var labContainerNames = []string{"lab-tomcat", "lab-redis", "lab-mariadb", "lab-ssh", "lab-samba", "lab-unknown"}
 
 func startExistingLabContainers(t *testing.T, root string) {
 	t.Helper()
@@ -386,7 +399,7 @@ func existingLabContainers(t *testing.T, root string) []string {
 	var names []string
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
 		switch strings.TrimSpace(line) {
-		case "anchorscan-lab-tomcat", "anchorscan-lab-redis", "anchorscan-lab-mariadb", "anchorscan-lab-ssh", "anchorscan-lab-samba", "anchorscan-lab-unknown":
+		case "lab-tomcat", "lab-redis", "lab-mariadb", "lab-ssh", "lab-samba", "lab-unknown":
 			names = append(names, strings.TrimSpace(line))
 		}
 	}
@@ -463,7 +476,7 @@ func writeConfig(t *testing.T, root, dir string, paths toolPaths) string {
 		}
 	}
 	configPath := filepath.Join(dir, "config.yaml")
-	template := filepath.Join(root, "e2e", "fixtures", "anchorscan-lab.yaml")
+	template := filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml")
 	content := fmt.Sprintf(`tools:
   rustscan: %q
   nmap: %q

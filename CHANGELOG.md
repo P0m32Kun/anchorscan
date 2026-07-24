@@ -6,6 +6,14 @@ adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 →
 
 ## [Unreleased]
 
+### Changed
+- Docker 靶场移出本项目至 `~/DEV/lab/`，合并 `Anchor/docker-rangefield/` 和 `local-redteam/lab/` 为一个共享靶场，所有项目共用。
+- `e2e/smoke_test.go`：改用 `~/DEV/lab/`（绝对路径），容器名 `lab-*`，支持 `SHARED_LAB_DIR` 环境变量覆盖。
+- `.github/workflows/lab.yml`：CI 内联构建靶场到 `/tmp/shared-lab`，通过 `SHARED_LAB_DIR` 传递。
+
+### Removed
+- `docker-compose.lab.yml`、`e2e/fixtures/anchorscan-lab.yaml` 从仓库 git-rm。
+
 ## [1.9.2] - 2026-07-22
 
 报告风险等级与 Nuclei 对齐，并修复多项报告可用性问题。
