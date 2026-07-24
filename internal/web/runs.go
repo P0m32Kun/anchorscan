@@ -11,13 +11,23 @@ import (
 )
 
 type runDetailView struct {
-	Run            store.ScanRun
-	RunMeta        runMetaView
-	CanRerun       bool
-	IsToolRun      bool
-	ReturnURL      string
-	VerificationID string
-	EvidenceURL    string
+	PropsJSON string
+}
+
+type runDetailProps struct {
+	RunID       string `json:"run_id"`
+	ProjectID   string `json:"project_id"`
+	Status      string `json:"status"`
+	Target      string `json:"target"`
+	Ports       string `json:"ports"`
+	Profile     string `json:"profile"`
+	FullTarget  string `json:"full_target"`
+	FullPorts   string `json:"full_ports"`
+	FullProfile string `json:"full_profile"`
+	CanRerun    bool   `json:"can_rerun"`
+	IsToolRun   bool   `json:"is_tool_run"`
+	ReturnURL   string `json:"return_url"`
+	EvidenceURL string `json:"evidence_url"`
 }
 
 func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
@@ -118,15 +128,23 @@ func (s *server) runDetail(w http.ResponseWriter, r *http.Request) {
 	if isToolRun && verificationID != "" && run.ProjectID != "" {
 		evidenceURL = "/projects/" + run.ProjectID + "/verifications/" + verificationID + "/evidence"
 	}
-	render(w, "templates/run.html", runDetailView{
-		Run:            run,
-		RunMeta:        newRunMetaView(run),
-		CanRerun:       (run.Status == "interrupted" || run.Status == "completed_with_errors") && run.ProjectID != "" && isScanProfile(run.Profile),
-		IsToolRun:      isToolRun,
-		ReturnURL:      returnURL,
-		VerificationID: verificationID,
-		EvidenceURL:    evidenceURL,
+	meta := newRunMetaView(run)
+	props, _ := json.Marshal(runDetailProps{
+		RunID:       run.RunID,
+		ProjectID:   run.ProjectID,
+		Status:      run.Status,
+		Target:      meta.Target,
+		Ports:       meta.Ports,
+		Profile:     meta.Profile,
+		FullTarget:  meta.FullTarget,
+		FullPorts:   meta.FullPorts,
+		FullProfile: meta.FullProfile,
+		CanRerun:    (run.Status == "interrupted" || run.Status == "completed_with_errors") && run.ProjectID != "" && isScanProfile(run.Profile),
+		IsToolRun:   isToolRun,
+		ReturnURL:   returnURL,
+		EvidenceURL: evidenceURL,
 	})
+	render(w, "templates/run.html", runDetailView{PropsJSON: string(props)})
 }
 
 func (s *server) runAPI(w http.ResponseWriter, r *http.Request) {

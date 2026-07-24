@@ -130,8 +130,6 @@ func TestStaticAssetsServeLeafScripts(t *testing.T) {
 		want string
 	}{
 		{path: "/static/app.js", want: "copyReportData"},
-		{path: "/static/run-status.js", want: "refreshRunStatus"},
-		{path: "/static/tool-form.js", want: "setupToolForm"},
 		{path: "/static/report-ui.js", want: "renderVulnDistribution"},
 	} {
 		t.Run(asset.path, func(t *testing.T) {

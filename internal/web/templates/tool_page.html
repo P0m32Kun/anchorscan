@@ -99,26 +99,5 @@
   </aside>
 </section>
 
-<section class="panel tool-output-panel">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">工具输出</p>
-      <h3>工具实时输出</h3>
-    </div>
-    <a class="button button-secondary" id="tool-run-detail" href="#" hidden>查看本次完整结果</a>
-  </div>
-  <div class="terminal-window tool-preview-window">
-    <div class="terminal-header">
-      <div class="terminal-dots">
-        <span class="terminal-dot dot-red"></span>
-        <span class="terminal-dot dot-yellow"></span>
-        <span class="terminal-dot dot-green"></span>
-      </div>
-      <div class="terminal-title">tool output</div>
-    </div>
-    <pre class="event-log tool-command-preview" id="tool-output">等待启动工具...</pre>
-  </div>
-</section>
-
-<script src="/static/tool-form.js" defer></script>
+<div data-tool-run-feedback></div>
 {{end}}

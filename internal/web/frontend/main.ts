@@ -1,7 +1,9 @@
 import { createApp } from 'vue';
 import ReportInteractions from './ReportInteractions.vue';
+import RunDetail from './RunDetail.vue';
 import ScanCreate from './ScanCreate.vue';
 import ThemeToggle from './ThemeToggle.vue';
+import ToolRunFeedback from './ToolRunFeedback.vue';
 import Workbench from './Workbench.vue';
 import { initTheme } from './theme';
 
@@ -48,11 +50,27 @@ function mountReportInteractions() {
   mountPoint.dataset.mounted = 'true';
 }
 
+function mountRunDetail() {
+  const mountPoint = document.querySelector<HTMLElement>('[data-run-detail]');
+  if (!mountPoint) return;
+  createApp(RunDetail, JSON.parse(mountPoint.dataset.runProps || '{}')).mount(mountPoint);
+  mountPoint.dataset.mounted = 'true';
+}
+
+function mountToolRunFeedback() {
+  const mountPoint = document.querySelector<HTMLElement>('[data-tool-run-feedback]');
+  if (!mountPoint) return;
+  createApp(ToolRunFeedback).mount(mountPoint);
+  mountPoint.dataset.mounted = 'true';
+}
+
 function mountApps() {
   mountThemeControls();
   mountScanCreate();
   mountWorkbench();
   mountReportInteractions();
+  mountRunDetail();
+  mountToolRunFeedback();
 }
 
 if (document.readyState === 'loading') {

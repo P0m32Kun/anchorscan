@@ -55,11 +55,10 @@ func TestToolRunDetailShowsReturnAndEvidenceLinks(t *testing.T) {
 	}
 	body := res.Body.String()
 	for _, want := range []string{
-		"返回工作台",
-		"上传证据",
+		"data-run-detail",
+		"is_tool_run",
 		"/projects/p1/workbench",
 		"/projects/p1/verifications/v1/evidence",
-		"复制输出",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body: %s", want, body)
@@ -383,7 +382,7 @@ func TestRunStatusAPI(t *testing.T) {
 	}
 }
 
-func TestRunPageLoadsStatusPolling(t *testing.T) {
+func TestRunPageMountsVueRunDetail(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
@@ -407,10 +406,11 @@ func TestRunPageLoadsStatusPolling(t *testing.T) {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	appScript := strings.Index(body, `<script src="/static/app.js" defer></script>`)
-	runStatusScript := strings.Index(body, `<script src="/static/run-status.js" defer></script>`)
-	if appScript == -1 || runStatusScript == -1 || appScript > runStatusScript {
-		t.Fatalf("expected app.js before run-status.js: %s", body)
+	if !strings.Contains(body, `data-run-detail`) || !strings.Contains(body, `data-run-props=`) {
+		t.Fatalf("expected Vue run detail mount: %s", body)
+	}
+	if strings.Contains(body, `/static/run-status.js`) {
+		t.Fatalf("legacy polling script must not load: %s", body)
 	}
 }
 
@@ -452,7 +452,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 
 	detail := httptest.NewRecorder()
 	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/runs/run-1", nil))
-	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "status-interrupted") || !strings.Contains(detail.Body.String(), "/projects/p1/scans/new?rerun=run-1") {
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "data-run-detail") || !strings.Contains(detail.Body.String(), "interrupted") || !strings.Contains(detail.Body.String(), "can_rerun") {
 		t.Fatalf("unexpected run detail: %d %s", detail.Code, detail.Body.String())
 	}
 
@@ -499,7 +499,7 @@ func TestCompletedWithErrorsRunCanBeRerun(t *testing.T) {
 	closeServer(t, handler)
 	detail := httptest.NewRecorder()
 	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/runs/run-errors", nil))
-	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "/projects/p1/scans/new?rerun=run-errors") {
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "data-run-detail") || !strings.Contains(detail.Body.String(), "can_rerun") {
 		t.Fatalf("run detail = %d %s", detail.Code, detail.Body.String())
 	}
 	rerun := httptest.NewRecorder()

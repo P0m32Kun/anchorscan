@@ -233,18 +233,16 @@ try {
   await page.locator('textarea[name="ports"]').fill('80');
   await page.getByRole('button', { name: '立即启动引擎扫描' }).click();
   await page.waitForURL(/\/runs\/run-/);
+  await page.locator('[data-run-detail][data-mounted="true"]').waitFor();
+  assert.equal(await page.locator('.run-monitor-panel').evaluate((element) => getComputedStyle(element).backgroundImage.includes('255')), false, 'dark run panel must not use a white surface');
+  await page.screenshot({ path: path.join(artifactDir, 'run-dark.png'), fullPage: true });
   const cancelButton = page.getByRole('button', { name: '中止扫描' });
-  const readyDeadline = Date.now() + 5_000;
-  while (Date.now() < readyDeadline && await cancelButton.count() === 0) {
-    await page.waitForTimeout(100);
-    await page.reload({ waitUntil: 'networkidle' });
-  }
-  assert.equal(await cancelButton.count(), 1, 'running scan detail did not become ready');
-  const cancelURL = await cancelButton.evaluate((button) => button.form.action);
-  await page.evaluate(async (url) => {
-    const response = await fetch(url, { method: 'POST', redirect: 'manual' });
-    if (!response.ok && response.type !== 'opaqueredirect') throw new Error(`cancel failed: ${response.status}`);
-  }, cancelURL);
+  await assert.doesNotReject(() => cancelButton.waitFor({ timeout: 5_000 }));
+  const runURL = page.url();
+  await cancelButton.focus();
+  await cancelButton.click();
+  await assert.doesNotReject(() => page.getByText('已请求中止，正在等待引擎停止。').waitFor({ timeout: 5_000 }));
+  assert.equal(page.url(), runURL, 'cancel should not navigate away from the run detail');
   await assert.doesNotReject(() => page.getByText('canceled').waitFor({ timeout: 5_000 }));
 
   await page.goto(`${baseURL}${projectURL}/scans/new`, { waitUntil: 'networkidle' });
@@ -262,6 +260,13 @@ try {
   await assert.doesNotReject(() => page.getByRole('cell', { name: 'anchorscan-test' }).waitFor());
 
   const projectID = projectURL.split('/').pop();
+  await page.goto(`${baseURL}/tools/nmap?project_id=${projectID}`, { waitUntil: 'networkidle' });
+  await page.locator('[data-tool-run-feedback][data-mounted="true"]').waitFor();
+  await page.locator('textarea[name="raw_args"]').fill('-sn 192.0.2.20');
+  await page.getByRole('button', { name: '启动 nmap' }).click();
+  await assert.doesNotReject(() => page.getByRole('link', { name: '查看本次完整结果' }).waitFor({ timeout: 5_000 }));
+  await assert.doesNotReject(() => page.getByText(/工具运行已完成|工具运行已结束/).waitFor({ timeout: 5_000 }));
+
   await seedRun(`INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
     ('browser-errors', '${projectID}', 'I', '192.0.2.30', '443', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.30","ports":"443","profile":"normal"}', ''),
     ('browser-interrupted', '${projectID}', 'I', '192.0.2.31', '80,443', 'normal', 'interrupted', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.31","ports":"80,443","profile":"fast"}', '');

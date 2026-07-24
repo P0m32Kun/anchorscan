@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — 迁移报告交互。
 
-**Status:** proposed
+**Status:** ready-for-agent
 
 **Execution skills:** `tdd`、`frontend-visual-design`、`browser:control-in-app-browser`、`code-review`、`ponytail`。
 
