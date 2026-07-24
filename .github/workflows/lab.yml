@@ -25,181 +25,181 @@ jobs:
           mkdir -p "$LAB_DIR"/{apps/tomcat-vuln,fixtures}
           # docker-compose.yml
           cat > "$LAB_DIR/docker-compose.yml" << 'COMPOSE'
-services:
-  nginx:
-    image: nginx:alpine
-    container_name: lab-nginx
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.8
-    ports:
-      - "18080:80"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-  tomcat:
-    build:
-      context: apps/tomcat-vuln
-      dockerfile: Dockerfile
-    container_name: lab-tomcat
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.6
-    ports:
-      - "18081:8080"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "--http-user=tomcat", "--http-password=tomcat", "http://127.0.0.1:8080/manager/html"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-  grafana:
-    image: grafana/grafana:10.0.0
-    container_name: lab-grafana
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.9
-    ports:
-      - "18082:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=
-      - GF_SERVER_ROOT_URL=http://localhost:3000
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-  redis:
-    image: redis:7-alpine
-    container_name: lab-redis
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.3
-    ports:
-      - "6379:6379"
-    command: redis-server --protected-mode no
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
-  mariadb:
-    image: mariadb:11
-    container_name: lab-mariadb
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.5
-    environment:
-      MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: testdb
-    ports:
-      - "13306:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-  ssh:
-    image: lscr.io/linuxserver/openssh-server:latest
-    container_name: lab-ssh
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.2
-    environment:
-      PUID: "1000"
-      PGID: "1000"
-      TZ: UTC
-      PASSWORD_ACCESS: "true"
-      USER_NAME: lab
-      USER_PASSWORD: lab
-    ports:
-      - "10022:2222"
-  samba:
-    image: dperson/samba
-    container_name: lab-samba
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.4
-    command:
-      - "-u"
-      - "lab;lab"
-      - "-s"
-      - "public;/share;yes;no;no;lab"
-    ports:
-      - "1445:445"
-  unknown-tcp:
-    image: python:3.12-alpine
-    container_name: lab-unknown
-    networks:
-      lab-net:
-        ipv4_address: 172.22.0.7
-    command:
-      - "python"
-      - "-c"
-      - |
-        import socket
-        s = socket.socket()
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind(("0.0.0.0", 9099))
-        s.listen()
-        while True:
-            conn, _ = s.accept()
-            try:
-                conn.sendall(b"lab-unknown\r\n")
-            except OSError:
-                pass
-            finally:
-                conn.close()
-    ports:
-      - "19099:9099"
-networks:
-  lab-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.22.0.0/24
-COMPOSE
+          services:
+            nginx:
+              image: nginx:alpine
+              container_name: lab-nginx
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.8
+              ports:
+                - "18080:80"
+              healthcheck:
+                test: ["CMD", "wget", "-qO-", "http://localhost/"]
+                interval: 5s
+                timeout: 3s
+                retries: 3
+            tomcat:
+              build:
+                context: apps/tomcat-vuln
+                dockerfile: Dockerfile
+              container_name: lab-tomcat
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.6
+              ports:
+                - "18081:8080"
+              healthcheck:
+                test: ["CMD", "wget", "-qO-", "--http-user=tomcat", "--http-password=tomcat", "http://127.0.0.1:8080/manager/html"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
+            grafana:
+              image: grafana/grafana:10.0.0
+              container_name: lab-grafana
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.9
+              ports:
+                - "18082:3000"
+              environment:
+                - GF_SECURITY_ADMIN_USER=admin
+                - GF_SECURITY_ADMIN_PASSWORD=admin
+                - GF_INSTALL_PLUGINS=
+                - GF_SERVER_ROOT_URL=http://localhost:3000
+              healthcheck:
+                test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+                interval: 5s
+                timeout: 3s
+                retries: 5
+            redis:
+              image: redis:7-alpine
+              container_name: lab-redis
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.3
+              ports:
+                - "6379:6379"
+              command: redis-server --protected-mode no
+              healthcheck:
+                test: ["CMD", "redis-cli", "ping"]
+                interval: 5s
+                timeout: 3s
+                retries: 3
+            mariadb:
+              image: mariadb:11
+              container_name: lab-mariadb
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.5
+              environment:
+                MARIADB_ROOT_PASSWORD: root
+                MARIADB_DATABASE: testdb
+              ports:
+                - "13306:3306"
+              healthcheck:
+                test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+                interval: 10s
+                timeout: 5s
+                retries: 5
+            ssh:
+              image: lscr.io/linuxserver/openssh-server:latest
+              container_name: lab-ssh
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.2
+              environment:
+                PUID: "1000"
+                PGID: "1000"
+                TZ: UTC
+                PASSWORD_ACCESS: "true"
+                USER_NAME: lab
+                USER_PASSWORD: lab
+              ports:
+                - "10022:2222"
+            samba:
+              image: dperson/samba
+              container_name: lab-samba
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.4
+              command:
+                - "-u"
+                - "lab;lab"
+                - "-s"
+                - "public;/share;yes;no;no;lab"
+              ports:
+                - "1445:445"
+            unknown-tcp:
+              image: python:3.12-alpine
+              container_name: lab-unknown
+              networks:
+                lab-net:
+                  ipv4_address: 172.22.0.7
+              command:
+                - "python"
+                - "-c"
+                - |
+                  import socket
+                  s = socket.socket()
+                  s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                  s.bind(("0.0.0.0", 9099))
+                  s.listen()
+                  while True:
+                      conn, _ = s.accept()
+                      try:
+                          conn.sendall(b"lab-unknown\r\n")
+                      except OSError:
+                          pass
+                      finally:
+                          conn.close()
+              ports:
+                - "19099:9099"
+          networks:
+            lab-net:
+              driver: bridge
+              ipam:
+                config:
+                  - subnet: 172.22.0.0/24
+          COMPOSE
           # tomcat-vuln Dockerfile
           cat > "$LAB_DIR/apps/tomcat-vuln/Dockerfile" << 'DOCKERFILE'
-FROM tomcat:9.0-jdk8-temurin
-RUN cp -r /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps/
-RUN cat > /usr/local/tomcat/conf/tomcat-users.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<tomcat-users xmlns="http://tomcat.apache.org/xml"
-              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-              xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
-              version="1.0">
-  <role rolename="manager-gui"/>
-  <role rolename="manager-script"/>
-  <role rolename="admin-gui"/>
-  <user username="tomcat" password="tomcat" roles="manager-gui,manager-script,admin-gui"/>
-</tomcat-users>
-EOF
-RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
-RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/host-manager/META-INF/context.xml || true
-RUN perl -i -0pe 's|<Realm className="org\.apache\.catalina\.realm\.LockOutRealm">\s*<!--.*?-->\s*<Realm className="org\.apache\.catalina\.realm\.UserDatabaseRealm"\s+resourceName="UserDatabase"/>\s*</Realm>|<Realm className="org.apache.catalina.realm.UserDatabaseRealm" resourceName="UserDatabase"/>|s' /usr/local/tomcat/conf/server.xml
-EXPOSE 8080
-DOCKERFILE
+          FROM tomcat:9.0-jdk8-temurin
+          RUN cp -r /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps/
+          RUN cat > /usr/local/tomcat/conf/tomcat-users.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <tomcat-users xmlns="http://tomcat.apache.org/xml"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                        xsi:schemaLocation="http://tomcat.apache.org/xml tomcat-users.xsd"
+                        version="1.0">
+            <role rolename="manager-gui"/>
+            <role rolename="manager-script"/>
+            <role rolename="admin-gui"/>
+            <user username="tomcat" password="tomcat" roles="manager-gui,manager-script,admin-gui"/>
+          </tomcat-users>
+          EOF
+          RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
+          RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/host-manager/META-INF/context.xml || true
+          RUN perl -i -0pe 's|<Realm className="org\.apache\.catalina\.realm\.LockOutRealm">\s*<!--.*?-->\s*<Realm className="org\.apache\.catalina\.realm\.UserDatabaseRealm"\s+resourceName="UserDatabase"/>\s*</Realm>|<Realm className="org.apache.catalina.realm.UserDatabaseRealm" resourceName="UserDatabase"/>|s' /usr/local/tomcat/conf/server.xml
+          EXPOSE 8080
+          DOCKERFILE
           # nuclei fixture
           cat > "$LAB_DIR/fixtures/lab-tomcat.yaml" << 'FIXTURE'
-id: lab-tomcat
-info:
-  name: Shared lab Tomcat reachability
-  author: anchorscan
-  severity: info
-  tags: tomcat,shared-lab
-http:
-  - method: GET
-    path:
-      - "{{BaseURL}}/"
-    matchers:
-      - type: status
-        status:
-          - 200
-FIXTURE
+          id: lab-tomcat
+          info:
+            name: Shared lab Tomcat reachability
+            author: anchorscan
+            severity: info
+            tags: tomcat,shared-lab
+          http:
+            - method: GET
+              path:
+                - "{{BaseURL}}/"
+              matchers:
+                - type: status
+                  status:
+                    - 200
+          FIXTURE
           echo "Lab set up at $LAB_DIR"
 
       - name: Set up Go
