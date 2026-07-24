@@ -1,6 +1,6 @@
 # Web Console 持续演进与 Vue 迁移
 
-**Status:** approved
+**Status:** completed
 
 ## Problem Statement
 

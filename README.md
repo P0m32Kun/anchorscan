@@ -2,7 +2,7 @@
 
 `anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。
 
-核心思路是「**指纹驱动、精准分类、服务多引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 每个已识别服务按 `nuclei` + NSE 双引擎规则表（`config/service-tags.yaml` + `config/nse.yaml`）同时调度；RDP 服务可额外启用可选 `rdpscan` 引擎检测 BlueKeep（CVE-2019-0708）→ Web 服务额外走 `httpx` → 结果统一落入 SQLite → 导出 JSON / HTML 报告。
+核心思路是「**指纹驱动、精准分类、服务多引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 每个已识别服务按 `nuclei` + NSE 双引擎规则表（`config/service-tags.yaml` + `config/nse.yaml`）同时调度；RDP 服务可额外启用可选 `rdpscan` 引擎检测 BlueKeep（CVE-2019-0708）→ Web 服务额外走 `httpx` → 结果统一落入 SQLite → 导出 JSON / HTML / DOCX 报告。
 
 ## 快速开始
 
@@ -12,8 +12,8 @@
 
 ```bash
 # Linux / macOS 示例
-tar -xzf anchorscan-v1.9.0-linux-amd64.tar.gz
-cd anchorscan-v1.9.0-linux-amd64
+tar -xzf anchorscan-v2.0.0-linux-amd64.tar.gz
+cd anchorscan-v2.0.0-linux-amd64
 chmod +x anchorscan
 ./anchorscan doctor    # 自动生成配置、检测工具路径
 ./anchorscan web       # 启动 Web 控制台
@@ -21,7 +21,11 @@ chmod +x anchorscan
 
 ### 方式二：从源码编译
 
-需要本机安装 [Go](https://go.dev/dl/)。
+需要本机安装 [Go](https://go.dev/dl/) 和 [Node.js](https://nodejs.org/) 20+。Node 只用于构建嵌入式 Web 静态资源，运行已编译的 `anchorscan` 不需要 Node。
+
+```bash
+npm ci
+```
 
 #### 1. 前置依赖
 
@@ -106,12 +110,13 @@ go run ./cmd/anchorscan tool nmap --mode alive --target 192.0.2.10
 
 ## Web 控制台功能
 
-- 项目管理：保存默认目标、端口、档位，支持目标文件导入、排除目标/端口
-- 扫描页：可临时覆盖目标/端口/档位，一键插入高危端口列表
-- 运行页：实时事件日志，可取消扫描
-- 单工具页：单独执行各引擎，带常用参数预设
-- 报告页：筛选、证据详情、按主机聚合、复制/导出 IP / IP:PORT / URL 清单
-- 配置页：编辑工具路径、默认端口，以及高危端口列表
+- 三态主题：支持跟随系统、浅色和深色模式，显式选择跨刷新保留
+- 项目交付：按 Network Zone 组织扫描、人工 Verification 与 Evidence，并导出项目 HTML / DOCX 报告
+- 扫描创建：选择项目分区后填写目标、端口和档位，支持目标文件导入、排除项和高危端口预设
+- 运行与单工具：实时事件、连续输出、取消操作和常用参数预设
+- 验证工作台：按服务指纹整理正向/负向候选，支持证据粘贴或拖放与确认结论
+- 报告阅读：风险摘要、检测覆盖、筛选、证据详情、主机/漏洞聚合，以及 IP / IP:PORT / URL 复制导出
+- 全局设置：编辑主题、工具路径、超时、原始 YAML 和高危端口列表
 
 ## 说明
 

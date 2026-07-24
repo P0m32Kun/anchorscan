@@ -8,7 +8,16 @@
   <a class="button button-secondary" href="/">返回面板</a>
 </section>
 
-<section class="config-grid config-workspace">
+<div class="settings-layout">
+<nav class="settings-nav" data-scroll-spy aria-label="设置分区导航">
+  <a href="#config-appearance">外观主题</a>
+  <a href="#config-engine">引擎路径</a>
+  <a href="#config-timeouts">超时设置</a>
+  <a href="#config-yaml">高级 YAML</a>
+  <a href="#config-ports">端口预设</a>
+</nav>
+<div class="settings-content">
+<section class="config-grid config-workspace" id="config-appearance">
   <article class="panel config-panel">
     <div class="panel-heading">
       <div>
@@ -35,7 +44,7 @@
 {{end}}
 
 <section class="config-grid config-workspace">
-  <article class="panel config-panel">
+  <article class="panel config-panel" id="config-engine">
     <div class="panel-heading">
       <div>
         <p class="eyebrow">基础设置</p>
@@ -64,10 +73,10 @@
         <input name="rdpscan" value="{{.Config.Tools.Rdpscan}}" placeholder="例如: /usr/local/bin/rdpscan">
         <p class="meta-line config-field-help">留空则 BlueKeep (CVE-2019-0708) 检测自动跳过。需自行编译 rdpscan 并填入路径。</p>
       </label>
-      <div class="full-width">
+      <div class="full-width" id="config-timeouts">
         <span>逐工具超时</span>
         <p class="meta-line config-field-help">使用 Go duration（例如 30s、5m）；填 0 表示不限时，档位不会覆盖这些全局设置。</p>
-        <div class="form-grid">
+        <div class="form-grid timeout-grid">
           <label><span>Rustscan</span><input name="timeout_rustscan" value="{{.Config.Timeouts.Rustscan}}"></label>
           <label><span>Nmap</span><input name="timeout_nmap" value="{{.Config.Timeouts.Nmap}}"></label>
           <label><span>Httpx</span><input name="timeout_httpx" value="{{.Config.Timeouts.Httpx}}"></label>
@@ -107,7 +116,7 @@
     </form>
   </article>
 
-  <article class="panel config-panel">
+  <article class="panel config-panel" id="config-yaml">
     <div class="panel-heading">
       <div>
         <p class="eyebrow">高级 YAML 编排</p>
@@ -131,7 +140,7 @@
   </article>
 </section>
 
-<section class="panel config-ports-panel">
+<section class="panel config-ports-panel" id="config-ports">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">端口预设</p>
@@ -154,4 +163,6 @@
     </div>
   </form>
 </section>
+</div>
+</div>
 {{end}}

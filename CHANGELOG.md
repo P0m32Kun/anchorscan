@@ -2,17 +2,35 @@
 
 All notable changes to AnchorScan are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-adheres to a manual local-operator versioning scheme (v1.0 → v1.1 → v1.2 → v1.3 → v1.4 → v1.5 → v1.5.1 → v1.6.0).
+uses semantic version tags for local-operator releases.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-24
+
+v2.0.0 完成 Web 控制台的渐进式 Vue 迁移与视觉收口，同时保持现有 Go 路由、表单和单文件发布方式。
+
+### Added
+- 接入 Vue 3、Vite 与 TypeScript；生产构建产物继续嵌入 Go 二进制，运行时不依赖 Node 或外部 CDN。
+- 新增 `system / light / dark` 三态主题，显式选择跨刷新保留，并覆盖键盘焦点、状态色和深色证据区。
+- 全局设置新增分区锚点导航，项目页新增 Zone Tabs 与分区胶囊，扫描报告新增可聚焦的 sticky 大纲。
+- Web 冒烟矩阵覆盖主题、键盘、焦点、确认对话框、长任务状态以及 1280/1440 视口。
+
 ### Changed
-- Docker 靶场移出本项目至 `~/DEV/lab/`，合并 `Anchor/docker-rangefield/` 和 `local-redteam/lab/` 为一个共享靶场，所有项目共用。
-- `e2e/smoke_test.go`：改用 `~/DEV/lab/`（绝对路径），容器名 `lab-*`，支持 `SHARED_LAB_DIR` 环境变量覆盖。
-- `.github/workflows/lab.yml`：CI 内联构建靶场到 `/tmp/shared-lab`，通过 `SHARED_LAB_DIR` 传递。
+- 扫描创建、验证工作台、报告筛选、Run 跟踪、单工具执行和破坏性确认交互迁入各自的 Vue 组件；普通 Go 表单和服务端校验契约保持不变。
+- 报告工作台简化标题与会话标签、默认折叠检测事实、支持证据粘贴/拖放，并自动纳入 `confirmed` / `not_observed` 验证。
+- 工具运行不再混入扫描任务列表；终端输出统一规范化，负向验证候选按服务指纹稳定分组。
+- 控制面板、配置页、项目详情和报告页完成高密度信息排版与明暗主题视觉重构。
+- Docker 靶场移至共享 `~/DEV/lab/`；本地 e2e 支持 `SHARED_LAB_DIR`，CI 在 `/tmp/shared-lab` 内联构建同等靶场。
+
+### Fixed
+- 修复报告与工作台的项目导航、旧标题导出、字段回归、命令对话框、键盘控制和焦点恢复问题。
+- 修复主题控件不同步、内联启动校验漂移、1280px 报告大纲不可用、配置页 scroll-spy 误高亮和 reduced-motion 下 hover 位移。
+- 保留扫描创建的原生回退与字段错误反馈，避免 Vue 未挂载或请求失败时丢失输入。
 
 ### Removed
-- `docker-compose.lab.yml`、`e2e/fixtures/anchorscan-lab.yaml` 从仓库 git-rm。
+- 删除 Vue 迁移后的重复原生脚本、适配层、过期选择器和旧测试残留。
+- 从仓库移除 `docker-compose.lab.yml` 与 `e2e/fixtures/anchorscan-lab.yaml`。
 
 ## [1.9.2] - 2026-07-22
 

@@ -135,10 +135,19 @@
     </div>
   </div>
 
+  {{if gt (len .Zones) 1}}
+  <div class="zone-tabs" data-zone-tabs role="group" aria-label="按分区过滤扫描历史">
+    <button class="zone-tab" type="button" data-zone-target="all" aria-pressed="true">全部分区</button>
+    {{range .Zones}}
+    <button class="zone-tab" type="button" data-zone-target="{{.ZoneID}}" aria-pressed="false">{{.Name}}</button>
+    {{end}}
+  </div>
+  {{end}}
+
   {{range .Zones}}
   {{$zoneID := .ZoneID}}
   {{$zoneName := .Name}}
-  <div class="project-zone-runs">
+  <div class="project-zone-runs" data-zone="{{$zoneID}}">
     <h4 class="project-zone-runs-title">{{$zoneName}} <span class="muted">{{$zoneID}}</span></h4>
     <table class="data-table run-history-table">
       <thead>

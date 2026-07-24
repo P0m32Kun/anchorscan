@@ -633,17 +633,24 @@ input[type="file"]::file-selector-button:hover {
   color: var(--text);
 }
 
-/* Code editor block */
+/* Code editor block — VS Code style dark surface in both themes */
 .code-editor {
   min-height: 24rem;
-  background: var(--code-bg);
-  color: var(--text);
-  border: 1px solid var(--border-strong);
+  background: #0d1117;
+  color: #c9d1d9;
+  caret-color: #58a6ff;
+  border: 1px solid #30363d;
   border-radius: var(--radius-md);
   font-family: var(--mono);
   font-size: 0.82rem;
   padding: 1rem;
   line-height: 1.5;
+}
+
+.code-editor:focus {
+  background: #11161d;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
 /* Lists */
@@ -663,12 +670,13 @@ input[type="file"]::file-selector-button:hover {
   padding: 0.75rem 0.65rem;
   border-bottom: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  transition: background-color 0.15s ease;
+  transition: background-color 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .link-list li:hover,
 .run-list li:hover {
   background-color: rgba(0, 113, 227, 0.045);
+  transform: translateX(4px);
 }
 
 .link-list li:last-child,
@@ -2088,7 +2096,8 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .popover-trigger-btn .chevron-icon { width: 0.7rem; height: 0.7rem; transition: transform 0.15s ease; }
 .button-icon { width: 1rem; height: 1rem; }
 .filter-reset { height: 34px; padding: 0 0.85rem; font-size: 0.82rem; }
-.report-filter .popover-panel, #active-filter-badges, #active-severity-count, #distribution-container { display: none; }
+/* #distribution-container stays hidden until report-ui.js computes segments (inline style). The popover panels are Vue v-show controlled - a stylesheet display:none here would permanently override v-show. */
+#distribution-container { display: none; }
 
 .report-section { margin-bottom: 1.25rem; }
 .report-section .panel-heading { align-items: flex-start; }
@@ -2309,10 +2318,10 @@ body {
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-.panel:hover, .stat-card:hover {
-  transform: translateY(-3px) !important;
-  box-shadow: 0 16px 40px rgba(31, 38, 135, 0.065), 0 4px 12px rgba(0, 113, 227, 0.03) !important;
-  border-color: rgba(0, 113, 227, 0.15) !important;
+.stat-card:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 20px rgba(31, 38, 135, 0.04) !important;
+  border-color: rgba(0, 113, 227, 0.12) !important;
 }
 
 /* 3. iOS-style Sidebar Glassmorphism */
@@ -2599,10 +2608,8 @@ body {
 }
 
 .overview-metrics div:hover {
-  transform: translateY(-2px) !important;
-  background: rgba(255, 255, 255, 0.7) !important;
-  box-shadow: 0 8px 24px rgba(31, 38, 135, 0.04) !important;
-  border-color: rgba(0, 113, 227, 0.12) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  border-color: rgba(0, 113, 227, 0.08) !important;
 }
 
 /* Project tabs */
@@ -2886,4 +2893,284 @@ body {
 }
 #negative-dialog::backdrop {
   background: rgba(0, 0, 0, 0.25);
+}
+
+/* ==========================================
+   Web UI Beautify (docs/plans/web-ui-beautify)
+   ========================================== */
+
+/* Smooth anchor scrolling (guarded below for reduced motion) */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .link-list li:hover,
+  .run-list li:hover {
+    transform: none !important;
+  }
+}
+
+/* Anchor targets must clear sticky headers */
+[id^="config-"],
+[id^="report-"] {
+  scroll-margin-top: 1.5rem;
+}
+
+/* --- Dashboard: breathing status beacon --- */
+@keyframes beacon-breathe {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(34, 160, 107, 0.18), 0 0 0 6px rgba(34, 160, 107, 0.07);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(34, 160, 107, 0.28), 0 0 0 10px rgba(34, 160, 107, 0.12);
+  }
+}
+.overview-metrics .system-ready::before {
+  animation: beacon-breathe 2.6s ease-in-out infinite;
+}
+
+/* --- Config: settings anchor layout --- */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.settings-nav {
+  position: sticky;
+  top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--surface-shadow);
+}
+.settings-nav a {
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-left: 2px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.settings-nav a:hover {
+  background: var(--surface-overlay-hover);
+  color: var(--heading);
+}
+.settings-nav a.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+.settings-content {
+  min-width: 0;
+}
+.settings-content .config-workspace {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 1100px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+/* --- Config: timeout grid panel --- */
+.timeout-grid {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+  margin-top: 0.6rem;
+  padding: 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+@media (max-width: 900px) {
+  .timeout-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- Project detail: Zone tabs --- */
+.zone-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0 1.5rem 1rem;
+}
+.zone-tab {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.38rem 0.95rem;
+  font-size: 0.83rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.zone-tab:hover {
+  background: var(--surface-overlay-hover);
+  color: var(--heading);
+}
+.zone-tab[aria-pressed="true"] {
+  background: var(--primary-soft);
+  border-color: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 600;
+}
+.project-zone-runs[hidden] {
+  display: none;
+}
+.project-zone-runs-title {
+  margin: 0;
+  padding: 1.25rem 1.5rem 0.75rem;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--heading);
+}
+
+/* --- Project detail: Zone pills --- */
+.project-zone-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.project-zone-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.32rem 0.5rem 0.32rem 0.85rem;
+  background: var(--bg-accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+.project-zone-name {
+  font-weight: 600;
+  color: var(--heading);
+}
+.project-zone-id {
+  font-size: 0.75rem;
+}
+.project-zone-delete-form {
+  margin: 0;
+  display: inline-flex;
+}
+.project-zone-delete-form .link-button {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.project-zone-delete-form .link-button:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.project-zone-form {
+  margin-top: 0.9rem;
+}
+
+/* --- Report: floating outline (sticky column, never overlays content) --- */
+.report-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+.report-main {
+  min-width: 0;
+}
+.report-outline {
+  position: sticky;
+  top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.7rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--surface-shadow);
+}
+.report-outline .eyebrow {
+  padding: 0 0.7rem 0.35rem;
+}
+.report-outline a {
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 0.83rem;
+  font-weight: 500;
+  border-left: 2px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.report-outline a:hover {
+  background: var(--surface-overlay-hover);
+  color: var(--heading);
+}
+.report-outline a.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 600;
+}
+@media (max-width: 1280px) {
+  .report-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .report-outline {
+    order: -1;
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.85rem;
+  }
+  .report-outline .eyebrow {
+    width: 100%;
+    padding: 0 0.7rem 0.15rem;
+  }
+  .report-outline a {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+  }
+  .report-outline a.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--primary);
+  }
+}
+
+/* --- Report: severity stacked chart polish --- */
+.vuln-distribution-bar {
+  height: 14px;
+  border-radius: 999px;
+  border: 0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.vuln-bar-segment:first-child {
+  border-radius: 999px 0 0 999px;
+}
+.vuln-bar-segment:last-child {
+  border-radius: 0 999px 999px 0;
+}
+.legend-item {
+  font-weight: 500;
 }

@@ -30,7 +30,9 @@
   </div>
 </section>
 
-<section class="panel report-overview">
+<div class="report-layout">
+<div class="report-main">
+<section class="panel report-overview" id="report-risk">
   <div class="report-overview-copy">
     <p class="eyebrow">风险优先级</p>
     <h3>先处理严重和高危发现</h3>
@@ -46,7 +48,7 @@
 </section>
 
 {{if .DetectionCoverage}}
-<section class="panel report-overview">
+<section class="panel report-overview" id="report-coverage">
   <div class="report-overview-copy">
     <p class="eyebrow">检测执行覆盖</p>
     <h3>仅统计已完成的检测引擎</h3>
@@ -85,7 +87,7 @@
 <div data-report-interactions></div>
 
 {{if eq .AssetView "vulnerabilities"}}
-<section class="panel report-section">
+<section class="panel report-section" id="report-deliverables">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">漏洞交付</p>
@@ -146,7 +148,7 @@
   {{end}}
 </section>
 {{else}}
-<section class="panel report-section">
+<section class="panel report-section" id="report-assets">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">网络空间测绘</p>
@@ -289,7 +291,7 @@
   {{end}}
 </section>
 
-<section class="panel report-section">
+<section class="panel report-section" id="report-findings">
   <div class="panel-heading">
     <div>
       <p class="eyebrow">漏洞脆弱性</p>
@@ -400,4 +402,17 @@
   <script src="/static/report-ui.js" defer></script>
 </section>
 {{end}}
+</div>
+<aside class="report-outline" data-scroll-spy aria-label="报告大纲">
+  <p class="eyebrow">报告大纲</p>
+  <a href="#report-risk">风险优先级摘要</a>
+  {{if .DetectionCoverage}}<a href="#report-coverage">检测覆盖事实</a>{{end}}
+  {{if eq .AssetView "vulnerabilities"}}
+  <a href="#report-deliverables">漏洞交付聚合</a>
+  {{else}}
+  <a href="#report-assets">资产与服务测绘</a>
+  <a href="#report-findings">安全脆弱性 Findings</a>
+  {{end}}
+</aside>
+</div>
 {{end}}

@@ -10,7 +10,73 @@ function setActiveNavigation(path, items = document.querySelectorAll('.nav-item'
   items.forEach(item => item.classList.toggle('active', item.id === activeID));
 }
 
-document.addEventListener('DOMContentLoaded', () => setActiveNavigation(window.location.pathname));
+// Scroll-spy: highlight the anchor link matching the section in view.
+// Used by the settings anchor nav and the report floating outline.
+function initScrollSpy(nav) {
+  const links = Array.from(nav.querySelectorAll('a[href^="#"]'));
+  if (links.length === 0 || !('IntersectionObserver' in window)) return;
+  const pairs = links
+    .map(link => ({ link, section: document.getElementById(link.hash.slice(1)) }))
+    .filter(pair => pair.section);
+  if (pairs.length === 0) return;
+  const visible = new Set();
+  const activate = () => {
+    let current = pairs[0];
+    const visiblePairs = pairs.filter(p => visible.has(p.section.id));
+    if (visiblePairs.length > 0) {
+      current = visiblePairs[0];
+      for (let i = 1; i < visiblePairs.length; i++) {
+        const candidate = visiblePairs[i];
+        if (current.section.contains(candidate.section)) {
+          current = candidate;
+        }
+      }
+    } else {
+      for (const pair of pairs) {
+        if (pair.section.getBoundingClientRect().top < window.innerHeight * 0.5) current = pair;
+      }
+    }
+    pairs.forEach(pair => pair.link.classList.toggle('active', pair === current));
+  };
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) visible.add(entry.target.id);
+      else visible.delete(entry.target.id);
+    });
+    activate();
+  }, { rootMargin: '-20% 0px -60% 0px' });
+  pairs.forEach(pair => observer.observe(pair.section));
+  activate();
+}
+
+// Zone Tabs: filter project run tables by zone. Toggle buttons (aria-pressed),
+// default "all" keeps every table visible.
+function initZoneTabs() {
+  const tabbar = document.querySelector('[data-zone-tabs]');
+  if (!tabbar) return;
+  const buttons = Array.from(tabbar.querySelectorAll('[data-zone-target]'));
+  const groups = Array.from(document.querySelectorAll('.project-zone-runs[data-zone]'));
+  if (buttons.length === 0 || groups.length === 0) return;
+  tabbar.addEventListener('click', event => {
+    const button = event.target.closest('[data-zone-target]');
+    if (!button) return;
+    const target = button.dataset.zoneTarget;
+    buttons.forEach(btn => btn.setAttribute('aria-pressed', String(btn === button)));
+    groups.forEach(group => {
+      group.hidden = target !== 'all' && group.dataset.zone !== target;
+    });
+  });
+}
+
+function initAnchorNavs() {
+  document.querySelectorAll('[data-scroll-spy]').forEach(initScrollSpy);
+  initZoneTabs();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setActiveNavigation(window.location.pathname);
+  initAnchorNavs();
+});
 
 async function copyReportData(button){
   let text = button.dataset.copyText || '';

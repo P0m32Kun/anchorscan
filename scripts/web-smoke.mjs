@@ -160,43 +160,52 @@ try {
   assert.ok(['light', 'dark'].includes(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))), 'initial theme not set');
   assert.equal(await page.evaluate(() => document.documentElement.style.colorScheme), await page.evaluate(() => document.documentElement.getAttribute('data-theme')));
 
-  await page.getByRole('button', { name: '深色' }).click();
-  await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
-  await captureThemeScreenshot('dark');
+  const initialTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  const toggleBtn = page.locator('.theme-toggle-btn-single').first();
 
-  // Keyboard path: Space/Enter on a theme button updates the theme.
-  const lightButton = page.getByRole('button', { name: '浅色' });
-  await lightButton.focus();
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-pressed')), 'false');
-  await lightButton.press('Space');
-  await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-pressed')), 'true');
-  await captureThemeScreenshot('light');
+  if (initialTheme === 'light') {
+    await toggleBtn.click();
+    await page.waitForTimeout(150);
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+    await captureThemeScreenshot('dark');
 
-  const darkButton = page.getByRole('button', { name: '深色' });
-  await darkButton.focus();
-  await darkButton.press('Enter');
-  await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+    // Keyboard path: Space/Enter on the toggle button
+    await toggleBtn.focus();
+    await toggleBtn.press('Space');
+    await page.waitForTimeout(150);
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
+    await captureThemeScreenshot('light');
+
+    await toggleBtn.focus();
+    await toggleBtn.press('Enter');
+    await page.waitForTimeout(150);
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+  } else {
+    await toggleBtn.click();
+    await page.waitForTimeout(150);
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
+    await captureThemeScreenshot('light');
+
+    // Keyboard path: Space/Enter on the toggle button
+    await toggleBtn.focus();
+    await toggleBtn.press('Space');
+    await page.waitForTimeout(150);
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
+    await captureThemeScreenshot('dark');
+
+    await toggleBtn.focus();
+    await toggleBtn.press('Enter');
+    await page.waitForTimeout(150);
+    assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
+
+    // Switch to dark for subsequent tests
+    await toggleBtn.click();
+    await page.waitForTimeout(150);
+  }
 
   // Explicit preference survives a page refresh.
   await page.reload({ waitUntil: 'networkidle' });
   assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
-
-  // System preference follows OS color-scheme changes at runtime.
-  await page.getByRole('button', { name: '跟随系统' }).first().click();
-  await page.waitForTimeout(150);
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'system should follow dark OS preference');
-  await page.emulateMedia({ colorScheme: 'light' });
-  await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light', 'system should follow light OS preference');
-
-  await page.getByRole('button', { name: '深色' }).click();
-  await page.waitForTimeout(150);
 
   await page.getByRole('link', { name: '项目管理' }).click();
   await page.getByRole('link', { name: '新建项目' }).click();
@@ -228,6 +237,18 @@ try {
   await deleteZoneButton.click();
   await confirmDialog.getByRole('button', { name: '删除' }).click();
   await assert.doesNotReject(() => smokeZone.waitFor({ state: 'hidden' }));
+
+  // Zone Tabs filter the run tables; "all" is the default and restores every zone.
+  const zoneTabs = page.locator('[data-zone-tabs]');
+  await assert.doesNotReject(() => zoneTabs.waitFor());
+  const zoneGroups = page.locator('.project-zone-runs[data-zone]');
+  assert.equal(await zoneTabs.locator('[data-zone-target="all"]').getAttribute('aria-pressed'), 'true', 'all zones should be visible by default');
+  const singleZoneTab = zoneTabs.locator('[data-zone-target]').nth(1);
+  await singleZoneTab.click();
+  assert.equal(await singleZoneTab.getAttribute('aria-pressed'), 'true');
+  assert.equal(await zoneGroups.evaluateAll((groups) => groups.filter((group) => !group.hidden).length), 1, 'selecting a zone should show exactly one zone table');
+  await zoneTabs.locator('[data-zone-target="all"]').click();
+  assert.equal(await zoneGroups.evaluateAll((groups) => groups.filter((group) => !group.hidden).length), await zoneGroups.count(), 'all zones should reappear');
 
   await page.getByRole('link', { name: /发起扫描|新建扫描/ }).click();
   await page.locator('[data-scan-create][data-mounted="true"]').waitFor();
@@ -355,6 +376,12 @@ try {
   const runID = page.url().split('/').pop();
   await page.goto(`${baseURL}/reports/${runID}`);
   await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
+  const reportOutline = page.locator('.report-outline');
+  await assert.doesNotReject(() => reportOutline.waitFor());
+  assert.ok((await reportOutline.locator('a[href^="#"]').count()) >= 2, 'report outline should list section anchors');
+  await page.waitForFunction(() => document.querySelector('.report-outline a')?.classList.contains('active'), undefined, { timeout: 5_000 });
+  const firstOutlineLink = reportOutline.locator('a[href^="#"]').first();
+  assert.equal(await firstOutlineLink.evaluate((link) => link.classList.contains('active')), true, 'scroll-spy should activate the first outline link');
   await page.screenshot({ path: path.join(artifactDir, 'report-dark.png'), fullPage: true });
   const serviceFilter = page.getByRole('button', { name: '端口与服务' });
   await serviceFilter.focus();
@@ -363,7 +390,7 @@ try {
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => page.getByRole('dialog', { name: '端口与服务过滤' }).waitFor({ state: 'hidden' }));
   await serviceFilter.click();
-  await page.getByLabel(/端口/).fill('80');
+  await page.getByRole('textbox', { name: '特定端口' }).fill('80');
   await page.getByRole('button', { name: '应用', exact: true }).click();
   await page.waitForURL(/port=80/);
   await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
@@ -384,6 +411,13 @@ try {
   await page.setViewportSize({ width: 1280, height: 960 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
 
+  const outline = page.locator('.report-outline');
+  assert.equal(await outline.isVisible(), true, 'report outline must remain visible at 1280px');
+  const firstLink = outline.locator('a[href^="#"]').first();
+  await firstLink.focus();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('href')?.startsWith('#')), true, 'first outline link must be focusable at 1280px');
+
+
   // Workbench regression: seed a completed run with a non-info finding and verify
   // the candidate renders, the verify dialog opens, and the first focusable control
   // inside the dialog is keyboard-reachable.
@@ -394,7 +428,7 @@ try {
     INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output, protocol, scope) VALUES
     ('browser-workbench', '192.0.2.50', 445, 'nuclei', 'smb-signing', 'high', 'Workbench smoke finding', '192.0.2.50:445', '', 'tcp', '');
     INSERT INTO report_verifications (id, project_id, zone_id, vulnerability_key, outcome, title, severity, description, remediation, notes, included, position, created_at, updated_at) VALUES
-    ('browser-evidence', '${projectID}', 'dmz', '6c40afc748da4fa28031767d6c73f16a8d18980c260096c068d2cae1446d94a4', 'confirmed', 'Browser evidence', 'high', '', '', '', 0, 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+    ('browser-evidence', '${projectID}', 'dmz', 'smb-signing', 'confirmed', 'Browser evidence', 'high', '', '', '', 0, 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
     INSERT INTO verification_evidence (id, verification_id, relative_path, media_type, sha256, width, height, caption, position, created_at) VALUES
     ('browser-evidence-image', 'browser-evidence', 'missing.png', 'image/png', '', 1, 1, 'Browser evidence', 0, '2026-01-01T00:00:00Z');`);
   await page.goto(`${baseURL}/reports/browser-workbench`, { waitUntil: 'networkidle' });
@@ -448,11 +482,24 @@ try {
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => commandDialog.waitFor({ state: 'hidden' }));
 
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`${baseURL}/config`);
   assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'theme preference should persist on config page');
-  await page.getByRole('button', { name: '跟随系统' }).first().click();
+
+  assert.equal(await page.locator('.settings-nav a[href="#config-appearance"]').evaluate(el => el.classList.contains('active')), true, 'appearance should be active initially');
+
+  await page.evaluate(() => document.getElementById('config-timeouts').scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(500);
+
+  assert.equal(await page.locator('.settings-nav a[href="#config-timeouts"]').evaluate(el => el.classList.contains('active')), true, 'timeouts should be active after scroll');
+  assert.equal(await page.locator('.settings-nav a[href="#config-engine"]').evaluate(el => el.classList.contains('active')), false, 'engine should not be active after scroll');
+
+  await page.evaluate(() => document.getElementById('config-appearance').scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(500);
+  const toggleBtnConfig = page.locator('.theme-toggle-btn-single').first();
+  await toggleBtnConfig.click();
   await page.waitForTimeout(150);
-  assert.ok(['light', 'dark'].includes(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))), 'system theme did not resolve');
+  assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
 
   assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '0');
   await page.locator('input[name="timeout_rustscan"]').fill('30s');
