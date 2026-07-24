@@ -26,14 +26,7 @@ const navItems = [
 context.setActiveNavigation('/projects/demo', navItems);
 assert.equal(navItems[1].classList.active, true);
 assert.equal(navItems[2].classList.active, false);
-assert.equal(context.queueNameFromHash('#negative'), 'negative');
-
-const ansi = context.ansiSegments('[[34mINF[0m] <img>');
-assert.equal(ansi.map((segment) => segment.text).join(''), '[INF] <img>');
-assert.ok(ansi.some((segment) => segment.text === 'INF' && segment.color));
-const markup = context.ansiHTML('\x1b[31mred\x1b[0m <img>');
-assert.ok(markup.includes('style="color:#cd3131"'));
-assert.ok(markup.includes('&lt;img&gt;'));
+assert.doesNotMatch(source, /imagesFromClipboardData|queueNameFromHash|ansiSegments|renderANSI|ansiHTML/);
 
 for (const name of ['RunDetail.vue', 'ToolRunFeedback.vue']) {
   const component = fs.readFileSync(new URL(`../frontend/${name}`, import.meta.url), 'utf8');
