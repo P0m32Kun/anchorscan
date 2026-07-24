@@ -34,3 +34,32 @@ assert.ok(ansi.some((segment) => segment.text === 'INF' && segment.color));
 const markup = context.ansiHTML('\x1b[31mred\x1b[0m <img>');
 assert.ok(markup.includes('style="color:#cd3131"'));
 assert.ok(markup.includes('&lt;img&gt;'));
+
+for (const name of ['RunDetail.vue', 'ToolRunFeedback.vue']) {
+  const component = fs.readFileSync(new URL(`../frontend/${name}`, import.meta.url), 'utf8');
+  assert.match(component, /contains\(selection\.anchorNode\) \|\| .*contains\(selection\.focusNode\)/, `${name} must preserve reverse selections while polling`);
+}
+
+function renderDistribution(badges) {
+  const callbacks = [];
+  const container = { style: { display: 'unset' } };
+  const bar = { innerHTML: '' };
+  const legend = { innerHTML: '' };
+  const reportContext = {
+    document: {
+      addEventListener: (event, callback) => { if (event === 'DOMContentLoaded') callbacks.push(callback); },
+      getElementById: (id) => ({ 'distribution-container': container, 'distribution-bar': bar, 'distribution-legend': legend })[id],
+      querySelectorAll: (selector) => selector === '.severity-badge' ? badges : [],
+    },
+  };
+  vm.createContext(reportContext);
+  vm.runInContext(fs.readFileSync(new URL('./report-ui.js', import.meta.url), 'utf8'), reportContext);
+  callbacks.at(-1)();
+  return { container, bar, legend };
+}
+
+const populatedDistribution = renderDistribution(['critical', 'high', 'high', 'medium'].map(textContent => ({ textContent })));
+assert.equal(populatedDistribution.container.style.display, 'block');
+assert.ok(populatedDistribution.bar.innerHTML.includes('critical'));
+assert.ok(populatedDistribution.legend.innerHTML.includes('高危 (High): <span class="legend-count">2'));
+assert.equal(renderDistribution([]).container.style.display, 'none');

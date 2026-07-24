@@ -67,7 +67,7 @@ async function submit(event: SubmitEvent) {
 watch(output, async () => {
   await nextTick();
   const selection = window.getSelection();
-  const selectingOutput = selection?.rangeCount && terminal.value?.contains(selection.anchorNode);
+  const selectingOutput = selection?.rangeCount && terminal.value && (terminal.value.contains(selection.anchorNode) || terminal.value.contains(selection.focusNode));
   if (followingOutput.value && !selectingOutput && terminal.value) terminal.value.scrollTop = terminal.value.scrollHeight;
 });
 

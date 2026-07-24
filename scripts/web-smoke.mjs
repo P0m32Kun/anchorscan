@@ -239,6 +239,10 @@ try {
   const cancelButton = page.getByRole('button', { name: '中止扫描' });
   await assert.doesNotReject(() => cancelButton.waitFor({ timeout: 5_000 }));
   const runURL = page.url();
+  await page.getByRole('link', { name: '项目管理' }).click();
+  await page.goBack({ waitUntil: 'networkidle' });
+  await page.locator('[data-run-detail][data-mounted="true"]').waitFor();
+  await assert.doesNotReject(() => page.getByRole('button', { name: '中止扫描' }).waitFor({ timeout: 5_000 }));
   await cancelButton.focus();
   await cancelButton.click();
   await assert.doesNotReject(() => page.getByText('已请求中止，正在等待引擎停止。').waitFor({ timeout: 5_000 }));
@@ -269,14 +273,20 @@ try {
 
   await seedRun(`INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
     ('browser-errors', '${projectID}', 'I', '192.0.2.30', '443', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.30","ports":"443","profile":"normal"}', ''),
+    ('browser-failed', '${projectID}', 'I', '192.0.2.32', '443', 'normal', 'failed', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', 'fixture failure', '{"zone_id":"I","target":"192.0.2.32","ports":"443","profile":"normal"}', ''),
     ('browser-interrupted', '${projectID}', 'I', '192.0.2.31', '80,443', 'normal', 'interrupted', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.31","ports":"80,443","profile":"fast"}', '');
     INSERT INTO detection_checks (run_id, ip, port, protocol, engine, status, reason_code, detail, started_at, finished_at) VALUES
-    ('browser-errors', '192.0.2.30', 443, 'tcp', 'nuclei', 'failed', 'command_failed', 'fixture failure', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z');`);
+    ('browser-errors', '192.0.2.30', 443, 'tcp', 'nuclei', 'failed', 'command_failed', 'fixture failure', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z'),
+    ('browser-interrupted', '192.0.2.31', 443, 'tcp', 'nuclei', 'interrupted', 'lease_expired', 'fixture interruption', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z');`);
   await page.goto(`${baseURL}/runs/browser-errors`, { waitUntil: 'networkidle' });
   await assert.doesNotReject(() => page.getByText('completed_with_errors').waitFor());
   await assert.doesNotReject(() => page.getByText(/检测检查：.*失败 1/).waitFor({ timeout: 5_000 }));
+  await page.goto(`${baseURL}/runs/browser-failed`, { waitUntil: 'networkidle' });
+  await assert.doesNotReject(() => page.getByText('failed', { exact: true }).waitFor());
+  await assert.doesNotReject(() => page.getByText('扫描失败，请查看最新事件。').waitFor());
   await page.goto(`${baseURL}/runs/browser-interrupted`, { waitUntil: 'networkidle' });
   await assert.doesNotReject(() => page.getByText('interrupted', { exact: true }).waitFor());
+  await assert.doesNotReject(() => page.getByText(/检测检查：.*已中断 1/).waitFor({ timeout: 5_000 }));
   await page.getByRole('link', { name: '确认并重新运行' }).click();
   await page.waitForURL(new RegExp(`/projects/${projectID}/scans/new\\?rerun=browser-interrupted`));
   assert.equal(await page.locator('textarea[name="target"]').inputValue(), '192.0.2.31');

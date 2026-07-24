@@ -43,14 +43,16 @@ const progress = computed(() => {
   return { done, total, percent: Math.min(100, Math.round((done / total) * 100)), detail: event?.message || '' };
 });
 
-const lifecycleText = computed(() => ({
-  running: '扫描正在运行，页面会在后台更新。',
-  canceled: '扫描已取消。',
-  interrupted: '扫描已中断，可确认参数后重新运行。',
-  completed: '扫描已完成。',
-  completed_with_errors: '扫描已完成，但部分检查发生错误。',
-  failed: '扫描失败，请查看最新事件。',
-}[status.value] || `当前状态：${status.value}`));
+const lifecycleText = computed(() => {
+  if (status.value === 'interrupted') return props.can_rerun ? '扫描已中断，可确认参数后重新运行。' : '扫描已中断，请查看最新事件。';
+  return ({
+    running: '扫描正在运行，页面会在后台更新。',
+    canceled: '扫描已取消。',
+    completed: '扫描已完成。',
+    completed_with_errors: '扫描已完成，但部分检查发生错误。',
+    failed: '扫描失败，请查看最新事件。',
+  }[status.value] || `当前状态：${status.value}`);
+});
 
 function runURL(suffix: string) {
   return `/api/runs/${encodeURIComponent(props.run_id)}${suffix}`;
@@ -101,7 +103,7 @@ function onOutputScroll() {
 watch(events, async () => {
   await nextTick();
   const selection = window.getSelection();
-  const selectingOutput = selection?.rangeCount && eventLog.value?.contains(selection.anchorNode);
+  const selectingOutput = selection?.rangeCount && eventLog.value && (eventLog.value.contains(selection.anchorNode) || eventLog.value.contains(selection.focusNode));
   if (followingOutput.value && !selectingOutput && eventLog.value) eventLog.value.scrollTop = eventLog.value.scrollHeight;
 });
 
@@ -156,7 +158,7 @@ onBeforeUnmount(() => window.clearInterval(timer));
       <div v-if="progress" class="scan-progress-bar-wrap"><div class="scan-progress-bar" :style="{ width: `${progress.percent}%` }"></div></div>
       <div v-if="progress" class="scan-progress-detail">{{ progress.detail }}</div>
     </div>
-    <p class="meta-line">检测检查：已完成 {{ checks.completed || 0 }}，运行中 {{ checks.running || 0 }}，失败 {{ checks.failed || 0 }}，跳过 {{ checks.skipped || 0 }}，已取消 {{ checks.canceled || 0 }}</p>
+    <p class="meta-line">检测检查：已完成 {{ checks.completed || 0 }}，运行中 {{ checks.running || 0 }}，失败 {{ checks.failed || 0 }}，跳过 {{ checks.skipped || 0 }}，已取消 {{ checks.canceled || 0 }}，已中断 {{ checks.interrupted || 0 }}</p>
     <div class="terminal-window">
       <div class="terminal-header"><div class="terminal-dots"><span class="terminal-dot dot-red"></span><span class="terminal-dot dot-yellow"></span><span class="terminal-dot dot-green"></span></div><div class="terminal-title">anchorscan@engine: ~</div></div>
       <pre ref="eventLog" class="event-log" @scroll="onOutputScroll">{{ output || '等待运行事件…' }}</pre>
