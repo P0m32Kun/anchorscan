@@ -27,7 +27,7 @@
 
 每次涉及控制台交互的变更至少运行受影响测试；合并前运行 `make pr-check`。涉及发布物时额外核对 `make package` 的离线二进制与归档；浏览器矩阵由 `npm run test:web` 覆盖浅色/深色、键盘、焦点、1280/1440 视口、状态颜色与长任务状态。
 
-修改 `.github/workflows/*.yml` 后运行 `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml`。`run: |` 内的 heredoc 正文和结束标记必须在 YAML 文件中保持块缩进；否则 reusable workflow 会在创建 job 前直接失败。
+修改 `.github/workflows/*.yml` 后运行 `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml`。`run: |` 内的 heredoc 正文和结束标记必须在 YAML 文件中保持块缩进；否则 reusable workflow 会在创建 job 前直接失败。生成 Dockerfile 所需的多行配置优先作为构建上下文文件写入并用 `COPY` 引入，不嵌套依赖 builder 语法版本的 Dockerfile heredoc。
 
 ## 新能力进入方式
 

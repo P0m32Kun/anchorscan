@@ -166,7 +166,13 @@ jobs:
           cat > "$LAB_DIR/apps/tomcat-vuln/Dockerfile" << 'DOCKERFILE'
           FROM tomcat:9.0-jdk8-temurin
           RUN cp -r /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps/
-          RUN cat > /usr/local/tomcat/conf/tomcat-users.xml << 'EOF'
+          COPY tomcat-users.xml /usr/local/tomcat/conf/tomcat-users.xml
+          RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
+          RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/host-manager/META-INF/context.xml || true
+          RUN perl -i -0pe 's|<Realm className="org\.apache\.catalina\.realm\.LockOutRealm">\s*<!--.*?-->\s*<Realm className="org\.apache\.catalina\.realm\.UserDatabaseRealm"\s+resourceName="UserDatabase"/>\s*</Realm>|<Realm className="org.apache.catalina.realm.UserDatabaseRealm" resourceName="UserDatabase"/>|s' /usr/local/tomcat/conf/server.xml
+          EXPOSE 8080
+          DOCKERFILE
+          cat > "$LAB_DIR/apps/tomcat-vuln/tomcat-users.xml" << 'TOMCAT_USERS'
           <?xml version="1.0" encoding="UTF-8"?>
           <tomcat-users xmlns="http://tomcat.apache.org/xml"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -177,12 +183,7 @@ jobs:
             <role rolename="admin-gui"/>
             <user username="tomcat" password="tomcat" roles="manager-gui,manager-script,admin-gui"/>
           </tomcat-users>
-          EOF
-          RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
-          RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/host-manager/META-INF/context.xml || true
-          RUN perl -i -0pe 's|<Realm className="org\.apache\.catalina\.realm\.LockOutRealm">\s*<!--.*?-->\s*<Realm className="org\.apache\.catalina\.realm\.UserDatabaseRealm"\s+resourceName="UserDatabase"/>\s*</Realm>|<Realm className="org.apache.catalina.realm.UserDatabaseRealm" resourceName="UserDatabase"/>|s' /usr/local/tomcat/conf/server.xml
-          EXPOSE 8080
-          DOCKERFILE
+          TOMCAT_USERS
           # nuclei fixture
           cat > "$LAB_DIR/fixtures/lab-tomcat.yaml" << 'FIXTURE'
           id: lab-tomcat
