@@ -7,8 +7,8 @@
 | 范围 | 状态所有者 | 接口与失败反馈 |
 | --- | --- | --- |
 | 页面初始数据、原生提交、重定向和字段错误 | Go handler + 模板 | 服务端渲染或重定向后的字段错误；不由 Vue 重复提交。 |
-| 主题和导航 | `theme.ts` / `ThemeToggle.vue`，`app.js` 仅导航高亮 | `localStorage` 不可用时回退系统主题；主题切换立即反映到 `data-theme`。 |
-| 扫描创建、运行详情、工具运行、报告交互、工作台 | 对应 Vue 组件 | `fetch` 失败显示组件内状态，不丢弃用户输入或运行输出。 |
+| 主题、导航和原生表单快捷填充 | `theme.ts` / `ThemeToggle.vue`；`app.js` | `app.js` 负责导航高亮、工具预设、端口填充，以及 Vue 未挂载时的报告复制回退；`localStorage` 不可用时回退系统主题。 |
+| 扫描创建、运行详情、工具运行提交与输出、报告交互、工作台 | 对应 Vue 组件 | `fetch` 失败显示组件内状态，不丢弃用户输入或运行输出；工具预填充后由 Vue 从同一原生表单读取并提交。 |
 | 破坏性操作 | `ConfirmActions.vue` | 原生表单以 `data-confirm-form` 接入；Vue 通过 `anchorscan:confirm` 请求同一个原生 `dialog`，取消或 Escape 必须回焦触发控件。 |
 | 离线导出报告 | `report-ui.js` | 只服务独立 HTML 报告，不与控制台 Vue 状态竞争。 |
 

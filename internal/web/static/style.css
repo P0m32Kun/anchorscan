@@ -482,6 +482,12 @@ button[type="submit"]:hover {
   border-color: var(--success-border);
 }
 
+.status-completed_with_errors {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
 .status-running {
   color: var(--primary);
   background: var(--primary-soft);

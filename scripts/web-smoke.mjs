@@ -304,6 +304,16 @@ try {
     ('browser-interrupted', '192.0.2.31', 443, 'tcp', 'nuclei', 'interrupted', 'lease_expired', 'fixture interruption', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z');`);
   await page.goto(`${baseURL}/runs/browser-errors`, { waitUntil: 'networkidle' });
   await assert.doesNotReject(() => page.getByText('completed_with_errors').waitFor());
+  const statusBackgrounds = await page.locator('.status-badge').evaluate((element) => {
+    const completed = document.createElement('span');
+    completed.className = 'status-badge status-completed';
+    document.body.append(completed);
+    const colors = [getComputedStyle(element).backgroundColor, getComputedStyle(completed).backgroundColor];
+    completed.remove();
+    return colors;
+  });
+  assert.notEqual(statusBackgrounds[0], 'rgba(0, 0, 0, 0)', 'completed_with_errors needs a status color');
+  assert.notEqual(statusBackgrounds[0], statusBackgrounds[1], 'completed_with_errors must remain distinguishable from completed');
   await assert.doesNotReject(() => page.getByText(/检测检查：.*失败 1/).waitFor({ timeout: 5_000 }));
   await page.goto(`${baseURL}/runs/browser-failed`, { waitUntil: 'networkidle' });
   await assert.doesNotReject(() => page.getByText('failed', { exact: true }).waitFor());
