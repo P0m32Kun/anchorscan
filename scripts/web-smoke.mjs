@@ -323,6 +323,12 @@ try {
   await page.waitForURL((url) => !url.searchParams.has('port'));
   await page.getByRole('tab', { name: '按主机' }).click();
   await page.waitForURL(/view=hosts/);
+  const hostTab = page.getByRole('tab', { name: '按主机' });
+  await hostTab.focus();
+  await hostTab.press('ArrowRight');
+  await page.waitForURL(/view=vulnerabilities/);
+  await page.getByRole('tab', { name: '按主机' }).click();
+  await page.waitForURL(/view=hosts/);
   await page.getByRole('link', { name: '下一页' }).first().click();
   await page.getByRole('button', { name: '复制 IP' }).first().click();
 

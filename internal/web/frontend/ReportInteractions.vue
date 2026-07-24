@@ -16,6 +16,7 @@ const openPanel = ref<Panel | ''>('');
 const lastTrigger = ref<HTMLButtonElement>();
 const current = new URL(window.location.href);
 const supportedSeverities = ['critical', 'high', 'medium', 'low', 'info'];
+const viewOptions = [{ value: 'ports', label: '按端口' }, { value: 'hosts', label: '按主机' }, { value: 'vulnerabilities', label: '按漏洞' }] as const;
 const searchText = ref(current.searchParams.get('ip') || current.searchParams.get('q') || '');
 const port = ref(current.searchParams.get('port') || '');
 const service = ref(current.searchParams.get('service') || '');
@@ -76,6 +77,14 @@ function selectView(nextView: string) {
   applyFilters();
 }
 
+function handleViewKeydown(event: KeyboardEvent) {
+  const index = viewOptions.findIndex((item) => item.value === view.value);
+  const target = event.key === 'Home' ? 0 : event.key === 'End' ? viewOptions.length - 1 : event.key === 'ArrowRight' ? (index + 1) % viewOptions.length : event.key === 'ArrowLeft' ? (index - 1 + viewOptions.length) % viewOptions.length : -1;
+  if (target < 0) return;
+  event.preventDefault();
+  selectView(viewOptions[target].value);
+}
+
 function removeFilter(key: string, value: string) {
   if (key === 'search') searchText.value = '';
   if (key === 'port') port.value = '';
@@ -102,11 +111,11 @@ async function writeClipboard(text: string) {
   if (!copied) throw new Error('copy failed');
 }
 
-async function copyButton(button: HTMLElement, text: string) {
+async function copyButton(button: HTMLElement, text: string | Promise<string>) {
   const original = button.innerHTML;
   button.setAttribute('disabled', '');
   try {
-    await writeClipboard(text.trimEnd());
+    await writeClipboard((await text).trimEnd());
     button.textContent = '已复制';
   } catch {
     button.textContent = '复制失败';
@@ -180,7 +189,7 @@ function handleDocumentClick(event: MouseEvent) {
   }
   const copy = target.closest<HTMLElement>('[data-copy-text],[data-copy-url],[data-copy-target-id]');
   if (!copy) return;
-  void (async () => {
+  void copyButton(copy, (async () => {
     let text = copy.dataset.copyText || '';
     if (copy.dataset.copyUrl) {
       const response = await fetch(copy.dataset.copyUrl);
@@ -188,8 +197,8 @@ function handleDocumentClick(event: MouseEvent) {
       text = await response.text();
     }
     if (copy.dataset.copyTargetId) text = document.getElementById(copy.dataset.copyTargetId)?.textContent || '';
-    await copyButton(copy, text);
-  })();
+    return text;
+  })());
 }
 
 function handleDocumentChange(event: Event) {
@@ -274,7 +283,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="report-view-tabs" role="tablist" aria-label="报告视图">
-        <button v-for="item in [{ value: 'ports', label: '按端口' }, { value: 'hosts', label: '按主机' }, { value: 'vulnerabilities', label: '按漏洞' }]" :key="item.value" class="report-view-tab" type="button" role="tab" :aria-selected="view === item.value" @click="selectView(item.value)">{{ item.label }}</button>
+        <button v-for="item in viewOptions" :key="item.value" class="report-view-tab" type="button" role="tab" :aria-selected="view === item.value" @click="selectView(item.value)" @keydown="handleViewKeydown">{{ item.label }}</button>
       </div>
 
       <div v-if="activeFilters.length" class="active-filter-badges">
