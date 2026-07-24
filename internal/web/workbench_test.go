@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -738,5 +739,84 @@ func TestWorkbenchJSONUsesFieldNamesConsumedByJavaScript(t *testing.T) {
 	}
 	if !strings.Contains(string(candidateJSON), `"ZoneID":"I"`) || !strings.Contains(string(groupJSON), `"Key":"I|redis"`) || !strings.Contains(string(groupJSON), `"ZoneID":"I"`) {
 		t.Fatalf("JSON fields must match Vue prop contract: candidate=%s group=%s", candidateJSON, groupJSON)
+	}
+}
+
+// TestWorkbenchChineseNegativeVerificationKeyAccepted verifies that backend
+// accepts non-ASCII negative verification titles with distinct VulnerabilityKey
+// values derived from a djb2 fallback. This is the regression guard for the
+// frontend helper buildNegativeVerificationKey: pure-Chinese titles used to
+// collapse to the empty slug key "neg:" and overwrite each other in the
+// workbench VerificationMap.
+func TestWorkbenchChineseNegativeVerificationKeyAccepted(t *testing.T) {
+	handler, projectID, dbPath := setupNegativeWorkbenchProject(t)
+
+	djb2Hex := func(input string) string {
+		var hash uint32 = 5381
+		for _, r := range input {
+			hash = ((hash << 5) + hash) + uint32(r)
+		}
+		return fmt.Sprintf("%08x", hash)
+	}
+
+	cases := []struct {
+		title string
+	}{
+		{"中文测试一"},
+		{"中文测试二"},
+	}
+
+	createdIDs := make(map[string]struct{})
+	for _, tc := range cases {
+		key := "neg:I:h" + djb2Hex("I"+"\x00"+tc.title)
+		payload := verificationCreateRequest{
+			ZoneID:           "I",
+			VulnerabilityKey: key,
+			Outcome:          "not_observed",
+			Title:            tc.title,
+			Severity:         "low",
+			Description:      "负向验证非 ASCII 标题回归测试",
+			Included:         false,
+			Assets: []store.VerificationAsset{
+				{IP: "10.0.0.1", Port: 80, Protocol: "tcp", AssetName: "10.0.0.1:80", Position: 0},
+			},
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/projects/"+projectID+"/verifications", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusCreated {
+			t.Fatalf("expected 201 for %q, got %d: %s", tc.title, res.Code, res.Body.String())
+		}
+		var v store.Verification
+		if err := json.Unmarshal(res.Body.Bytes(), &v); err != nil {
+			t.Fatalf("unmarshal returned error: %v", err)
+		}
+		if v.VulnerabilityKey != key {
+			t.Fatalf("expected VulnerabilityKey %s, got %s", key, v.VulnerabilityKey)
+		}
+		createdIDs[v.ID] = struct{}{}
+	}
+
+	// Ensure both records are persisted and neither overwrote the other.
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer s.Close()
+
+	verifications, err := s.ListProjectVerifications(projectID)
+	if err != nil {
+		t.Fatalf("ListProjectVerifications returned error: %v", err)
+	}
+	found := 0
+	for _, v := range verifications {
+		if _, ok := createdIDs[v.ID]; ok {
+			found++
+		}
+	}
+	if found != len(cases) {
+		t.Fatalf("expected %d distinct verifications, found %d", len(cases), found)
 	}
 }

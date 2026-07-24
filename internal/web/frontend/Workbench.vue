@@ -258,6 +258,23 @@ function hostPort(a: ProjectAsset) {
   return `${a.IP}:${a.Port}`;
 }
 
+function djb2(input: string): number {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash) + input.charCodeAt(i);
+  }
+  return hash >>> 0;
+}
+
+function buildNegativeVerificationKey(zoneID: string, title: string): string {
+  const slug = title.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  if (!slug) {
+    const hash = djb2(zoneID + '\x00' + title).toString(16).padStart(8, '0');
+    return `neg:${zoneID}:h${hash}`;
+  }
+  return `neg:${zoneID}:${slug}`;
+}
+
 // ---------- Command dialog ----------
 const commandDialog = ref<HTMLDialogElement>();
 const commandTitle = ref('生成命令');
@@ -557,7 +574,7 @@ async function saveNegative() {
       asset_name: hostPort(a),
       position: i,
     }));
-    const key = `neg:${negTitle.value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
+    const key = buildNegativeVerificationKey(negZoneId.value, negTitle.value);
     const res = await fetch(`/projects/${props.project_id}/verifications`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
