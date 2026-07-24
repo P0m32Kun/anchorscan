@@ -407,8 +407,16 @@ function removeVerifyPending(idx: number) {
   verifyPendingFiles.value.splice(idx, 1);
 }
 
-async function deleteEvidence(verificationID: string, evidenceID: string) {
-  if (!confirm('确定删除这张截图？')) return;
+function requestConfirmation(trigger: HTMLElement) {
+  return new Promise<boolean>((resolve) => {
+    document.dispatchEvent(new CustomEvent('anchorscan:confirm', {
+      detail: { title: '删除截图', message: '确定要删除这张截图吗？此操作不可撤销。', trigger, resolve },
+    }));
+  });
+}
+
+async function deleteEvidence(verificationID: string, evidenceID: string, event: MouseEvent) {
+  if (!(event.currentTarget instanceof HTMLElement) || !await requestConfirmation(event.currentTarget)) return;
   const res = await fetch(`/projects/${props.project_id}/verifications/${verificationID}/evidence/${evidenceID}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -986,7 +994,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
             <li v-for="e in verifyCurrent?.Evidence" :key="e.ID" class="evidence-item">
               <img :src="`/projects/${project_id}/verifications/${verifyId}/evidence/${e.ID}`" alt="" loading="lazy" />
               <span>{{ e.Caption || '无说明' }}</span>
-              <button type="button" class="button button-small" @click="deleteEvidence(verifyId, e.ID)">删除</button>
+              <button type="button" class="button button-small" @click="deleteEvidence(verifyId, e.ID, $event)">删除</button>
             </li>
           </ul>
         </div>

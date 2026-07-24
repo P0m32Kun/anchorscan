@@ -382,7 +382,11 @@ try {
     INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url, protocol, cpe, extrainfo, tunnel) VALUES
     ('browser-workbench', '192.0.2.50', 445, 'smb', '', '', 'smb', 0, '', 'tcp', '', '', '');
     INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output, protocol, scope) VALUES
-    ('browser-workbench', '192.0.2.50', 445, 'nuclei', 'smb-signing', 'high', 'Workbench smoke finding', '192.0.2.50:445', '', 'tcp', '');`);
+    ('browser-workbench', '192.0.2.50', 445, 'nuclei', 'smb-signing', 'high', 'Workbench smoke finding', '192.0.2.50:445', '', 'tcp', '');
+    INSERT INTO report_verifications (id, project_id, zone_id, vulnerability_key, outcome, title, severity, description, remediation, notes, included, position, created_at, updated_at) VALUES
+    ('browser-evidence', '${projectID}', 'dmz', '6c40afc748da4fa28031767d6c73f16a8d18980c260096c068d2cae1446d94a4', 'confirmed', 'Browser evidence', 'high', '', '', '', 0, 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+    INSERT INTO verification_evidence (id, verification_id, relative_path, media_type, sha256, width, height, caption, position, created_at) VALUES
+    ('browser-evidence-image', 'browser-evidence', 'missing.png', 'image/png', '', 1, 1, 'Browser evidence', 0, '2026-01-01T00:00:00Z');`);
   await page.goto(`${baseURL}/reports/browser-workbench`, { waitUntil: 'networkidle' });
   await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
   await page.getByRole('button', { name: '生成 Nuclei 命令' }).click();
@@ -404,6 +408,18 @@ try {
   });
   const focusedName = await page.evaluate(() => document.activeElement?.getAttribute('name') || document.activeElement?.tagName || '');
   assert.ok(focusedName === 'title' || focusedName === 'INPUT', `verify dialog first focusable should be reachable, got ${focusedName}`);
+  const evidenceDeleteButton = dialog.locator('.evidence-item').getByRole('button', { name: '删除' });
+  await evidenceDeleteButton.click();
+  const evidenceConfirmDialog = page.getByRole('dialog', { name: '删除截图' });
+  await assert.doesNotReject(() => evidenceConfirmDialog.waitFor());
+  await page.keyboard.press('Escape');
+  await assert.doesNotReject(() => evidenceConfirmDialog.waitFor({ state: 'hidden' }));
+  assert.equal(await evidenceDeleteButton.evaluate((button) => document.activeElement === button), true, 'closing evidence confirmation should restore focus');
+  await evidenceDeleteButton.click();
+  await assert.doesNotReject(() => evidenceConfirmDialog.waitFor());
+  await evidenceConfirmDialog.getByRole('button', { name: '删除' }).click();
+  await assert.doesNotReject(() => page.getByText('截图已删除').waitFor());
+  await assert.doesNotReject(() => evidenceDeleteButton.waitFor({ state: 'hidden' }));
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
 

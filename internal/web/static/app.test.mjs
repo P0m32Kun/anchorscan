@@ -40,6 +40,10 @@ for (const name of ['RunDetail.vue', 'ToolRunFeedback.vue']) {
   assert.match(component, /contains\(selection\.anchorNode\) \|\| .*contains\(selection\.focusNode\)/, `${name} must preserve reverse selections while polling`);
 }
 
+const workbench = fs.readFileSync(new URL('../frontend/Workbench.vue', import.meta.url), 'utf8');
+assert.doesNotMatch(workbench, /\bconfirm\s*\(/, 'Workbench destructive actions must use the shared confirmation dialog');
+assert.match(workbench, /anchorscan:confirm/, 'Workbench must request the shared confirmation dialog');
+
 function renderDistribution(badges) {
   const callbacks = [];
   const container = { style: { display: 'unset' } };
