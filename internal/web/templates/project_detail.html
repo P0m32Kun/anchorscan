@@ -31,9 +31,10 @@
     </div>
     <div class="header-actions">
       <a class="button button-secondary" href="/projects/{{.Project.ID}}/report.html" target="_blank">预览 HTML 报告</a>
-      <button class="button button-primary" type="button" onclick="anchorscanDownloadDocx('{{.Project.ID}}')">导出 DOCX 报告</button>
+      <a class="button button-primary" href="/projects/{{.Project.ID}}/report.docx">导出 DOCX 报告</a>
     </div>
   </div>
+  <p class="meta-line">下载后请在 Word/WPS 中更新一次目录域；WPS 可在目录页右键选择“更新域”。</p>
   <div class="config-layout">
     <div class="config-row-card">
       <div class="config-card-header">
@@ -103,9 +104,9 @@
       <li class="project-zone-item">
         <span class="project-zone-name">{{.Name}}</span>
         <span class="project-zone-id muted">{{.ZoneID}}</span>
-        <form class="project-zone-delete-form" method="post" action="/projects/{{.ProjectID}}/zones/{{.ZoneID}}">
+        <form class="project-zone-delete-form" method="post" action="/projects/{{.ProjectID}}/zones/{{.ZoneID}}" data-confirm-form data-confirm-title="删除分区" data-confirm-message="确定要删除该分区吗？">
           <input type="hidden" name="_method" value="delete">
-          <button class="link-button danger" type="submit" onclick="return confirm('确定要删除该分区吗？')">删除</button>
+          <button class="link-button danger" type="submit">删除</button>
         </form>
       </li>
       {{end}}

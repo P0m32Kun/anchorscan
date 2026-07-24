@@ -205,6 +205,30 @@ try {
   await page.getByRole('button', { name: '保存项目' }).click();
   await page.waitForURL(/\/projects\/project-/);
   const projectURL = new URL(page.url()).pathname;
+
+  // Destructive actions use the shared, keyboard-accessible confirmation dialog.
+  await page.locator('input[name="name"]').fill('Smoke deletion zone');
+  await page.getByRole('button', { name: '添加' }).click();
+  const smokeZone = page.locator('.project-zone-item', { hasText: 'Smoke deletion zone' });
+  await assert.doesNotReject(() => smokeZone.waitFor());
+  const deleteZoneButton = smokeZone.getByRole('button', { name: '删除' });
+  let browserConfirmOpened = false;
+  page.once('dialog', async (dialog) => {
+    browserConfirmOpened = true;
+    await dialog.dismiss();
+  });
+  await deleteZoneButton.click();
+  const confirmDialog = page.getByRole('dialog', { name: '删除分区' });
+  await assert.doesNotReject(() => confirmDialog.waitFor({ timeout: 2_000 }));
+  assert.equal(browserConfirmOpened, false, 'destructive actions must not use browser confirm');
+  await page.screenshot({ path: path.join(artifactDir, 'confirmation-dark.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  await assert.doesNotReject(() => confirmDialog.waitFor({ state: 'hidden' }));
+  assert.equal(await deleteZoneButton.evaluate((button) => document.activeElement === button), true, 'closing confirmation should restore focus');
+  await deleteZoneButton.click();
+  await confirmDialog.getByRole('button', { name: '删除' }).click();
+  await assert.doesNotReject(() => smokeZone.waitFor({ state: 'hidden' }));
+
   await page.getByRole('link', { name: /发起扫描|新建扫描/ }).click();
   await page.locator('[data-scan-create][data-mounted="true"]').waitFor();
   assert.equal(await page.locator('select[name="zone_id"]').inputValue(), '', 'multiple Zones must require an explicit choice');

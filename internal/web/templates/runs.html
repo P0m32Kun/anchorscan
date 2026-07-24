@@ -74,7 +74,7 @@
           <span class="run-no-action">—</span>
           {{end}}
           {{if ne .Status "running"}}
-          <form class="run-delete-form" method="post" action="/runs/{{.RunID}}" onsubmit="return confirm('确认删除该运行历史？');">
+          <form class="run-delete-form" method="post" action="/runs/{{.RunID}}" data-confirm-form data-confirm-title="删除运行记录" data-confirm-message="确认删除该运行历史？此操作不可撤销。">
             <input type="hidden" name="_method" value="delete">
             <button class="button button-danger run-delete-action" type="submit">删除</button>
           </form>

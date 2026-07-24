@@ -4,7 +4,7 @@
 
 **Blocked by:** 05 — 迁移 Run 状态与工具交互。
 
-**Status:** proposed
+**Status:** ready-for-agent
 
 **Execution skills:** `tdd`、`frontend-visual-design`、`browser:control-in-app-browser`、`code-review`、`ponytail`。
 

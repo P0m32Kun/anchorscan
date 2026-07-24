@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import ConfirmActions from './ConfirmActions.vue';
 import ReportInteractions from './ReportInteractions.vue';
 import RunDetail from './RunDetail.vue';
 import ScanCreate from './ScanCreate.vue';
@@ -15,6 +16,11 @@ function mountThemeControls() {
     const app = createApp(ThemeToggle);
     app.mount(el);
   });
+}
+
+function mountConfirmActions() {
+  const mountPoint = document.querySelector<HTMLElement>('[data-confirm-actions]');
+  if (mountPoint) createApp(ConfirmActions).mount(mountPoint);
 }
 
 function mountScanCreate() {
@@ -66,6 +72,7 @@ function mountToolRunFeedback() {
 
 function mountApps() {
   mountThemeControls();
+  mountConfirmActions();
   mountScanCreate();
   mountWorkbench();
   mountReportInteractions();

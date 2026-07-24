@@ -187,16 +187,3 @@ document.addEventListener('click', async (event) => {
     button.textContent = original;
   }, 1200);
 });
-
-// Project DOCX report export: warn that the TOC must be refreshed once in
-// Word/WPS (WPS ignores updateFields), then trigger the download.
-window.anchorscanDownloadDocx = function (projectID) {
-  const msg =
-    "下载的 DOCX 报告目录页码需要在 Word/WPS 中更新一次。\n\n" +
-    "• Word：打开时弹出「是否更新域」，点「是」即可自动生成目录。\n" +
-    "• WPS：打开后请在目录页右键 → 更新域（或按 F9），选「更新整个目录」。\n\n" +
-    "点击「确定」开始下载。";
-  if (window.confirm(msg)) {
-    window.location.href = "/projects/" + projectID + "/report.docx";
-  }
-};
