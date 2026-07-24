@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — 迁移验证工作台。
 
-**Status:** proposed
+**Status:** ready-for-agent
 
 **Execution skills:** `tdd`、`frontend-visual-design`、`browser:control-in-app-browser`、`code-review`、`ponytail`。
 

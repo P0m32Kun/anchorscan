@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import ReportInteractions from './ReportInteractions.vue';
 import ScanCreate from './ScanCreate.vue';
 import ThemeToggle from './ThemeToggle.vue';
 import Workbench from './Workbench.vue';
@@ -40,10 +41,18 @@ function mountWorkbench() {
   mountPoint.dataset.mounted = 'true';
 }
 
+function mountReportInteractions() {
+  const mountPoint = document.querySelector<HTMLElement>('[data-report-interactions]');
+  if (!mountPoint) return;
+  createApp(ReportInteractions).mount(mountPoint);
+  mountPoint.dataset.mounted = 'true';
+}
+
 function mountApps() {
   mountThemeControls();
   mountScanCreate();
   mountWorkbench();
+  mountReportInteractions();
 }
 
 if (document.readyState === 'loading') {

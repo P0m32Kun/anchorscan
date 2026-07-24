@@ -584,9 +584,10 @@ func TestReportPageRendersFindings(t *testing.T) {
 	if !strings.Contains(res.Body.String(), "筛选") || !strings.Contains(res.Body.String(), "证据与详情") {
 		t.Fatalf("expected chinese report copy: %s", res.Body.String())
 	}
+	if !strings.Contains(res.Body.String(), "data-report-interactions") {
+		t.Fatalf("expected Vue report interaction mount: %s", res.Body.String())
+	}
 	for _, want := range []string{
-		`type="checkbox" name="severity" value="critical"`,
-		`type="checkbox" name="severity" value="high"`,
 		`href="/reports/run-1/export?format=html"`,
 	} {
 		if !strings.Contains(res.Body.String(), want) {
@@ -638,9 +639,6 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 			t.Fatalf("aggregate response missing %q: %s", want, body)
 		}
 	}
-	if !strings.Contains(body, "漏洞名称或漏洞 ID") {
-		t.Fatalf("aggregate response missing vulnerability filter guidance: %s", body)
-	}
 	if strings.Contains(body, "info-only") {
 		t.Fatalf("aggregate response included info finding: %s", body)
 	}
@@ -650,10 +648,6 @@ func TestReportPageRendersMatchedVulnerabilityAggregate(t *testing.T) {
 	if !strings.Contains(body, "复制当前筛选全部 IP:port") {
 		t.Fatalf("aggregate response missing filtered asset copy control: %s", body)
 	}
-	if !strings.Contains(body, `value="vulnerabilities" selected`) {
-		t.Fatalf("aggregate response did not keep the selected view: %s", body)
-	}
-
 	results := httptest.NewRecorder()
 	handler.ServeHTTP(results, httptest.NewRequest(http.MethodGet, "/reports/run-aggregate?severity=info", nil))
 	if results.Code != http.StatusOK || !strings.Contains(results.Body.String(), "info-only") {
@@ -1177,7 +1171,7 @@ func TestReportPageRendersHostViewAndAssetWorkbench(t *testing.T) {
 		t.Fatalf("status mismatch: %d", res.Code)
 	}
 	body := res.Body.String()
-	if !strings.Contains(body, "按主机聚合") || !strings.Contains(body, "复制 IP:PORT") {
+	if !strings.Contains(body, "复制 IP:PORT") {
 		t.Fatalf("expected asset workbench controls: %s", body)
 	}
 	appScript := strings.Index(body, `<script src="/static/app.js" defer></script>`)

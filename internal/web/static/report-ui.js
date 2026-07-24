@@ -123,27 +123,5 @@ function highlightAllEvidences() {
 
 document.addEventListener('DOMContentLoaded', () => {
   renderVulnDistribution();
-  initPageJumpForms();
   highlightAllEvidences();
 });
-
-// initPageJumpForms wires up the "jump to page" forms so submitting them
-// preserves all other query parameters (filters, size, view, etc.) instead of
-// replacing the whole query string with just the page number.
-function initPageJumpForms() {
-  document.querySelectorAll('form.page-jump').forEach(form => {
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      const pageInput = form.querySelector('input[type="number"]');
-      if (!pageInput) return;
-      const page = parseInt(pageInput.value, 10);
-      if (!Number.isFinite(page) || page < 1) return;
-      const max = parseInt(pageInput.max, 10);
-      if (Number.isFinite(max) && page > max) return;
-
-      const params = new URLSearchParams(window.location.search);
-      params.set(pageInput.name, String(page));
-      window.location.search = params.toString();
-    });
-  });
-}

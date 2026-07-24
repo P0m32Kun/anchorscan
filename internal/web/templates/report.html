@@ -82,149 +82,7 @@
 </details>
 {{end}}
 
-<section class="panel report-filter">
-  <form class="search-console-form" method="get" id="report-filter-form">
-    <div class="search-console-bar">
-      <div class="search-input-wrapper">
-        <span class="search-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
-        </span>
-        <input type="text" id="smart-search-input" placeholder="{{if eq .AssetView "vulnerabilities"}}输入漏洞名称或漏洞 ID 筛选{{else}}输入主机 IP、网段或漏洞关键词检索{{end}}，回车或点击应用..." value="{{if .Filters.IP}}{{.Filters.IP}}{{else}}{{.Filters.Keyword}}{{end}}">
-        <input type="hidden" name="ip" id="hidden-ip" value="{{.Filters.IP}}">
-        <input type="hidden" name="q" id="hidden-q" value="{{.Filters.Keyword}}">
-      </div>
-      <button class="button button-primary search-submit-btn" type="submit">应用检索</button>
-    </div>
-
-    <div class="filter-popover-row">
-      <div class="popover-wrapper">
-        <button class="popover-trigger-btn" type="button" data-popover-target="popover-severity">
-          <span>危险级别</span>
-          <span class="trigger-active-count" id="active-severity-count">0</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-        <div class="popover-panel" id="popover-severity">
-          <div class="popover-panel-header">过滤危险级别</div>
-          <div class="popover-panel-body">
-            <div class="popover-checkbox-list">
-              <label class="popover-checkbox-item">
-                <input type="checkbox" name="severity" value="critical" {{if contains .Filters.Severities "critical"}}checked{{end}}>
-                <span class="severity-dot critical"></span>
-                <span>critical</span>
-              </label>
-              <label class="popover-checkbox-item">
-                <input type="checkbox" name="severity" value="high" {{if contains .Filters.Severities "high"}}checked{{end}}>
-                <span class="severity-dot high"></span>
-                <span>high</span>
-              </label>
-              <label class="popover-checkbox-item">
-                <input type="checkbox" name="severity" value="medium" {{if contains .Filters.Severities "medium"}}checked{{end}}>
-                <span class="severity-dot medium"></span>
-                <span>medium</span>
-              </label>
-              <label class="popover-checkbox-item">
-                <input type="checkbox" name="severity" value="low" {{if contains .Filters.Severities "low"}}checked{{end}}>
-                <span class="severity-dot low"></span>
-                <span>low</span>
-              </label>
-              <label class="popover-checkbox-item">
-                <input type="checkbox" name="severity" value="info" {{if contains .Filters.Severities "info"}}checked{{end}}>
-                <span class="severity-dot info"></span>
-                <span>info</span>
-              </label>
-            </div>
-          </div>
-          <div class="popover-panel-footer">
-            <button class="button button-primary popover-apply-btn" type="submit">应用</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="popover-wrapper">
-        <button class="popover-trigger-btn" type="button" data-popover-target="popover-ports">
-          <span>端口与服务</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-        <div class="popover-panel" id="popover-ports">
-          <div class="popover-panel-header">端口与服务过滤</div>
-          <div class="popover-panel-body">
-            <div class="popover-form-group">
-              <label>
-                <span>特定端口</span>
-                <input name="port" placeholder="例如: 80" value="{{.Filters.Port}}">
-              </label>
-              <label>
-                <span>服务精确匹配</span>
-                <input name="service" placeholder="例如: redis" value="{{.Filters.Service}}">
-              </label>
-            </div>
-          </div>
-          <div class="popover-panel-footer">
-            <button class="button button-primary popover-apply-btn" type="submit">应用</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="popover-wrapper">
-        <button class="popover-trigger-btn" type="button" data-popover-target="popover-source">
-          <span>数据源</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-        <div class="popover-panel" id="popover-source">
-          <div class="popover-panel-header">数据源过滤</div>
-          <div class="popover-panel-body">
-            <div class="popover-form-group">
-              <label>
-                <span>探针数据源</span>
-                <input name="source" placeholder="例如: nuclei" value="{{.Filters.Source}}">
-              </label>
-            </div>
-          </div>
-          <div class="popover-panel-footer">
-            <button class="button button-primary popover-apply-btn" type="submit">应用</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="popover-wrapper">
-        <button class="popover-trigger-btn" type="button" data-popover-target="popover-view">
-          <span>视图模式</span>
-          <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-        <div class="popover-panel" id="popover-view">
-          <div class="popover-panel-header">切换视图呈现</div>
-          <div class="popover-panel-body">
-            <div class="popover-form-group">
-              <select name="view" id="filter-view-select">
-                <option value="ports" {{if eq .AssetView "ports"}}selected{{end}}>按端口列表</option>
-                <option value="hosts" {{if eq .AssetView "hosts"}}selected{{end}}>按主机聚合</option>
-                <option value="vulnerabilities" {{if eq .AssetView "vulnerabilities"}}selected{{end}}>按漏洞聚合</option>
-              </select>
-            </div>
-          </div>
-          <div class="popover-panel-footer">
-            <button class="button button-primary popover-apply-btn" type="submit">应用</button>
-          </div>
-        </div>
-      </div>
-
-      <a href="/reports/{{.Run.RunID}}" class="button button-secondary filter-reset">重置筛选</a>
-    </div>
-
-    <div class="active-filter-badges" id="active-filter-badges">
-      <span class="active-badges-label">活动过滤器：</span>
-      <div class="badges-row-content" id="badges-row-content"></div>
-    </div>
-  </form>
-</section>
+<div data-report-interactions></div>
 
 {{if eq .AssetView "vulnerabilities"}}
 <section class="panel report-section">
@@ -305,7 +163,7 @@
         <input type="number" name="assets_page" min="1" max="{{.HostPage.TotalPages}}" value="{{.HostPage.Page}}" aria-label="跳转到指定页">
         <button type="submit" class="page-jump-btn">GO</button>
       </form>
-      <select class="page-size" onchange="location.href=this.value">
+      <select class="page-size" data-page-size aria-label="每页主机数">
         <option value="{{index .HostPage.SizeURLs 10}}" {{if eq .HostPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
         <option value="{{index .HostPage.SizeURLs 20}}" {{if eq .HostPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
         <option value="{{index .HostPage.SizeURLs 50}}" {{if eq .HostPage.SizeStr "50"}}selected{{end}}>50 / 页</option>
@@ -319,7 +177,7 @@
         <input type="number" name="assets_page" min="1" max="{{.AssetPage.TotalPages}}" value="{{.AssetPage.Page}}" aria-label="跳转到指定页">
         <button type="submit" class="page-jump-btn">GO</button>
       </form>
-      <select class="page-size" onchange="location.href=this.value">
+      <select class="page-size" data-page-size aria-label="每页资产数">
         <option value="{{index .AssetPage.SizeURLs 10}}" {{if eq .AssetPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
         <option value="{{index .AssetPage.SizeURLs 20}}" {{if eq .AssetPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
         <option value="{{index .AssetPage.SizeURLs 50}}" {{if eq .AssetPage.SizeStr "50"}}selected{{end}}>50 / 页</option>
@@ -450,7 +308,7 @@
         <input type="number" name="findings_page" min="1" max="{{.FindingPage.TotalPages}}" value="{{.FindingPage.Page}}" aria-label="跳转到指定页">
         <button type="submit" class="page-jump-btn">GO</button>
       </form>
-      <select class="page-size" onchange="location.href=this.value">
+      <select class="page-size" data-page-size aria-label="每页漏洞数">
         <option value="{{index .FindingPage.SizeURLs 10}}" {{if eq .FindingPage.SizeStr "10"}}selected{{end}}>10 / 页</option>
         <option value="{{index .FindingPage.SizeURLs 20}}" {{if eq .FindingPage.SizeStr "20"}}selected{{end}}>20 / 页</option>
         <option value="{{index .FindingPage.SizeURLs 50}}" {{if eq .FindingPage.SizeStr "50"}}selected{{end}}>50 / 页</option>
@@ -485,7 +343,7 @@
           <td class="mono-cell">{{.Target}}</td>
           <td class="finding-summary">{{.Summary}}</td>
           <td class="finding-actions">
-            <button class="button button-secondary details-toggle-btn" onclick="toggleFindingDetails('{{$index}}')">
+            <button class="button button-secondary details-toggle-btn" type="button" data-finding-details="{{$index}}" aria-controls="finding-details-{{$index}}" aria-expanded="false">
               <span>证据与详情</span>
               <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -539,82 +397,7 @@
     </details>
   </div>
 
-  <dialog id="nuclei-command-dialog" class="panel">
-	<div class="panel-heading"><h3 id="command-dialog-title">生成检测命令</h3><button class="button button-secondary" type="button" data-command-close>关闭</button></div>
-    <p class="meta-line" id="nuclei-command-message"></p>
-    <pre id="nuclei-command-full"></pre>
-    <div class="header-actions"><button class="button button-secondary" type="button" id="nuclei-command-copy">复制完整命令</button><a class="button button-primary" id="nuclei-command-tool" href="/tools/nuclei">带参数打开工具页</a></div>
-  </dialog>
-  
-          <script src="/static/report-ui.js" defer></script>
-          <script>
-    function toggleFindingDetails(index) {
-      const detailsRow = document.getElementById('finding-details-' + index);
-      if (!detailsRow) return;
-      
-      const prevRow = detailsRow.previousElementSibling;
-      const btn = prevRow ? prevRow.querySelector('.details-toggle-btn') : null;
-      const icon = btn ? btn.querySelector('.chevron-icon') : null;
-      
-      if (detailsRow.hidden) {
-        detailsRow.hidden = false;
-        if (btn) btn.classList.add('active-toggle');
-        if (icon) icon.style.transform = 'rotate(180deg)';
-      } else {
-        detailsRow.hidden = true;
-        if (btn) btn.classList.remove('active-toggle');
-        if (icon) icon.style.transform = 'rotate(0deg)';
-      }
-    }
-
-    const commandDialog = document.getElementById('nuclei-command-dialog');
-    const commandMessage = document.getElementById('nuclei-command-message');
-    const commandFull = document.getElementById('nuclei-command-full');
-    document.querySelector('[data-command-close]')?.addEventListener('click', () => commandDialog.close());
-    document.querySelectorAll('.command-generate-btn').forEach(button => button.addEventListener('click', async () => {
-      commandMessage.textContent = '正在生成，不会启动扫描。';
-      commandFull.textContent = '';
-      commandDialog.showModal();
-      try {
-        const endpoint = new URL('/reports/{{.Run.RunID}}/commands', window.location.origin);
-        endpoint.search = window.location.search;
-		const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({finding_key: button.dataset.commandKey, tool: button.dataset.commandTool})});
-        if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
-        const command = await response.json();
-        commandMessage.textContent = '请人工确认后运行；此操作未启动扫描。';
-        commandFull.textContent = command.full_command;
-		const toolLink = document.getElementById('nuclei-command-tool');
-		document.getElementById('command-dialog-title').textContent = '生成 ' + button.textContent.trim().replace('生成 ', '');
-		toolLink.hidden = button.dataset.commandTool === 'msf';
-		if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.commandTool + '?raw_args=' + encodeURIComponent(command.tool_args);
-        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(command.full_command);
-      } catch (error) {
-        commandMessage.textContent = error.message || String(error);
-      }
-    }));
-    document.querySelectorAll('.batch-command-btn').forEach(button => button.addEventListener('click', async () => {
-      commandMessage.textContent = '正在生成批量命令，不会启动扫描。';
-      commandFull.textContent = '';
-      commandDialog.showModal();
-      try {
-        const endpoint = new URL('/reports/{{.Run.RunID}}/commands/batch', window.location.origin);
-        endpoint.search = window.location.search;
-        const response = await fetch(endpoint, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({group_key: button.dataset.batchGroup, tool: button.dataset.batchTool})});
-		if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
-        const command = await response.json();
-        const commands = command.commands || [command];
-        const files = commands.map(item => item.target_file).filter(Boolean);
-        commandMessage.textContent = (command.warning ? command.warning + '；' : '') + '共 ' + commands.length + ' 条命令' + (files.length ? '；目标文件：' + files.join('、') : '') + '；请人工确认后运行。';
-        commandFull.textContent = commands.map(item => typeof item === 'string' ? item : item.full_command).join('\n');
-        const toolLink = document.getElementById('nuclei-command-tool');
-        toolLink.hidden = button.dataset.batchTool === 'msf' || commands.length !== 1;
-        if (!toolLink.hidden) toolLink.href = '/tools/' + button.dataset.batchTool + '?raw_args=' + encodeURIComponent(commands[0].tool_args);
-        document.getElementById('nuclei-command-copy').onclick = () => navigator.clipboard.writeText(commandFull.textContent);
-      } catch (error) {
-        commandMessage.textContent = error.message || String(error);
-      }
-    }));
-  </script>
+  <script src="/static/report-ui.js" defer></script>
 </section>
 {{end}}
 {{end}}

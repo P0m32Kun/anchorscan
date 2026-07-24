@@ -305,10 +305,24 @@ try {
   await page.waitForURL(/\/runs\/run-/);
   const runID = page.url().split('/').pop();
   await page.goto(`${baseURL}/reports/${runID}`);
-  await page.getByRole('button', { name: '端口与服务' }).click();
+  await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
+  await page.screenshot({ path: path.join(artifactDir, 'report-dark.png'), fullPage: true });
+  const serviceFilter = page.getByRole('button', { name: '端口与服务' });
+  await serviceFilter.focus();
+  await serviceFilter.press('Enter');
+  await assert.doesNotReject(() => page.getByRole('dialog', { name: '端口与服务过滤' }).waitFor());
+  await page.keyboard.press('Escape');
+  await assert.doesNotReject(() => page.getByRole('dialog', { name: '端口与服务过滤' }).waitFor({ state: 'hidden' }));
+  await serviceFilter.click();
   await page.getByLabel(/端口/).fill('80');
   await page.getByRole('button', { name: '应用', exact: true }).click();
+  await page.waitForURL(/port=80/);
+  await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
   await assert.doesNotReject(() => page.getByText('192.0.2.10').first().waitFor());
+  await page.getByRole('button', { name: /移除端口 80/ }).click();
+  await page.waitForURL((url) => !url.searchParams.has('port'));
+  await page.getByRole('tab', { name: '按主机' }).click();
+  await page.waitForURL(/view=hosts/);
   await page.getByRole('link', { name: '下一页' }).first().click();
   await page.getByRole('button', { name: '复制 IP' }).first().click();
 
@@ -324,6 +338,15 @@ try {
     ('browser-workbench', '192.0.2.50', 445, 'smb', '', '', 'smb', 0, '', 'tcp', '', '', '');
     INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output, protocol, scope) VALUES
     ('browser-workbench', '192.0.2.50', 445, 'nuclei', 'smb-signing', 'high', 'Workbench smoke finding', '192.0.2.50:445', '', 'tcp', '');`);
+  await page.goto(`${baseURL}/reports/browser-workbench`, { waitUntil: 'networkidle' });
+  await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
+  await page.getByRole('button', { name: '生成 Nuclei 命令' }).click();
+  const reportCommandDialog = page.getByRole('dialog', { name: '生成 Nuclei 命令' });
+  await assert.doesNotReject(() => reportCommandDialog.waitFor());
+  await assert.doesNotReject(() => reportCommandDialog.locator('pre.command-pre').filter({ hasText: /nuclei/i }).waitFor({ timeout: 10_000 }));
+  await page.keyboard.press('Escape');
+  await assert.doesNotReject(() => reportCommandDialog.waitFor({ state: 'hidden' }));
+
   await page.goto(`${baseURL}${projectURL}/workbench`, { waitUntil: 'networkidle' });
   await page.locator('[data-workbench][data-mounted="true"]').waitFor();
   await assert.doesNotReject(() => page.getByRole('heading', { name: 'SMB 签名未启用' }).waitFor());
