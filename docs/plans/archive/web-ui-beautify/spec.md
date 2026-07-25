@@ -28,17 +28,17 @@
 ### 涉及的源文件
 
 - 核心样式：
-  - [style.css](../../../internal/web/static/style.css) (CSS 样式主文件，重构的核心)
-  - [dark.css](../../../internal/web/static/dark.css) (深色模式覆盖文件)
-  - [app.js](../../../internal/web/static/app.js) (Zone Tabs 过滤与锚点滚动高亮的 vanilla JS，**注意**：`app.test.mjs` 断言全文件只允许一个 `DOMContentLoaded` 回调，新初始化逻辑必须挂在既有回调内)
+  - [style.css](../../../../internal/web/static/style.css) (CSS 样式主文件，重构的核心)
+  - [dark.css](../../../../internal/web/static/dark.css) (深色模式覆盖文件)
+  - [app.js](../../../../internal/web/static/app.js) (Zone Tabs 过滤与锚点滚动高亮的 vanilla JS，**注意**：`app.test.mjs` 断言全文件只允许一个 `DOMContentLoaded` 回调，新初始化逻辑必须挂在既有回调内)
 - Go HTML 模板：
-  - [base.html](../../../internal/web/templates/base.html) (应用外壳/侧边栏)
-  - [home.html](../../../internal/web/templates/home.html) (仪表盘)
-  - [config.html](../../../internal/web/templates/config.html) (全局设置)
-  - [project_detail.html](../../../internal/web/templates/project_detail.html) (项目详情/Zone扫描历史/分区管理)
-  - [report.html](../../../internal/web/templates/report.html) (扫描报告)
+  - [base.html](../../../../internal/web/templates/base.html) (应用外壳/侧边栏)
+  - [home.html](../../../../internal/web/templates/home.html) (仪表盘)
+  - [config.html](../../../../internal/web/templates/config.html) (全局设置)
+  - [project_detail.html](../../../../internal/web/templates/project_detail.html) (项目详情/Zone扫描历史/分区管理)
+  - [report.html](../../../../internal/web/templates/report.html) (扫描报告)
 - Vue 前端组件（视排版微调需要）：
-  - [ReportInteractions.vue](../../../internal/web/frontend/ReportInteractions.vue) (报告筛选交互，如必要)
+  - [ReportInteractions.vue](../../../../internal/web/frontend/ReportInteractions.vue) (报告筛选交互，如必要)
 
 ## 4. 验收标准与测试规范
 

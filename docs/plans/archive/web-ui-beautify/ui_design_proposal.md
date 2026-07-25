@@ -3,8 +3,8 @@
 您好！针对您提到的“全局设置、控制面板、项目扫描历史、网络分区、扫描报告”页面排版较乱、缺乏逻辑和条理的问题，我认真梳理了目前的页面痛点，并借鉴了市面上优秀的安全管理平台（如 Snyk、Nessus）与现代 SaaS 系统（如 Linear、Vercel、Stripe）的 UI 设计风格，为您制定了这套排版美化与视觉重构方案。
 
 本项目相关的工程规范与产品设计已同步写入：
-- 📋 任务范围规范：[spec.md](file:///Users/kun/DEV/new-Anchor/docs/plans/web-ui-beautify/spec.md)
-- 🎨 详细产品设计：[product-design.md](file:///Users/kun/DEV/new-Anchor/docs/plans/web-ui-beautify/product-design.md)
+- 任务范围规范：[spec.md](spec.md)
+- 详细产品设计：[product-design.md](product-design.md)
 
 ---
 
@@ -17,7 +17,7 @@
 
 以下是为您生成的现代化安全扫描控制台仪表盘 UI 设计 Mockup 效果图：
 
-![安全扫描控制台设计示意图](file:///Users/kun/DEV/new-Anchor/docs/plans/web-ui-beautify/scanner_ui_mockup.jpg)
+![安全扫描控制台设计示意图](scanner_ui_mockup.jpg)
 
 ---
 

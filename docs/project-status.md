@@ -91,11 +91,16 @@ These are generated locally and should not be treated as source:
 
 ## Current Documentation Set
 
-- `README.md` - user-facing quick start and feature overview
-- `docs/testing-lab-checklist.md` - local lab validation checklist
-- `docs/testing-results-template.md` - reusable lab result record
-- `docs/troubleshooting-lab.md` - stage-by-stage lab troubleshooting
-- `docs/plans/` - durable specifications, completed implementation records, and actionable plans
+- [README.md](../README.md) - 用户快速开始、运行方式和功能概览
+- [docs/project-status.md](project-status.md) - 当前产品基线、边界和交付前验证命令
+- [docs/deploy.md](deploy.md) - 打包、发布与部署说明
+- [docs/testing-lab-checklist.md](testing-lab-checklist.md) - 外部 Docker 实验室的启动与验收清单
+- [docs/testing-results-template.md](testing-results-template.md) - 可复制的实验室结果记录模板
+- [docs/troubleshooting-lab.md](troubleshooting-lab.md) - 按扫描阶段组织的实验室故障排查
+- [docs/adr/](adr/) - 仍生效的架构决策；被替代的决策位于 `docs/adr/archive/`
+- [docs/research/](research/) - 外部资料调研与来源记录
+- [docs/plans/](plans/) - 当前可执行计划（目前没有）
+- [docs/plans/archive/](plans/archive/) - 已完成计划的规格、设计与验收历史记录
 
 ## Recommended Next Steps
 

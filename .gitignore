@@ -33,9 +33,6 @@ tools/docx-render/out/
 # 本地测试靶场与 e2e（仅本机使用，不进版本控制）
 /docker-compose.lab.yml
 /e2e/
-/docs/testing-lab-checklist.md
-/docs/troubleshooting-lab.md
-/docs/testing-results-template.md
 
 # AIOS & ContextDB
 /.aios/
