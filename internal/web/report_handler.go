@@ -14,6 +14,7 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
+	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
 func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
@@ -73,21 +74,24 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	filters := reportFiltersFromValues(r.URL.Query())
-	filteredFingerprints := filterFingerprints(fps, filters)
-	filteredFindings := filterFindingsForView(findings, fps, filters, s.catalog, r.URL.Query().Get("view") == "vulnerabilities")
-	filteredChecks := filterDetectionChecks(detectionChecks, filteredFingerprints)
-	filteredBuilt := report.Build(filteredFingerprints, filteredFindings)
-	if run.Status != "running" {
-		filteredBuilt = report.BuildWithScanDataAndDetectionChecks(filteredFingerprints, filteredFindings, report.ScanData{}, filteredChecks)
-	}
+
+	reading := buildRunReportReading(runReportReadingInput{
+		Run:             run,
+		Fingerprints:    fps,
+		Findings:        findings,
+		DetectionChecks: detectionChecks,
+		Query:           r.URL.Query(),
+		Catalog:         s.catalog,
+	})
+
+	built := reading.Built
 	if format == "html" || exportFormat == "html" {
-		report.EnrichFindingsWithVulnerabilityDetails(&filteredBuilt, s.catalog)
+		report.EnrichFindingsWithVulnerabilityDetails(&built, s.catalog)
 	}
 	switch format {
 	case "html":
 		tmp := filepath.Join(os.TempDir(), "anchorscan-report-"+runID+".html")
-		if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
+		if err := report.WriteHTML(tmp, built); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -97,7 +101,7 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		if exportFormat == "html" {
 			filename := "anchorscan-" + runID
 			tmp := filepath.Join(os.TempDir(), "anchorscan-export-"+runID+".html")
-			if err := report.WriteHTML(tmp, filteredBuilt); err != nil {
+			if err := report.WriteHTML(tmp, built); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -114,19 +118,11 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 		if assetExport == "txt" {
 			w.Header().Set("Content-Disposition", `attachment; filename="`+runID+`-assets.txt"`)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			_, _ = io.WriteString(w, exportAssetsTXT(filteredFingerprints, r.URL.Query().Get("kind")))
+			_, _ = io.WriteString(w, exportAssetsTXT(reading.FilteredFingerprints, r.URL.Query().Get("kind")))
 			return
 		}
-		render(w, "templates/report.html", buildReportViewModel(reportViewInput{
-			Run:               run,
-			Fingerprints:      filteredFingerprints,
-			Findings:          filteredFindings,
-			DetectionChecks:   filteredBuilt.DetectionChecks,
-			DetectionCoverage: filteredBuilt.DetectionCoverage,
-			Query:             r.URL.Query(),
-			Catalog:           s.catalog,
-			CommandTools:      s.commandTools(filteredFindings),
-		}))
+		reading.ViewInput.CommandTools = s.commandTools(reading.FilteredFindings)
+		render(w, "templates/report.html", buildReportViewModel(reading.ViewInput))
 	}
 }
 
@@ -226,15 +222,22 @@ func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID str
 		http.NotFound(w, r)
 		return
 	}
-	fingerprints, err := s.store.ListFingerprints(runID)
+	fps, err := s.store.ListFingerprints(runID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	findings = filterFindings(findings, fingerprints, reportFiltersFromValues(r.URL.Query()))
+
+	reading := buildRunReportReading(runReportReadingInput{
+		Run:          store.ScanRun{RunID: runID},
+		Fingerprints: fps,
+		Findings:     findings,
+		Query:        r.URL.Query(),
+		Catalog:      s.catalog,
+	})
 	key := strings.TrimSpace(r.FormValue("finding_key"))
 	var matches []report.Finding
-	for _, finding := range findings {
+	for _, finding := range reading.FilteredFindings {
 		if report.FindingKey(finding) == key {
 			matches = append(matches, finding)
 		}
@@ -271,13 +274,20 @@ func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runI
 		http.NotFound(w, r)
 		return
 	}
-	fingerprints, err := s.store.ListFingerprints(runID)
+	fps, err := s.store.ListFingerprints(runID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	filters := reportFiltersFromValues(r.URL.Query())
-	filtered := filterFindingsForView(findings, fingerprints, filters, s.catalog, r.URL.Query().Get("view") == "vulnerabilities")
+
+	reading := buildRunReportReading(runReportReadingInput{
+		Run:          store.ScanRun{RunID: runID},
+		Fingerprints: fps,
+		Findings:     findings,
+		Query:        r.URL.Query(),
+		Catalog:      s.catalog,
+	})
+	filtered := reading.FilteredFindings
 	if tool == "msf" {
 		s.reportBatchMSFCommand(w, filtered, strings.TrimSpace(r.FormValue("group_key")))
 		return

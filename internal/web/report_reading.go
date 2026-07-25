@@ -1,0 +1,74 @@
+package web
+
+import (
+	"net/url"
+
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
+	"github.com/P0m32Kun/anchorscan/internal/report"
+	"github.com/P0m32Kun/anchorscan/internal/store"
+)
+
+// runReportReadingInput collects the raw facts and query for a run report
+// reading. Handlers load facts from Store, then call buildRunReportReading
+// once to obtain the filtered, built, and shaped result.
+type runReportReadingInput struct {
+	Run             store.ScanRun
+	Fingerprints    []fingerprint.ServiceFingerprint
+	Findings        []report.Finding
+	DetectionChecks []report.DetectionCheck
+	Query           url.Values
+	Catalog         *knowledgebase.Catalog
+}
+
+// runReportReading is the unified reading model shared by the console page,
+// HTML export, assets.txt, and command endpoints. Handlers grab whichever
+// fields they need; command generation stays in internal/report.
+type runReportReading struct {
+	Run                  store.ScanRun
+	FilteredFingerprints []fingerprint.ServiceFingerprint
+	FilteredFindings     []report.Finding
+	FilteredChecks       []report.DetectionCheck
+	DetectionCoverage    *report.DetectionCoverage
+	Built                report.ScanReport
+	ViewInput            reportViewInput
+}
+
+func buildRunReportReading(in runReportReadingInput) runReportReading {
+	filters := reportFiltersFromValues(in.Query)
+	view := in.Query.Get("view")
+	vulnerabilityView := view == "vulnerabilities"
+
+	filteredFingerprints := filterFingerprints(in.Fingerprints, filters)
+	filteredFindings := filterFindingsForView(in.Findings, in.Fingerprints, filters, in.Catalog, vulnerabilityView)
+	filteredChecks := filterDetectionChecks(in.DetectionChecks, filteredFingerprints)
+
+	built := report.Build(filteredFingerprints, filteredFindings)
+	var detectionCoverage *report.DetectionCoverage
+	if in.Run.Status != "running" {
+		built = report.BuildWithScanDataAndDetectionChecks(filteredFingerprints, filteredFindings, report.ScanData{}, filteredChecks)
+		detectionCoverage = built.DetectionCoverage
+	}
+
+	viewInput := reportViewInput{
+		Run:               in.Run,
+		Fingerprints:      filteredFingerprints,
+		Findings:          filteredFindings,
+		DetectionChecks:   built.DetectionChecks,
+		DetectionCoverage: detectionCoverage,
+		Query:             in.Query,
+		Catalog:           in.Catalog,
+		// CommandTools must be computed by the handler — it depends on
+		// server-held tool config via buildCommand.
+	}
+
+	return runReportReading{
+		Run:                  in.Run,
+		FilteredFingerprints: filteredFingerprints,
+		FilteredFindings:     filteredFindings,
+		FilteredChecks:       filteredChecks,
+		DetectionCoverage:    detectionCoverage,
+		Built:                built,
+		ViewInput:            viewInput,
+	}
+}
