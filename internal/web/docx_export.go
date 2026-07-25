@@ -44,14 +44,14 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	contextBytes, err := json.MarshalIndent(context, "", "  ")
 	if err != nil {
 		log.Printf("docx export: marshal context: %v", err)
-		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
+		http.Error(w, projectReportMessage(app.CodeProjectReportUnavailable, "暂时无法生成报告，请稍后重试。"), http.StatusInternalServerError)
 		return
 	}
 
 	tmpDir, err := os.MkdirTemp("", "anchorscan-docx-")
 	if err != nil {
 		log.Printf("docx export: create temp dir: %v", err)
-		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
+		http.Error(w, projectReportMessage(app.CodeProjectReportUnavailable, "暂时无法生成报告，请稍后重试。"), http.StatusInternalServerError)
 		return
 	}
 	defer os.RemoveAll(tmpDir)
@@ -59,7 +59,7 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	contextPath := filepath.Join(tmpDir, "context.json")
 	if err := os.WriteFile(contextPath, contextBytes, 0o644); err != nil {
 		log.Printf("docx export: write context: %v", err)
-		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
+		http.Error(w, projectReportMessage(app.CodeProjectReportUnavailable, "暂时无法生成报告，请稍后重试。"), http.StatusInternalServerError)
 		return
 	}
 	outPath := filepath.Join(tmpDir, safeReportFilename(deliverable.Project.Name)+".docx")
@@ -83,5 +83,5 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 }
 
 func docxUnavailable(message string) string {
-	return fmt.Sprintf("[%s] %s", app.CodeDocxUnavailable, message)
+	return projectReportMessage(app.CodeDocxUnavailable, message)
 }

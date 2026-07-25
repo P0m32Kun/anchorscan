@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
@@ -373,6 +374,25 @@ func TestProjectReportHTMLRejectsIncludedVerificationWithoutEvidence(t *testing.
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/report.html", nil))
 	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), "缺少证据") {
 		t.Fatalf("expected missing-evidence error, got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestWriteProjectReportErrorIncludesStableCode(t *testing.T) {
+	cases := []struct {
+		err  error
+		code int
+		want string
+	}{
+		{&app.ProjectReportError{Code: app.CodeProjectNotFound, Message: "项目不存在"}, http.StatusNotFound, "[PROJECT_NOT_FOUND] 项目不存在"},
+		{&app.ProjectReportError{Code: app.CodeProjectReportInvalid, Message: "报告不完整"}, http.StatusBadRequest, "[PROJECT_REPORT_INVALID] 报告不完整"},
+		{&app.ProjectReportError{Code: app.CodeProjectReportUnavailable, Message: "稍后重试"}, http.StatusInternalServerError, "[PROJECT_REPORT_UNAVAILABLE] 稍后重试"},
+	}
+	for _, tc := range cases {
+		res := httptest.NewRecorder()
+		writeProjectReportError(res, httptest.NewRequest(http.MethodGet, "/", nil), tc.err)
+		if res.Code != tc.code || !strings.Contains(res.Body.String(), tc.want) {
+			t.Fatalf("error response = %d %q, want %d containing %q", res.Code, res.Body.String(), tc.code, tc.want)
+		}
 	}
 }
 

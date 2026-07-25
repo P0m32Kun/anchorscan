@@ -24,7 +24,7 @@ func (s *server) projectReportHTML(w http.ResponseWriter, r *http.Request, proje
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.html"`, safeReportFilename(deliverable.Project.Name)))
 	if err := report.RenderProjectHTML(w, deliverable); err != nil {
-		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
+		http.Error(w, projectReportMessage(app.CodeProjectReportUnavailable, "暂时无法生成报告，请稍后重试。"), http.StatusInternalServerError)
 	}
 }
 
@@ -33,15 +33,19 @@ func writeProjectReportError(w http.ResponseWriter, r *http.Request, err error) 
 	if errors.As(err, &perr) {
 		switch perr.Code {
 		case app.CodeProjectNotFound:
-			http.Error(w, perr.Message, http.StatusNotFound)
+			http.Error(w, projectReportMessage(perr.Code, perr.Message), http.StatusNotFound)
 		case app.CodeProjectReportInvalid:
-			http.Error(w, perr.Message, http.StatusBadRequest)
+			http.Error(w, projectReportMessage(perr.Code, perr.Message), http.StatusBadRequest)
 		default:
-			http.Error(w, perr.Message, http.StatusInternalServerError)
+			http.Error(w, projectReportMessage(perr.Code, perr.Message), http.StatusInternalServerError)
 		}
 		return
 	}
-	http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
+	http.Error(w, projectReportMessage(app.CodeProjectReportUnavailable, "暂时无法生成报告，请稍后重试。"), http.StatusInternalServerError)
+}
+
+func projectReportMessage(code app.ErrorCode, message string) string {
+	return fmt.Sprintf("[%s] %s", code, message)
 }
 
 func safeReportFilename(name string) string {
