@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
 
@@ -31,8 +32,9 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 		return
 	}
 
-	deliverable, project, err := s.buildProjectDeliverable(w, r, projectID)
+	deliverable, err := app.BuildProjectDeliverable(s.store, projectID, s.opts.Now())
 	if err != nil {
+		writeProjectReportError(w, r, err)
 		return
 	}
 
@@ -55,7 +57,7 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	outPath := filepath.Join(tmpDir, safeReportFilename(project)+".docx")
+	outPath := filepath.Join(tmpDir, safeReportFilename(deliverable.Project.Name)+".docx")
 
 	cmd := exec.Command("uv", "run", "--project", s.opts.DocxRenderProject, "python", filepath.Join(s.opts.DocxRenderProject, "render_docx.py"),
 		"--template", s.opts.DocxTemplatePath,
@@ -70,6 +72,6 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.docx"`, safeReportFilename(project)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.docx"`, safeReportFilename(deliverable.Project.Name)))
 	http.ServeFile(w, r, outPath)
 }
