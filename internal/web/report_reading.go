@@ -25,7 +25,6 @@ type runReportReadingInput struct {
 // HTML export, assets.txt, and command endpoints. Handlers grab whichever
 // fields they need; command generation stays in internal/report.
 type runReportReading struct {
-	Run                  store.ScanRun
 	FilteredFingerprints []fingerprint.ServiceFingerprint
 	FilteredFindings     []report.Finding
 	FilteredChecks       []report.DetectionCheck
@@ -63,7 +62,6 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 	}
 
 	return runReportReading{
-		Run:                  in.Run,
 		FilteredFingerprints: filteredFingerprints,
 		FilteredFindings:     filteredFindings,
 		FilteredChecks:       filteredChecks,
