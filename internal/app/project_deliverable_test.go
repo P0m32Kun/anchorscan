@@ -32,17 +32,21 @@ func TestBuildProjectDeliverableAssemblesEvidence(t *testing.T) {
 	}
 }
 
-func TestBuildProjectDeliverableClassifiesMissingProject(t *testing.T) {
+func TestBuildProjectDeliverableReturnsNotFoundCode(t *testing.T) {
 	st := newProjectDeliverableStore(t)
 	defer st.Close()
 
 	_, err := BuildProjectDeliverable(st, "missing", time.Unix(100, 0))
-	if !errors.Is(err, ErrProjectReportNotFound) {
-		t.Fatalf("expected not-found error, got %v", err)
+	var perr *ProjectReportError
+	if !errors.As(err, &perr) || perr.Code != CodeProjectNotFound {
+		t.Fatalf("expected CodeProjectNotFound, got %v", err)
+	}
+	if !strings.Contains(perr.Message, "不存在") {
+		t.Fatalf("expected user-facing not-found message, got %q", perr.Message)
 	}
 }
 
-func TestBuildProjectDeliverableClassifiesInvalidReport(t *testing.T) {
+func TestBuildProjectDeliverableReturnsInvalidCodeForMissingMetadata(t *testing.T) {
 	st := newProjectDeliverableStore(t)
 	defer st.Close()
 	if err := st.SaveProject(store.Project{ID: "p1", Name: "空项目"}); err != nil {
@@ -50,12 +54,16 @@ func TestBuildProjectDeliverableClassifiesInvalidReport(t *testing.T) {
 	}
 
 	_, err := BuildProjectDeliverable(st, "p1", time.Unix(100, 0))
-	if !errors.Is(err, ErrInvalidProjectReport) || !strings.Contains(err.Error(), "报告元数据不完整，缺失：被测单位、测试对象、测试开始日期、测试结束日期、测试人员") {
-		t.Fatalf("expected invalid metadata error, got %v", err)
+	var perr *ProjectReportError
+	if !errors.As(err, &perr) || perr.Code != CodeProjectReportInvalid {
+		t.Fatalf("expected CodeProjectReportInvalid, got %v", err)
+	}
+	if !strings.Contains(perr.Message, "不完整") || !strings.Contains(perr.Message, "项目工作台") {
+		t.Fatalf("expected user-action hint in message, got %q", perr.Message)
 	}
 }
 
-func TestBuildProjectDeliverableReturnsEvidenceReadFailure(t *testing.T) {
+func TestBuildProjectDeliverableReturnsUnavailableCodeForEvidenceReadFailure(t *testing.T) {
 	st := newProjectDeliverableStore(t)
 	defer st.Close()
 	seedProjectDeliverable(t, st)
@@ -68,8 +76,12 @@ func TestBuildProjectDeliverableReturnsEvidenceReadFailure(t *testing.T) {
 	}
 
 	_, err = BuildProjectDeliverable(st, "p1", time.Unix(100, 0))
-	if err == nil || errors.Is(err, ErrInvalidProjectReport) || errors.Is(err, ErrProjectReportNotFound) {
-		t.Fatalf("expected internal evidence read error, got %v", err)
+	var perr *ProjectReportError
+	if !errors.As(err, &perr) || perr.Code != CodeProjectReportUnavailable {
+		t.Fatalf("expected CodeProjectReportUnavailable, got %v", err)
+	}
+	if !strings.Contains(perr.Message, "暂时无法生成") {
+		t.Fatalf("expected user-facing unavailable message, got %q", perr.Message)
 	}
 }
 

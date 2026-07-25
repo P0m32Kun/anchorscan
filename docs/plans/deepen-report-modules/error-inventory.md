@@ -1,42 +1,41 @@
-# Project Report 当前中文错误清单
+# Project Report 错误分类
 
-本清单记录架构重构前的用户可见错误契约。ticket 01 必须保持文本与触发语义；ticket 03 再决定统一措辞、错误码或本地化方式。
+本清单记录 ticket 03 实施后的稳定错误分类。旧文案见下方新旧映射表。
 
-## Project Report 组装与验证（400）
+## 稳定错误码
 
-| 当前文本 | 触发条件 |
-| --- | --- |
-| `报告元数据不完整，缺失：<字段列表>` | Project 缺少被测单位、测试对象、测试开始日期、测试结束日期或测试人员；字段以 `、` 连接。 |
-| `纳入报告的验证项“<标题>”缺少证据` | included Verification 没有 Evidence。 |
-| `纳入报告的验证项“<标题>”没有有效网络分区` | Verification 的 Zone 无效，且无法从 included Run 或唯一 Zone 推断。 |
-| `正式报告缺少<字段>` | `ProjectDeliverable` 缺少报告标题、被测单位、测试对象、测试开始日期、测试结束日期或测试人员。 |
-| `正式报告缺少项目创建时间` | Project 创建时间为空。 |
-| `正式报告暂不支持 critical 结论口径，请先调整严重级别` | 汇总或 included confirmed Verification 含 critical。 |
-| `纳入报告的运行“<标签>”缺少测试设备接入点` | included Run 缺少 AccessPoint。 |
-| `纳入报告的运行“<标签>”缺少测试设备 IP` | included Run 缺少 TesterIP。 |
-| `纳入报告的运行“<标签>”缺少测试范围` | included Run 缺少 Targets。 |
-| `纳入报告的已确认验证项“<标题>”缺少漏洞描述` | confirmed Verification 缺少 description。 |
-| `纳入报告的已确认验证项“<标题>”缺少修改建议` | confirmed Verification 缺少 remediation。 |
-| `纳入报告的已确认验证项“<标题>”缺少关联资产` | confirmed Verification 没有资产。 |
-| `纳入报告的已确认验证项“<标题>”缺少证据` | confirmed Verification 在最终交付验证时没有 Evidence。 |
-| `纳入报告的未发现验证项“<标题>”缺少端口资产` | not_observed Verification 没有资产。 |
-| `纳入报告的未发现验证项“<标题>”缺少证据` | not_observed Verification 在最终交付验证时没有 Evidence。 |
+所有 Project Report 模块（`internal/app`）错误实现为 `*app.ProjectReportError`，携带稳定 `Code` 与用户中文 `Message`。Web adapter 按 Code 映射 HTTP 状态，不做字符串匹配。
 
-## DOCX adapter（503）
+| 错误码 | HTTP | 用户消息摘要 | 触发条件 |
+| --- | --- | --- | --- |
+| `PROJECT_NOT_FOUND` | 404 | 项目不存在或已删除，请检查项目列表。 | `GetProject` 返回 `sql.ErrNoRows`。 |
+| `PROJECT_REPORT_INVALID` | 400 | 报告数据不完整/不符合交付要求 + 返回项目工作台修正建议。 | 元数据缺失、验证项缺证据/网络分区、`ValidateProjectDeliverable` 失败。 |
+| `PROJECT_REPORT_UNAVAILABLE` | 500 | 暂时无法生成报告，请稍后重试。 | Store 读取失败或 Evidence 文件读取失败；内部错误仅写 `log.Printf`，不回传客户端。 |
+| `PROJECT_REPORT_DOCX_UNAVAILABLE` | 503 | DOCX 导出不可用 + 检查部署环境建议。 | sidecar/模板未配置、模板文件缺失、sidecar 执行失败。 |
 
-| 当前文本 | 触发条件 |
-| --- | --- |
-| `DOCX 导出未配置：缺少 docxtpl sidecar 或模板路径，请先运行 doctor 检查。` | 未配置 sidecar project 或模板路径。 |
-| `DOCX 模板不存在：<路径>` | 配置的模板文件不存在。 |
-| `DOCX 渲染失败（docxtpl sidecar 未安装或出错）：<stderr>` | `uv run ... render_docx.py` 执行失败。 |
+## 内部错误处理
 
-## 暂不直接展示的内部错误
+- 数据库读/写错误：`log.Printf` 记录详情后，返回 `PROJECT_REPORT_UNAVAILABLE` 通用消息。
+- Evidence 文件读取失败：同上。
+- DOCX sidecar stderr：`log.Printf` 记录详情后，返回 `PROJECT_REPORT_DOCX_UNAVAILABLE` 通用消息。
+- DOCX JSON 编码 / 临时文件写入错误：`log.Printf` 记录后，返回 500 通用消息。
 
-Store 读取、Evidence 文件读取、JSON 编码、临时目录/文件写入及 HTML 渲染错误当前直接以 `err.Error()` 返回 500。ticket 03 应单独决定这些内部错误是否需要稳定的用户文案，以及详细原因应记录到日志还是返回给操作者。
+## 新旧映射
 
-## 后续改造约束
+| 旧文案（ticket 01/02） | 新文案（ticket 03） | 新错误码 |
+| --- | --- | --- |
+| `报告元数据不完整，缺失：<字段>` | `报告元数据不完整，缺失：<字段>。请返回项目工作台补齐后重新导出。` | `PROJECT_REPORT_INVALID` |
+| `纳入报告的验证项"<标题>"缺少证据` | `纳入报告的验证项"<标题>"缺少证据，请返回项目工作台补充后重新导出。` | `PROJECT_REPORT_INVALID` |
+| `纳入报告的验证项"<标题>"没有有效网络分区` | `纳入报告的验证项"<标题>"没有有效网络分区，请返回项目工作台修正后重新导出。` | `PROJECT_REPORT_INVALID` |
+| 其他 `ValidateProjectDeliverable` 错误（如 "正式报告缺少…"） | 原文 + `。请返回项目工作台修正后重新导出。` | `PROJECT_REPORT_INVALID` |
+| `err.Error()` 直接返回 500（Store/Evidence 内部错误） | `暂时无法生成报告，请稍后重试。`（仅 `PROJECT_REPORT_UNAVAILABLE`） | `PROJECT_REPORT_UNAVAILABLE` |
+| `DOCX 导出未配置：缺少 docxtpl sidecar …` | `[PROJECT_REPORT_DOCX_UNAVAILABLE] DOCX 导出未配置，请先运行 doctor 检查部署环境。` | `PROJECT_REPORT_DOCX_UNAVAILABLE` |
+| `DOCX 模板不存在：<路径>` | `[PROJECT_REPORT_DOCX_UNAVAILABLE] DOCX 模板不可用，请检查部署环境。` | `PROJECT_REPORT_DOCX_UNAVAILABLE` |
+| `DOCX 渲染失败（docxtpl sidecar …）：<stderr>` | `[PROJECT_REPORT_DOCX_UNAVAILABLE] DOCX 渲染失败，请检查部署环境。`（stderr 仅日志） | `PROJECT_REPORT_DOCX_UNAVAILABLE` |
 
-- 先定义稳定错误分类或错误码，再统一文案；不要继续以字符串匹配决定 HTTP 状态。
-- 不得把 Evidence、Verification 或 Project Report 的领域含义压缩成泛化的“数据错误”。
-- 内部路径、sidecar stderr 与数据库错误是否对用户展示，需要单独评估信息泄漏风险。
-- 文案变更必须同步 Web 回归测试与操作文档。
+## 兼容说明
+
+- HTTP 状态码映射不变（404/400/500/503）。
+- 400 错误仍可按旧关键字（"缺失"、"缺少"、"测试设备 IP"、"critical"）在 Web 测试中匹配；新增的"项目工作台"后缀不影响现有匹配。
+- 503 错误现在以 `[PROJECT_REPORT_DOCX_UNAVAILABLE]` 开头；旧测试中的 `docxtpl` 关键字不再出现。
+- 旧 sentinel errors（`ErrProjectReportNotFound`、`ErrInvalidProjectReport`）已删除，由 `*ProjectReportError` 的 `Code` 字段替代。

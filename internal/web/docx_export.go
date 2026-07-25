@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -24,11 +25,12 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 		return
 	}
 	if s.opts.DocxTemplatePath == "" || s.opts.DocxRenderProject == "" {
-		http.Error(w, "DOCX 导出未配置：缺少 docxtpl sidecar 或模板路径，请先运行 doctor 检查。", http.StatusServiceUnavailable)
+		http.Error(w, docxUnavailable("DOCX 导出未配置，请先运行 doctor 检查部署环境。"), http.StatusServiceUnavailable)
 		return
 	}
 	if _, err := os.Stat(s.opts.DocxTemplatePath); err != nil {
-		http.Error(w, "DOCX 模板不存在："+s.opts.DocxTemplatePath, http.StatusServiceUnavailable)
+		log.Printf("docx export: template not found at %s: %v", s.opts.DocxTemplatePath, err)
+		http.Error(w, docxUnavailable("DOCX 模板不可用，请检查部署环境。"), http.StatusServiceUnavailable)
 		return
 	}
 
@@ -41,20 +43,23 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	context := report.BuildDocxContext(deliverable, s.opts.Now())
 	contextBytes, err := json.MarshalIndent(context, "", "  ")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("docx export: marshal context: %v", err)
+		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
 		return
 	}
 
 	tmpDir, err := os.MkdirTemp("", "anchorscan-docx-")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("docx export: create temp dir: %v", err)
+		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
 		return
 	}
 	defer os.RemoveAll(tmpDir)
 
 	contextPath := filepath.Join(tmpDir, "context.json")
 	if err := os.WriteFile(contextPath, contextBytes, 0o644); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("docx export: write context: %v", err)
+		http.Error(w, "暂时无法生成报告，请稍后重试。", http.StatusInternalServerError)
 		return
 	}
 	outPath := filepath.Join(tmpDir, safeReportFilename(deliverable.Project.Name)+".docx")
@@ -67,11 +72,16 @@ func (s *server) projectReportDOCX(w http.ResponseWriter, r *http.Request, proje
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		http.Error(w, "DOCX 渲染失败（docxtpl sidecar 未安装或出错）："+strings.TrimSpace(stderr.String()), http.StatusServiceUnavailable)
+		log.Printf("docx export: sidecar failed: %v (stderr: %s)", err, strings.TrimSpace(stderr.String()))
+		http.Error(w, docxUnavailable("DOCX 渲染失败，请检查部署环境。"), http.StatusServiceUnavailable)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.docx"`, safeReportFilename(deliverable.Project.Name)))
 	http.ServeFile(w, r, outPath)
+}
+
+func docxUnavailable(message string) string {
+	return fmt.Sprintf("[%s] %s", app.CodeDocxUnavailable, message)
 }

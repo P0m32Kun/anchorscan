@@ -219,8 +219,8 @@ func TestProjectReportDOCXReturnsClearErrorWhenUnconfigured(t *testing.T) {
 	if res.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 when sidecar unconfigured, got %d body=%s", res.Code, res.Body.String())
 	}
-	if !strings.Contains(res.Body.String(), "docxtpl") {
-		t.Fatalf("expected docxtpl hint in body: %s", res.Body.String())
+	if !strings.Contains(res.Body.String(), "PROJECT_REPORT_DOCX_UNAVAILABLE") {
+		t.Fatalf("expected error code in body: %s", res.Body.String())
 	}
 }
 
