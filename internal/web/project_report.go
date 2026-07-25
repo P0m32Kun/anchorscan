@@ -33,7 +33,7 @@ func writeProjectReportError(w http.ResponseWriter, r *http.Request, err error) 
 	case errors.Is(err, app.ErrProjectReportNotFound):
 		http.NotFound(w, r)
 	case errors.Is(err, app.ErrInvalidProjectReport):
-		http.Error(w, strings.TrimPrefix(err.Error(), app.ErrInvalidProjectReport.Error()+": "), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

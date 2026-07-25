@@ -19,6 +19,15 @@ var (
 	ErrInvalidProjectReport  = errors.New("invalid project report")
 )
 
+type projectReportError struct {
+	kind    error
+	message string
+}
+
+func (err projectReportError) Error() string { return err.message }
+
+func (err projectReportError) Is(target error) bool { return target == err.kind }
+
 // BuildProjectDeliverable reads, assembles, and validates the shared HTML and
 // DOCX project-report model. Evidence is loaded eagerly for both adapters.
 func BuildProjectDeliverable(scanStore *store.Store, projectID string, now time.Time) (report.ProjectDeliverable, error) {
@@ -107,13 +116,13 @@ func BuildProjectDeliverable(scanStore *store.Store, projectID string, now time.
 		EndDate: project.EndDate, Testers: project.Testers, CreatedAt: project.CreatedAt,
 	}, reportZones, reportRuns, deliverableVerifications, now)
 	if err := report.ValidateProjectDeliverable(deliverable); err != nil {
-		return report.ProjectDeliverable{}, fmt.Errorf("%w: %v", ErrInvalidProjectReport, err)
+		return report.ProjectDeliverable{}, invalidProjectReportError(err.Error())
 	}
 	return deliverable, nil
 }
 
 func invalidProjectReportError(message string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidProjectReport, message)
+	return projectReportError{kind: ErrInvalidProjectReport, message: message}
 }
 
 func projectReportVerificationZone(zoneID string, zones []store.ProjectZone, runs []store.ScanRun) (string, bool) {
