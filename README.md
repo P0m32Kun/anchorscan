@@ -21,11 +21,14 @@ chmod +x anchorscan
 
 ### 方式二：从源码编译
 
-需要本机安装 [Go](https://go.dev/dl/) 和 [Node.js](https://nodejs.org/) 20+。Node 只用于构建嵌入式 Web 静态资源，运行已编译的 `anchorscan` 不需要 Node。
+需要本机安装 [Go](https://go.dev/dl/) 1.26+、[Node.js](https://nodejs.org/) 20+ 和 `make`。Node 只用于构建嵌入式 Web 静态资源，运行已编译的 `anchorscan` 不需要 Node。
 
 ```bash
 npm ci
+make build
 ```
+
+编译产物为 `dist/anchorscan`（Windows 为 `dist/anchorscan.exe`）。
 
 #### 1. 前置依赖
 
@@ -36,7 +39,7 @@ npm ci
 #### 2. 自检
 
 ```bash
-go run ./cmd/anchorscan doctor
+./dist/anchorscan doctor
 ```
 
 检查配置、工具路径、数据库、报告目录是否就绪。
@@ -44,7 +47,7 @@ go run ./cmd/anchorscan doctor
 #### 3. 启动 Web 控制台（推荐日常使用）
 
 ```bash
-go run ./cmd/anchorscan web
+./dist/anchorscan web
 ```
 
 默认监听 `127.0.0.1:8088`，配置读 `config/default.yaml`，数据库用 `data/scans.sqlite`，无需传参。打开 http://127.0.0.1:8088 即可使用。中文界面，本机单兵操作。
@@ -52,13 +55,13 @@ go run ./cmd/anchorscan web
 如需覆盖，可选传参：
 
 ```bash
-go run ./cmd/anchorscan web --listen 127.0.0.1:9000 --config custom.yaml --db other.sqlite
+./dist/anchorscan web --listen 127.0.0.1:9000 --config custom.yaml --db other.sqlite
 ```
 
 #### 4. 或直接命令行扫描
 
 ```bash
-go run ./cmd/anchorscan scan --target 127.0.0.1 --ports top1000
+./dist/anchorscan scan --target 127.0.0.1 --ports top1000
 ```
 
 不传 `--json` 时，JSON 报告默认写到 `reports/scan-<时间戳>.json`。如需 HTML 报告或自定义路径，加 `--html reports/test.html`。
@@ -84,7 +87,7 @@ go run ./cmd/anchorscan scan --target 127.0.0.1 --ports top1000
 - `fast`：健康高速网络，多目标
 
 ```bash
-go run ./cmd/anchorscan scan --target 127.0.0.1 --profile slow
+./dist/anchorscan scan --target 127.0.0.1 --profile slow
 ```
 
 ## 常用命令

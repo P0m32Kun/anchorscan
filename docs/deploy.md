@@ -42,15 +42,16 @@ chmod +x anchorscan
 
 ### 方式二：从源码编译
 
-需要本机安装 [Go](https://go.dev/dl/)：
+需要本机安装 [Go](https://go.dev/dl/) 1.26+、[Node.js](https://nodejs.org/) 20+ 和 `make`：
 
 ```bash
-git clone git@github.com:P0m32Kun/anchorscan.git
+git clone https://github.com/P0m32Kun/anchorscan.git
 cd anchorscan
+npm ci
 make build
 ```
 
-编译产物输出到 `dist/anchorscan`。
+编译产物输出到 `dist/anchorscan`（Windows 为 `dist/anchorscan.exe`）。下文的 `./anchorscan` 指预编译归档；从源码编译时请改用 `./dist/anchorscan`。
 
 ## 3. 首次自检（自动初始化）
 
