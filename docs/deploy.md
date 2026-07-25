@@ -42,7 +42,7 @@ chmod +x anchorscan
 
 ### 方式二：从源码编译
 
-需要本机安装 [Go](https://go.dev/dl/) 1.26+、[Node.js](https://nodejs.org/) 20+ 和 `make`：
+需要本机安装 [Go](https://go.dev/dl/) 1.26+ 与 [Node.js](https://nodejs.org/) 20+。macOS/Linux 或安装了 GNU Make 的 Windows 环境：
 
 ```bash
 git clone https://github.com/P0m32Kun/anchorscan.git
@@ -51,11 +51,22 @@ npm ci
 make build
 ```
 
-编译产物输出到 `dist/anchorscan`（Windows 为 `dist/anchorscan.exe`）。下文的 `./anchorscan` 指预编译归档；从源码编译时请改用 `./dist/anchorscan`。
+Windows PowerShell 不需要安装 `make`：
+
+```powershell
+git clone https://github.com/P0m32Kun/anchorscan.git
+cd anchorscan
+npm ci
+npm run build:web
+New-Item -ItemType Directory -Force dist
+go build -o dist/anchorscan.exe ./cmd/anchorscan
+```
+
+编译产物输出到 `dist/anchorscan`（Windows 为 `dist/anchorscan.exe`）。
 
 ## 3. 首次自检（自动初始化）
 
-直接运行 doctor，**无需任何参数**：
+预编译归档在 macOS/Linux 执行 `./anchorscan doctor`，Windows 执行 `.\anchorscan.exe doctor`；源码编译后分别执行 `./dist/anchorscan doctor` 或 `.\dist\anchorscan.exe doctor`。无需任何参数。
 
 ```bash
 ./anchorscan doctor
@@ -85,16 +96,26 @@ tools:
 ## 5. 首次扫描验证
 
 ```bash
+# 预编译归档（macOS/Linux）
 ./anchorscan scan --target 127.0.0.1 --ports 80,443,8080
+# 源码编译（macOS/Linux）
+./dist/anchorscan scan --target 127.0.0.1 --ports 80,443,8080
 ```
+
+Windows 请把相应可执行文件替换为 `.\anchorscan.exe` 或 `.\dist\anchorscan.exe`。
 
 不传 `--json` 时，JSON 报告默认写到 `reports/scan-<时间戳>.json`。如需 HTML 报告，加 `--html reports/smoke.html`。
 
 ## 6. 启动 Web 控制台
 
 ```bash
+# 预编译归档（macOS/Linux）
 ./anchorscan web
+# 源码编译（macOS/Linux）
+./dist/anchorscan web
 ```
+
+Windows 请把相应可执行文件替换为 `.\anchorscan.exe` 或 `.\dist\anchorscan.exe`。
 
 默认监听 `127.0.0.1:8088`，配置读 `config/default.yaml`，数据库用 `data/scans.sqlite`，无需传参。浏览器打开 http://127.0.0.1:8088。
 
@@ -103,8 +124,13 @@ Web 控制台扫描工作流：先在「项目管理」创建项目（配置默�
 如需覆盖默认值：
 
 ```bash
+# 预编译归档（macOS/Linux）
 ./anchorscan web --listen 127.0.0.1:9000 --config custom.yaml --db other.sqlite
+# 源码编译（macOS/Linux）
+./dist/anchorscan web --listen 127.0.0.1:9000 --config custom.yaml --db other.sqlite
 ```
+
+Windows 请把相应可执行文件替换为 `.\anchorscan.exe` 或 `.\dist\anchorscan.exe`。
 
 ## 7. 目录结构
 

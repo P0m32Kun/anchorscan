@@ -21,14 +21,27 @@ chmod +x anchorscan
 
 ### 方式二：从源码编译
 
-需要本机安装 [Go](https://go.dev/dl/) 1.26+、[Node.js](https://nodejs.org/) 20+ 和 `make`。Node 只用于构建嵌入式 Web 静态资源，运行已编译的 `anchorscan` 不需要 Node。
+需要本机安装 [Go](https://go.dev/dl/) 1.26+ 与 [Node.js](https://nodejs.org/) 20+。先获取源码；macOS/Linux 或安装了 GNU Make 的 Windows 环境可执行：
 
 ```bash
+git clone https://github.com/P0m32Kun/anchorscan.git
+cd anchorscan
 npm ci
 make build
 ```
 
-编译产物为 `dist/anchorscan`（Windows 为 `dist/anchorscan.exe`）。
+Windows PowerShell 不需要安装 `make`：
+
+```powershell
+git clone https://github.com/P0m32Kun/anchorscan.git
+cd anchorscan
+npm ci
+npm run build:web
+New-Item -ItemType Directory -Force dist
+go build -o dist/anchorscan.exe ./cmd/anchorscan
+```
+
+编译产物为 `dist/anchorscan`（Windows 为 `dist/anchorscan.exe`）。Node 只用于构建嵌入式 Web 静态资源，运行已编译的 `anchorscan` 不需要 Node。
 
 #### 1. 前置依赖
 
@@ -102,13 +115,13 @@ make pr-check  # 完整质量门禁（首次执行前运行 npm ci 与 npx playw
 导入已有的 Nmap XML：
 
 ```bash
-go run ./cmd/anchorscan import-nmap --xml path/to/scan.xml
+./dist/anchorscan import-nmap --xml path/to/scan.xml
 ```
 
 单工具调用（不走完整流水线，仅跑 rustscan / nmap / httpx / nuclei 之一）：
 
 ```bash
-go run ./cmd/anchorscan tool nmap --mode alive --target 192.0.2.10
+./dist/anchorscan tool nmap --mode alive --target 192.0.2.10
 ```
 
 ## Web 控制台功能
