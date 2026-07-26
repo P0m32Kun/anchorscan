@@ -1,8 +1,6 @@
-// Package version holds the single source of truth for the AnchorScan version.
-// Both the CLI (--version) and the Web Console footer consume this constant so
-// a release bump only needs to touch it once.
+// Package version holds the AnchorScan build version shared by the CLI and Web
+// Console. Release builds override Version through the Go linker.
 package version
 
-// Version is the current AnchorScan release. Keep it in sync with the latest
-// git tag (e.g. "1.6.1" for tag v1.6.1) and the CHANGELOG.md entry.
-const Version = "1.9.2"
+// Version identifies a local source build when no release value is injected.
+var Version = "dev"

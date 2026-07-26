@@ -50,8 +50,8 @@ func TestHomePageRenders(t *testing.T) {
 	if !strings.Contains(res.Body.String(), `/projects/p1`) || !strings.Contains(res.Body.String(), `/runs/run-1`) {
 		t.Fatalf("expected home links in body: %s", res.Body.String())
 	}
-	// footer version is rendered from the version package, not hardcoded
-	if !strings.Contains(res.Body.String(), "AnchorScan Console v"+version.Version) {
+	// The build version already carries its release prefix (for example v2.0.1).
+	if !strings.Contains(res.Body.String(), "AnchorScan Console "+version.Version) {
 		t.Fatalf("expected versioned footer in body: %s", res.Body.String())
 	}
 }

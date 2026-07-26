@@ -575,7 +575,7 @@ func TestReportPageRendersFindings(t *testing.T) {
 	if strings.Contains(res.Body.String(), "探测规则:") || strings.Contains(res.Body.String(), "危险指数:") {
 		t.Fatalf("expected details panel to avoid duplicated finding metadata: %s", res.Body.String())
 	}
-	if !strings.Contains(res.Body.String(), "v"+version.Version) {
+	if !strings.Contains(res.Body.String(), "AnchorScan Console "+version.Version) {
 		t.Fatalf("expected current version in footer: %s", res.Body.String())
 	}
 	if strings.Contains(res.Body.String(), "展开原始输出") || strings.Contains(res.Body.String(), `class="evidence-details"`) {
