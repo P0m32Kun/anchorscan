@@ -76,6 +76,12 @@ func writeTestConfig(t *testing.T, dir string) string {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "nse.yaml"), []byte("redis: [redis-info]\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile NSE rules returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "service-tags.yaml"), []byte("- name: redis\n  service: [redis]\n  nuclei_tags: [redis]\n  target: hostport\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile tag rules returned error: %v", err)
+	}
 	return path
 }
 

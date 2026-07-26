@@ -14,19 +14,21 @@ import (
 )
 
 type Options struct {
-	ConfigDir    string
-	DBPath       string
-	JSONPath     string
-	ReportDir    string
-	Targets      []string
-	PortSpec     string
-	Tools        config.ToolPaths
-	Profile      string
-	Workers      int
-	ExtraArgs    config.ToolArgs
-	Timeouts     config.ToolTimeouts
-	NSERuleCount int
-	TagRuleCount int
+	ConfigDir     string
+	DBPath        string
+	JSONPath      string
+	ReportDir     string
+	Targets       []string
+	PortSpec      string
+	Tools         config.ToolPaths
+	Profile       string
+	Workers       int
+	ExtraArgs     config.ToolArgs
+	Timeouts      config.ToolTimeouts
+	NSERuleCount  int
+	TagRuleCount  int
+	NSERulesError error
+	TagRulesError error
 }
 
 type Result struct {
@@ -101,6 +103,9 @@ func Run(opts Options) Result {
 	checkOptionalTool(&result, "nuclei", opts.Tools.Nuclei)
 	checkOptionalTool(&result, "rdpscan", opts.Tools.Rdpscan)
 
+	checkRuleLoad(&result, "nse rules", opts.NSERulesError, true)
+	checkRuleLoad(&result, "tag rules", opts.TagRulesError, strings.TrimSpace(opts.Tools.Nuclei) != "")
+
 	checkWritableParent(&result, "database", opts.DBPath)
 	checkWritableParent(&result, "json", opts.JSONPath)
 	if strings.TrimSpace(opts.ReportDir) != "" {
@@ -108,6 +113,18 @@ func Run(opts Options) Result {
 	}
 
 	return result
+}
+
+func checkRuleLoad(result *Result, name string, err error, required bool) {
+	if err == nil {
+		return
+	}
+	message := Message{Field: name, Message: err.Error()}
+	if required {
+		result.Errors = append(result.Errors, message)
+	} else {
+		result.Warnings = append(result.Warnings, message)
+	}
 }
 
 func checkRequiredTool(result *Result, name string, path string) {

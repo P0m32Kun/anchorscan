@@ -2,12 +2,15 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 	"gopkg.in/yaml.v3"
 )
+
+var ErrEmptyRuleFile = errors.New("rule file contains no rules")
 
 func LoadNSERules(path string) (map[string][]string, error) {
 	var rules map[string][]string
@@ -17,6 +20,9 @@ func LoadNSERules(path string) (map[string][]string, error) {
 	}
 	if err := yaml.Unmarshal(data, &rules); err != nil {
 		return nil, err
+	}
+	if len(rules) == 0 {
+		return nil, fmt.Errorf("%s: %w", path, ErrEmptyRuleFile)
 	}
 	return rules, nil
 }
@@ -29,6 +35,9 @@ func LoadTagRules(path string) ([]vuln.TagRule, error) {
 	}
 	if err := yaml.Unmarshal(data, &rules); err != nil {
 		return nil, err
+	}
+	if len(rules) == 0 {
+		return nil, fmt.Errorf("%s: %w", path, ErrEmptyRuleFile)
 	}
 	return rules, nil
 }
@@ -53,5 +62,5 @@ func loadRuleFileForConfig[T any](configPath string, fileName string, loader fun
 		}
 		return zero, err
 	}
-	return zero, nil
+	return zero, fmt.Errorf("%s: %w", fileName, os.ErrNotExist)
 }

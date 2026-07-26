@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -152,6 +153,44 @@ func TestLoadDefaultsProfileToNormal(t *testing.T) {
 	}
 	if cfg.Scan.Profile != "normal" {
 		t.Fatalf("profile mismatch: got %q want normal", cfg.Scan.Profile)
+	}
+}
+
+func TestLoadRulesForConfigReportsMissingAndEmptyFiles(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	configPath := filepath.Join(root, "custom", "default.yaml")
+
+	for name, load := range map[string]func(string) error{
+		"nse": func(path string) error {
+			_, err := LoadNSERulesForConfig(path)
+			return err
+		},
+		"service tags": func(path string) error {
+			_, err := LoadTagRulesForConfig(path)
+			return err
+		},
+	} {
+		t.Run(name+" missing", func(t *testing.T) {
+			if err := load(configPath); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("load error = %v, want os.ErrNotExist", err)
+			}
+		})
+	}
+
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, fileName := range []string{"nse.yaml", "service-tags.yaml"} {
+		if err := os.WriteFile(filepath.Join(filepath.Dir(configPath), fileName), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := LoadNSERulesForConfig(configPath); !errors.Is(err, ErrEmptyRuleFile) {
+		t.Fatalf("empty NSE rules error = %v, want ErrEmptyRuleFile", err)
+	}
+	if _, err := LoadTagRulesForConfig(configPath); !errors.Is(err, ErrEmptyRuleFile) {
+		t.Fatalf("empty tag rules error = %v, want ErrEmptyRuleFile", err)
 	}
 }
 

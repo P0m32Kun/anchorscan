@@ -24,6 +24,12 @@ func saveProjectWithZones(t *testing.T, s *store.Store, project store.Project) {
 	}
 }
 
+func writeWebScanRules(t *testing.T, dir string) {
+	t.Helper()
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "http: [http-title]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n")
+}
+
 func TestNewScanPageRenders(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -149,6 +155,7 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -199,6 +206,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -318,6 +326,7 @@ func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -361,6 +370,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
+	writeWebScanRules(t, dir)
 
 	scanStore, err := store.Open(dbPath)
 	if err != nil {

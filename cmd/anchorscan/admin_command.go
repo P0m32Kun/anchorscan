@@ -36,11 +36,7 @@ func runDoctor(args []string, stdout io.Writer) error {
 		DocxRenderProject: filepath.Join("tools", "docx-render"),
 	})
 	for _, check := range checks {
-		status := "fail"
-		if check.OK {
-			status = "ok"
-		}
-		_, _ = fmt.Fprintf(stdout, "%s: %s %s\n", check.Name, status, check.Message)
+		_, _ = fmt.Fprintf(stdout, "%s: %s %s\n", check.Name, check.Status, check.Message)
 	}
 	if doctor.HasFailures(checks) {
 		return errors.New("doctor found issues")

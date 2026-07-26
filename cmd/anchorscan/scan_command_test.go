@@ -116,6 +116,7 @@ func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -162,6 +163,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
 	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeScanRuleFiles(t, dir)
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	var stdout, stderr bytes.Buffer
@@ -238,6 +240,7 @@ profiles:
     httpx_args: ["-rate-limit", "20"]
     nuclei_args: ["-rate-limit", "10"]
 `)
+	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -280,6 +283,7 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 	htmlPath := filepath.Join(dir, "report.html")
 
 	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\nscan:\n  ports: 8080\n")
+	writeScanRuleFiles(t, dir)
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
@@ -328,4 +332,10 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 			t.Fatalf("expected log %q in stderr %q", line, stderr.String())
 		}
 	}
+}
+
+func writeScanRuleFiles(t *testing.T, dir string) {
+	t.Helper()
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "http: [http-title]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n")
 }

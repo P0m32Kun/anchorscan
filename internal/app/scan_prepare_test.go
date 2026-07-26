@@ -80,6 +80,54 @@ func TestPrepareScanAppliesExclusionsButKeepsPreflightPortSpec(t *testing.T) {
 	}
 }
 
+func TestPrepareScanWarnsWhenDisabledNucleiRulesAreMissing(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	if err := os.Remove(filepath.Join(fixture.dir, "service-tags.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	nucleiLine := "  nuclei: " + filepath.Join(fixture.dir, "nuclei") + "\n"
+	configYAML := strings.Replace(fixture.configYAML, nucleiLine, "  nuclei: \"\"\n", 1)
+	if err := os.WriteFile(fixture.configPath, []byte(configYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(fixture.dir)
+
+	prepared, err := PrepareScan(fixture.request())
+	if err != nil {
+		t.Fatalf("PrepareScan returned error: %v", err)
+	}
+	if prepared.Preflight.HasErrors() {
+		t.Fatalf("disabled nuclei rules must not fail preflight: %#v", prepared.Preflight.Errors)
+	}
+	var foundWarning bool
+	for _, warning := range prepared.Preflight.Warnings {
+		foundWarning = foundWarning || warning.Field == "tag rules"
+	}
+	if !foundWarning || prepared.Options.TagRules != nil {
+		t.Fatalf("PrepareScan = %#v, want tag rule warning and no tag rules", prepared)
+	}
+}
+
+func TestPrepareScanReturnsMissingNSERulesAsPreflightError(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	if err := os.Remove(filepath.Join(fixture.dir, "nse.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(fixture.dir)
+
+	prepared, err := PrepareScan(fixture.request())
+	if err != nil {
+		t.Fatalf("PrepareScan returned ordinary error: %v", err)
+	}
+	var foundError bool
+	for _, issue := range prepared.Preflight.Errors {
+		foundError = foundError || issue.Field == "nse rules"
+	}
+	if !foundError || !reflect.DeepEqual(prepared.Options, ScanOptions{}) {
+		t.Fatalf("PrepareScan = %#v, want NSE preflight error before options", prepared)
+	}
+}
+
 func TestPrepareScanReturnsPreflightErrorsWithoutOptions(t *testing.T) {
 	fixture := newPrepareScanFixture(t)
 	if err := os.Remove(fixture.rustscan); err != nil {

@@ -1,20 +1,32 @@
 package doctor
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+type Status string
+
+const (
+	StatusOK      Status = "ok"
+	StatusWarning Status = "warning"
+	StatusFail    Status = "fail"
+)
+
 type Check struct {
 	Name    string
-	OK      bool
+	Status  Status
 	Message string
 }
 
@@ -27,35 +39,29 @@ type Options struct {
 
 func Run(opts Options) []Check {
 	cfg, err := config.Load(opts.ConfigPath)
-	checks := []Check{{Name: "config", OK: err == nil, Message: message(err, "ok")}}
+	checks := []Check{checkForError("config", err, "ok")}
 	if err != nil {
 		return checks
 	}
 
 	checks = append(checks,
-		executableCheck("rustscan", cfg.Tools.Rustscan),
-		executableCheck("nmap", cfg.Tools.Nmap),
-		executableCheck("httpx", cfg.Tools.Httpx),
-		executableCheck("nuclei", cfg.Tools.Nuclei),
+		toolCheck("rustscan", cfg.Tools.Rustscan, false),
+		toolCheck("nmap", cfg.Tools.Nmap, false),
+		toolCheck("httpx", cfg.Tools.Httpx, true),
+		toolCheck("nuclei", cfg.Tools.Nuclei, true),
 		rdpscanCheck(cfg.Tools.Rdpscan),
 	)
 
 	if _, err := ports.Resolve(cfg.Scan.Ports, filepath.Dir(opts.ConfigPath)); err != nil {
-		checks = append(checks, Check{Name: "ports", OK: false, Message: message(err, "ok")})
+		checks = append(checks, failCheck("ports", err.Error()))
 	} else {
-		checks = append(checks, Check{Name: "ports", OK: true, Message: "ok"})
+		checks = append(checks, okCheck("ports", "ok"))
 	}
 
-	if _, err := config.LoadNSERules(sidecarPath(opts.ConfigPath, "nse.yaml")); err == nil || errors.Is(err, os.ErrNotExist) {
-		checks = append(checks, Check{Name: "nse rules", OK: true, Message: "ok"})
-	} else {
-		checks = append(checks, Check{Name: "nse rules", OK: false, Message: message(err, "ok")})
-	}
-	if _, err := config.LoadTagRules(sidecarPath(opts.ConfigPath, "service-tags.yaml")); err == nil || errors.Is(err, os.ErrNotExist) {
-		checks = append(checks, Check{Name: "tag rules", OK: true, Message: "ok"})
-	} else {
-		checks = append(checks, Check{Name: "tag rules", OK: false, Message: message(err, "ok")})
-	}
+	nseRules, err := config.LoadNSERulesForConfig(opts.ConfigPath)
+	checks = append(checks, ruleCheck("nse rules", len(nseRules), err, true))
+	tagRules, err := config.LoadTagRulesForConfig(opts.ConfigPath)
+	checks = append(checks, ruleCheck("tag rules", len(tagRules), err, strings.TrimSpace(cfg.Tools.Nuclei) != ""))
 
 	checks = append(checks,
 		databaseCheck(opts.DBPath),
@@ -67,60 +73,119 @@ func Run(opts Options) []Check {
 
 func HasFailures(checks []Check) bool {
 	for _, check := range checks {
-		if !check.OK {
+		if check.Status == StatusFail {
 			return true
 		}
 	}
 	return false
 }
 
-func executableCheck(name string, path string) Check {
+func toolCheck(name, path string, optional bool) Check {
+	if strings.TrimSpace(path) == "" {
+		if optional {
+			return warningCheck(name, "not configured (optional)")
+		}
+		return failCheck(name, "path is empty")
+	}
+	check := executableCheck(name, path)
+	if check.Status == StatusFail {
+		return check
+	}
+	version, err := toolVersion(path)
+	if err != nil {
+		return warningCheck(name, "executable but version unavailable: "+err.Error())
+	}
+	return okCheck(name, version)
+}
+
+func toolVersion(path string) (string, error) {
+	var lastErr error
+	for _, flag := range []string{"--version", "-version"} {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		out, err := exec.CommandContext(ctx, path, flag).CombinedOutput()
+		cancel()
+		line := firstLine(string(out))
+		if err == nil && line != "" {
+			return line, nil
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = errors.New("empty version output")
+		}
+	}
+	if lastErr == nil {
+		lastErr = errors.New("version unavailable")
+	}
+	return "", lastErr
+}
+
+func firstLine(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	line, _, _ := strings.Cut(value, "\n")
+	return trimMessage(line)
+}
+
+func executableCheck(name, path string) Check {
 	info, err := os.Stat(path)
 	if err != nil {
-		return Check{Name: name, OK: false, Message: message(err, "ok")}
+		return failCheck(name, err.Error())
 	}
 	if info.IsDir() {
-		return Check{Name: name, OK: false, Message: "path is a directory"}
+		return failCheck(name, "path is a directory")
 	}
 	if info.Mode()&0o111 == 0 {
-		return Check{Name: name, OK: false, Message: "not executable"}
+		return failCheck(name, "not executable")
 	}
-	return Check{Name: name, OK: true, Message: "ok"}
+	return okCheck(name, "ok")
 }
 
 func rdpscanCheck(path string) Check {
-	check := executableCheck("rdpscan", path)
-	if check.OK {
-		check.Message = "ok: " + path
-		return check
+	if strings.TrimSpace(path) == "" {
+		return warningCheck("rdpscan", rdpscanInstallHint())
 	}
-	return Check{Name: "rdpscan", OK: true, Message: rdpscanInstallHint()}
+	check := executableCheck("rdpscan", path)
+	if check.Status == StatusOK {
+		check.Message = path
+	}
+	return check
 }
 
-// docxtplCheck reports whether the DOCX sidecar can import docxtpl. It is
-// non-blocking: when unavailable it stays OK=true and explains that DOCX
-// export will be disabled, leaving HTML export unaffected.
+func ruleCheck(name string, count int, err error, required bool) Check {
+	if err != nil {
+		if required {
+			return failCheck(name, err.Error())
+		}
+		return warningCheck(name, err.Error())
+	}
+	return okCheck(name, fmt.Sprintf("%d rules", count))
+}
+
+// docxtplCheck is non-blocking because HTML export remains available.
 func docxtplCheck(projectDir string) Check {
 	const name = "docxtpl (docx export)"
 	if projectDir == "" {
-		return Check{Name: name, OK: true, Message: "not configured: DOCX export disabled, HTML export unaffected"}
+		return warningCheck(name, "not configured: DOCX export disabled, HTML export unaffected")
 	}
 	if _, err := os.Stat(projectDir); err != nil {
-		return Check{Name: name, OK: true, Message: "tools/docx-render not found: DOCX export disabled, HTML export unaffected"}
+		return warningCheck(name, "tools/docx-render not found: DOCX export disabled, HTML export unaffected")
 	}
 	cmd := exec.Command("uv", "run", "--project", projectDir, "python", "-c", "import docxtpl")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return Check{Name: name, OK: true, Message: "docxtpl missing: run `uv sync --project " + projectDir + "`; DOCX export disabled, HTML export unaffected: " + trimCmdOutput(out)}
+		return warningCheck(name, "docxtpl missing: run `uv sync --project "+projectDir+"`; DOCX export disabled, HTML export unaffected: "+trimMessage(string(out)))
 	}
-	return Check{Name: name, OK: true, Message: "ok"}
+	return okCheck(name, "ok")
 }
 
-func trimCmdOutput(out []byte) string {
-	s := string(out)
-	if len(s) > 120 {
-		s = s[:120] + "..."
+func trimMessage(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 120 {
+		return value[:120] + "..."
 	}
-	return s
+	return value
 }
 
 func rdpscanInstallHint() string {
@@ -141,9 +206,9 @@ func writableParentCheck(name string, path string) Check {
 		parent = "."
 	}
 	if err := writableDirWritable(parent); err != nil {
-		return Check{Name: name, OK: false, Message: err.Error()}
+		return failCheck(name, err.Error())
 	}
-	return Check{Name: name, OK: true, Message: "ok"}
+	return okCheck(name, "ok")
 }
 
 func writableDirCheck(name string, path string) Check {
@@ -152,35 +217,43 @@ func writableDirCheck(name string, path string) Check {
 		if os.IsNotExist(err) {
 			return writableParentCheck(name, path)
 		}
-		return Check{Name: name, OK: false, Message: message(err, "ok")}
+		return failCheck(name, err.Error())
 	}
 	if !info.IsDir() {
-		return Check{Name: name, OK: false, Message: "path is not a directory"}
+		return failCheck(name, "path is not a directory")
 	}
 	if err := writableDirWritable(path); err != nil {
-		return Check{Name: name, OK: false, Message: message(err, "ok")}
+		return failCheck(name, err.Error())
 	}
-	return Check{Name: name, OK: true, Message: "ok"}
+	return okCheck(name, "ok")
 }
 
 func databaseCheck(path string) Check {
 	scanStore, err := store.Open(path)
 	if err != nil {
-		return Check{Name: "database", OK: false, Message: err.Error()}
+		return failCheck("database", err.Error())
 	}
 	_ = scanStore.Close()
-	return Check{Name: "database", OK: true, Message: "ok"}
+	return okCheck("database", "ok")
 }
 
-func message(err error, ok string) string {
-	if err == nil {
-		return ok
+func checkForError(name string, err error, okMessage string) Check {
+	if err != nil {
+		return failCheck(name, err.Error())
 	}
-	return err.Error()
+	return okCheck(name, okMessage)
 }
 
-func sidecarPath(configPath string, fileName string) string {
-	return filepath.Join(filepath.Dir(configPath), fileName)
+func okCheck(name, message string) Check {
+	return Check{Name: name, Status: StatusOK, Message: message}
+}
+
+func warningCheck(name, message string) Check {
+	return Check{Name: name, Status: StatusWarning, Message: message}
+}
+
+func failCheck(name, message string) Check {
+	return Check{Name: name, Status: StatusFail, Message: message}
 }
 
 func writableDirWritable(path string) error {

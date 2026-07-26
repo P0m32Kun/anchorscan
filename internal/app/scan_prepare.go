@@ -66,31 +66,27 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	if err != nil {
 		return PreparedScan{}, err
 	}
-	nseRules, err := config.LoadNSERulesForConfig(req.ConfigPath)
-	if err != nil {
-		return PreparedScan{}, err
-	}
-	tagRules, err := config.LoadTagRulesForConfig(req.ConfigPath)
-	if err != nil {
-		return PreparedScan{}, err
-	}
+	nseRules, nseRulesErr := config.LoadNSERulesForConfig(req.ConfigPath)
+	tagRules, tagRulesErr := config.LoadTagRulesForConfig(req.ConfigPath)
 
 	toolPaths := cfg.Tools
 	extraArgs := effective.ToolArgs
 	preflightResult := preflight.Run(preflight.Options{
-		ConfigDir:    filepath.Dir(req.ConfigPath),
-		DBPath:       req.DBPath,
-		JSONPath:     req.JSONReportPath,
-		ReportDir:    filepath.Dir(req.JSONReportPath),
-		Targets:      targets,
-		PortSpec:     portSpec,
-		Tools:        toolPaths,
-		Profile:      effective.ProfileName,
-		Workers:      effective.HostWorkers,
-		ExtraArgs:    extraArgs,
-		Timeouts:     cfg.Timeouts,
-		NSERuleCount: len(nseRules),
-		TagRuleCount: len(tagRules),
+		ConfigDir:     filepath.Dir(req.ConfigPath),
+		DBPath:        req.DBPath,
+		JSONPath:      req.JSONReportPath,
+		ReportDir:     filepath.Dir(req.JSONReportPath),
+		Targets:       targets,
+		PortSpec:      portSpec,
+		Tools:         toolPaths,
+		Profile:       effective.ProfileName,
+		Workers:       effective.HostWorkers,
+		ExtraArgs:     extraArgs,
+		Timeouts:      cfg.Timeouts,
+		NSERuleCount:  len(nseRules),
+		TagRuleCount:  len(tagRules),
+		NSERulesError: nseRulesErr,
+		TagRulesError: tagRulesErr,
 	})
 	prepared := PreparedScan{Preflight: preflightResult}
 	if preflightResult.HasErrors() {
