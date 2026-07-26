@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -22,12 +22,20 @@
 
 ## 验收
 
-- [ ] 先增加会因缺失 `nse.yaml`、`service-tags.yaml` 和端口预设而失败的 package test。
-- [ ] 最小修改 Makefile，使 package test 通过。
-- [ ] 先增加会因硬编码 `1.9.2` 而失败的版本注入测试。
-- [ ] `version.Version` 可注入，开发构建值明确，CLI 与 Web 使用同一值。
-- [ ] 发布 workflow 传入 tag 版本；归档命名和二进制输出一致。
-- [ ] 聚焦测试、`make test`、`go vet ./...`、`make pr-check` 通过。
+- [x] 先增加会因缺失 `nse.yaml`、`service-tags.yaml` 和端口预设而失败的 package test。
+- [x] 最小修改 Makefile，使 package test 通过。
+- [x] 先增加会因硬编码 `1.9.2` 而失败的版本注入测试。
+- [x] `version.Version` 可注入，开发构建值明确，CLI 与 Web 使用同一值。
+- [x] 发布 workflow 传入 tag 版本；归档命名和二进制输出一致。
+- [x] 聚焦测试、`make test`、`go vet ./...`、`make pr-check` 通过。
+
+## 验收记录
+
+- packaging integration 先因缺少四个运行时资源失败；补齐显式复制后，真实归档可由生产 loader 加载 NSE、service-tag 和两个端口预设。
+- 版本 integration 先观察到 ldflags 无法覆盖硬编码 `1.9.2`；改为默认 `dev` 的变量后，注入构建、开发构建、解包二进制、CLI 和 Web 页脚使用同一值。
+- 归档测试同时拒绝本机 `config/default.yaml`、`data/` 和 `reports/`。
+- `make pr-check`、`go vet ./...` 与修改 Go 文件的 LSP diagnostics 均通过。
+- 双轴 review 未发现 blocker；异平台归档的原生执行 smoke 由 ticket 09 的 release gate 处理，本 ticket 已验证本机真实归档和 release tag 接线。
 
 ## 非目标
 

@@ -69,8 +69,10 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 			t.Errorf("packaged runtime resource %q: %v", relativePath, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(packageDir, "config", "default.yaml")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("package must not include local config/default.yaml: %v", err)
+	for _, relativePath := range []string{"config/default.yaml", "data", "reports"} {
+		if _, err := os.Stat(filepath.Join(packageDir, filepath.FromSlash(relativePath))); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("package must not include local path %q: %v", relativePath, err)
+		}
 	}
 
 	configPath := filepath.Join(packageDir, "config", "default.yaml.example")
