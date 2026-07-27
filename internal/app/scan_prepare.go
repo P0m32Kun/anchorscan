@@ -73,6 +73,9 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 
 	toolPaths := cfg.Tools
 	extraArgs := effective.ToolArgs
+	if err := config.ValidateScopeSafeToolArgs(extraArgs); err != nil {
+		return PreparedScan{}, err
+	}
 	preflightResult := preflight.Run(preflight.Options{
 		ConfigDir:     filepath.Dir(req.ConfigPath),
 		DBPath:        req.DBPath,
