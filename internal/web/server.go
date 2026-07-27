@@ -2,7 +2,9 @@ package web
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,6 +15,8 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
+
+const maxRequestBodySize = 10 << 20 // 10 MiB
 
 type ServerOptions struct {
 	ConfigPath        string
@@ -55,6 +59,9 @@ func managedArtifactParent(jsonPath string) string {
 func NewServer(opts ServerOptions) (http.Handler, error) {
 	if opts.Listen == "" {
 		opts.Listen = "127.0.0.1:8088"
+	}
+	if err := validateLoopbackListen(opts.Listen); err != nil {
+		return nil, err
 	}
 	if opts.Now == nil {
 		opts.Now = time.Now
@@ -102,7 +109,43 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if isUnsafeMethod(r.Method) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	}
+	if isUnsafeMethod(r.Method) && !sameOrigin(r, s.opts.Listen) {
+		http.Error(w, "cross-origin request forbidden", http.StatusForbidden)
+		return
+	}
 	s.mux.ServeHTTP(w, r)
+}
+
+func validateLoopbackListen(listen string) error {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return fmt.Errorf("invalid listen address %q: %w", listen, err)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return fmt.Errorf("listen address must be loopback: %q", listen)
+	}
+	return nil
+}
+
+func isUnsafeMethod(method string) bool {
+	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
+}
+
+func sameOrigin(r *http.Request, listen string) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	return err == nil && parsed.Host == listen && (parsed.Scheme == "http" || parsed.Scheme == "https")
 }
 
 func (s *server) Close() error {

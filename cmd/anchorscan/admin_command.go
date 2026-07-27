@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/doctor"
@@ -70,7 +71,14 @@ func runWeb(args []string, stdout io.Writer, _ io.Writer, deps cliDeps) error {
 		return err
 	}
 	_, _ = fmt.Fprintf(stdout, "listening on http://%s\n", *listen)
-	return http.ListenAndServe(*listen, handler)
+	return (&http.Server{
+		Addr:              *listen,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}).ListenAndServe()
 }
 
 func runCancel(args []string, stdout io.Writer) error {

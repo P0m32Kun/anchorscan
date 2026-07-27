@@ -100,6 +100,25 @@ func closeServer(t *testing.T, handler http.Handler) {
 	})
 }
 
+func TestServerRejectsCrossOriginStateChangeAndNonLoopbackListen(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "0.0.0.0:8088"}); err == nil {
+		t.Fatal("non-loopback listen address was accepted")
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
+	req.Header.Set("Origin", "https://attacker.example")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusForbidden)
+	}
+}
+
 func TestNavIncludesImportNmapEntry(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
