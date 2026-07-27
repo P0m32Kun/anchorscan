@@ -33,7 +33,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 	}
 	targets := scope.NmapTargets()
 
-	if opts.Tools.Nmap != "" && len(targets) > 0 {
+	if opts.Tools.Nmap != "" && len(targets) > 0 && opts.DiscoveryMode != "assume-up" {
 		discovered := make([]string, 0)
 		for _, discoveryScope := range scope.DiscoveryScopes() {
 			progress.Emit("info", "nmap", "nmap alive sweep targets=%v", discoveryScope.NmapTargets())
@@ -61,6 +61,9 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 		if len(targets) == 0 {
 			progress.Emit("info", "target", "no live hosts discovered; skip port scan")
 		}
+	} else if opts.DiscoveryMode == "assume-up" && len(targets) > 0 {
+		aliveIPs = append([]string(nil), targets...)
+		progress.Emit("info", "target", "assume-up: skip alive discovery, treat %d host(s) as up", len(targets))
 	}
 
 	totalTargets := len(targets)

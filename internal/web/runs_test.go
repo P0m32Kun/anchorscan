@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -535,5 +536,46 @@ func TestInterruptedLegacyProjectScanPrefillsPersistedFields(t *testing.T) {
 	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/projects/p1/scans/new?rerun=legacy", nil))
 	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), `data-scan-create-props=`) || !strings.Contains(res.Body.String(), "198.51.100.20") || !strings.Contains(res.Body.String(), "443") || !strings.Contains(res.Body.String(), "normal") {
 		t.Fatalf("legacy rerun page: %d %s", res.Code, res.Body.String())
+	}
+}
+
+func TestRunEventsAPIAfterID(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	if err := scanStore.SaveScanRun(store.ScanRun{RunID: "run-1", Target: "127.0.0.1", Ports: "8080", Profile: "normal", Status: "running", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatalf("SaveScanRun returned error: %v", err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := scanStore.AppendScanEvent(store.ScanEvent{RunID: "run-1", Time: time.Unix(int64(i+2), 0), Level: "info", Stage: "test", Message: fmt.Sprintf("event-%d", i)}); err != nil {
+			t.Fatalf("AppendScanEvent returned error: %v", err)
+		}
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/events?after_id=1", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("unexpected response: %d %s", res.Code, res.Body.String())
+	}
+	var events []map[string]any
+	if err := json.Unmarshal(res.Body.Bytes(), &events); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events after id 1, got %d", len(events))
+	}
+
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/api/runs/run-1/events?after_id=invalid", nil))
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected bad request for invalid after_id, got %d", res.Code)
 	}
 }

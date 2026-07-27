@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -18,7 +19,33 @@ func NewExecRunner() Runner {
 }
 
 func (ExecRunner) Run(ctx context.Context, binary string, args []string) ([]byte, error) {
-	return exec.CommandContext(ctx, binary, args...).CombinedOutput()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	cmd := exec.Command(binary, args...)
+	setProcessGroup(cmd)
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	if err := cmd.Start(); err != nil {
+		return nil, withOutputError(err, out.Bytes())
+	}
+
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			killProcessGroup(cmd)
+		case <-done:
+		}
+	}()
+
+	err := cmd.Wait()
+	close(done)
+	return out.Bytes(), withOutputError(err, out.Bytes())
 }
 
 func withOutputError(err error, out []byte) error {

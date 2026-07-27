@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
 type serverSequenceRunner struct {
+	mu       sync.Mutex
 	outputs  [][]byte
 	commands [][]string
 	index    int
@@ -19,7 +21,9 @@ type serverSequenceRunner struct {
 }
 
 func (r *serverSequenceRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	r.mu.Lock()
 	r.commands = append(r.commands, append([]string{binary}, args...))
+	r.mu.Unlock()
 	if r.started != nil {
 		close(r.started)
 		r.started = nil
@@ -36,7 +40,11 @@ func (r *serverSequenceRunner) Run(_ context.Context, binary string, args []stri
 }
 
 func (r *serverSequenceRunner) hasArgs(binary string, want ...string) bool {
-	for _, cmd := range r.commands {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	commands := make([][]string, len(r.commands))
+	copy(commands, r.commands)
+	for _, cmd := range commands {
 		if len(cmd) == 0 || cmd[0] != binary {
 			continue
 		}
@@ -62,6 +70,8 @@ func (r *serverSequenceRunner) hasArgs(binary string, want ...string) bool {
 }
 
 func (r *serverSequenceRunner) callCount(binary string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	count := 0
 	for _, cmd := range r.commands {
 		if len(cmd) > 0 && cmd[0] == binary {
@@ -69,6 +79,16 @@ func (r *serverSequenceRunner) callCount(binary string) int {
 		}
 	}
 	return count
+}
+
+func (r *serverSequenceRunner) Commands() [][]string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([][]string, len(r.commands))
+	for i, cmd := range r.commands {
+		out[i] = append([]string(nil), cmd...)
+	}
+	return out
 }
 
 func writeFile(t *testing.T, path string, content string) {

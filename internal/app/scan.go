@@ -35,6 +35,7 @@ type ScanOptions struct {
 	TesterIP             string
 	Notes                string
 	IncludeInReport      bool
+	DiscoveryMode        string
 	Targets              []string
 	Scope                target.Scope
 	Ports                string
@@ -175,8 +176,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 
 	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)
 	scanReport := report.BuildWithScanDataAndDetectionChecks(allFingerprints, allFindings, report.ScanData{
-		AliveIPs:  aliveIPs,
-		OpenPorts: openPorts,
+		DiscoveryMode: opts.DiscoveryMode,
+		AliveIPs:      aliveIPs,
+		OpenPorts:     openPorts,
 	}, detectionChecks)
 	reportProv := ReportProvenance(prov, EnginesFromDetectionChecks(detectionChecks))
 	scanReport.Provenance = &reportProv

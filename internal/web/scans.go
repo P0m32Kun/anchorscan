@@ -25,6 +25,7 @@ type scanForm struct {
 	ExcludeTargets string          `json:"exclude_targets"`
 	Ports          string          `json:"ports"`
 	ExcludePorts   string          `json:"exclude_ports"`
+	DiscoveryMode  string          `json:"discovery_mode"`
 	Profile        string          `json:"profile"`
 	Label          string          `json:"label"`
 	AccessPoint    string          `json:"access_point"`
@@ -63,6 +64,9 @@ type scanCreateError struct {
 // context and an optional preflight result used to surface validation errors
 // when a scan submission is rejected. Scans are always bound to a project.
 func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, zones []store.ProjectZone, preflightResult preflight.Result, form scanForm) {
+	if form.DiscoveryMode == "" {
+		form.DiscoveryMode = "auto"
+	}
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 	props := scanCreateProps{
 		ProjectID:     project.ID,
@@ -147,6 +151,9 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		}, form)
 		return
 	}
+	if form.DiscoveryMode == "" {
+		form.DiscoveryMode = "auto"
+	}
 
 	runID := newID("run", s.opts.Now())
 	projectID := project.ID
@@ -161,6 +168,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		PortSpec:       form.Ports,
 		ExcludeTargets: form.ExcludeTargets,
 		ExcludePorts:   form.ExcludePorts,
+		DiscoveryMode:  form.DiscoveryMode,
 		Overrides: config.Overrides{
 			ProfileName:  form.Profile,
 			RustscanArgs: form.RustscanArgs,
@@ -199,6 +207,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	form.Scope = prepared.Options.Scope.Snapshot()
 	form.Ports = prepared.Options.Ports
 	form.Profile = prepared.Options.ProfileName
+	form.DiscoveryMode = prepared.Options.DiscoveryMode
 	prepared.Options.ConfigSnapshot = scanFormSnapshot(form)
 	prepared.Options.Kind = "scan"
 	prepared.Options.Label = form.Label
@@ -225,6 +234,7 @@ func scanFormFromRequest(r *http.Request) scanForm {
 		ExcludeTargets: strings.TrimSpace(r.FormValue("exclude_targets")),
 		Ports:          strings.TrimSpace(r.FormValue("ports")),
 		ExcludePorts:   strings.TrimSpace(r.FormValue("exclude_ports")),
+		DiscoveryMode:  strings.TrimSpace(r.FormValue("discovery_mode")),
 		Profile:        strings.TrimSpace(r.FormValue("profile")),
 		Label:          strings.TrimSpace(r.FormValue("label")),
 		AccessPoint:    strings.TrimSpace(r.FormValue("access_point")),
@@ -271,6 +281,9 @@ func validateScanForm(form scanForm, zones []store.ProjectZone) *scanFormError {
 	if !isScanProfile(form.Profile) {
 		return &scanFormError{Field: "profile", Message: "请选择有效的扫描档位"}
 	}
+	if form.DiscoveryMode != "" && form.DiscoveryMode != "auto" && form.DiscoveryMode != "assume-up" {
+		return &scanFormError{Field: "discovery_mode", Message: "发现模式必须是 auto 或 assume-up"}
+	}
 	return nil
 }
 
@@ -307,6 +320,9 @@ func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
 	}
 	if form.Notes == "" && run.Notes != "" {
 		form.Notes = run.Notes
+	}
+	if form.DiscoveryMode == "" {
+		form.DiscoveryMode = "auto"
 	}
 	if !completeScanForm(form) || !isScanProfile(form.Profile) {
 		return scanForm{}, errors.New("prior run has an incomplete scan snapshot")

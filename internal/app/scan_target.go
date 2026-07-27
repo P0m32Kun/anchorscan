@@ -63,7 +63,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		for {
 			select {
 			case <-ticker.C:
-				logf(opts, "nmap %s still running elapsed=%s", target, time.Since(started).Round(time.Second))
+				progress.Emit("info", "heartbeat", "nmap %s still running elapsed=%s", target, time.Since(started).Round(time.Second))
 			case <-done:
 				return
 			}

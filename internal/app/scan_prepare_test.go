@@ -37,6 +37,9 @@ func TestPrepareScanBuildsNormalizedScopeSnapshot(t *testing.T) {
 	if got, want := snapshot, prepared.Options.Scope.Snapshot(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("scope snapshot = %#v, want %#v", got, want)
 	}
+	if !strings.Contains(prepared.Options.ConfigSnapshot, `"discovery_mode":"auto"`) {
+		t.Fatalf("ConfigSnapshot missing default discovery mode: %s", prepared.Options.ConfigSnapshot)
+	}
 	if got, want := prepared.Preflight.Summary.TargetCount, 256; got != want {
 		t.Fatalf("TargetCount = %d, want %d", got, want)
 	}

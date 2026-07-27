@@ -189,14 +189,14 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	for range 50 {
+	for range 200 {
 		if runner.hasArgs(rustscanPath, "--top") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	if !runner.hasArgs(rustscanPath, "--top") {
-		t.Fatalf("expected top1000 passed to rustscan --top, got %#v", runner.commands)
+		t.Fatalf("expected top1000 passed to rustscan --top, got %#v", runner.Commands())
 	}
 }
 
@@ -240,14 +240,14 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	for range 50 {
+	for range 200 {
 		if runner.hasArgs(rustscanPath, "--range", "100-1000") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	if !runner.hasArgs(rustscanPath, "--range", "100-1000") {
-		t.Fatalf("expected port range passed to rustscan, got %#v", runner.commands)
+		t.Fatalf("expected port range passed to rustscan, got %#v", runner.Commands())
 	}
 }
 
@@ -405,7 +405,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	}
 
 	var run store.ScanRun
-	for range 50 {
+	for range 200 {
 		runs, err := scanStore.ListScanRuns(10)
 		if err != nil {
 			t.Fatalf("ListScanRuns returned error: %v", err)
@@ -425,7 +425,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if run.AccessPoint != "core-sw-a" || run.TesterIP != "10.0.0.5" || run.Notes != "lab" {
 		t.Fatalf("unexpected run context fields: %#v", run)
 	}
-	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) || !strings.Contains(run.ConfigSnapshot, `"scope":{"includes":["127.0.0.1/32"],"excludes":["192.0.2.1/32"],"estimated_addresses":1}`) {
+	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) || !strings.Contains(run.ConfigSnapshot, `"discovery_mode":"auto"`) || !strings.Contains(run.ConfigSnapshot, `"scope":{"includes":["127.0.0.1/32"],"excludes":["192.0.2.1/32"],"estimated_addresses":1}`) {
 		t.Fatalf("expected exclusions and normalized scope in snapshot: %s", run.ConfigSnapshot)
 	}
 	if run.Kind != "scan" {
@@ -443,7 +443,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
 	}
 	if !runner.hasArgs(rustscanPath, "-a", "127.0.0.1", "--ports", "80,8080") {
-		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
+		t.Fatalf("unexpected rustscan args: %#v", runner.Commands())
 	}
 }
 

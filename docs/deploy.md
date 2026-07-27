@@ -105,6 +105,20 @@ tools:
 Windows 请把相应可执行文件替换为 `.\anchorscan.exe` 或 `.\dist\anchorscan.exe`。
 
 不传 `--json` 时，JSON 报告默认写到 `reports/scan-<时间戳>.json`。如需 HTML 报告，加 `--html reports/smoke.html`。
+**主机发现模式**
+
+扫描默认使用 `auto` 模式：先通过 nmap `-sn` 探测存活主机，再对存活主机做端口发现。如果你已经确认目标在线（例如本地回环、测试容器或已有资产清单），可以用 `assume-up` 跳过存活探测，直接对所有目标执行端口扫描：
+
+```bash
+./anchorscan scan --target 10.0.0.0/24 --ports 80,443,8080 --discovery assume-up
+```
+
+`--discovery auto` 是默认值。发现模式会写入扫描配置快照和 HTML 报告，便于追溯本次扫描的前提假设。
+
+**中止与超时**
+
+Web 控制台和 CLI 都支持取消正在运行的扫描。在 Linux/macOS 上，取消会发送 SIGKILL 到扫描器进程组，尽量终止子进程；Windows 上仅保证终止直接启动的进程，不宣称进程树全部结束。工具超时遵循各自的全局配置，超时会被记录为 failed 或 completed_with_errors，而不会变成 canceled。
+
 
 ## 6. 启动 Web 控制台
 

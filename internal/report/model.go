@@ -56,6 +56,7 @@ type Provenance struct {
 type ScanReport struct {
 	ScanMeta          ScanMeta           `json:"scan_meta"`
 	AliveIPs          []string           `json:"alive_ips,omitempty"`
+	DiscoveryMode     string             `json:"discovery_mode,omitempty"`
 	Hosts             []HostReport       `json:"hosts"`
 	DetectionChecks   []DetectionCheck   `json:"detection_checks,omitempty"`
 	DetectionCoverage *DetectionCoverage `json:"detection_coverage,omitempty"`
@@ -97,8 +98,9 @@ func DetectionCheckTime(value time.Time) string {
 // the host sweep (even those with no open ports) and the raw open ports per host
 // discovered by the port scan (even those nmap could not fingerprint).
 type ScanData struct {
-	AliveIPs  []string
-	OpenPorts map[string][]int // IP → raw open ports from rustscan
+	DiscoveryMode string
+	AliveIPs      []string
+	OpenPorts     map[string][]int // IP → raw open ports from rustscan
 }
 
 func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport {
@@ -222,9 +224,10 @@ func buildWithScanDataAndDetectionChecks(fps []fingerprint.ServiceFingerprint, f
 	}
 
 	report := ScanReport{
-		ScanMeta: ScanMeta{Tool: "anchorscan"},
-		AliveIPs: aliveIPs,
-		Hosts:    hosts,
+		ScanMeta:      ScanMeta{Tool: "anchorscan"},
+		AliveIPs:      aliveIPs,
+		DiscoveryMode: data.DiscoveryMode,
+		Hosts:         hosts,
 	}
 	if len(checks) > 0 {
 		report.DetectionChecks = append([]DetectionCheck(nil), checks...)

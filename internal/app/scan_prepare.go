@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
@@ -16,6 +17,7 @@ type PrepareScanRequest struct {
 	ExcludeTargets string
 	PortSpec       string
 	ExcludePorts   string
+	DiscoveryMode  string
 	RunID          string
 	ProjectID      string
 	ZoneID         string
@@ -31,6 +33,11 @@ type PreparedScan struct {
 	Preflight preflight.Result
 }
 
+type scanConfigSnapshot struct {
+	target.Snapshot
+	DiscoveryMode string `json:"discovery_mode"`
+}
+
 func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	cfg, err := config.Load(req.ConfigPath)
 	if err != nil {
@@ -41,8 +48,19 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	if err != nil {
 		return PreparedScan{}, err
 	}
+
+	discoveryMode := req.DiscoveryMode
+	if discoveryMode == "" {
+		discoveryMode = "auto"
+	}
+	if discoveryMode != "auto" && discoveryMode != "assume-up" {
+		return PreparedScan{}, fmt.Errorf("invalid discovery mode: %s (expected auto or assume-up)", discoveryMode)
+	}
 	targets := scope.NmapTargets()
-	scopeSnapshot, err := json.Marshal(scope.Snapshot())
+	scopeSnapshot, err := json.Marshal(scanConfigSnapshot{
+		Snapshot:      scope.Snapshot(),
+		DiscoveryMode: discoveryMode,
+	})
 	if err != nil {
 		return PreparedScan{}, err
 	}
@@ -117,6 +135,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		ExtraArgs:      extraArgs,
 		Timeouts:       timeouts,
 		ConfigSnapshot: string(scopeSnapshot),
+		DiscoveryMode:  discoveryMode,
 		RulePaths:      rulePaths,
 		JSONReportPath: req.JSONReportPath,
 		ArtifactRoot:   req.ArtifactRoot,

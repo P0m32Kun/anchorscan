@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -885,5 +886,40 @@ func TestSaveImportRunPreservesZoneFields(t *testing.T) {
 	}
 	if got.ZoneID != "III" || got.Kind != "import" {
 		t.Fatalf("unexpected import run fields: %#v", got)
+	}
+}
+
+func TestListScanEventsAfterReturnsOnlyNewEvents(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "scan.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.SaveScanRun(ScanRun{RunID: "run-events", Target: "127.0.0.1", Ports: "80", Profile: "normal", Status: "running", StartedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := s.AppendScanEvent(ScanEvent{RunID: "run-events", Time: time.Unix(int64(i+1), 0), Level: "info", Stage: "test", Message: fmt.Sprintf("event-%d", i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	all, err := s.ListScanEvents("run-events", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("expected 3 events, got %d", len(all))
+	}
+	afterID := all[0].ID
+	after, err := s.ListScanEventsAfter("run-events", afterID, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != 2 {
+		t.Fatalf("expected 2 events after id %d, got %d", afterID, len(after))
+	}
+	if after[0].ID <= afterID || after[1].ID <= afterID {
+		t.Fatalf("event IDs are not monotonic after after_id")
 	}
 }

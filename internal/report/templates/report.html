@@ -557,6 +557,7 @@
         <div><span style="color: var(--muted);">AnchorScan 版本:</span> {{.Provenance.Version}}</div>
         <div><span style="color: var(--muted);">开始时间:</span> {{.Provenance.StartedAt}}</div>
         <div><span style="color: var(--muted);">结束时间:</span> {{.Provenance.FinishedAt}}</div>
+        <div><span style="color: var(--muted);">发现模式:</span> {{if .DiscoveryMode}}{{.DiscoveryMode}}{{else}}auto{{end}}</div>
         <div><span style="color: var(--muted);">执行引擎:</span> {{if .Provenance.Engines}}{{range .Provenance.Engines}}{{.}} {{end}}{{else}}—{{end}}</div>
       </div>
       {{if .Provenance.Scope}}<div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--muted); word-break: break-all;">授权范围: {{.Provenance.Scope}}</div>{{end}}

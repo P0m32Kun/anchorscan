@@ -59,12 +59,16 @@ function runURL(suffix: string) {
 }
 
 async function refresh() {
-  const [statusResult, eventResult] = await Promise.all([fetch(runURL('/status')), fetch(runURL('/events'))]);
+  const [statusResult, eventResult] = await Promise.all([
+    fetch(runURL('/status')),
+    fetch(runURL(`/events?after_id=${latestEvent.value?.id ?? 0}`)),
+  ]);
   if (!statusResult.ok || !eventResult.ok) throw new Error('refresh failed');
   const statusData = await statusResult.json() as StatusResponse;
   status.value = statusData.status;
   checks.value = statusData.detection_checks || {};
-  events.value = await eventResult.json() as ScanEvent[];
+  const newEvents = await eventResult.json() as ScanEvent[];
+  if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
   if (!active.value) window.clearInterval(timer);
 }
 

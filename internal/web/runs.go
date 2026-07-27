@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -179,7 +180,19 @@ func (s *server) runAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := strings.TrimSuffix(path, "/events")
-	events, err := s.store.ListScanEvents(id, 1000)
+	afterIDStr := r.URL.Query().Get("after_id")
+	var events []store.ScanEvent
+	var err error
+	if afterIDStr == "" {
+		events, err = s.store.ListScanEvents(id, 1000)
+	} else {
+		afterID, parseErr := strconv.ParseInt(afterIDStr, 10, 64)
+		if parseErr != nil {
+			http.Error(w, "invalid after_id", http.StatusBadRequest)
+			return
+		}
+		events, err = s.store.ListScanEventsAfter(id, afterID, 1000)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
