@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — 建模并执行授权 Scan Scope。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -24,12 +24,20 @@
 
 ## 验收
 
-- [ ] 先写跨站 POST 当前被接受的失败测试。
-- [ ] 优先使用 Go 标准库同源能力，在 server 外层一次实现。
-- [ ] 先写超限 Nmap XML/multipart 会继续解析的失败测试，再加 `MaxBytesReader`。
-- [ ] 非 loopback listen 在启动前明确失败。
-- [ ] 增加最小安全响应头，不破坏现有内联资产策略。
-- [ ] 聚焦测试、`make test`、`go vet ./...`、`make pr-check` 通过。
+- [x] 先写跨站 POST 当前被接受的失败测试。
+- [x] 优先使用 Go 标准库同源能力，在 server 外层一次实现。
+- [x] 先写超限 Nmap XML/multipart 会继续解析的失败测试，再加 `MaxBytesReader`。
+- [x] 非 loopback listen 在启动前明确失败。
+- [x] 增加最小安全响应头，不破坏现有内联资产策略。
+- [x] 聚焦测试、`make test`、`go vet ./...`、`make pr-check` 通过。
+
+## 验收记录
+
+- 外层使用 `http.CrossOriginProtection`，拒绝恶意 Origin 与 `Sec-Fetch-Site: cross-site`，同时保留缺失浏览器来源信号的本地 CLI/表单兼容路径。
+- 监听地址在打开数据库前限制为 IPv4/IPv6 loopback 或 `localhost`；显式 `http.Server` 设置 header/read/write/idle timeout。
+- 所有非安全请求具有 10 MiB 外层硬限制，Nmap XML multipart 另有 8 MiB 专用限制，Evidence 保持 10 MiB handler 限制。
+- 添加 `nosniff`，未引入会破坏既有内联资源的 CSP。
+- `make test`、`go vet ./...`、`make pr-check`、LSP diagnostics 均通过；最终 Standards/Spec 双轴 review 无 blocker/high。
 
 ## 非目标
 
