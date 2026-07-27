@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — 对运行时资源给出可执行诊断。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -24,12 +24,20 @@
 
 ## 验收
 
-- [ ] 先写 `/24` 排除单 IP 仍被扫描的失败测试。
-- [ ] 使用 `net/netip` 完成最小 Scope 类型和 membership 判断。
-- [ ] 覆盖排除子网、IPv6、重复和规范化。
-- [ ] 覆盖以 `-` 开头输入和超大 Scope 在 Runner 前失败。
-- [ ] 更新 CONTEXT 中 Target/Scope 术语及配置 snapshot。
-- [ ] 聚焦测试、`make test`、`go vet ./...`、相关 Web smoke 通过。
+- [x] 先写 `/24` 排除单 IP 仍被扫描的失败测试。
+- [x] 使用 `net/netip` 完成最小 Scope 类型和 membership 判断。
+- [x] 覆盖排除子网、IPv6、重复和规范化。
+- [x] 覆盖以 `-` 开头输入和超大 Scope 在 Runner 前失败。
+- [x] 更新 CONTEXT 中 Target/Scope 术语及配置 snapshot。
+- [x] 聚焦测试、`make test`、`go vet ./...`、相关 Web smoke 通过。
+
+## 验收记录
+
+- Scope 用紧凑 `net/netip.Prefix` include/exclude 表示，执行前估算并限制至 4096 地址；CIDR 不展开。
+- Nmap discovery 按 IPv4/IPv6 地址族拆分，回传地址、服务 fingerprint、HTTPX URL、NSE/Nuclei/RDP 调用与所有 Nuclei 证据端点均在持久化前受 Scope 约束。
+- CLI 与 Web 都经 `PrepareScan` 构造稳定 Scope snapshot；CLI 支持 `--exclude-targets`。
+- raw tool args 为严格 allowlist；Manager/RunScan 在获取 lease 前校验；Nmap 缺失时 CIDR/exclusion Scope fail-closed。
+- `make test`、`go vet ./...`、`make pr-check`、修改 Go 文件 LSP diagnostics 均通过；最终 Standards/Spec 双轴 review 无 blocker/high。
 
 ## 非目标
 
