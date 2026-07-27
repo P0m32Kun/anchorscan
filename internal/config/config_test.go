@@ -306,6 +306,13 @@ func TestSSHMiniBruteTemplateExistsAndIsLimited(t *testing.T) {
 	if _, err := os.Stat(sshRule.Template); err != nil {
 		t.Fatalf("SSH template not found at %q: %v", sshRule.Template, err)
 	}
+	content, err := os.ReadFile(sshRule.Template)
+	if err != nil {
+		t.Fatalf("cannot read SSH template: %v", err)
+	}
+	if !strings.Contains(string(content), "attack: clusterbomb") {
+		t.Fatalf("SSH template must use clusterbomb to attempt all 2x2 combinations")
+	}
 	users, err := os.ReadFile(filepath.Join(filepath.Dir(sshRule.Template), "payloads", "users-mini.txt"))
 	if err != nil {
 		t.Fatalf("users payload not found: %v", err)

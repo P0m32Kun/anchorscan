@@ -172,7 +172,7 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		ID:       "native-output",
 		Severity: "info",
 		Summary:  opts.Tool + " native output",
-		Target:   strings.Join(opts.NativeArgs, " "),
+		Target:   firstNonEmpty(opts.Target, opts.URL, opts.Tool),
 		Output:   output,
 	}
 	if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {

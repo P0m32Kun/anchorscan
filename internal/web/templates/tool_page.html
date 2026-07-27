@@ -21,6 +21,7 @@
 
     <div class="panel" style="background: var(--color-surface-2); margin-bottom: 1rem;">
       <p class="meta-line">单工具调用不会计入扫描任务，也不会出现在首页/项目的扫描历史列表中。</p>
+      <p class="meta-line" style="color: var(--color-warning);">⚠ 原生参数会绕过默认安全限制（可能触发账号锁定、高噪音或主动探测），参数会审计保存但不会进入客户报告。</p>
     </div>
 
     {{if .Verification}}

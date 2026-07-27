@@ -278,6 +278,13 @@ func TestRunToolNativeArgsDoNotLeakIntoTargetField(t *testing.T) {
 	if !strings.Contains(run.ConfigSnapshot, `"native_args"`) || !strings.Contains(run.ConfigSnapshot, `"--version"`) {
 		t.Fatalf("ConfigSnapshot missing native_args audit: %s", run.ConfigSnapshot)
 	}
+	findings, err := st.ListFindings("run-native")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || strings.Contains(findings[0].Target, "--version") {
+		t.Fatalf("finding target leaks native args: %#v", findings)
+	}
 }
 
 func TestRunToolAppliesConfiguredToolTimeout(t *testing.T) {
