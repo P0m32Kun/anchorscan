@@ -39,6 +39,12 @@ func LoadTagRules(path string) ([]vuln.TagRule, error) {
 	if len(rules) == 0 {
 		return nil, fmt.Errorf("%s: %w", path, ErrEmptyRuleFile)
 	}
+	base := filepath.Dir(path)
+	for i := range rules {
+		if rules[i].Template != "" && !filepath.IsAbs(rules[i].Template) {
+			rules[i].Template = filepath.Join(base, rules[i].Template)
+		}
+	}
 	return rules, nil
 }
 

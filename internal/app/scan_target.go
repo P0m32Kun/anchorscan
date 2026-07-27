@@ -208,17 +208,27 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		// nuclei has an extra ParseNucleiJSONL + invalid_output stage that NSE lacks,
 		// so a shared helper would parameterize (and blur) the state machine.
 		default:
-			progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 			started := time.Now()
 			stageFailed := false
 			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", "", started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nuclei)
-			out, err := tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+			var out []byte
+			var err error
+			var artifactKey string
+			if match.Template != "" {
+				progress.Emit("info", "nuclei", "nuclei %s template=%s", match.Address, match.Template)
+				out, err = tools.RunNucleiTemplate(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Template, opts.ExtraArgs.Nuclei)
+				artifactKey = "template"
+			} else {
+				progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
+				out, err = tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+				artifactKey = strings.Join(match.Tags, ",")
+			}
 			operatorCanceled := isOperatorCanceled(toolCtx)
 			cancel()
-			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), artifactKey)+".jsonl", out); writeErr != nil {
 				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
 				result.HadErrors = true
 				stageFailed = true

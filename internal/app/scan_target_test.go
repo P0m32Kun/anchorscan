@@ -125,10 +125,11 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos,ssh-hostkey", "-p", "22") {
 		t.Fatalf("expected nmap NSE invocation with ssh scripts, commands=%#v", runner.commands)
 	}
-	// Nuclei: must be invoked with -tags ssh and -etags default-login (exclude official
-	// brute-force templates; the mini-brute template carries ssh tag but not default-login),
-	// targeting IP:22, jsonl output.
-	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "default-login", "-target", "192.168.1.10:22", "-jsonl") {
+	// Nuclei: SSH is invoked by a custom template path in the default rule, but this
+	// test uses a tag-only fallback rule. The command must still use -tags ssh and
+	// exclude both the global fuzz/dos categories and the official default-login
+	// template (which carries the large SSH wordlist), targeting IP:22 with jsonl output.
+	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "fuzz,dos,default-login", "-target", "192.168.1.10:22", "-jsonl") {
 		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
 	}
 	checks, err := scanStore.ListDetectionChecks("run-ssh-dual")

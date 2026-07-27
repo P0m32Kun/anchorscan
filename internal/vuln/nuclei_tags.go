@@ -20,15 +20,23 @@ type TagRule struct {
 	Tech        []string `yaml:"tech"`
 	NucleiTags  []string `yaml:"nuclei_tags"`
 	ExcludeTags []string `yaml:"exclude_tags"`
+	Template    string   `yaml:"template"`
 	Target      string   `yaml:"target"`
 }
 
 type MatchResult struct {
 	Tags        []string
 	ExcludeTags []string
+	Template    string
 	Target      string
 	Address     string
 }
+
+// defaultExcludedNucleiTags are globally excluded from tag-based nuclei runs
+// because they select templates unrelated to the intended service-specific
+// check (fuzz/dos). Credential checks (default-login/brute) are intentionally
+// not excluded here; services opt into them individually.
+var defaultExcludedNucleiTags = []string{"fuzz", "dos"}
 
 func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules []TagRule) MatchResult {
 	for _, rule := range rules {
@@ -37,12 +45,19 @@ func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules [
 			if rule.Target == "url" && http.URL != "" {
 				address = http.URL
 			}
-			return MatchResult{
-				Tags:        append([]string(nil), rule.NucleiTags...),
-				ExcludeTags: append([]string(nil), rule.ExcludeTags...),
-				Target:      rule.Target,
-				Address:     address,
+			result := MatchResult{
+				Tags:     append([]string(nil), rule.NucleiTags...),
+				Template: rule.Template,
+				Target:   rule.Target,
+				Address:  address,
 			}
+			// Default fuzz/dos exclusions only apply to tag-based selection.
+			// Template-based rules select an exact file and do not need them.
+			if result.Template == "" {
+				result.ExcludeTags = append([]string(nil), defaultExcludedNucleiTags...)
+				result.ExcludeTags = append(result.ExcludeTags, rule.ExcludeTags...)
+			}
+			return result
 		}
 	}
 	return MatchResult{}

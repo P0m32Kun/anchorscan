@@ -271,10 +271,11 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 	// 弱口令检测契约：nuclei_tags 不携带全局 default-login 标签。每个服务的
 	// default-login 模板本身都带服务名 tag（如 redis-default-logins 带 redis），
 	// 所以 -tags <service> 已能覆盖该服务的弱口令检测；追加全局 default-login
-	// 会加载 360 个无关爆破模板，既慢又易触发账户锁定。SSH 用 exclude_tags 单独排除。
+	// 会加载 360 个无关爆破模板，既慢又易触发账户锁定。SSH 用模板精确调用
+	// ssh-mini-brute，不依赖 tag 选择，也不使用默认大字典。
 	for _, rule := range tagRules {
-		if len(rule.NucleiTags) == 0 {
-			t.Fatalf("rule %s has no nuclei_tags: %#v", rule.Name, rule)
+		if len(rule.NucleiTags) == 0 && rule.Template == "" {
+			t.Fatalf("rule %s has neither nuclei_tags nor template: %#v", rule.Name, rule)
 		}
 		for _, tag := range rule.NucleiTags {
 			if tag == "default-login" {
@@ -285,6 +286,49 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 			t.Fatalf("rule %s has unexpected target %q (want url or hostport)", rule.Name, rule.Target)
 		}
 	}
+}
+
+func TestSSHMiniBruteTemplateExistsAndIsLimited(t *testing.T) {
+	tagRules, err := LoadTagRules(filepath.Join("..", "..", "config", "service-tags.yaml"))
+	if err != nil {
+		t.Fatalf("LoadTagRules returned error: %v", err)
+	}
+	var sshRule *vuln.TagRule
+	for i := range tagRules {
+		if tagRules[i].Name == "ssh" {
+			sshRule = &tagRules[i]
+			break
+		}
+	}
+	if sshRule == nil || sshRule.Template == "" {
+		t.Fatalf("SSH rule must reference a custom template: %#v", sshRule)
+	}
+	if _, err := os.Stat(sshRule.Template); err != nil {
+		t.Fatalf("SSH template not found at %q: %v", sshRule.Template, err)
+	}
+	users, err := os.ReadFile(filepath.Join(filepath.Dir(sshRule.Template), "payloads", "users-mini.txt"))
+	if err != nil {
+		t.Fatalf("users payload not found: %v", err)
+	}
+	passwords, err := os.ReadFile(filepath.Join(filepath.Dir(sshRule.Template), "payloads", "passwords-mini.txt"))
+	if err != nil {
+		t.Fatalf("passwords payload not found: %v", err)
+	}
+	userCount := countNonEmptyLines(string(users))
+	passCount := countNonEmptyLines(string(passwords))
+	if userCount != 2 || passCount != 2 || userCount*passCount != 4 {
+		t.Fatalf("ssh-mini-brute wordlist must be 2x2=4 attempts, got %d users x %d passwords", userCount, passCount)
+	}
+}
+
+func countNonEmptyLines(s string) int {
+	count := 0
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func TestDefaultWebRulesRouteByFingerprint(t *testing.T) {
