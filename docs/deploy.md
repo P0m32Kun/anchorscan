@@ -113,7 +113,7 @@ Windows 请把相应可执行文件替换为 `.\anchorscan.exe` 或 `.\dist\anch
 ./anchorscan scan --target 10.0.0.0/24 --ports 80,443,8080 --discovery assume-up
 ```
 
-`--discovery auto` 是默认值。发现模式会写入扫描配置快照和 HTML 报告，便于追溯本次扫描的前提假设。
+`--discovery auto` 是默认值。发现模式会写入扫描配置快照和 HTML 报告，便于追溯本次扫描的前提假设。默认端口发现仍只执行 TCP；本次不会因为选择 `assume-up` 自动加入 UDP 扫描。
 
 **中止与超时**
 

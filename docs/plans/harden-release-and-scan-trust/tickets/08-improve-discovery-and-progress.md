@@ -4,7 +4,7 @@
 
 **Blocked by:** 07 — 提供可靠备份与恢复。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -26,11 +26,11 @@
 
 ## 验收
 
-- [ ] 先写屏蔽 alive discovery 时 `assume-up` 仍执行后续扫描的失败测试。
-- [ ] 先写 Web 运行收不到 heartbeat 的失败测试。
-- [ ] 先写 `after_id` 仍返回全部事件的失败测试。
-- [ ] 取消分类保持 canceled，工具 timeout 保持失败/超时语义。
-- [ ] 聚焦测试、`make test`、`go vet ./...`、`make pr-check` 通过。
+- [x] 先写屏蔽 alive discovery 时 `assume-up` 仍执行后续扫描的失败测试。
+- [x] 先写 Web 运行收不到 heartbeat 的失败测试。
+- [x] 先写 `after_id` 仍返回全部事件的失败测试。
+- [x] 取消分类保持 canceled，工具 timeout 保持失败/超时语义。
+- [x] 聚焦测试、`make test`、`go vet ./...`、`make pr-check` 通过。
 
 ## 非目标
 
