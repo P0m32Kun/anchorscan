@@ -373,6 +373,15 @@ CREATE INDEX IF NOT EXISTS idx_verification_evidence_verification ON verificatio
 			return err
 		},
 	},
+	{
+		version: 13,
+		name:    "create_run_provenance",
+		sql: `
+CREATE TABLE IF NOT EXISTS run_provenance (
+  run_id TEXT PRIMARY KEY,
+  manifest TEXT NOT NULL DEFAULT ''
+);`,
+	},
 }
 
 func hasTable(tx *sql.Tx, table string) bool {

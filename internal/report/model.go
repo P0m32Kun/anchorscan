@@ -45,12 +45,21 @@ type ScanMeta struct {
 	Tool string `json:"tool"`
 }
 
+type Provenance struct {
+	Version    string   `json:"version,omitempty"`
+	StartedAt  string   `json:"started_at,omitempty"`
+	FinishedAt string   `json:"finished_at,omitempty"`
+	Scope      string   `json:"scope,omitempty"`
+	Engines    []string `json:"engines,omitempty"`
+}
+
 type ScanReport struct {
 	ScanMeta          ScanMeta           `json:"scan_meta"`
 	AliveIPs          []string           `json:"alive_ips,omitempty"`
 	Hosts             []HostReport       `json:"hosts"`
 	DetectionChecks   []DetectionCheck   `json:"detection_checks,omitempty"`
 	DetectionCoverage *DetectionCoverage `json:"detection_coverage,omitempty"`
+	Provenance        *Provenance        `json:"provenance,omitempty"`
 }
 
 type DetectionCheck struct {

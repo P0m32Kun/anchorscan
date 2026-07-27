@@ -107,15 +107,11 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 
 	if *htmlPath != "" {
 		logScan(stderr, "report html %s", *htmlPath)
-		fps, err := scanStore.ListFingerprints(runID)
+		reportData, err := report.ReadJSON(*jsonPath)
 		if err != nil {
 			return err
 		}
-		findings, err := scanStore.ListFindings(runID)
-		if err != nil {
-			return err
-		}
-		if err := report.WriteHTML(*htmlPath, report.Build(fps, findings)); err != nil {
+		if err := report.WriteHTML(*htmlPath, reportData); err != nil {
 			return err
 		}
 	}

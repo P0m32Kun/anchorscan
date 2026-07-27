@@ -70,6 +70,11 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	}
 	nseRules, nseRulesErr := config.LoadNSERulesForConfig(req.ConfigPath)
 	tagRules, tagRulesErr := config.LoadTagRulesForConfig(req.ConfigPath)
+	configDir := filepath.Dir(req.ConfigPath)
+	rulePaths := []string{
+		filepath.Join(configDir, "nse.yaml"),
+		filepath.Join(configDir, "service-tags.yaml"),
+	}
 
 	toolPaths := cfg.Tools
 	extraArgs := effective.ToolArgs
@@ -112,6 +117,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		ExtraArgs:      extraArgs,
 		Timeouts:       timeouts,
 		ConfigSnapshot: string(scopeSnapshot),
+		RulePaths:      rulePaths,
 		JSONReportPath: req.JSONReportPath,
 		ArtifactRoot:   req.ArtifactRoot,
 		NSERules:       nseRules,

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type ToolRunOptions struct {
 	Tags            []string
 	Template        string
 	Tools           ToolPaths
+	RulePaths       []string
 	ExtraArgs       ToolExtraArgs
 	Timeouts        ToolTimeouts
 	JSONReportPath  string
@@ -73,7 +75,8 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		finishLease(status, message, time.Now())
 	}()
 
-	if err := saveToolRun(scanStore, opts); err != nil {
+	startedAt := time.Now()
+	if err := saveToolRun(scanStore, opts, startedAt); err != nil {
 		return err
 	}
 	runSaved = true
@@ -84,38 +87,68 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		emitTool(opts, scanStore, "warning", "tool", "raw tool arguments supplied; default safety limits are bypassed")
 	}
 
+	var scanReport report.ScanReport
+	var reportErr error
 	if opts.UseNativeArgs {
 		findings, runErr := runNativeTool(ctx, runner, scanStore, opts)
 		if runErr != nil {
 			return runErr
 		}
-		emitTool(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
-		return report.WriteJSON(opts.JSONReportPath, report.Build(nil, findings))
+		scanReport = report.Build(nil, findings)
+	} else {
+		var fingerprints []fingerprint.ServiceFingerprint
+		var findings []report.Finding
+		switch opts.Tool {
+		case "rustscan":
+			fingerprints, runErr = runRustscanTool(ctx, runner, scanStore, opts)
+		case "nmap":
+			fingerprints, findings, runErr = runNmapTool(ctx, runner, scanStore, opts)
+		case "httpx":
+			fingerprints, findings, runErr = runHTTPXTool(ctx, runner, scanStore, opts)
+		case "nuclei":
+			findings, runErr = runNucleiTool(ctx, runner, scanStore, opts)
+		default:
+			runErr = fmt.Errorf("unknown tool: %s", opts.Tool)
+		}
+		if runErr != nil {
+			return runErr
+		}
+		scanReport = report.Build(fingerprints, findings)
+	}
+	if reportErr != nil {
+		return reportErr
 	}
 
-	var fingerprints []fingerprint.ServiceFingerprint
-	var findings []report.Finding
-	switch opts.Tool {
-	case "rustscan":
-		fingerprints, runErr = runRustscanTool(ctx, runner, scanStore, opts)
-	case "nmap":
-		fingerprints, findings, runErr = runNmapTool(ctx, runner, scanStore, opts)
-	case "httpx":
-		fingerprints, findings, runErr = runHTTPXTool(ctx, runner, scanStore, opts)
-	case "nuclei":
-		findings, runErr = runNucleiTool(ctx, runner, scanStore, opts)
-	default:
-		runErr = fmt.Errorf("unknown tool: %s", opts.Tool)
-	}
-	if runErr != nil {
-		return runErr
-	}
+	prov := BuildRunProvenance(ProvenanceOptions{
+		Version:         "",
+		RulePaths:       opts.RulePaths,
+		TemplatePath:    opts.Template,
+		Tags:            opts.Tags,
+		Tools:           opts.Tools,
+		ConfigSnapshot:  redactedToolConfigSnapshot(opts),
+		Scope:           firstNonEmpty(opts.Target, opts.URL),
+		VersionProvider: nil,
+	}, startedAt, time.Time{}, nil)
+	reportProv := ReportProvenance(prov, []string{opts.Tool})
+	scanReport.Provenance = &reportProv
 
 	emitTool(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
-	return report.WriteJSON(opts.JSONReportPath, report.Build(fingerprints, findings))
+	if err := report.WriteJSON(opts.JSONReportPath, scanReport); err != nil {
+		return err
+	}
+	artifactDir := ""
+	if opts.JSONReportPath != "" {
+		artifactDir = filepath.Dir(opts.JSONReportPath)
+	}
+	artifactHashes, err := HashArtifactFiles(artifactDir)
+	if err != nil {
+		return err
+	}
+	_, err = UpdateRunProvenanceArtifactHashes(scanStore, opts.RunID, prov, artifactHashes)
+	return err
 }
 
-func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
+func saveToolRun(scanStore *store.Store, opts ToolRunOptions, startedAt time.Time) error {
 	snapshot, _ := json.Marshal(map[string]any{
 		"tool":            opts.Tool,
 		"mode":            opts.Mode,
@@ -140,7 +173,7 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 		Ports:           opts.Ports,
 		Profile:         "tool:" + opts.Tool,
 		Status:          "running",
-		StartedAt:       time.Now(),
+		StartedAt:       startedAt,
 		ConfigSnapshot:  string(snapshot),
 	})
 }
