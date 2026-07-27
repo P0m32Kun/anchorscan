@@ -45,3 +45,24 @@ func TestWriteJSONOutputsHostAndPortData(t *testing.T) {
 		t.Fatalf("legacy report unexpectedly contains detection checks: %#v", decoded)
 	}
 }
+
+func TestReadJSONIgnoresUnknownFieldsAndReadsLegacyReport(t *testing.T) {
+	legacy := `{"scan_meta":{"tool":"anchorscan"},"alive_ips":["192.0.2.10"],"hosts":[{"ip":"192.0.2.10","ports":[{"port":80,"protocol":"tcp","service":"http","findings":[]}]}],"unknown_future_field":"ignored"}`
+	path := filepath.Join(t.TempDir(), "legacy.json")
+	if err := os.WriteFile(path, []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, err := ReadJSON(path)
+	if err != nil {
+		t.Fatalf("ReadJSON returned error: %v", err)
+	}
+	if r.ScanMeta.Tool != "anchorscan" {
+		t.Fatalf("tool = %q", r.ScanMeta.Tool)
+	}
+	if len(r.AliveIPs) != 1 || len(r.Hosts) != 1 {
+		t.Fatalf("legacy fields not read: %#v", r)
+	}
+	if r.Provenance != nil {
+		t.Fatalf("legacy report should not have provenance")
+	}
+}

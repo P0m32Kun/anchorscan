@@ -129,7 +129,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			ConfigSnapshot: opts.ConfigSnapshot,
 			Scope:          opts.ConfigSnapshot,
 		}, startedAt, time.Time{}, nil)
-		_ = SaveRunProvenance(scanStore, opts.RunID, prov)
+		if err := SaveRunProvenance(scanStore, opts.RunID, prov); err != nil {
+			return err
+		}
 	}
 
 	if opts.RecordDetectionCheck == nil && scanStore != nil {
@@ -163,6 +165,14 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			})
 		}
 	}
+	finishedAt := time.Now()
+	prov.FinishedAt = finishedAt
+	artifactHashes, err := HashArtifactFiles(artifactDir)
+	if err != nil {
+		return err
+	}
+	prov.ArtifactHashes = artifactHashes
+
 	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)
 	scanReport := report.BuildWithScanDataAndDetectionChecks(allFingerprints, allFindings, report.ScanData{
 		AliveIPs:  aliveIPs,
@@ -173,12 +183,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if err := report.WriteJSON(opts.JSONReportPath, scanReport); err != nil {
 		return err
 	}
-	artifactHashes, err := HashArtifactFiles(artifactDir)
-	if err != nil {
-		return err
-	}
-	_, err = UpdateRunProvenanceArtifactHashes(scanStore, opts.RunID, prov, artifactHashes)
-	return err
+	return SaveRunProvenance(scanStore, opts.RunID, prov)
 }
 
 func logf(opts ScanOptions, format string, args ...any) {

@@ -70,10 +70,11 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	}
 	if manifest != "" {
 		var p app.RunProvenance
-		if err := json.Unmarshal([]byte(manifest), &p); err == nil {
-			rp := app.ReportProvenance(p, app.EnginesFromDetectionChecks(reportChecks))
-			builtReport.Provenance = &rp
+		if err := json.Unmarshal([]byte(manifest), &p); err != nil {
+			return fmt.Errorf("decode run provenance: %w", err)
 		}
+		rp := app.ReportProvenance(p, app.EnginesFromDetectionChecks(reportChecks))
+		builtReport.Provenance = &rp
 	}
 	if *jsonPath != "" {
 		if err := ensureParentDir(*jsonPath); err != nil {

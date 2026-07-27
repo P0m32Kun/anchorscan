@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/doctor"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/version"
@@ -195,14 +196,20 @@ func toolVersions(tools config.ToolPaths, provider func(name, path string) strin
 		"nuclei":   tools.Nuclei,
 		"rdpscan":  tools.Rdpscan,
 	}
+	if provider == nil {
+		provider = func(name, path string) string {
+			if v, err := doctor.ToolVersion(path); err == nil {
+				return v
+			}
+			return path
+		}
+	}
 	for name, path := range m {
 		if path == "" {
 			delete(m, name)
 			continue
 		}
-		if provider != nil {
-			m[name] = provider(name, path)
-		}
+		m[name] = provider(name, path)
 	}
 	return m
 }
@@ -336,20 +343,6 @@ func SaveRunProvenance(scanStore *store.Store, runID string, p RunProvenance) er
 		return nil
 	}
 	return scanStore.SaveRunProvenance(runID, p.JSON())
-}
-
-// UpdateRunProvenanceArtifactHashes updates the artifact hashes in the stored
-// manifest after the run has produced its artifacts.
-func UpdateRunProvenanceArtifactHashes(scanStore *store.Store, runID string, p RunProvenance, artifactHashes map[string]string) (RunProvenance, error) {
-	if scanStore == nil {
-		return p, nil
-	}
-	p.FinishedAt = time.Now()
-	p.ArtifactHashes = artifactHashes
-	if err := scanStore.SaveRunProvenance(runID, p.JSON()); err != nil {
-		return p, err
-	}
-	return p, nil
 }
 
 // redactedToolConfigSnapshot builds a customer-safe snapshot of a single-tool run.

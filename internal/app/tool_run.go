@@ -129,6 +129,7 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		Scope:           firstNonEmpty(opts.Target, opts.URL),
 		VersionProvider: nil,
 	}, startedAt, time.Time{}, nil)
+	prov.FinishedAt = time.Now()
 	reportProv := ReportProvenance(prov, []string{opts.Tool})
 	scanReport.Provenance = &reportProv
 
@@ -136,16 +137,15 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if err := report.WriteJSON(opts.JSONReportPath, scanReport); err != nil {
 		return err
 	}
-	artifactDir := ""
+	// Tool runs only write report.json; avoid hashing a shared reports directory.
+	artifactHashes := map[string]string{}
 	if opts.JSONReportPath != "" {
-		artifactDir = filepath.Dir(opts.JSONReportPath)
+		if h, err := hashFile(opts.JSONReportPath); err == nil {
+			artifactHashes[filepath.Base(opts.JSONReportPath)] = h
+		}
 	}
-	artifactHashes, err := HashArtifactFiles(artifactDir)
-	if err != nil {
-		return err
-	}
-	_, err = UpdateRunProvenanceArtifactHashes(scanStore, opts.RunID, prov, artifactHashes)
-	return err
+	prov.ArtifactHashes = artifactHashes
+	return SaveRunProvenance(scanStore, opts.RunID, prov)
 }
 
 func saveToolRun(scanStore *store.Store, opts ToolRunOptions, startedAt time.Time) error {

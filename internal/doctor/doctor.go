@@ -98,6 +98,11 @@ func toolCheck(name, path string, optional bool) Check {
 	return okCheck(name, version)
 }
 
+// ToolVersion returns the first line of the tool's --version or -version output.
+func ToolVersion(path string) (string, error) {
+	return toolVersion(path)
+}
+
 func toolVersion(path string) (string, error) {
 	var lastErr error
 	for _, flag := range []string{"--version", "-version"} {

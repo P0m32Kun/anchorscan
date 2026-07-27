@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -247,5 +248,52 @@ INSERT INTO scan_runs (run_id, project_id, zone_id, kind, label, access_point, t
 	}
 	if manifest != "" {
 		t.Fatalf("expected empty manifest for legacy run, got %q", manifest)
+	}
+}
+
+func TestToolRunHashesOnlyReportJSON(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	scanStore, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scanStore.Close()
+
+	reportPath := filepath.Join(dir, "reports", "tool-nmap-1.json")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Write an unrelated file in the shared reports directory to prove it is not hashed.
+	if err := os.WriteFile(filepath.Join(dir, "reports", "other.json"), []byte("other"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	runner := runnerFunc(func(ctx context.Context, binary string, args []string) ([]byte, error) {
+		return []byte(`<nmaprun><host><status state="up"/></host></nmaprun>`), nil
+	})
+	opts := ToolRunOptions{
+		RunID:          "tool-nmap-1",
+		Tool:           "nmap",
+		Mode:           "alive",
+		Target:         "192.0.2.10",
+		JSONReportPath: reportPath,
+		Tools:          ToolPaths{Nmap: "/bin/nmap"},
+		Timeouts:       ToolTimeouts{},
+	}
+	if err := RunTool(context.Background(), runner, scanStore, opts); err != nil {
+		t.Fatalf("RunTool returned error: %v", err)
+	}
+
+	manifest, err := scanStore.GetRunProvenance("tool-nmap-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p RunProvenance
+	if err := json.Unmarshal([]byte(manifest), &p); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.ArtifactHashes) != 1 || p.ArtifactHashes["tool-nmap-1.json"] == "" {
+		t.Fatalf("tool run should hash only its own report, got %v", p.ArtifactHashes)
 	}
 }
