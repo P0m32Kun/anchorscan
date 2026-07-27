@@ -132,7 +132,33 @@ Web 控制台扫描工作流：先在「项目管理」创建项目（配置默�
 
 Windows 请把相应可执行文件替换为 `.\anchorscan.exe` 或 `.\dist\anchorscan.exe`。
 
-## 7. 目录结构
+## 7. 备份与恢复
+
+备份包含 SQLite 数据库一致快照、项目 Evidence 和 `config/` 下必要文件；默认不包含 `reports/` 和运行期 Artifact，可用 `--include-artifacts` 显式包含。
+
+**创建备份（必须没有正在运行的扫描）：**
+
+```bash
+# 预编译归档（macOS/Linux）
+./anchorscan backup
+# 源码编译（macOS/Linux）
+./dist/anchorscan backup
+```
+
+默认输出到 `data/backups/anchorscan-backup-<时间戳>.tar.gz`。
+
+**恢复备份（会替换当前 `data/scans.sqlite`、`config/`、`data/projects/`）：**
+
+```bash
+# 预编译归档（macOS/Linux）
+./anchorscan restore --archive data/backups/anchorscan-backup-20260102-150405.tar.gz
+# 源码编译（macOS/Linux）
+./dist/anchorscan restore --archive data/backups/anchorscan-backup-20260102-150405.tar.gz
+```
+
+恢复前会先校验 manifest 中的路径、大小和 SHA-256；若校验失败不会替换目标数据。备份和恢复命令都会拒绝当前存在活动 Run Lease 时执行，避免在扫描过程中产生不一致归档或替换数据。
+
+## 8. 目录结构
 
 首次运行后，工作目录结构如下：
 
@@ -147,19 +173,19 @@ reports/
   scan-*.json           扫描报告
 ```
 
-## 8. 升级建议
+## 9. 升级建议
 
 - 升级前先备份 `data/scans.sqlite`
 - 程序启动时会自动运行 SQLite migration 补齐 schema
 - 如果迁移或数据库打开失败，`doctor` 会直接报出 `database: fail`
 
-## 9. 常见建议
+## 10. 常见建议
 
 - 先用 `doctor`，再扫描
 - 先用精确端口 CSV 或「插入高危端口列表」，再考虑 `top1000`；全端口请明确填写 `1-65535`
 - 对脆弱网络优先使用 `slow` 档位
 
-## 10. 看懂扫描状态与检测记录
+## 11. 看懂扫描状态与检测记录
 
 扫描结束后，在「扫描历史」或报告页会看到以下状态：
 
@@ -172,6 +198,6 @@ reports/
 
 报告中的「检测执行覆盖」列出每个服务的 NSE 与 nuclei 实际状态：完成、跳过、失败、取消或中断（程序或租约失联前未完成）。它用来解释本次运行做了什么，**不是**漏洞覆盖率，也不代表目标安全。
 
-## 11. 工具超时（默认关闭）
+## 12. 工具超时（默认关闭）
 
 默认情况下所有工具都不限时，以免长扫描被程序提前停止。如确实需要限制单个工具，在 Web 的「配置管理」填写 rustscan、nmap、httpx、NSE 或 nuclei 的超时；使用 `30s`、`5m` 这样的时长，填 `0` 表示不限时。扫描档位不会改写这些全局值。
