@@ -57,9 +57,11 @@
 
 `runWeb` 使用显式 `http.Server` 设置 timeout，并在启动前验证 listen address 为 loopback。请求体大小在 handler 解析之前通过 `http.MaxBytesReader` 限制；multipart 的 `maxMemory` 不被视为硬上限。
 
-## 5. Safe probes
+## 5. 受控默认凭据检测
 
-第一阶段不创建 ProbePolicy 抽象：直接删除默认规则中的 brute、default-login 和用户枚举入口，并用命令构造测试证明默认命令不包含这些能力。单工具原生参数继续作为专家显式入口。
+第一阶段不创建 ProbePolicy 抽象：默认流水线保留非 SSH 服务的弱口令/默认凭据检测；SSH 排除官方大字典 `default-login` 模板，改用 AnchorScan 自带的 `ssh-mini-brute` 模板通过 `-t` 精确调用，字典固定为 2 用户 × 2 密码（最多 4 次尝试），并设置 `stop-at-first-match`。
+
+非 SSH 服务的 nuclei tag 仍可能命中各自的 `default-login` 模板；全局默认只排除与凭据检测无关的 `fuzz`/`dos` 类别，不额外排除 `default-login`/`brute`。单工具原生参数（`--args` / Web raw args）继续作为专家显式入口，调用时记录审计事件并保存在 `ConfigSnapshot`，但工具运行默认不纳入客户报告，避免泄露敏感参数。
 
 如果后续 ticket 证明需要自动 active policy，必须先更新 spec，再增加与 Profile 独立的风险选择和 Run snapshot。
 

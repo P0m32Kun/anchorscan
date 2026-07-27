@@ -4,6 +4,8 @@
 
 核心思路是「**指纹驱动、精准分类、服务多引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 每个已识别服务按 `nuclei` + NSE 双引擎规则表（`config/service-tags.yaml` + `config/nse.yaml`）同时调度；RDP 服务可额外启用可选 `rdpscan` 引擎检测 BlueKeep（CVE-2019-0708）→ Web 服务额外走 `httpx` → 结果统一落入 SQLite → 导出 JSON / HTML / DOCX 报告。
 
+默认流水线保留非 SSH 服务的弱口令/默认凭据检测；SSH 使用自带的 `config/nuclei-templates/ssh-mini-brute.yaml` 模板，最多 2 用户 × 2 密码（4 次尝试）。使用 `--args` 或 Web 单工具「原生参数」会绕过默认安全限制，调用记录会审计保存但不会进入客户报告。
+
 ## 快速开始
 
 ### 方式一：下载预编译归档（推荐）

@@ -78,6 +78,12 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	}
 	runSaved = true
 
+	// Tool runs are intentionally excluded from customer reports (IncludeInReport=false),
+	// but raw args must still be audited without leaking secrets into report-facing fields.
+	if opts.UseNativeArgs || hasExtraArgs(opts.ExtraArgs) {
+		emitTool(opts, scanStore, "warning", "tool", "raw tool arguments supplied; default safety limits are bypassed")
+	}
+
 	if opts.UseNativeArgs {
 		findings, runErr := runNativeTool(ctx, runner, scanStore, opts)
 		if runErr != nil {
@@ -120,6 +126,7 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 		"template":        opts.Template,
 		"use_native":      opts.UseNativeArgs,
 		"native_args":     opts.NativeArgs,
+		"extra_args":      opts.ExtraArgs,
 		"zone_id":         opts.ZoneID,
 		"verification_id": opts.VerificationID,
 	})
@@ -129,13 +136,17 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 		ZoneID:          opts.ZoneID,
 		Kind:            "tool",
 		IncludeInReport: false,
-		Target:          firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),
+		Target:          firstNonEmpty(opts.Target, opts.URL),
 		Ports:           opts.Ports,
 		Profile:         "tool:" + opts.Tool,
 		Status:          "running",
 		StartedAt:       time.Now(),
 		ConfigSnapshot:  string(snapshot),
 	})
+}
+
+func hasExtraArgs(args ToolExtraArgs) bool {
+	return len(args.Rustscan) > 0 || len(args.Nmap) > 0 || len(args.Httpx) > 0 || len(args.Nuclei) > 0
 }
 
 func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]report.Finding, error) {
