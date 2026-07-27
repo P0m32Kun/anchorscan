@@ -21,6 +21,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	fs.SetOutput(io.Discard)
 	configPath := fs.String("config", filepath.Join("config", "default.yaml"), "path to config file")
 	targetSpec := fs.String("target", "", "target IP, CIDR, or comma-separated list")
+	excludeTargetSpec := fs.String("exclude-targets", "", "IP, CIDR, or comma-separated exclusions")
 	dbPath := fs.String("db", filepath.Join("data", "scans.sqlite"), "path to sqlite database")
 	jsonPath := fs.String("json", "", "path to JSON report output")
 	htmlPath := fs.String("html", "", "path to HTML report output")
@@ -50,6 +51,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	prepared, err := app.PrepareScan(app.PrepareScanRequest{
 		ConfigPath:     *configPath,
 		TargetSpec:     *targetSpec,
+		ExcludeTargets: *excludeTargetSpec,
 		PortSpec:       *portsSpec,
 		DBPath:         *dbPath,
 		JSONReportPath: *jsonPath,
@@ -147,6 +149,7 @@ func printScanHelp(w io.Writer) {
 Flags:
   --config <path>   Config file path
   --target <value>  Target IP, IPv6, CIDR, or comma-separated list
+  --exclude-targets <value>  IP, IPv6, CIDR, or comma-separated exclusions
   --ports <value>   top1000, a range like 100-1000, or CSV like 80,443
   --profile slow|normal|fast
   --host-workers N

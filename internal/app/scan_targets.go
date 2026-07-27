@@ -28,6 +28,9 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 		}
 	}
 	opts.Scope = scope
+	if opts.Tools.Nmap == "" && scope.RequiresNmapDiscovery() {
+		return nil, nil, false, errors.New("nmap is required for CIDR or excluded scan targets")
+	}
 	targets := scope.NmapTargets()
 
 	if opts.Tools.Nmap != "" && len(targets) > 0 {

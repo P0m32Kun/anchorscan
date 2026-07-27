@@ -184,6 +184,15 @@ func (s Scope) Excludes() []string { return prefixStrings(s.excludes) }
 
 func (s Scope) EstimatedAddresses() uint64 { return s.estimated }
 
+func (s Scope) RequiresNmapDiscovery() bool {
+	for _, prefix := range s.includes {
+		if prefix.Bits() != prefix.Addr().BitLen() {
+			return true
+		}
+	}
+	return len(s.excludes) > 0
+}
+
 func (s Scope) IsIPv6() bool {
 	return len(s.includes) > 0 && !s.includes[0].Addr().Is4()
 }
