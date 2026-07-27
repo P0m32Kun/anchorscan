@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 — 记录 Run provenance 与制品完整性。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -24,11 +24,11 @@
 
 ## 验收
 
-- [ ] 先证明只复制主 DB 会遗漏状态，并为新 backup 行为写失败测试。
-- [ ] 带 Evidence 的项目恢复后可生成相同聚合内容。
-- [ ] 缺文件、哈希不一致、路径穿越和活动 lease 都明确失败。
-- [ ] 更新 deploy 的备份/升级步骤。
-- [ ] 聚焦测试、`make test`、`go vet ./...` 通过。
+- [x] 先证明只复制主 DB 会遗漏状态，并为新 backup 行为写失败测试。
+- [x] 带 Evidence 的项目恢复后可生成相同聚合内容。
+- [x] 缺文件、哈希不一致、路径穿越和活动 lease 都明确失败。
+- [x] 更新 deploy 的备份/升级步骤。
+- [x] 聚焦测试、`make test`、`go vet ./...` 通过。
 
 ## 非目标
 
