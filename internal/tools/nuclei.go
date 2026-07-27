@@ -112,6 +112,23 @@ func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 	return findings, nil
 }
 
+// EndpointHosts returns every IP endpoint represented in a Nuclei result.
+func (f NucleiFinding) EndpointHosts() []string {
+	var hosts []string
+	seen := make(map[string]struct{})
+	for _, value := range []string{f.IP, f.Host, f.URL, f.MatchedAt} {
+		host, _ := parseNucleiEndpoint(value)
+		if host == "" {
+			continue
+		}
+		if _, ok := seen[host]; !ok {
+			seen[host] = struct{}{}
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
+}
+
 // Endpoint returns Nuclei's endpoint when present, otherwise the scan target.
 func (f NucleiFinding) Endpoint(fallbackHost string, fallbackPort int) (string, int) {
 	host := strings.TrimSpace(f.IP)

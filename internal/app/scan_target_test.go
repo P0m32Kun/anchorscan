@@ -32,6 +32,12 @@ func TestScopeAllowsFindingRejectsNucleiEndpointOutsideScope(t *testing.T) {
 	if !scopeAllowsFinding(scope, report.Finding{IP: "192.0.2.10"}) {
 		t.Fatal("in-scope Nuclei endpoint was rejected")
 	}
+	if scopeAllowsNucleiFinding(scope, tools.NucleiFinding{IP: "192.0.2.10", MatchedAt: "http://192.0.2.20/"}, report.Finding{IP: "192.0.2.10"}) {
+		t.Fatal("finding with excluded Nuclei evidence was allowed")
+	}
+	if !scopeAllowsNucleiFinding(scope, tools.NucleiFinding{IP: "192.0.2.10", MatchedAt: "http://192.0.2.10/"}, report.Finding{IP: "192.0.2.10"}) {
+		t.Fatal("finding with in-scope Nuclei evidence was rejected")
+	}
 }
 
 func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
