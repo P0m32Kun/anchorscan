@@ -68,9 +68,13 @@ func TestValidateScopeSafeToolArgsRejectsTargetSelectors(t *testing.T) {
 	for _, args := range []ToolArgs{
 		{Nmap: []string{"198.51.100.10"}},
 		{Nmap: []string{"-iL", "targets.txt"}},
+		{Nmap: []string{"-iLtargets.txt"}},
 		{Rustscan: []string{"-a", "198.51.100.10"}},
 		{Httpx: []string{"-u", "https://example.test"}},
+		{Httpx: []string{"-target=https://example.test"}},
 		{Nuclei: []string{"-target", "https://example.test"}},
+		{Nuclei: []string{"-u=https://example.test"}},
+		{Nuclei: []string{"-unknown", "https://example.test"}},
 	} {
 		if err := ValidateScopeSafeToolArgs(args); err == nil {
 			t.Fatalf("ValidateScopeSafeToolArgs(%#v) returned nil", args)
@@ -78,5 +82,8 @@ func TestValidateScopeSafeToolArgsRejectsTargetSelectors(t *testing.T) {
 	}
 	if err := ValidateScopeSafeToolArgs(builtInProfiles()["normal"].ToolArgs); err != nil {
 		t.Fatalf("built-in profile rejected: %v", err)
+	}
+	if err := ValidateScopeSafeToolArgs(ToolArgs{Nmap: []string{"-T4", "--max-rate=50"}}); err != nil {
+		t.Fatalf("allowed tuning args rejected: %v", err)
 	}
 }

@@ -96,30 +96,42 @@ func ValidateScopeSafeToolArgs(args ToolArgs) error {
 }
 
 func validateScopeSafeArgs(tool string, args []string) error {
-	targetFlags := map[string]map[string]bool{
-		"rustscan": {"-a": true, "--addresses": true},
-		"nmap":     {"-iL": true, "-iR": true, "--exclude": true, "--excludefile": true, "--resume": true},
-		"httpx":    {"-u": true, "-l": true, "-list": true},
-		"nuclei":   {"-target": true, "-l": true, "-list": true},
-	}
-	valueFlags := map[string]map[string]bool{
-		"rustscan": {"--batch-size": true, "--timeout": true, "--tries": true, "--ulimit": true},
-		"nmap":     {"--max-retries": true, "--scan-delay": true, "--min-rate": true, "--max-rate": true, "--host-timeout": true, "--version-intensity": true},
-		"httpx":    {"-rate-limit": true, "-threads": true, "-timeout": true, "-retries": true},
-		"nuclei":   {"-rate-limit": true, "-c": true, "-retries": true, "-timeout": true},
+	allowed := map[string]map[string]bool{
+		"rustscan": {
+			"--batch-size": true, "--timeout": true, "--tries": true, "--ulimit": true,
+		},
+		"nmap": {
+			"-T0": false, "-T1": false, "-T2": false, "-T3": false, "-T4": false, "-T5": false,
+			"-sV": false, "--version-light": false,
+			"--max-retries": true, "--scan-delay": true, "--min-rate": true, "--max-rate": true,
+			"--host-timeout": true, "--version-intensity": true,
+		},
+		"httpx": {
+			"-rate-limit": true, "-threads": true, "-timeout": true, "-retries": true,
+		},
+		"nuclei": {
+			"-rate-limit": true, "-c": true, "-retries": true, "-timeout": true,
+		},
 	}
 	for i := 0; i < len(args); i++ {
-		flag := strings.SplitN(args[i], "=", 2)[0]
-		if targetFlags[tool][flag] {
-			return fmt.Errorf("%s args cannot set scan targets: %s", tool, flag)
+		arg := args[i]
+		flag, _, hasValue := strings.Cut(arg, "=")
+		takesValue, ok := allowed[tool][flag]
+		if !ok {
+			return fmt.Errorf("%s args are not allowed by the scan scope: %s", tool, arg)
 		}
-		if strings.HasPrefix(args[i], "-") {
-			if valueFlags[tool][flag] && !strings.Contains(args[i], "=") {
-				i++
+		if !takesValue {
+			if hasValue {
+				return fmt.Errorf("%s arg does not accept a value: %s", tool, flag)
 			}
 			continue
 		}
-		return fmt.Errorf("%s args cannot include positional targets: %s", tool, args[i])
+		if !hasValue {
+			if i+1 >= len(args) {
+				return fmt.Errorf("%s arg requires a value: %s", tool, flag)
+			}
+			i++
+		}
 	}
 	return nil
 }
