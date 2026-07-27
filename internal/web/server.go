@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,6 +33,7 @@ type server struct {
 	manager *app.Manager
 	catalog *knowledgebase.Catalog
 	mux     *http.ServeMux
+	origin  *http.CrossOriginProtection
 }
 
 func managedDataRoot(dbPath string) string {
@@ -82,7 +82,7 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	if cfg, err := config.Load(opts.ConfigPath); err == nil {
 		catalog = knowledgebase.Load(opts.ConfigPath, cfg.KnowledgeBase.Path)
 	}
-	s := &server{opts: opts, store: scanStore, manager: app.NewManager(opts.Runner, scanStore), catalog: catalog}
+	s := &server{opts: opts, store: scanStore, manager: app.NewManager(opts.Runner, scanStore), catalog: catalog, origin: http.NewCrossOriginProtection()}
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServerFS(assets))
 	mux.HandleFunc("/projects", s.projects)
@@ -111,11 +111,15 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	if isUnsafeMethod(r.Method) {
+		if r.ContentLength > maxRequestBodySize {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		if err := s.origin.Check(r); err != nil {
+			http.Error(w, "cross-origin request forbidden", http.StatusForbidden)
+			return
+		}
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
-	}
-	if isUnsafeMethod(r.Method) && !sameOrigin(r, s.opts.Listen) {
-		http.Error(w, "cross-origin request forbidden", http.StatusForbidden)
-		return
 	}
 	s.mux.ServeHTTP(w, r)
 }
@@ -137,15 +141,6 @@ func validateLoopbackListen(listen string) error {
 
 func isUnsafeMethod(method string) bool {
 	return method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
-}
-
-func sameOrigin(r *http.Request, listen string) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	parsed, err := url.Parse(origin)
-	return err == nil && parsed.Host == listen && (parsed.Scheme == "http" || parsed.Scheme == "https")
 }
 
 func (s *server) Close() error {

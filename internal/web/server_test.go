@@ -117,6 +117,14 @@ func TestServerRejectsCrossOriginStateChangeAndNonLoopbackListen(t *testing.T) {
 	if res.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", res.Code, http.StatusForbidden)
 	}
+
+	crossSite := httptest.NewRequest(http.MethodPost, "/projects", nil)
+	crossSite.Header.Set("Sec-Fetch-Site", "cross-site")
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, crossSite)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("cross-site status = %d, want %d", res.Code, http.StatusForbidden)
+	}
 }
 
 func TestNavIncludesImportNmapEntry(t *testing.T) {
