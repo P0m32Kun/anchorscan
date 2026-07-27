@@ -27,6 +27,7 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 			return nil, nil, false, err
 		}
 	}
+	opts.Scope = scope
 	targets := scope.NmapTargets()
 
 	if opts.Tools.Nmap != "" && len(targets) > 0 {

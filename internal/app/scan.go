@@ -64,6 +64,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if err != nil {
 		return err
 	}
+	if err := config.ValidateScopeSafeToolArgs(opts.ExtraArgs); err != nil {
+		return err
+	}
 	runSaved := false
 	defer func() {
 		if !runSaved {

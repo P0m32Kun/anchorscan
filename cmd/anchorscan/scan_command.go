@@ -146,7 +146,7 @@ func printScanHelp(w io.Writer) {
 
 Flags:
   --config <path>   Config file path
-  --target <value>  Target IP, CIDR, IP range, or comma-separated list
+  --target <value>  Target IP, IPv6, CIDR, or comma-separated list
   --ports <value>   top1000, a range like 100-1000, or CSV like 80,443
   --profile slow|normal|fast
   --host-workers N

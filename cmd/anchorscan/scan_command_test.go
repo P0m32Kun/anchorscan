@@ -26,7 +26,8 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	for _, want := range []string{
 		"Usage: anchorscan scan",
 		"--target",
-		"IP range",
+		"IPv6",
+		"CIDR",
 		"--ports",
 		"top1000",
 		"--profile",
