@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — 保护本地 Web 控制面。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -23,11 +23,11 @@
 
 ## 验收
 
-- [ ] 先为 SSH 官方 default-login 排除与非 SSH 默认凭据模板可达性写失败测试。
-- [ ] 验证 `ssh-mini-brute` 模板存在且其尝试预算为 2 用户 x 2 密码。
-- [ ] 更新 README、配置注释和报告说明，准确描述默认凭据检测与 SSH 限额。
-- [ ] 保存 raw tool run 的操作者参数事实，同时避免在客户报告泄露 secret。
-- [ ] 聚焦测试、`make test`、`go vet ./...` 通过。
+- [x] 先为 SSH 官方 default-login 排除与非 SSH 默认凭据模板可达性写失败测试。
+- [x] 验证 `ssh-mini-brute` 模板存在且其尝试预算为 2 用户 x 2 密码。
+- [x] 更新 README、配置注释和报告说明，准确描述默认凭据检测与 SSH 限额。
+- [x] 保存 raw tool run 的操作者参数事实，同时避免在客户报告泄露 secret。
+- [x] 聚焦测试、`make test`、`go vet ./...` 通过。
 
 ## 非目标
 
