@@ -103,6 +103,35 @@ func TestImportNmapRunRedirectsToRun(t *testing.T) {
 	}
 }
 
+func TestImportNmapRunRejectsOversizeBody(t *testing.T) {
+	dir := t.TempDir()
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	fileWriter, err := writer.CreateFormFile("xml_file", "large.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fileWriter.Write(bytes.Repeat([]byte("x"), maxNmapImportSize)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/import/nmap/run", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "文件过大或格式错误") {
+		t.Fatalf("oversize import response = %d %q", res.Code, res.Body.String())
+	}
+}
+
 func TestImportNmapRunEmptyFileRendersFormError(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
