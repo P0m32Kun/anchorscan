@@ -9,6 +9,8 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/app"
 )
 
+const maxNmapImportSize = 8 << 20 // 8 MiB
+
 func (s *server) importNmapForm(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -40,7 +42,8 @@ func (s *server) importNmapRun(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := r.ParseMultipartForm(8 << 20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, maxNmapImportSize)
+	if err := r.ParseMultipartForm(maxNmapImportSize); err != nil {
 		s.renderImportForm(w, "文件过大或格式错误")
 		return
 	}
