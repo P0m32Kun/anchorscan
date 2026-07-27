@@ -7,6 +7,14 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 )
 
+func TestMatchNucleiTagsFormatsIPv6HostPort(t *testing.T) {
+	fp := fingerprint.ServiceFingerprint{IP: "2001:db8::10", Port: 6379, Normalized: "redis"}
+	rules := []TagRule{{Service: []string{"redis"}, Target: "hostport"}}
+	if got := MatchNucleiTags(fp, HTTPResult{}, rules).Address; got != "[2001:db8::10]:6379" {
+		t.Fatalf("Address = %q", got)
+	}
+}
+
 func TestMatchNucleiTagsUsesServiceAndProductRules(t *testing.T) {
 	rules := []TagRule{
 		{

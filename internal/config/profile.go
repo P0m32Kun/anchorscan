@@ -130,6 +130,9 @@ func validateScopeSafeArgs(tool string, args []string) error {
 			if i+1 >= len(args) {
 				return fmt.Errorf("%s arg requires a value: %s", tool, flag)
 			}
+			if strings.HasPrefix(args[i+1], "-") {
+				return fmt.Errorf("%s arg requires a non-flag value: %s", tool, flag)
+			}
 			i++
 		}
 	}

@@ -12,9 +12,27 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
+
+func TestScopeAllowsFindingRejectsNucleiEndpointOutsideScope(t *testing.T) {
+	scope, err := target.ParseScope("192.0.2.0/24", "192.0.2.20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scopeAllowsFinding(scope, report.Finding{IP: "192.0.2.20"}) {
+		t.Fatal("excluded Nuclei endpoint was allowed")
+	}
+	if scopeAllowsFinding(scope, report.Finding{IP: "198.51.100.10"}) {
+		t.Fatal("out-of-scope Nuclei endpoint was allowed")
+	}
+	if !scopeAllowsFinding(scope, report.Finding{IP: "192.0.2.10"}) {
+		t.Fatal("in-scope Nuclei endpoint was rejected")
+	}
+}
 
 func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
 	fallback := fingerprint.ServiceFingerprint{IP: "172.22.0.1", Port: 8080, Protocol: "tcp"}
@@ -33,6 +51,36 @@ func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
 	}
 	if finding.Target != "172.22.0.1:6379" {
 		t.Fatalf("finding target = %q", finding.Target)
+	}
+}
+
+func TestRunScanDiscardsOutOfScopeNucleiFinding(t *testing.T) {
+	scope, err := target.ParseScope("192.168.1.10", "192.168.1.20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.168.1.10 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"ip\":\"192.168.1.20\",\"port\":\"22\",\"matched-at\":\"192.168.1.20:22\"}\n"),
+	}}
+	scanStore := newScanStore(t)
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-out-of-scope-nuclei", Scope: scope, Targets: scope.NmapTargets(), Ports: "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		TagRules:       []TagRule{{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, Target: "hostport"}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	findings, err := scanStore.ListFindings("run-out-of-scope-nuclei")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("out-of-scope findings persisted: %#v", findings)
 	}
 }
 

@@ -1,7 +1,8 @@
 package vuln
 
 import (
-	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
@@ -32,7 +33,7 @@ type MatchResult struct {
 func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules []TagRule) MatchResult {
 	for _, rule := range rules {
 		if contains(rule.Service, fp.Normalized) || contains(rule.Product, fp.Product) || overlaps(rule.Tech, http.Tech) {
-			address := fmt.Sprintf("%s:%d", fp.IP, fp.Port)
+			address := net.JoinHostPort(fp.IP, strconv.Itoa(fp.Port))
 			if rule.Target == "url" && http.URL != "" {
 				address = http.URL
 			}

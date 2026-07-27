@@ -247,6 +247,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			if err == nil && parseErr == nil {
 				for _, nucleiResult := range nucleiFindings {
 					finding := findingFromNuclei(nucleiResult, fp, allFingerprints)
+					if !scopeAllowsFinding(opts.Scope, finding) {
+						progress.Emit("warning", "nuclei", "discarded out-of-scope finding for %s", finding.IP)
+						continue
+					}
 					if err := persistFinding(opts, finding); err != nil {
 						_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "persistence_failed", err.Error(), started, time.Now())
 						return result, err
@@ -351,6 +355,10 @@ func filterScopeFingerprints(scope target.Scope, fingerprints []fingerprint.Serv
 		}
 	}
 	return filtered
+}
+
+func scopeAllowsFinding(scope target.Scope, finding report.Finding) bool {
+	return scope.IsZero() || scope.Allows(finding.IP)
 }
 
 func scopeAllowsURL(scope target.Scope, value string) bool {

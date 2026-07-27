@@ -74,6 +74,7 @@ func TestValidateScopeSafeToolArgsRejectsTargetSelectors(t *testing.T) {
 		{Httpx: []string{"-target=https://example.test"}},
 		{Nuclei: []string{"-target", "https://example.test"}},
 		{Nuclei: []string{"-u=https://example.test"}},
+		{Nmap: []string{"--max-retries", "-iL"}},
 		{Nuclei: []string{"-unknown", "https://example.test"}},
 	} {
 		if err := ValidateScopeSafeToolArgs(args); err == nil {

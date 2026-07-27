@@ -60,11 +60,11 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
 	}
-	ctx, finishLease, abortLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
-	if err != nil {
+	if err := config.ValidateScopeSafeToolArgs(opts.ExtraArgs); err != nil {
 		return err
 	}
-	if err := config.ValidateScopeSafeToolArgs(opts.ExtraArgs); err != nil {
+	ctx, finishLease, abortLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
+	if err != nil {
 		return err
 	}
 	runSaved := false
