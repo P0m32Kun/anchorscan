@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
@@ -69,6 +71,9 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}()
 	toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nmap)
 	fingerprints, out, err := tools.FingerprintWithOutput(toolCtx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
+	if !opts.Scope.IsZero() {
+		fingerprints = filterScopeFingerprints(opts.Scope, fingerprints)
+	}
 	normalizedErr = normalizeToolError(toolCtx, err)
 	cancel()
 	close(done)
@@ -105,7 +110,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				result.HadErrors = true
 				progress.Emit("error", "httpx", "httpx %s failed: %v", fp.URL, err)
 			}
-			if httpResult.URL != "" {
+			if httpResult.URL != "" && (opts.Scope.IsZero() || scopeAllowsURL(opts.Scope, httpResult.URL)) {
 				fp.URL = httpResult.URL
 			}
 		}
@@ -336,6 +341,21 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
+}
+
+func filterScopeFingerprints(scope target.Scope, fingerprints []fingerprint.ServiceFingerprint) []fingerprint.ServiceFingerprint {
+	filtered := make([]fingerprint.ServiceFingerprint, 0, len(fingerprints))
+	for _, fp := range fingerprints {
+		if scope.Allows(fp.IP) {
+			filtered = append(filtered, fp)
+		}
+	}
+	return filtered
+}
+
+func scopeAllowsURL(scope target.Scope, value string) bool {
+	parsed, err := url.Parse(value)
+	return err == nil && scope.Allows(parsed.Hostname())
 }
 
 func recordDetectionCheck(opts ScanOptions, fp fingerprint.ServiceFingerprint, engine, status, reasonCode, detail string, startedAt, finishedAt time.Time) error {

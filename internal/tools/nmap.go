@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/xml"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -16,7 +17,11 @@ func Fingerprint(ctx context.Context, runner Runner, binaryPath string, ip strin
 }
 
 func FingerprintWithOutput(ctx context.Context, runner Runner, binaryPath string, ip string, ports []int, extraArgs []string) ([]fingerprint.ServiceFingerprint, []byte, error) {
-	args := []string{"-sV", "--version-intensity", "7", "-p", joinPorts(ports), ip, "-oX", "-"}
+	args := []string{"-sV", "--version-intensity", "7", "-p", joinPorts(ports)}
+	if address, err := netip.ParseAddr(ip); err == nil && !address.Is4() {
+		args = append(args, "-6")
+	}
+	args = append(args, ip, "-oX", "-")
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)
@@ -78,6 +83,9 @@ func DiscoverAliveInScope(ctx context.Context, runner Runner, binaryPath string,
 
 func DiscoverAliveInScopeWithOutput(ctx context.Context, runner Runner, binaryPath string, scope target.Scope, extraArgs []string) ([]string, []byte, error) {
 	args := []string{"-sn"}
+	if scope.IsIPv6() {
+		args = append(args, "-6")
+	}
 	args = append(args, scope.NmapTargets()...)
 	if excludes := scope.NmapExcludes(); len(excludes) > 0 {
 		args = append(args, "--exclude", strings.Join(excludes, ","))

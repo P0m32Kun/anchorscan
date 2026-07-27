@@ -31,9 +31,14 @@ func ParseScope(includeSpec, excludeSpec string) (Scope, error) {
 	if err != nil {
 		return Scope{}, err
 	}
+	includes = removeCoveredPrefixes(includes)
 	excludes, err := parsePrefixesOptional(excludeSpec, "exclude target")
 	if err != nil {
 		return Scope{}, err
+	}
+	excludes = removeCoveredPrefixes(excludes)
+	if mixedAddressFamilies(includes) {
+		return Scope{}, fmt.Errorf("IPv4 and IPv6 targets cannot be mixed in one scan")
 	}
 	includes = removeExcludedPrefixes(includes, excludes)
 	if len(includes) == 0 {
@@ -125,6 +130,19 @@ func removeCoveredPrefixes(prefixes []netip.Prefix) []netip.Prefix {
 	return result
 }
 
+func mixedAddressFamilies(prefixes []netip.Prefix) bool {
+	if len(prefixes) < 2 {
+		return false
+	}
+	family := prefixes[0].Addr().Is4()
+	for _, prefix := range prefixes[1:] {
+		if prefix.Addr().Is4() != family {
+			return true
+		}
+	}
+	return false
+}
+
 func removeExcludedPrefixes(includes, excludes []netip.Prefix) []netip.Prefix {
 	result := make([]netip.Prefix, 0, len(includes))
 	for _, included := range includes {
@@ -165,6 +183,10 @@ func (s Scope) Targets() []string { return prefixStrings(s.includes) }
 func (s Scope) Excludes() []string { return prefixStrings(s.excludes) }
 
 func (s Scope) EstimatedAddresses() uint64 { return s.estimated }
+
+func (s Scope) IsIPv6() bool {
+	return len(s.includes) > 0 && !s.includes[0].Addr().Is4()
+}
 
 func (s Scope) NmapTargets() []string { return nmapPrefixStrings(s.includes) }
 
