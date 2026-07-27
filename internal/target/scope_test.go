@@ -95,3 +95,13 @@ func TestParseScopeRejectsOversizedAddressCountBeforeExpansion(t *testing.T) {
 		})
 	}
 }
+
+func TestScopeAddressesExpandsOnlyAuthorizedHosts(t *testing.T) {
+	scope, err := ParseScope("192.0.2.0/30", "192.0.2.2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := scope.Addresses(), []string{"192.0.2.0", "192.0.2.1", "192.0.2.3"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Addresses() = %#v, want %#v", got, want)
+	}
+}

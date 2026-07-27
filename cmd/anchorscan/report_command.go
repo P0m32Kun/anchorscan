@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -43,6 +44,10 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	if err != nil {
 		return err
 	}
+	run, err := scanStore.GetScanRun(*runID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
 	fps, err := scanStore.ListFingerprints(*runID)
 	if err != nil {
 		return err
@@ -63,7 +68,9 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 			StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
 		})
 	}
-	builtReport := report.BuildWithScanDataAndDetectionChecks(fps, findings, report.ScanData{}, reportChecks)
+	builtReport := report.BuildWithScanDataAndDetectionChecks(fps, findings, report.ScanData{
+		DiscoveryMode: app.DiscoveryModeFromConfigSnapshot(run.ConfigSnapshot),
+	}, reportChecks)
 	manifest, err := scanStore.GetRunProvenance(*runID)
 	if err != nil {
 		return err

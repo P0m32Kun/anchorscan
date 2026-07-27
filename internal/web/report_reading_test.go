@@ -19,7 +19,7 @@ func TestBuildRunReportReadingFiltersAndView(t *testing.T) {
 		fps[i] = fingerprint.ServiceFingerprint{IP: "10.0.0." + strconv.Itoa(i+1), Port: 80, Service: "http"}
 	}
 	findings := []report.Finding{{IP: "10.0.0.1", Port: 80, Source: "nuclei", Severity: "info"}}
-	run := store.ScanRun{RunID: "run-x", Status: "completed"}
+	run := store.ScanRun{RunID: "run-x", Status: "completed", ConfigSnapshot: `{"discovery_mode":"assume-up"}`}
 	checks := []report.DetectionCheck{
 		{IP: "10.0.0.1", Port: 80, Protocol: "tcp", Engine: "nse", Status: "completed"},
 	}
@@ -52,6 +52,9 @@ func TestBuildRunReportReadingFiltersAndView(t *testing.T) {
 	// coverage populated for non-running run
 	if reading.DetectionCoverage == nil {
 		t.Fatal("DetectionCoverage is nil")
+	}
+	if reading.Built.DiscoveryMode != "assume-up" {
+		t.Fatalf("DiscoveryMode = %q, want assume-up", reading.Built.DiscoveryMode)
 	}
 }
 

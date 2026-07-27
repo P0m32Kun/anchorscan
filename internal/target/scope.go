@@ -227,6 +227,27 @@ func (s Scope) NmapTargets() []string { return nmapPrefixStrings(s.includes) }
 
 func (s Scope) NmapExcludes() []string { return nmapPrefixStrings(s.excludes) }
 
+// Addresses expands this already-bounded scope into individual authorized
+// addresses. It is for tools that cannot represent exclusions in their own
+// target syntax; ParseScope caps the expansion at MaxAddresses.
+func (s Scope) Addresses() []string {
+	addresses := make([]string, 0, int(s.estimated))
+	seen := make(map[netip.Addr]struct{}, int(s.estimated))
+	for _, prefix := range s.includes {
+		for address := prefix.Masked().Addr(); prefix.Contains(address); address = address.Next() {
+			if !s.AllowsAddr(address) {
+				continue
+			}
+			if _, ok := seen[address]; ok {
+				continue
+			}
+			seen[address] = struct{}{}
+			addresses = append(addresses, address.String())
+		}
+	}
+	return addresses
+}
+
 func (s Scope) SingleAddress() (string, bool) {
 	if len(s.includes) != 1 {
 		return "", false

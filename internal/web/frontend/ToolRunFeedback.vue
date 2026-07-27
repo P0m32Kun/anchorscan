@@ -12,6 +12,7 @@ const followingOutput = ref(true);
 const terminal = ref<HTMLElement>();
 let form: HTMLFormElement | null = null;
 let stopped = false;
+const eventPageSize = 1000;
 
 function onScroll() {
   const box = terminal.value;
@@ -30,11 +31,12 @@ async function poll(run: string) {
     if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
     output.value = events.value.map((event) => `[${event.time}] [${event.level || 'info'}] ${event.stage || 'tool'}: ${event.message}`).join('\n') || '工具已启动，等待输出…';
     const status = (await statusResult.json() as { status: string }).status;
-    if (status !== 'running') {
+    const hasMoreEvents = newEvents.length === eventPageSize;
+    if (status !== 'running' && !hasMoreEvents) {
       feedback.value = status === 'completed' ? '工具运行已完成。' : `工具运行已结束：${status}。`;
       return;
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    if (status === 'running') await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
 }
 

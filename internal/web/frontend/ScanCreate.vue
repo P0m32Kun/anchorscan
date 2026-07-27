@@ -39,7 +39,7 @@ const artifactRoot = ref(props.artifactRoot);
 const submitting = ref(false);
 const optionalOpen = ref(false);
 const errorSummary = ref<HTMLElement>();
-const optionalFields = ['label', 'exclude_targets', 'exclude_ports', 'discovery_mode', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
+const optionalFields = ['label', 'exclude_targets', 'exclude_ports', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
 const formFields = ['zone_id', 'target', 'exclude_targets', 'ports', 'exclude_ports', 'profile', 'discovery_mode', 'label', 'access_point', 'tester_ip', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
 
 const optionalChangedCount = computed(() => {

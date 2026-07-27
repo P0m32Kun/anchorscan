@@ -62,6 +62,9 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 			progress.Emit("info", "target", "no live hosts discovered; skip port scan")
 		}
 	} else if opts.DiscoveryMode == "assume-up" && len(targets) > 0 {
+		// Rustscan has no exclusion argument, so expand the bounded Scope into
+		// authorized hosts rather than passing an exclusion-bearing CIDR through.
+		targets = scope.Addresses()
 		aliveIPs = append([]string(nil), targets...)
 		progress.Emit("info", "target", "assume-up: skip alive discovery, treat %d host(s) as up", len(targets))
 	}

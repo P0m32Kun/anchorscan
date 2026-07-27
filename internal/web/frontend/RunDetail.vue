@@ -29,7 +29,10 @@ const feedback = ref('');
 const metaOpen = ref(false);
 const followingOutput = ref(true);
 const eventLog = ref<HTMLElement>();
+const eventPageSize = 1000;
 let timer = 0;
+let refreshing = false;
+let hasMoreEvents = false;
 
 const active = computed(() => status.value === 'running');
 const latestEvent = computed(() => events.value.at(-1));
@@ -59,17 +62,24 @@ function runURL(suffix: string) {
 }
 
 async function refresh() {
-  const [statusResult, eventResult] = await Promise.all([
-    fetch(runURL('/status')),
-    fetch(runURL(`/events?after_id=${latestEvent.value?.id ?? 0}`)),
-  ]);
-  if (!statusResult.ok || !eventResult.ok) throw new Error('refresh failed');
-  const statusData = await statusResult.json() as StatusResponse;
-  status.value = statusData.status;
-  checks.value = statusData.detection_checks || {};
-  const newEvents = await eventResult.json() as ScanEvent[];
-  if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
-  if (!active.value) window.clearInterval(timer);
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    const [statusResult, eventResult] = await Promise.all([
+      fetch(runURL('/status')),
+      fetch(runURL(`/events?after_id=${latestEvent.value?.id ?? 0}`)),
+    ]);
+    if (!statusResult.ok || !eventResult.ok) throw new Error('refresh failed');
+    const statusData = await statusResult.json() as StatusResponse;
+    status.value = statusData.status;
+    checks.value = statusData.detection_checks || {};
+    const newEvents = await eventResult.json() as ScanEvent[];
+    if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
+    hasMoreEvents = newEvents.length === eventPageSize;
+    if (!active.value && !hasMoreEvents) window.clearInterval(timer);
+  } finally {
+    refreshing = false;
+  }
 }
 
 async function cancelRun() {
@@ -117,7 +127,7 @@ onMounted(async () => {
   } catch {
     feedback.value = '暂时无法更新运行状态。';
   }
-  if (active.value) timer = window.setInterval(() => { void refresh().catch(() => { feedback.value = '暂时无法更新运行状态。'; }); }, 1200);
+  if (active.value || hasMoreEvents) timer = window.setInterval(() => { void refresh().catch(() => { feedback.value = '暂时无法更新运行状态。'; }); }, 1200);
 });
 
 onBeforeUnmount(() => window.clearInterval(timer));
