@@ -172,7 +172,11 @@ func Restore(archivePath string, opts RestoreOptions) error {
 		opts.ArtifactRoot = filepath.Join(opts.DataRoot, "artifacts")
 	}
 
-	extractDir, err := os.MkdirTemp("", "anchorscan-restore-*")
+	// Extract within the data root so that os.Rename stays on the same filesystem.
+	if err := os.MkdirAll(opts.DataRoot, 0o755); err != nil {
+		return fmt.Errorf("create data root: %w", err)
+	}
+	extractDir, err := os.MkdirTemp(opts.DataRoot, "anchorscan-restore-*")
 	if err != nil {
 		return fmt.Errorf("create extract dir: %w", err)
 	}
@@ -191,6 +195,9 @@ func Restore(archivePath string, opts RestoreOptions) error {
 	}
 	if err := validateManifest(extractDir, manifest); err != nil {
 		return fmt.Errorf("validate manifest: %w", err)
+	}
+	if err := validateNoExtraFiles(extractDir, manifest); err != nil {
+		return fmt.Errorf("validate archive contents: %w", err)
 	}
 
 	// Replace target directories. Fail fast if any replacement errors.
@@ -267,6 +274,36 @@ func readManifest(root string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	return manifest, nil
+}
+
+// validateNoExtraFiles ensures every file under root is listed in the manifest.
+// It prevents injecting arbitrary files into the managed directories even when
+// every listed manifest entry is valid.
+func validateNoExtraFiles(root string, manifest Manifest) error {
+	allowed := make(map[string]struct{}, len(manifest.Entries))
+	for _, entry := range manifest.Entries {
+		allowed[entry.RelPath] = struct{}{}
+	}
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "manifest.json" {
+			return nil
+		}
+		if _, ok := allowed[rel]; !ok {
+			return fmt.Errorf("extra file in archive: %s", rel)
+		}
+		return nil
+	})
 }
 
 func validateManifest(root string, manifest Manifest) error {

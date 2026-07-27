@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/backup"
 )
@@ -72,7 +73,7 @@ func runRestore(args []string, stdout io.Writer, deps cliDeps) error {
 	if err != nil {
 		return err
 	}
-	if err := scanStore.ReconcileInterruptedRuns(deps.now(), 30); err != nil {
+	if err := scanStore.ReconcileInterruptedRuns(deps.now(), 30*time.Second); err != nil {
 		_ = scanStore.Close()
 		return err
 	}

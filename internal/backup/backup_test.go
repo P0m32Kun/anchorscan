@@ -4,6 +4,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"image"
 	"image/color"
 	"image/png"
@@ -291,4 +293,120 @@ func TestBackupRestoresEvidence(t *testing.T) {
 	if _, err := os.Stat(rs.EvidenceFilePath(evidence[0], "p1")); err != nil {
 		t.Fatalf("evidence file not restored: %v", err)
 	}
+}
+
+func TestValidateManifestRejectsHashMismatch(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "data.txt"), []byte("wrong"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest := Manifest{
+		Version: backupVersion,
+		Entries: []ManifestEntry{{RelPath: "data.txt", Size: 5, SHA256: "0000000000000000000000000000000000000000000000000000000000000000"}},
+	}
+	if err := validateManifest(dir, manifest); err == nil {
+		t.Fatal("expected hash mismatch error")
+	}
+}
+
+func TestValidateManifestRejectsMissingFile(t *testing.T) {
+	dir := t.TempDir()
+	manifest := Manifest{
+		Version: backupVersion,
+		Entries: []ManifestEntry{{RelPath: "missing.txt", Size: 1, SHA256: "0000000000000000000000000000000000000000000000000000000000000000"}},
+	}
+	if err := validateManifest(dir, manifest); err == nil {
+		t.Fatal("expected missing file error")
+	}
+}
+
+func TestValidateNoExtraFilesRejectsInjectedFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "good.txt"), []byte("good"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "evil.txt"), []byte("evil"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manifest := Manifest{
+		Version: backupVersion,
+		Entries: []ManifestEntry{{RelPath: "good.txt", Size: 4, SHA256: hashOf("good")}},
+	}
+	if err := validateManifest(dir, manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateNoExtraFiles(dir, manifest); err == nil {
+		t.Fatal("expected extra file error")
+	}
+}
+
+func TestBackupIncludesArtifactsWhenRequested(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "data", "scans.sqlite")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveProject(store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	configDir := filepath.Join(dir, "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "default.yaml"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifactRoot := filepath.Join(dir, "data", "artifacts")
+	if err := os.MkdirAll(filepath.Join(artifactRoot, "run-1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(artifactRoot, "run-1", "report.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err = store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive, err := Create(CreateOptions{
+		Store:            s,
+		DataRoot:         filepath.Dir(dbPath),
+		DBPath:           dbPath,
+		ConfigDir:        configDir,
+		ArtifactRoot:     artifactRoot,
+		IncludeArtifacts: true,
+		OutputDir:        filepath.Join(dir, "backups"),
+		Now:              func() time.Time { return time.Unix(1, 0) },
+	})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	restoreDir := filepath.Join(dir, "restore")
+	restoreDB := filepath.Join(restoreDir, "data", "scans.sqlite")
+	if err := Restore(archive, RestoreOptions{
+		DataRoot:     filepath.Dir(restoreDB),
+		DBPath:       restoreDB,
+		ConfigDir:    filepath.Join(restoreDir, "config"),
+		ArtifactRoot: filepath.Join(restoreDir, "data", "artifacts"),
+	}); err != nil {
+		t.Fatalf("Restore returned error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(restoreDir, "data", "artifacts", "run-1", "report.json")); err != nil {
+		t.Fatalf("artifact not restored: %v", err)
+	}
+}
+
+func hashOf(s string) string {
+	h := sha256.New()
+	_, _ = h.Write([]byte(s))
+	return hex.EncodeToString(h.Sum(nil))
 }

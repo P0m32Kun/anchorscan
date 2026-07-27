@@ -59,3 +59,27 @@ func TestRestoreCommandRejectsMissingArchive(t *testing.T) {
 		t.Fatal("expected restore to reject missing --archive")
 	}
 }
+
+func TestRestoreCommandRejectsActiveRunLease(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "data", "scans.sqlite")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AcquireRunLease("run-1", "owner-1", time.Now(), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	deps := cliDeps{openStore: store.Open, now: func() time.Time { return time.Now() }}
+	if err := runRestore([]string{
+		"--archive", filepath.Join(dir, "backup.tar.gz"),
+		"--db", dbPath,
+	}, &stdout, deps); err == nil {
+		t.Fatal("expected restore to reject active run lease")
+	}
+}
