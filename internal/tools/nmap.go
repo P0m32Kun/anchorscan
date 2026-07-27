@@ -54,8 +54,9 @@ type aliveXML struct {
 		Status struct {
 			State string `xml:"state,attr"`
 		} `xml:"status"`
-		Address struct {
+		Addresses []struct {
 			Addr string `xml:"addr,attr"`
+			Type string `xml:"addrtype,attr"`
 		} `xml:"address"`
 	} `xml:"host"`
 }
@@ -107,13 +108,28 @@ func DiscoverAliveInScopeWithOutput(ctx context.Context, runner Runner, binaryPa
 		if host.Status.State != "up" {
 			continue
 		}
-		address := host.Address.Addr
+		address := ipAddress(host.Addresses)
 		if address == "" {
 			address, _ = scope.SingleAddress()
 		}
 		addresses = append(addresses, address)
 	}
 	return scope.Filter(addresses), out, nil
+}
+
+func ipAddress(addresses []struct {
+	Addr string `xml:"addr,attr"`
+	Type string `xml:"addrtype,attr"`
+}) string {
+	for _, address := range addresses {
+		if address.Type != "" && address.Type != "ipv4" && address.Type != "ipv6" {
+			continue
+		}
+		if ip, err := netip.ParseAddr(address.Addr); err == nil {
+			return ip.String()
+		}
+	}
+	return ""
 }
 
 func CheckAlive(ctx context.Context, runner Runner, binaryPath string, target string, extraArgs []string) (bool, error) {

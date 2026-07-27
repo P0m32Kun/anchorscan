@@ -66,6 +66,22 @@ func TestDiscoverAliveInScopeExcludesUnapprovedHosts(t *testing.T) {
 	}
 }
 
+func TestDiscoverAliveInScopeSelectsIPOverMACAddress(t *testing.T) {
+	scope, err := target.ParseScope("192.0.2.10", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &aliveRunner{out: []byte(`<nmaprun><host><status state="up"/><address addr="192.0.2.10" addrtype="ipv4"/><address addr="00:11:22:33:44:55" addrtype="mac"/></host></nmaprun>`)}
+
+	alive, err := DiscoverAliveInScope(context.Background(), runner, "nmap", scope, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := alive, []string{"192.0.2.10"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("alive = %#v, want %#v", got, want)
+	}
+}
+
 func TestDiscoverAliveBuildsSingleNmapPingAndParsesAliveHosts(t *testing.T) {
 	runner := &aliveRunner{out: []byte(`<nmaprun><host><status state="up"/><address addr="192.0.2.1" addrtype="ipv4"/></host><host><status state="down"/><address addr="192.0.2.2" addrtype="ipv4"/></host><host><status state="up"/><address addr="198.51.100.10" addrtype="ipv4"/></host></nmaprun>`)}
 
