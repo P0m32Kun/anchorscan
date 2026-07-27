@@ -107,6 +107,27 @@ func TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails(t *testing.T) {
 	}
 }
 
+func TestExecuteScanRejectsInvalidScopeBeforeOpeningStore(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "scan:\n  ports: 80\n  profile: normal\n")
+	storeOpened := false
+
+	err := run([]string{"scan", "--config", configPath, "--target=-Pn", "--db", filepath.Join(dir, "scan.db"), "--json", filepath.Join(dir, "report.json")}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{
+		newRunner: func() tools.Runner { return failRunner{} },
+		openStore: func(string) (*store.Store, error) {
+			storeOpened = true
+			return nil, errors.New("store must not open")
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid target") {
+		t.Fatalf("run error = %v, want invalid target", err)
+	}
+	if storeOpened {
+		t.Fatal("scope rejection opened the store")
+	}
+}
+
 func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

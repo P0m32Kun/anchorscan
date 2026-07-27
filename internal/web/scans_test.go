@@ -425,8 +425,8 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if run.AccessPoint != "core-sw-a" || run.TesterIP != "10.0.0.5" || run.Notes != "lab" {
 		t.Fatalf("unexpected run context fields: %#v", run)
 	}
-	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) {
-		t.Fatalf("expected exclusions in snapshot: %s", run.ConfigSnapshot)
+	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) || !strings.Contains(run.ConfigSnapshot, `"scope":{"includes":["127.0.0.1/32"],"excludes":["192.0.2.1/32"],"estimated_addresses":1}`) {
+		t.Fatalf("expected exclusions and normalized scope in snapshot: %s", run.ConfigSnapshot)
 	}
 	if run.Kind != "scan" {
 		t.Fatalf("expected kind scan, got %q", run.Kind)

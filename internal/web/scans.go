@@ -14,26 +14,28 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
 
 // scanForm is the small, explicitly allowed subset of a prior scan that can
 // be shown again for user-confirmed reruns.
 type scanForm struct {
-	ZoneID         string `json:"zone_id"`
-	Target         string `json:"target"`
-	ExcludeTargets string `json:"exclude_targets"`
-	Ports          string `json:"ports"`
-	ExcludePorts   string `json:"exclude_ports"`
-	Profile        string `json:"profile"`
-	Label          string `json:"label"`
-	AccessPoint    string `json:"access_point"`
-	TesterIP       string `json:"tester_ip"`
-	Notes          string `json:"notes"`
-	RustscanArgs   string `json:"rustscan_args"`
-	NmapArgs       string `json:"nmap_args"`
-	HttpxArgs      string `json:"httpx_args"`
-	NucleiArgs     string `json:"nuclei_args"`
-	IsRerun        bool   `json:"-"`
+	ZoneID         string          `json:"zone_id"`
+	Target         string          `json:"target"`
+	ExcludeTargets string          `json:"exclude_targets"`
+	Ports          string          `json:"ports"`
+	ExcludePorts   string          `json:"exclude_ports"`
+	Profile        string          `json:"profile"`
+	Label          string          `json:"label"`
+	AccessPoint    string          `json:"access_point"`
+	TesterIP       string          `json:"tester_ip"`
+	Notes          string          `json:"notes"`
+	RustscanArgs   string          `json:"rustscan_args"`
+	NmapArgs       string          `json:"nmap_args"`
+	HttpxArgs      string          `json:"httpx_args"`
+	NucleiArgs     string          `json:"nuclei_args"`
+	Scope          target.Snapshot `json:"scope"`
+	IsRerun        bool            `json:"-"`
 }
 
 type scanCreateProps struct {
@@ -194,6 +196,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	form.Target = strings.Join(prepared.Options.Targets, ",")
+	form.Scope = prepared.Options.Scope.Snapshot()
 	form.Ports = prepared.Options.Ports
 	form.Profile = prepared.Options.ProfileName
 	prepared.Options.ConfigSnapshot = scanFormSnapshot(form)

@@ -19,6 +19,7 @@ type Options struct {
 	JSONPath      string
 	ReportDir     string
 	Targets       []string
+	TargetCount   int
 	PortSpec      string
 	Tools         config.ToolPaths
 	Profile       string
@@ -74,6 +75,9 @@ func Run(opts Options) Result {
 			NSERuleCount: opts.NSERuleCount,
 			TagRuleCount: opts.TagRuleCount,
 		},
+	}
+	if opts.TargetCount > 0 {
+		result.Summary.TargetCount = opts.TargetCount
 	}
 
 	if len(opts.Targets) == 0 {

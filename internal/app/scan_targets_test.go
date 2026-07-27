@@ -10,7 +10,33 @@ import (
 	"testing"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
+
+func TestRunScanNeverScansAliveHostsOutsideScope(t *testing.T) {
+	scope, err := target.ParseScope("172.22.0.0/30", "172.22.0.2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &scopeFilteringRunner{}
+	err = RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
+		RunID:          "run-scope-filter",
+		Targets:        scope.Targets(),
+		Scope:          scope,
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if got, want := runner.rustscanTargets, []string{"172.22.0.1"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rustscan targets = %#v, want %#v", got, want)
+	}
+	if got, want := runner.aliveArgs, []string{"-sn", "172.22.0.0/30", "--exclude", "172.22.0.2", "-oX", "-"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("alive args = %#v, want %#v", got, want)
+	}
+}
 
 func TestRunScanClampsHostWorkers(t *testing.T) {
 	for _, tc := range []struct {
@@ -105,6 +131,24 @@ func TestRunScanFastProfileDoesNotReduceAliveSweep(t *testing.T) {
 	}
 	if runner.rustscanCalls != 2 {
 		t.Fatalf("fast profile scanned %d alive hosts, want 2", runner.rustscanCalls)
+	}
+}
+
+type scopeFilteringRunner struct {
+	aliveArgs       []string
+	rustscanTargets []string
+}
+
+func (r *scopeFilteringRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	switch binary {
+	case "/opt/nmap":
+		r.aliveArgs = append([]string(nil), args...)
+		return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1" addrtype="ipv4"/></host><host><status state="up"/><address addr="172.22.0.2" addrtype="ipv4"/></host><host><status state="up"/><address addr="198.51.100.10" addrtype="ipv4"/></host></nmaprun>`), nil
+	case "/opt/rustscan":
+		r.rustscanTargets = append(r.rustscanTargets, args[1])
+		return []byte(args[1] + " -> []\n"), nil
+	default:
+		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
 }
 

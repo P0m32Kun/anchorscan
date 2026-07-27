@@ -4,6 +4,8 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
 
 type aliveRunner struct {
@@ -42,6 +44,25 @@ func TestCheckAliveReturnsFalseForDownHost(t *testing.T) {
 	}
 	if alive {
 		t.Fatal("expected host to be down")
+	}
+}
+
+func TestDiscoverAliveInScopeExcludesUnapprovedHosts(t *testing.T) {
+	scope, err := target.ParseScope("192.0.2.0/24", "192.0.2.20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &aliveRunner{out: []byte(`<nmaprun><host><status state="up"/><address addr="192.0.2.1" addrtype="ipv4"/></host><host><status state="up"/><address addr="192.0.2.20" addrtype="ipv4"/></host><host><status state="up"/><address addr="198.51.100.10" addrtype="ipv4"/></host></nmaprun>`)}
+
+	alive, err := DiscoverAliveInScope(context.Background(), runner, "nmap", scope, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := alive, []string{"192.0.2.1"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("alive = %#v, want %#v", got, want)
+	}
+	if got, want := runner.args, []string{"-sn", "192.0.2.0/24", "--exclude", "192.0.2.20", "-oX", "-"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
 	}
 }
 

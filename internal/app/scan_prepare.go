@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"path/filepath"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
@@ -36,11 +37,12 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		return PreparedScan{}, err
 	}
 
-	targets, err := target.Parse(req.TargetSpec)
+	scope, err := target.ParseScope(req.TargetSpec, req.ExcludeTargets)
 	if err != nil {
 		return PreparedScan{}, err
 	}
-	targets, err = target.Exclude(targets, req.ExcludeTargets)
+	targets := scope.NmapTargets()
+	scopeSnapshot, err := json.Marshal(scope.Snapshot())
 	if err != nil {
 		return PreparedScan{}, err
 	}
@@ -77,6 +79,7 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		JSONPath:      req.JSONReportPath,
 		ReportDir:     filepath.Dir(req.JSONReportPath),
 		Targets:       targets,
+		TargetCount:   int(scope.EstimatedAddresses()),
 		PortSpec:      portSpec,
 		Tools:         toolPaths,
 		Profile:       effective.ProfileName,
@@ -98,12 +101,14 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		ProjectID:      req.ProjectID,
 		ZoneID:         req.ZoneID,
 		Targets:        targets,
+		Scope:          scope,
 		Ports:          resolvedPorts,
 		Tools:          toolPaths,
 		ProfileName:    effective.ProfileName,
 		HostWorkers:    effective.HostWorkers,
 		ExtraArgs:      extraArgs,
 		Timeouts:       timeouts,
+		ConfigSnapshot: string(scopeSnapshot),
 		JSONReportPath: req.JSONReportPath,
 		ArtifactRoot:   req.ArtifactRoot,
 		NSERules:       nseRules,

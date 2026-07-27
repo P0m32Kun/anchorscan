@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -8,7 +9,53 @@ import (
 	"testing"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
+
+func TestPrepareScanBuildsNormalizedScopeSnapshot(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	prepared, err := PrepareScan(PrepareScanRequest{
+		ConfigPath: fixture.configPath, TargetSpec: "192.0.2.0/24", ExcludeTargets: "192.0.2.20",
+		DBPath: fixture.dbPath, JSONReportPath: fixture.jsonPath, ArtifactRoot: fixture.artifactPath,
+	})
+	if err != nil {
+		t.Fatalf("PrepareScan returned error: %v", err)
+	}
+	if prepared.Preflight.HasErrors() {
+		t.Fatalf("PrepareScan preflight errors: %#v", prepared.Preflight.Errors)
+	}
+	if !prepared.Options.Scope.Allows("192.0.2.1") || prepared.Options.Scope.Allows("192.0.2.20") {
+		t.Fatalf("scope does not enforce exclusion: %#v", prepared.Options.Scope.Snapshot())
+	}
+	if got, want := prepared.Options.Targets, []string{"192.0.2.0/24"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Targets = %#v, want %#v", got, want)
+	}
+	var snapshot target.Snapshot
+	if err := json.Unmarshal([]byte(prepared.Options.ConfigSnapshot), &snapshot); err != nil {
+		t.Fatalf("ConfigSnapshot is not scope JSON: %v", err)
+	}
+	if got, want := snapshot, prepared.Options.Scope.Snapshot(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("scope snapshot = %#v, want %#v", got, want)
+	}
+	if got, want := prepared.Preflight.Summary.TargetCount, 256; got != want {
+		t.Fatalf("TargetCount = %d, want %d", got, want)
+	}
+}
+
+func TestPrepareScanRejectsInvalidOrOversizedScope(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	for _, targetSpec := range []string{"host.local", "-Pn", "192.0.2.0/19"} {
+		t.Run(targetSpec, func(t *testing.T) {
+			prepared, err := PrepareScan(PrepareScanRequest{
+				ConfigPath: fixture.configPath, TargetSpec: targetSpec,
+				DBPath: fixture.dbPath, JSONReportPath: fixture.jsonPath, ArtifactRoot: fixture.artifactPath,
+			})
+			if err == nil || !reflect.DeepEqual(prepared, PreparedScan{}) {
+				t.Fatalf("PrepareScan(%q) = %#v, %v; want ordinary scope error", targetSpec, prepared, err)
+			}
+		})
+	}
+}
 
 func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	fixture := newPrepareScanFixture(t)
@@ -37,8 +84,8 @@ func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	if got, want := prepared.Preflight.Summary.TagRuleCount, len(prepared.Options.TagRules); got != want {
 		t.Fatalf("tag rule count = %d, want %d", got, want)
 	}
-	if prepared.Options.ConfigSnapshot != "" {
-		t.Fatalf("ConfigSnapshot = %q, want zero value", prepared.Options.ConfigSnapshot)
+	if prepared.Options.ConfigSnapshot == "" {
+		t.Fatal("ConfigSnapshot is empty")
 	}
 
 	prepared, err = PrepareScan(PrepareScanRequest{

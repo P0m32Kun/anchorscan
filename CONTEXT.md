@@ -19,7 +19,11 @@
 Project 内用于组织测试范围和报告内容的业务分区。创建 Project Scan Run 时必须且只能选择一个 Zone；标准选项为 I区、II区、III区，也允许使用甲方定义的自定义分区。Project Report 只生成实际有纳入内容的 Zone，不补空分区。Zone 的持久化载体为 `store.ProjectZone`（`project_id`, `zone_id`, `name`, `sort_order`），按 `sort_order` 稳定排序。
 
 ### Target（目标）
-被扫描的**单个**主机/IP。一次 Run 扫描一组 Targets（`ScanOptions.Targets`）。
+被扫描的**单个**主机/IP。一次 Run 扫描一组 Targets（`ScanOptions.Targets`）。Target 只能是规范 IPv4、IPv6 或 CIDR；hostname、范围表达式和以 `-` 开头的扫描器参数不是合法 Target。
+
+### Scan Scope（授权扫描范围，简称 Scope）
+一次 Run 的规范化 include/exclude IP 前缀集合。由 `target.ParseScope` 使用 `net/netip` 构建，最大估算地址数为 4096，且不为计数展开 CIDR。Scope 是授权边界：Nmap 使用其 include/exclude 参数，Nmap 回传地址也必须通过 Scope 过滤，后续 rustscan、httpx 与检测阶段只接收允许地址。它的稳定快照保存进 `ScanOptions.ConfigSnapshot`。
+
 
 ### TargetScan（单目标扫描结果）
 对**一个** Target 执行流水线（rustscan→nmap→httpx→NSE/nuclei）产出的结果束：`Fingerprints` + `Findings` + `OpenPorts`（见 `internal/app.TargetScan`）。

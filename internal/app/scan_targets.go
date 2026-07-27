@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
 
@@ -17,12 +19,20 @@ type targetResult struct {
 
 func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, artifactDir string, progress Progress) ([]TargetScan, []string, bool, error) {
 	var aliveIPs []string
-	targets := opts.Targets
+	scope := opts.Scope
+	if scope.IsZero() {
+		var err error
+		scope, err = target.ParseScope(strings.Join(opts.Targets, ","), "")
+		if err != nil {
+			return nil, nil, false, err
+		}
+	}
+	targets := scope.NmapTargets()
 
 	if opts.Tools.Nmap != "" && len(targets) > 0 {
 		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", targets)
 		toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
-		aliveTargets, out, err := tools.DiscoverAliveWithOutput(toolCtx, runner, opts.Tools.Nmap, targets, nil)
+		aliveTargets, out, err := tools.DiscoverAliveInScopeWithOutput(toolCtx, runner, opts.Tools.Nmap, scope, nil)
 		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
 			cancel()
 			return nil, nil, false, writeErr

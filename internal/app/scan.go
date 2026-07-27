@@ -12,6 +12,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
@@ -34,6 +35,7 @@ type ScanOptions struct {
 	Notes                string
 	IncludeInReport      bool
 	Targets              []string
+	Scope                target.Scope
 	Ports                string
 	Tools                ToolPaths
 	ProfileName          string

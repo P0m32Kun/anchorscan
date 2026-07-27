@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
 
 func Fingerprint(ctx context.Context, runner Runner, binaryPath string, ip string, ports []int, extraArgs []string) ([]fingerprint.ServiceFingerprint, error) {
@@ -55,13 +56,32 @@ type aliveXML struct {
 }
 
 func DiscoverAlive(ctx context.Context, runner Runner, binaryPath string, targets []string, extraArgs []string) ([]string, error) {
-	alive, _, err := DiscoverAliveWithOutput(ctx, runner, binaryPath, targets, extraArgs)
-	return alive, err
+	scope, err := target.ParseScope(strings.Join(targets, ","), "")
+	if err != nil {
+		return nil, err
+	}
+	return DiscoverAliveInScope(ctx, runner, binaryPath, scope, extraArgs)
 }
 
 func DiscoverAliveWithOutput(ctx context.Context, runner Runner, binaryPath string, targets []string, extraArgs []string) ([]string, []byte, error) {
+	scope, err := target.ParseScope(strings.Join(targets, ","), "")
+	if err != nil {
+		return nil, nil, err
+	}
+	return DiscoverAliveInScopeWithOutput(ctx, runner, binaryPath, scope, extraArgs)
+}
+
+func DiscoverAliveInScope(ctx context.Context, runner Runner, binaryPath string, scope target.Scope, extraArgs []string) ([]string, error) {
+	alive, _, err := DiscoverAliveInScopeWithOutput(ctx, runner, binaryPath, scope, extraArgs)
+	return alive, err
+}
+
+func DiscoverAliveInScopeWithOutput(ctx context.Context, runner Runner, binaryPath string, scope target.Scope, extraArgs []string) ([]string, []byte, error) {
 	args := []string{"-sn"}
-	args = append(args, targets...)
+	args = append(args, scope.NmapTargets()...)
+	if excludes := scope.NmapExcludes(); len(excludes) > 0 {
+		args = append(args, "--exclude", strings.Join(excludes, ","))
+	}
 	args = append(args, "-oX", "-")
 	args = append(args, extraArgs...)
 
@@ -74,26 +94,18 @@ func DiscoverAliveWithOutput(ctx context.Context, runner Runner, binaryPath stri
 	if err := xml.Unmarshal(out, &parsed); err != nil {
 		return nil, out, err
 	}
-	seen := make(map[string]struct{}, len(parsed.Hosts))
-	alive := make([]string, 0, len(parsed.Hosts))
+	addresses := make([]string, 0, len(parsed.Hosts))
 	for _, host := range parsed.Hosts {
 		if host.Status.State != "up" {
 			continue
 		}
-		addr := host.Address.Addr
-		if addr == "" && len(targets) == 1 {
-			addr = targets[0]
+		address := host.Address.Addr
+		if address == "" {
+			address, _ = scope.SingleAddress()
 		}
-		if addr == "" {
-			continue
-		}
-		if _, ok := seen[addr]; ok {
-			continue
-		}
-		seen[addr] = struct{}{}
-		alive = append(alive, addr)
+		addresses = append(addresses, address)
 	}
-	return alive, out, nil
+	return scope.Filter(addresses), out, nil
 }
 
 func CheckAlive(ctx context.Context, runner Runner, binaryPath string, target string, extraArgs []string) (bool, error) {
