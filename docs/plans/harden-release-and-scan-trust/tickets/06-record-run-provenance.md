@@ -4,7 +4,7 @@
 
 **Blocked by:** 05 — 让默认自动探测保持 safe。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -24,12 +24,12 @@
 
 ## 验收
 
-- [ ] 先写相同 Run 在规则文件变化后仍保留原 provenance 的失败测试。
-- [ ] 为 Artifact 增加独立已知 SHA-256 断言。
-- [ ] 报告展示必要 provenance 和实际 DetectionCheck，不暴露 raw secret。
-- [ ] 旧数据库 migration 后仍可读取历史 Run。
-- [ ] JSON 新字段保持向后兼容。
-- [ ] 聚焦测试、`make test`、`go vet ./...`、报告 smoke 通过。
+- [x] 先写相同 Run 在规则文件变化后仍保留原 provenance 的失败测试。
+- [x] 为 Artifact 增加独立已知 SHA-256 断言。
+- [x] 报告展示必要 provenance 和实际 DetectionCheck，不暴露 raw secret。
+- [x] 旧数据库 migration 后仍可读取历史 Run。
+- [x] JSON 新字段保持向后兼容。
+- [x] 聚焦测试、`make test`、`go vet ./...`、报告 smoke 通过。
 
 ## 非目标
 
