@@ -32,8 +32,7 @@ AnchorScan 的核心编排、SQLite Run Lease、DetectionCheck 历史事实和 P
 
 - 产品继续定位为本机单操作者工具；本计划不引入账号、权限、远程 Web 部署或分布式 worker。
 - Web 默认只允许 loopback 监听。未来 LAN/远程访问需要单独 ADR，同时设计认证与 TLS。
-- 扫描速度 `Profile` 与探测风险是两个概念。默认流水线只执行 safe 探测。
-- 第一阶段直接从默认规则移除 brute、default-login 和用户枚举；只有出现明确产品需求后才增加自动化 `ProbePolicy: active`。
+- 扫描速度 `Profile` 与探测风险是两个概念。默认流水线保留非 SSH 服务的弱口令/默认凭据检测；SSH 排除官方大字典模板，改由仓库提供的 `ssh-mini-brute` 模板执行最多 2 用户 x 2 密码（4 次）尝试。
 - Scan Scope 支持文档承诺且能可靠验证的 IP、IPv6 和 CIDR。未明确支持的 hostname/range 输入不得以任意字符串形式传给扫描器。
 - 大网段不得为了计数而完整展开到内存；Scope 保留 prefix 表示并在执行前做规模判断。
 - DetectionCheck 仍表示历史执行事实，不解释为漏洞覆盖率或安全保证。
