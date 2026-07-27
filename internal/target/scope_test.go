@@ -33,6 +33,23 @@ func TestParseScopeExcludesAddressInsideCIDR(t *testing.T) {
 	}
 }
 
+func TestParseScopeSplitsMixedAddressFamiliesForDiscovery(t *testing.T) {
+	scope, err := ParseScope("192.0.2.10,2001:db8::10", "")
+	if err != nil {
+		t.Fatalf("ParseScope returned error: %v", err)
+	}
+	discovery := scope.DiscoveryScopes()
+	if len(discovery) != 2 || discovery[0].IsIPv6() || !discovery[1].IsIPv6() {
+		t.Fatalf("DiscoveryScopes = %#v", discovery)
+	}
+	if got, want := discovery[0].NmapTargets(), []string{"192.0.2.10"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("IPv4 targets = %#v, want %#v", got, want)
+	}
+	if got, want := discovery[1].NmapTargets(), []string{"2001:db8::10"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("IPv6 targets = %#v, want %#v", got, want)
+	}
+}
+
 func TestParseScopeNormalizesIPv6AndPrefixExclusions(t *testing.T) {
 	scope, err := ParseScope("2001:db8:1::1, 2001:db8:2::ff/120", "2001:db8:2::80/121,2001:db8:1::1")
 	if err != nil {

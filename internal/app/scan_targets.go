@@ -34,20 +34,28 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 	targets := scope.NmapTargets()
 
 	if opts.Tools.Nmap != "" && len(targets) > 0 {
-		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", targets)
-		toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
-		aliveTargets, out, err := tools.DiscoverAliveInScopeWithOutput(toolCtx, runner, opts.Tools.Nmap, scope, nil)
-		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
+		discovered := make([]string, 0)
+		for _, discoveryScope := range scope.DiscoveryScopes() {
+			progress.Emit("info", "nmap", "nmap alive sweep targets=%v", discoveryScope.NmapTargets())
+			toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
+			aliveTargets, out, err := tools.DiscoverAliveInScopeWithOutput(toolCtx, runner, opts.Tools.Nmap, discoveryScope, nil)
+			artifactName := "nmap-alive-ipv4.xml"
+			if discoveryScope.IsIPv6() {
+				artifactName = "nmap-alive-ipv6.xml"
+			}
+			if _, writeErr := writeArtifact(artifactDir, artifactName, out); writeErr != nil {
+				cancel()
+				return nil, nil, false, writeErr
+			}
+			if err != nil {
+				normalized := normalizeToolError(toolCtx, err)
+				cancel()
+				return nil, nil, false, normalized
+			}
 			cancel()
-			return nil, nil, false, writeErr
+			discovered = append(discovered, aliveTargets...)
 		}
-		if err != nil {
-			normalized := normalizeToolError(toolCtx, err)
-			cancel()
-			return nil, nil, false, normalized
-		}
-		cancel()
-		targets = aliveTargets
+		targets = scope.Filter(discovered)
 		aliveIPs = append([]string(nil), targets...)
 		progress.Emit("info", "nmap", "nmap alive hosts=%v", targets)
 		if len(targets) == 0 {

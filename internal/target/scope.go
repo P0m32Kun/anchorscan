@@ -37,9 +37,6 @@ func ParseScope(includeSpec, excludeSpec string) (Scope, error) {
 		return Scope{}, err
 	}
 	excludes = removeCoveredPrefixes(excludes)
-	if mixedAddressFamilies(includes) {
-		return Scope{}, fmt.Errorf("IPv4 and IPv6 targets cannot be mixed in one scan")
-	}
 	includes = removeExcludedPrefixes(includes, excludes)
 	if len(includes) == 0 {
 		return Scope{}, fmt.Errorf("target scope is empty after exclusions")
@@ -128,6 +125,35 @@ func removeCoveredPrefixes(prefixes []netip.Prefix) []netip.Prefix {
 		}
 	}
 	return result
+}
+
+func (s Scope) DiscoveryScopes() []Scope {
+	var ipv4, ipv6 []netip.Prefix
+	for _, prefix := range s.includes {
+		if prefix.Addr().Is4() {
+			ipv4 = append(ipv4, prefix)
+		} else {
+			ipv6 = append(ipv6, prefix)
+		}
+	}
+	return compactScopes(ipv4, ipv6, s.excludes)
+}
+
+func compactScopes(ipv4, ipv6, excludes []netip.Prefix) []Scope {
+	var scopes []Scope
+	for _, includes := range [][]netip.Prefix{ipv4, ipv6} {
+		if len(includes) == 0 {
+			continue
+		}
+		familyExcludes := make([]netip.Prefix, 0)
+		for _, exclude := range excludes {
+			if exclude.Addr().Is4() == includes[0].Addr().Is4() {
+				familyExcludes = append(familyExcludes, exclude)
+			}
+		}
+		scopes = append(scopes, Scope{includes: includes, excludes: familyExcludes, estimated: estimateAddresses(includes)})
+	}
+	return scopes
 }
 
 func mixedAddressFamilies(prefixes []netip.Prefix) bool {
