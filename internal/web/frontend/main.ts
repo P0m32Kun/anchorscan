@@ -34,6 +34,10 @@ function mountScanCreate() {
   mountPoint.dataset.mounted = 'true';
 }
 
+function normalizeEnum(value: unknown, allowed: readonly string[], fallback: string) {
+  return typeof value === 'string' && allowed.includes(value) ? value : fallback;
+}
+
 function mountWorkbench() {
   const mountPoint = document.querySelector<HTMLElement>('[data-workbench]');
   if (!mountPoint) return;
@@ -43,7 +47,16 @@ function mountWorkbench() {
   props.incomplete_checks ||= [];
   props.verifications ||= [];
   props.zones ||= [];
-  props.zone_names ||= {};
+  props.verifications = props.verifications.map((verification: Record<string, unknown>) => ({
+    ...verification,
+    Outcome: normalizeEnum(verification.Outcome, ['confirmed', 'inconclusive', 'not_observed'], 'inconclusive'),
+    Severity: normalizeEnum(verification.Severity, ['critical', 'high', 'medium', 'low', 'info'], 'info'),
+  }));
+  props.candidates = props.candidates.map((candidate: Record<string, unknown>) => ({
+    ...candidate,
+    Assets: Array.isArray(candidate.Assets) ? candidate.Assets : [],
+    Sources: Array.isArray(candidate.Sources) ? candidate.Sources : [],
+  }));
   props.counts ||= { positive: 0, negative: 0, incomplete: 0 };
   createApp(Workbench, props).mount(mountPoint);
   mountPoint.dataset.mounted = 'true';
