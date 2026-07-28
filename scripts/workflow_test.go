@@ -43,12 +43,15 @@ func TestWorkflowsPinActionsAndReleaseArtifacts(t *testing.T) {
 	if !strings.Contains(string(pr), "make security-check") {
 		t.Fatal("PR workflow does not run dependency security checks")
 	}
+	if !strings.Contains(string(pr), "version: \"0.11.32\"") {
+		t.Fatal("PR workflow does not pin uv version")
+	}
 
 	makefile, err := os.ReadFile(filepath.Join(repoRoot, "Makefile"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"govulncheck@v1.1.4", "npm audit --audit-level=high", "uv lock --check"} {
+	for _, want := range []string{"govulncheck@v1.1.4", "npm audit --audit-level=high --registry=https://registry.npmjs.org", "uv lock --check"} {
 		if !strings.Contains(string(makefile), want) {
 			t.Fatalf("Makefile security check does not contain %q", want)
 		}

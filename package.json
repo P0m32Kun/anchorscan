@@ -8,12 +8,12 @@
     "test:web": "node scripts/web-smoke.mjs"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "5.1.0",
+    "@vitejs/plugin-vue": "^6.0.8",
     "playwright": "1.61.1",
     "typescript": "5.5.4",
-    "vite": "5.3.5",
+    "vite": "^7.3.6",
     "vue": "3.4.34",
-    "vue-tsc": "2.0.29"
+    "vue-tsc": "^3.3.8"
   },
   "engines": {
     "node": ">=20"

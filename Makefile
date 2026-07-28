@@ -48,7 +48,7 @@ package-test: package package-smoke
 
 security-check:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
-	npm audit --audit-level=high --omit=dev
+	npm audit --audit-level=high --registry=https://registry.npmjs.org
 	uv lock --check --project tools/docx-render
 
 web-smoke: build
