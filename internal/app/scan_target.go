@@ -210,12 +210,12 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 
 		match := vuln.MatchNucleiTags(fp, vuln.HTTPResult{URL: fp.URL, Tech: httpResult.Tech}, opts.TagRules)
 		switch {
-		case len(match.Tags) == 0:
-			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
-				return TargetScan{}, err
-			}
+		// MatchNucleiTags returns a zero-value MatchResult (empty Address) when no
+		// rule matches. A template-based match carries an empty Tags slice but a
+		// non-empty Address and Template, so "no match" must key on Address — using
+		// len(Tags)==0 here would wrongly skip every template-based rule.
 		case match.Address == "":
-			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "missing_target", "nuclei target is empty", time.Now(), time.Now()); err != nil {
+			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
 		case opts.Tools.Nuclei == "":
