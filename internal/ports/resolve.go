@@ -2,13 +2,12 @@ package ports
 
 import (
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-func Resolve(spec string, presetDir string) (string, error) {
+func Resolve(spec string) (string, error) {
 	spec = strings.TrimSpace(spec)
 	if spec == "top1000" {
 		return spec, nil
@@ -61,15 +60,7 @@ func parsePort(value string) (int, error) {
 }
 
 func ResolveForConfig(spec string, configPath string) (string, error) {
-	dir := filepath.Dir(configPath)
-	resolved, err := Resolve(spec, dir)
-	if err == nil {
-		return resolved, nil
-	}
-	if dir != "config" {
-		return Resolve(spec, "config")
-	}
-	return "", err
+	return Resolve(spec)
 }
 
 func ExcludeForConfig(portSpec string, excludeSpec string, configPath string) (string, error) {
@@ -127,11 +118,11 @@ func expandPortSpec(spec string) ([]int, error) {
 			if len(bounds) != 2 {
 				return nil, fmt.Errorf("invalid port range: %s", part)
 			}
-			start, err := parsePortNumber(bounds[0])
+			start, err := parsePort(bounds[0])
 			if err != nil {
 				return nil, err
 			}
-			end, err := parsePortNumber(bounds[1])
+			end, err := parsePort(bounds[1])
 			if err != nil {
 				return nil, err
 			}
@@ -146,7 +137,7 @@ func expandPortSpec(spec string) ([]int, error) {
 			}
 			continue
 		}
-		port, err := parsePortNumber(part)
+		port, err := parsePort(part)
 		if err != nil {
 			return nil, err
 		}
@@ -157,15 +148,6 @@ func expandPortSpec(spec string) ([]int, error) {
 	}
 	slices.Sort(out)
 	return out, nil
-}
-
-func parsePortNumber(value string) (int, error) {
-	var port int
-	_, err := fmt.Sscanf(strings.TrimSpace(value), "%d", &port)
-	if err != nil || port < 1 || port > 65535 {
-		return 0, fmt.Errorf("invalid port: %s", value)
-	}
-	return port, nil
 }
 
 func compressPorts(ports []int) string {

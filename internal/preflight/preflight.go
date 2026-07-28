@@ -86,7 +86,7 @@ func Run(opts Options) Result {
 
 	if strings.TrimSpace(opts.PortSpec) == "" {
 		result.Errors = append(result.Errors, Message{Field: "ports", Message: "ports is empty"})
-	} else if resolved, err := ports.Resolve(opts.PortSpec, opts.ConfigDir); err != nil {
+	} else if resolved, err := ports.Resolve(opts.PortSpec); err != nil {
 		result.Errors = append(result.Errors, Message{Field: "ports", Message: err.Error()})
 	} else if err := validatePorts(resolved); err != nil {
 		result.Errors = append(result.Errors, Message{Field: "ports", Message: err.Error()})

@@ -52,7 +52,7 @@ func Run(opts Options) []Check {
 		rdpscanCheck(cfg.Tools.Rdpscan),
 	)
 
-	if _, err := ports.Resolve(cfg.Scan.Ports, filepath.Dir(opts.ConfigPath)); err != nil {
+	if _, err := ports.Resolve(cfg.Scan.Ports); err != nil {
 		checks = append(checks, failCheck("ports", err.Error()))
 	} else {
 		checks = append(checks, okCheck("ports", "ok"))

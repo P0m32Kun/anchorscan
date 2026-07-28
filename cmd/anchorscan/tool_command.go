@@ -58,7 +58,7 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		if resolvedPorts == "" {
 			resolvedPorts = cfg.Scan.Ports
 		}
-		resolvedPorts, err = ports.Resolve(resolvedPorts, filepath.Dir(*configPath))
+		resolvedPorts, err = ports.Resolve(resolvedPorts)
 		if err != nil {
 			return err
 		}
