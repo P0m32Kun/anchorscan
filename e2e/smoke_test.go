@@ -466,17 +466,29 @@ func buildBinary(t *testing.T, root string) string {
 
 func writeConfig(t *testing.T, root, dir string, paths toolPaths) string {
 	t.Helper()
-	for _, name := range []string{"nse.yaml", "service-tags.yaml"} {
-		data, err := os.ReadFile(filepath.Join(root, "config", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
-			t.Fatal(err)
-		}
+	nseData, err := os.ReadFile(filepath.Join(root, "config", "nse.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "nse.yaml"), nseData, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The lab runs hermetically (no `nuclei -update-templates`), so tag-based
+	// nuclei rules have no public templates to match. Route the Tomcat check
+	// through the trusted template-rule mechanism (service-tags.yaml `template`
+	// field -> RunNucleiTemplate) via the bundled lab-tomcat.yaml fixture,
+	// instead of raw "-t" profile args, which the scan-scope allowlist rejects.
+	template := filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml")
+	tagRules := fmt.Sprintf(`- name: tomcat
+  product: ["tomcat", "apache tomcat"]
+  tech: ["tomcat"]
+  template: %q
+  target: "url"
+`, template)
+	if err := os.WriteFile(filepath.Join(dir, "service-tags.yaml"), []byte(tagRules), 0o644); err != nil {
+		t.Fatal(err)
 	}
 	configPath := filepath.Join(dir, "config.yaml")
-	template := filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml")
 	content := fmt.Sprintf(`tools:
   rustscan: %q
   nmap: %q
@@ -493,8 +505,7 @@ profiles:
     rustscan_args: ["--ulimit", "5000"]
     nmap_args: ["-T2", "--max-retries", "2"]
     httpx_args: ["-silent"]
-    nuclei_args: ["-t", %q]
-`, paths.rustscan, paths.nmap, paths.httpx, paths.nuclei, template)
+`, paths.rustscan, paths.nmap, paths.httpx, paths.nuclei)
 	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}

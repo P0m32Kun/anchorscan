@@ -108,6 +108,7 @@ func validateScopeSafeArgs(tool string, args []string) error {
 		},
 		"httpx": {
 			"-rate-limit": true, "-threads": true, "-timeout": true, "-retries": true,
+			"-silent": false,
 		},
 		"nuclei": {
 			"-rate-limit": true, "-c": true, "-retries": true, "-timeout": true,

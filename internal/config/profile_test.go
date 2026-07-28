@@ -88,3 +88,19 @@ func TestValidateScopeSafeToolArgsRejectsTargetSelectors(t *testing.T) {
 		t.Fatalf("allowed tuning args rejected: %v", err)
 	}
 }
+
+func TestValidateScopeSafeToolArgsAllowsBenignHttpxSilentAndKeepsNucleiTemplateBlocked(t *testing.T) {
+	// httpx -silent suppresses the banner so only the JSON line remains for
+	// parsing; it is scope-neutral (the httpx runner injects it internally) and
+	// must be allowed by the scan-scope allowlist.
+	if err := ValidateScopeSafeToolArgs(ToolArgs{Httpx: []string{"-silent"}}); err != nil {
+		t.Fatalf("httpx -silent rejected: %v", err)
+	}
+	// nuclei -t selects a template and is scope-sensitive (arbitrary template
+	// / local-file paths from untrusted overrides), so it stays rejected.
+	// Trusted configs that need a fixed template use the service-tags.yaml
+	// `template` rule (RunNucleiTemplate) instead of raw -t args.
+	if err := ValidateScopeSafeToolArgs(ToolArgs{Nuclei: []string{"-t", "evil.yaml"}}); err == nil {
+		t.Fatal("nuclei -t must stay rejected by the scan-scope allowlist")
+	}
+}
