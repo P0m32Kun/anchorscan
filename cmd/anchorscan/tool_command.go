@@ -58,7 +58,7 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		if resolvedPorts == "" {
 			resolvedPorts = cfg.Scan.Ports
 		}
-		resolvedPorts, err = ports.Resolve(resolvedPorts, filepath.Dir(*configPath))
+		resolvedPorts, err = ports.Resolve(resolvedPorts)
 		if err != nil {
 			return err
 		}
@@ -83,6 +83,14 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	}
 
 	runID := "tool-" + toolName + "-" + deps.now().Format("20060102-150405")
+	configDir := filepath.Dir(*configPath)
+	rulePaths := []string{
+		filepath.Join(configDir, "nse.yaml"),
+		filepath.Join(configDir, "service-tags.yaml"),
+	}
+	if *templateValue != "" {
+		rulePaths = append(rulePaths, *templateValue)
+	}
 	opts := app.ToolRunOptions{
 		RunID:     runID,
 		ProjectID: *projectID,
@@ -93,6 +101,7 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		URL:       *urlValue,
 		Tags:      splitCSV(*tagsValue),
 		Template:  *templateValue,
+		RulePaths: rulePaths,
 		Tools: app.ToolPaths{
 			Rustscan: cfg.Tools.Rustscan,
 			Nmap:     cfg.Tools.Nmap,

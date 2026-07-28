@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
 type serverSequenceRunner struct {
+	mu       sync.Mutex
 	outputs  [][]byte
 	commands [][]string
 	index    int
@@ -19,7 +21,9 @@ type serverSequenceRunner struct {
 }
 
 func (r *serverSequenceRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
+	r.mu.Lock()
 	r.commands = append(r.commands, append([]string{binary}, args...))
+	r.mu.Unlock()
 	if r.started != nil {
 		close(r.started)
 		r.started = nil
@@ -36,7 +40,11 @@ func (r *serverSequenceRunner) Run(_ context.Context, binary string, args []stri
 }
 
 func (r *serverSequenceRunner) hasArgs(binary string, want ...string) bool {
-	for _, cmd := range r.commands {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	commands := make([][]string, len(r.commands))
+	copy(commands, r.commands)
+	for _, cmd := range commands {
 		if len(cmd) == 0 || cmd[0] != binary {
 			continue
 		}
@@ -62,6 +70,8 @@ func (r *serverSequenceRunner) hasArgs(binary string, want ...string) bool {
 }
 
 func (r *serverSequenceRunner) callCount(binary string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	count := 0
 	for _, cmd := range r.commands {
 		if len(cmd) > 0 && cmd[0] == binary {
@@ -69,6 +79,16 @@ func (r *serverSequenceRunner) callCount(binary string) int {
 		}
 	}
 	return count
+}
+
+func (r *serverSequenceRunner) Commands() [][]string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([][]string, len(r.commands))
+	for i, cmd := range r.commands {
+		out[i] = append([]string(nil), cmd...)
+	}
+	return out
 }
 
 func writeFile(t *testing.T, path string, content string) {
@@ -107,6 +127,33 @@ func closeServer(t *testing.T, handler http.Handler) {
 			t.Fatalf("Close returned error: %v", err)
 		}
 	})
+}
+
+func TestServerRejectsCrossOriginStateChangeAndNonLoopbackListen(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "0.0.0.0:8088"}); err == nil {
+		t.Fatal("non-loopback listen address was accepted")
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: filepath.Join(dir, "scan.db"), Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	req := httptest.NewRequest(http.MethodPost, "/projects", nil)
+	req.Header.Set("Origin", "https://attacker.example")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", res.Code, http.StatusForbidden)
+	}
+
+	crossSite := httptest.NewRequest(http.MethodPost, "/projects", nil)
+	crossSite.Header.Set("Sec-Fetch-Site", "cross-site")
+	res = httptest.NewRecorder()
+	handler.ServeHTTP(res, crossSite)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("cross-site status = %d, want %d", res.Code, http.StatusForbidden)
+	}
 }
 
 func TestNavIncludesImportNmapEntry(t *testing.T) {

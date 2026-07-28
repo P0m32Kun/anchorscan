@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
@@ -61,7 +63,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		for {
 			select {
 			case <-ticker.C:
-				logf(opts, "nmap %s still running elapsed=%s", target, time.Since(started).Round(time.Second))
+				progress.Emit("info", "heartbeat", "nmap %s still running elapsed=%s", target, time.Since(started).Round(time.Second))
 			case <-done:
 				return
 			}
@@ -69,6 +71,9 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}()
 	toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nmap)
 	fingerprints, out, err := tools.FingerprintWithOutput(toolCtx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
+	if !opts.Scope.IsZero() {
+		fingerprints = filterScopeFingerprints(opts.Scope, fingerprints)
+	}
 	normalizedErr = normalizeToolError(toolCtx, err)
 	cancel()
 	close(done)
@@ -105,7 +110,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				result.HadErrors = true
 				progress.Emit("error", "httpx", "httpx %s failed: %v", fp.URL, err)
 			}
-			if httpResult.URL != "" {
+			if httpResult.URL != "" && (opts.Scope.IsZero() || scopeAllowsURL(opts.Scope, httpResult.URL)) {
 				fp.URL = httpResult.URL
 			}
 		}
@@ -203,17 +208,27 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		// nuclei has an extra ParseNucleiJSONL + invalid_output stage that NSE lacks,
 		// so a shared helper would parameterize (and blur) the state machine.
 		default:
-			progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
 			started := time.Now()
 			stageFailed := false
 			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", "", started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nuclei)
-			out, err := tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+			var out []byte
+			var err error
+			var artifactKey string
+			if match.Template != "" {
+				progress.Emit("info", "nuclei", "nuclei %s template=%s", match.Address, match.Template)
+				out, err = tools.RunNucleiTemplate(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Template, opts.ExtraArgs.Nuclei)
+				artifactKey = "template"
+			} else {
+				progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
+				out, err = tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+				artifactKey = strings.Join(match.Tags, ",")
+			}
 			operatorCanceled := isOperatorCanceled(toolCtx)
 			cancel()
-			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), strings.Join(match.Tags, ","))+".jsonl", out); writeErr != nil {
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), artifactKey)+".jsonl", out); writeErr != nil {
 				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
 				result.HadErrors = true
 				stageFailed = true
@@ -242,6 +257,10 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			if err == nil && parseErr == nil {
 				for _, nucleiResult := range nucleiFindings {
 					finding := findingFromNuclei(nucleiResult, fp, allFingerprints)
+					if !scopeAllowsNucleiFinding(opts.Scope, nucleiResult, finding) {
+						progress.Emit("warning", "nuclei", "discarded out-of-scope finding for %s", finding.IP)
+						continue
+					}
 					if err := persistFinding(opts, finding); err != nil {
 						_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "persistence_failed", err.Error(), started, time.Now())
 						return result, err
@@ -336,6 +355,37 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
+}
+
+func filterScopeFingerprints(scope target.Scope, fingerprints []fingerprint.ServiceFingerprint) []fingerprint.ServiceFingerprint {
+	filtered := make([]fingerprint.ServiceFingerprint, 0, len(fingerprints))
+	for _, fp := range fingerprints {
+		if scope.Allows(fp.IP) {
+			filtered = append(filtered, fp)
+		}
+	}
+	return filtered
+}
+
+func scopeAllowsFinding(scope target.Scope, finding report.Finding) bool {
+	return scope.IsZero() || scope.Allows(finding.IP)
+}
+
+func scopeAllowsNucleiFinding(scope target.Scope, result tools.NucleiFinding, finding report.Finding) bool {
+	if !scopeAllowsFinding(scope, finding) {
+		return false
+	}
+	for _, host := range result.EndpointHosts() {
+		if !scope.Allows(host) {
+			return false
+		}
+	}
+	return true
+}
+
+func scopeAllowsURL(scope target.Scope, value string) bool {
+	parsed, err := url.Parse(value)
+	return err == nil && scope.Allows(parsed.Hostname())
 }
 
 func recordDetectionCheck(opts ScanOptions, fp fingerprint.ServiceFingerprint, engine, status, reasonCode, detail string, startedAt, finishedAt time.Time) error {

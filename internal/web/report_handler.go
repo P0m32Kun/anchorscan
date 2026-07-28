@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -85,6 +86,20 @@ func (s *server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	})
 
 	built := reading.Built
+	manifest, err := s.store.GetRunProvenance(runID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if manifest != "" {
+		var provenance app.RunProvenance
+		if err := json.Unmarshal([]byte(manifest), &provenance); err != nil {
+			http.Error(w, "decode run provenance: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		reportProvenance := app.ReportProvenance(provenance, app.EnginesFromDetectionChecks(built.DetectionChecks))
+		built.Provenance = &reportProvenance
+	}
 	if format == "html" || exportFormat == "html" {
 		report.EnrichFindingsWithVulnerabilityDetails(&built, s.catalog)
 	}

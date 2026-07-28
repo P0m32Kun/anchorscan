@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type ToolRunOptions struct {
 	Tags            []string
 	Template        string
 	Tools           ToolPaths
+	RulePaths       []string
 	ExtraArgs       ToolExtraArgs
 	Timeouts        ToolTimeouts
 	JSONReportPath  string
@@ -73,43 +75,80 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		finishLease(status, message, time.Now())
 	}()
 
-	if err := saveToolRun(scanStore, opts); err != nil {
+	startedAt := time.Now()
+	if err := saveToolRun(scanStore, opts, startedAt); err != nil {
 		return err
 	}
 	runSaved = true
 
+	// Tool runs are intentionally excluded from customer reports (IncludeInReport=false),
+	// but raw args must still be audited without leaking secrets into report-facing fields.
+	if opts.UseNativeArgs || hasExtraArgs(opts.ExtraArgs) {
+		emitTool(opts, scanStore, "warning", "tool", "raw tool arguments supplied; default safety limits are bypassed")
+	}
+
+	var scanReport report.ScanReport
+	var reportErr error
 	if opts.UseNativeArgs {
 		findings, runErr := runNativeTool(ctx, runner, scanStore, opts)
 		if runErr != nil {
 			return runErr
 		}
-		emitTool(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
-		return report.WriteJSON(opts.JSONReportPath, report.Build(nil, findings))
+		scanReport = report.Build(nil, findings)
+	} else {
+		var fingerprints []fingerprint.ServiceFingerprint
+		var findings []report.Finding
+		switch opts.Tool {
+		case "rustscan":
+			fingerprints, runErr = runRustscanTool(ctx, runner, scanStore, opts)
+		case "nmap":
+			fingerprints, findings, runErr = runNmapTool(ctx, runner, scanStore, opts)
+		case "httpx":
+			fingerprints, findings, runErr = runHTTPXTool(ctx, runner, scanStore, opts)
+		case "nuclei":
+			findings, runErr = runNucleiTool(ctx, runner, scanStore, opts)
+		default:
+			runErr = fmt.Errorf("unknown tool: %s", opts.Tool)
+		}
+		if runErr != nil {
+			return runErr
+		}
+		scanReport = report.Build(fingerprints, findings)
+	}
+	if reportErr != nil {
+		return reportErr
 	}
 
-	var fingerprints []fingerprint.ServiceFingerprint
-	var findings []report.Finding
-	switch opts.Tool {
-	case "rustscan":
-		fingerprints, runErr = runRustscanTool(ctx, runner, scanStore, opts)
-	case "nmap":
-		fingerprints, findings, runErr = runNmapTool(ctx, runner, scanStore, opts)
-	case "httpx":
-		fingerprints, findings, runErr = runHTTPXTool(ctx, runner, scanStore, opts)
-	case "nuclei":
-		findings, runErr = runNucleiTool(ctx, runner, scanStore, opts)
-	default:
-		runErr = fmt.Errorf("unknown tool: %s", opts.Tool)
-	}
-	if runErr != nil {
-		return runErr
-	}
+	prov := BuildRunProvenance(ProvenanceOptions{
+		Version:         "",
+		RulePaths:       opts.RulePaths,
+		TemplatePath:    opts.Template,
+		Tags:            opts.Tags,
+		Tools:           opts.Tools,
+		ConfigSnapshot:  redactedToolConfigSnapshot(opts),
+		Scope:           firstNonEmpty(opts.Target, opts.URL),
+		VersionProvider: nil,
+	}, startedAt, time.Time{}, nil)
+	prov.FinishedAt = time.Now()
+	reportProv := ReportProvenance(prov, []string{opts.Tool})
+	scanReport.Provenance = &reportProv
 
 	emitTool(opts, scanStore, "info", "report", "report json %s", opts.JSONReportPath)
-	return report.WriteJSON(opts.JSONReportPath, report.Build(fingerprints, findings))
+	if err := report.WriteJSON(opts.JSONReportPath, scanReport); err != nil {
+		return err
+	}
+	// Tool runs only write report.json; avoid hashing a shared reports directory.
+	artifactHashes := map[string]string{}
+	if opts.JSONReportPath != "" {
+		if h, err := hashFile(opts.JSONReportPath); err == nil {
+			artifactHashes[filepath.Base(opts.JSONReportPath)] = h
+		}
+	}
+	prov.ArtifactHashes = artifactHashes
+	return SaveRunProvenance(scanStore, opts.RunID, prov)
 }
 
-func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
+func saveToolRun(scanStore *store.Store, opts ToolRunOptions, startedAt time.Time) error {
 	snapshot, _ := json.Marshal(map[string]any{
 		"tool":            opts.Tool,
 		"mode":            opts.Mode,
@@ -120,6 +159,7 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 		"template":        opts.Template,
 		"use_native":      opts.UseNativeArgs,
 		"native_args":     opts.NativeArgs,
+		"extra_args":      opts.ExtraArgs,
 		"zone_id":         opts.ZoneID,
 		"verification_id": opts.VerificationID,
 	})
@@ -129,13 +169,17 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions) error {
 		ZoneID:          opts.ZoneID,
 		Kind:            "tool",
 		IncludeInReport: false,
-		Target:          firstNonEmpty(opts.Target, opts.URL, strings.Join(opts.NativeArgs, " ")),
+		Target:          firstNonEmpty(opts.Target, opts.URL),
 		Ports:           opts.Ports,
 		Profile:         "tool:" + opts.Tool,
 		Status:          "running",
-		StartedAt:       time.Now(),
+		StartedAt:       startedAt,
 		ConfigSnapshot:  string(snapshot),
 	})
+}
+
+func hasExtraArgs(args ToolExtraArgs) bool {
+	return len(args.Rustscan) > 0 || len(args.Nmap) > 0 || len(args.Httpx) > 0 || len(args.Nuclei) > 0
 }
 
 func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]report.Finding, error) {
@@ -161,7 +205,7 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 		ID:       "native-output",
 		Severity: "info",
 		Summary:  opts.Tool + " native output",
-		Target:   strings.Join(opts.NativeArgs, " "),
+		Target:   firstNonEmpty(opts.Target, opts.URL, opts.Tool),
 		Output:   output,
 	}
 	if err := scanStore.SaveFinding(opts.RunID, finding); err != nil {

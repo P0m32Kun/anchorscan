@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
@@ -22,6 +23,9 @@ func NewManager(runner tools.Runner, scanStore *store.Store) *Manager {
 }
 
 func (m *Manager) Start(ctx context.Context, opts ScanOptions) (string, error) {
+	if err := config.ValidateScopeSafeToolArgs(opts.ExtraArgs); err != nil {
+		return "", err
+	}
 	m.mu.Lock()
 	if m.activeID != "" {
 		m.mu.Unlock()

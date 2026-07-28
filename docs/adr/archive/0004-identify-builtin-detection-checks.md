@@ -1,8 +1,8 @@
 # ADR-0004：用 check_id 区分内置探针检测事实
 
-- 状态：Accepted
+- 状态：Rolled back by migration `remove_builtin_probe_identity`
 - 日期：2026-07-20
-- 关联计划：`docs/plans/add-builtin-vulnerability-probes/`
+- 关联计划：`docs/plans/archive/add-builtin-vulnerability-probes/`
 
 同一 Fingerprint 可能适用多个 Builtin Probe，仅以 engine 标识 DetectionCheck 会使探针结果互相覆盖，也无法审计历史 Run 实际执行了哪些检查。因此 DetectionCheck 增加可选 `check_id`，事实键扩展为 Run、Fingerprint 自然键、engine 与 `check_id`；既有 NSE/nuclei 记录保留空 `check_id`。这项决策细化 ADR-0003 的历史事实原则，而不改变 DetectionCheck 只记录实际执行、不表达漏洞覆盖保证的语义。
 

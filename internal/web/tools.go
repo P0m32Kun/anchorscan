@@ -194,6 +194,14 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	configDir := filepath.Dir(s.opts.ConfigPath)
+	rulePaths := []string{
+		filepath.Join(configDir, "nse.yaml"),
+		filepath.Join(configDir, "service-tags.yaml"),
+	}
+	if templateValue != "" {
+		rulePaths = append(rulePaths, templateValue)
+	}
 	opts := app.ToolRunOptions{
 		RunID:          runID,
 		ProjectID:      projectID,
@@ -208,6 +216,7 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		URL:            urlValue,
 		Tags:           splitCSV(tagsValue),
 		Template:       templateValue,
+		RulePaths:      rulePaths,
 		Tools: app.ToolPaths{
 			Rustscan: cfg.Tools.Rustscan,
 			Nmap:     cfg.Tools.Nmap,

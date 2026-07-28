@@ -14,27 +14,29 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 	"github.com/P0m32Kun/anchorscan/internal/preflight"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
 
 // scanForm is the small, explicitly allowed subset of a prior scan that can
 // be shown again for user-confirmed reruns.
 type scanForm struct {
-	ZoneID         string `json:"zone_id"`
-	Target         string `json:"target"`
-	ExcludeTargets string `json:"exclude_targets"`
-	Ports          string `json:"ports"`
-	ExcludePorts   string `json:"exclude_ports"`
-	DiscoveryMode  string `json:"discovery_mode"`
-	Profile        string `json:"profile"`
-	Label          string `json:"label"`
-	AccessPoint    string `json:"access_point"`
-	TesterIP       string `json:"tester_ip"`
-	Notes          string `json:"notes"`
-	RustscanArgs   string `json:"rustscan_args"`
-	NmapArgs       string `json:"nmap_args"`
-	HttpxArgs      string `json:"httpx_args"`
-	NucleiArgs     string `json:"nuclei_args"`
-	IsRerun        bool   `json:"-"`
+	ZoneID         string          `json:"zone_id"`
+	Target         string          `json:"target"`
+	ExcludeTargets string          `json:"exclude_targets"`
+	Ports          string          `json:"ports"`
+	ExcludePorts   string          `json:"exclude_ports"`
+	DiscoveryMode  string          `json:"discovery_mode"`
+	Profile        string          `json:"profile"`
+	Label          string          `json:"label"`
+	AccessPoint    string          `json:"access_point"`
+	TesterIP       string          `json:"tester_ip"`
+	Notes          string          `json:"notes"`
+	RustscanArgs   string          `json:"rustscan_args"`
+	NmapArgs       string          `json:"nmap_args"`
+	HttpxArgs      string          `json:"httpx_args"`
+	NucleiArgs     string          `json:"nuclei_args"`
+	Scope          target.Snapshot `json:"scope"`
+	IsRerun        bool            `json:"-"`
 }
 
 type scanCreateProps struct {
@@ -63,7 +65,7 @@ type scanCreateError struct {
 // when a scan submission is rejected. Scans are always bound to a project.
 func (s *server) renderProjectScanForm(w http.ResponseWriter, project store.Project, zones []store.ProjectZone, preflightResult preflight.Result, form scanForm) {
 	if form.DiscoveryMode == "" {
-		form.DiscoveryMode = app.DiscoveryAuto
+		form.DiscoveryMode = "auto"
 	}
 	highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
 	props := scanCreateProps{
@@ -141,9 +143,6 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 	if form.Profile == "" {
 		form.Profile = "normal"
 	}
-	if form.DiscoveryMode == "" {
-		form.DiscoveryMode = app.DiscoveryAuto
-	}
 
 	if err := validateScanForm(form, zones); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -151,6 +150,9 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 			Errors: []preflight.Message{{Field: err.Field, Message: err.Message}},
 		}, form)
 		return
+	}
+	if form.DiscoveryMode == "" {
+		form.DiscoveryMode = "auto"
 	}
 
 	runID := newID("run", s.opts.Now())
@@ -202,6 +204,7 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	form.Target = strings.Join(prepared.Options.Targets, ",")
+	form.Scope = prepared.Options.Scope.Snapshot()
 	form.Ports = prepared.Options.Ports
 	form.Profile = prepared.Options.ProfileName
 	form.DiscoveryMode = prepared.Options.DiscoveryMode
@@ -278,7 +281,7 @@ func validateScanForm(form scanForm, zones []store.ProjectZone) *scanFormError {
 	if !isScanProfile(form.Profile) {
 		return &scanFormError{Field: "profile", Message: "请选择有效的扫描档位"}
 	}
-	if form.DiscoveryMode != "" && form.DiscoveryMode != app.DiscoveryAuto && form.DiscoveryMode != app.DiscoveryAssumeUp {
+	if form.DiscoveryMode != "" && form.DiscoveryMode != "auto" && form.DiscoveryMode != "assume-up" {
 		return &scanFormError{Field: "discovery_mode", Message: "发现模式必须是 auto 或 assume-up"}
 	}
 	return nil
@@ -318,7 +321,9 @@ func (s *server) rerunScanForm(projectID, runID string) (scanForm, error) {
 	if form.Notes == "" && run.Notes != "" {
 		form.Notes = run.Notes
 	}
-	form.DiscoveryMode = app.DiscoveryModeFromConfigSnapshot(run.ConfigSnapshot)
+	if form.DiscoveryMode == "" {
+		form.DiscoveryMode = "auto"
+	}
 	if !completeScanForm(form) || !isScanProfile(form.Profile) {
 		return scanForm{}, errors.New("prior run has an incomplete scan snapshot")
 	}

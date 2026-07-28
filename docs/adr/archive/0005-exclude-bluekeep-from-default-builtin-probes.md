@@ -2,7 +2,7 @@
 
 - 状态：Superseded by ADR-0006
 - 日期：2026-07-20
-- 关联计划：`docs/plans/add-builtin-vulnerability-probes/`
+- 关联计划：`docs/plans/archive/add-builtin-vulnerability-probes/`
 
 首版默认 Builtin Probe 只接收能够证明无认证、非破坏且不修改目标状态的协议交互。Rapid7 的 BlueKeep Scan 路径虽然不包含 Crash 分支，但仍建立 RDP 会话并进入 Client Info 与许可相关步骤；其官方模块也将副作用标为未知。因此它不能满足本项目默认开启探针的准入标准。
 

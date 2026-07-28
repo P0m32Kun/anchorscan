@@ -21,7 +21,7 @@ func EnrichWeb(ctx context.Context, runner Runner, binaryPath string, fp fingerp
 }
 
 func EnrichWebWithOutput(ctx context.Context, runner Runner, binaryPath string, fp fingerprint.ServiceFingerprint, extraArgs []string) (HTTPResult, []byte, error) {
-	args := []string{"-json", "-silent", "-status-code", "-title", "-tech-detect", "-follow-redirects", "-u", fp.URL}
+	args := []string{"-json", "-silent", "-status-code", "-title", "-tech-detect", "-u", fp.URL}
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)

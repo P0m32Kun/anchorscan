@@ -9,7 +9,7 @@ import (
 )
 
 func TestResolveKeepsTop1000ForRustscanTop(t *testing.T) {
-	got, err := Resolve("top1000", t.TempDir())
+	got, err := Resolve("top1000")
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestResolveAcceptsRustscanRangeAndPortCSV(t *testing.T) {
 		"1000-100":    "100-1000",
 		"80, 443, 22": "80,443,22",
 	} {
-		got, err := Resolve(input, t.TempDir())
+		got, err := Resolve(input)
 		if err != nil {
 			t.Fatalf("Resolve(%q) returned error: %v", input, err)
 		}
@@ -36,7 +36,7 @@ func TestResolveAcceptsRustscanRangeAndPortCSV(t *testing.T) {
 
 func TestResolveRejectsRemovedAndInvalidFormats(t *testing.T) {
 	for _, input := range []string{"top100", "full", "highrisk", "0", "65536", "80,abc", "80,100-200", "1-65536", "0-100"} {
-		if _, err := Resolve(input, t.TempDir()); err == nil {
+		if _, err := Resolve(input); err == nil {
 			t.Fatalf("Resolve(%q) unexpectedly succeeded", input)
 		}
 	}

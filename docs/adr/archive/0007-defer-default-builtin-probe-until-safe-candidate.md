@@ -2,7 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-07-20
-- 关联计划：`docs/plans/add-builtin-vulnerability-probes/`
+- 关联计划：`docs/plans/archive/add-builtin-vulnerability-probes/`
 - 替代：ADR-0006
 
 首版默认开启的 Builtin Probe 必须同时满足：按服务指纹触发、无认证、没有持久化状态变化、不读取敏感数据，并补足 Nmap NSE 与 ProjectDiscovery nuclei 的实际检测缺口。

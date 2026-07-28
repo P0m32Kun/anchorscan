@@ -3,6 +3,7 @@ package web
 import (
 	"net/url"
 
+	"github.com/P0m32Kun/anchorscan/internal/app"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/report"
@@ -45,7 +46,9 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 	built := report.Build(filteredFingerprints, filteredFindings)
 	var detectionCoverage *report.DetectionCoverage
 	if in.Run.Status != "running" {
-		built = report.BuildWithScanDataAndDetectionChecks(filteredFingerprints, filteredFindings, report.ScanData{}, filteredChecks)
+		built = report.BuildWithScanDataAndDetectionChecks(filteredFingerprints, filteredFindings, report.ScanData{
+			DiscoveryMode: app.DiscoveryModeFromConfigSnapshot(in.Run.ConfigSnapshot),
+		}, filteredChecks)
 		detectionCoverage = built.DetectionCoverage
 	}
 

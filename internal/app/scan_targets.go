@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
 
@@ -17,29 +19,50 @@ type targetResult struct {
 
 func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, artifactDir string, progress Progress) ([]TargetScan, []string, bool, error) {
 	var aliveIPs []string
-	targets := opts.Targets
+	scope := opts.Scope
+	if scope.IsZero() {
+		var err error
+		scope, err = target.ParseScope(strings.Join(opts.Targets, ","), "")
+		if err != nil {
+			return nil, nil, false, err
+		}
+	}
+	opts.Scope = scope
+	if opts.Tools.Nmap == "" && scope.RequiresNmapDiscovery() {
+		return nil, nil, false, errors.New("nmap is required for CIDR or excluded scan targets")
+	}
+	targets := scope.NmapTargets()
 
 	if opts.Tools.Nmap != "" && len(targets) > 0 && opts.DiscoveryMode != DiscoveryAssumeUp {
-		progress.Emit("info", "nmap", "nmap alive sweep targets=%v", targets)
-		toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
-		aliveTargets, out, err := tools.DiscoverAliveWithOutput(toolCtx, runner, opts.Tools.Nmap, targets, nil)
-		if _, writeErr := writeArtifact(artifactDir, "nmap-alive-targets.xml", out); writeErr != nil {
+		discovered := make([]string, 0)
+		for _, discoveryScope := range scope.DiscoveryScopes() {
+			progress.Emit("info", "nmap", "nmap alive sweep targets=%v", discoveryScope.NmapTargets())
+			toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
+			aliveTargets, out, err := tools.DiscoverAliveInScopeWithOutput(toolCtx, runner, opts.Tools.Nmap, discoveryScope, nil)
+			artifactName := "nmap-alive-ipv4.xml"
+			if discoveryScope.IsIPv6() {
+				artifactName = "nmap-alive-ipv6.xml"
+			}
+			if _, writeErr := writeArtifact(artifactDir, artifactName, out); writeErr != nil {
+				cancel()
+				return nil, nil, false, writeErr
+			}
+			if err != nil {
+				normalized := normalizeToolError(toolCtx, err)
+				cancel()
+				return nil, nil, false, normalized
+			}
 			cancel()
-			return nil, nil, false, writeErr
+			discovered = append(discovered, aliveTargets...)
 		}
-		if err != nil {
-			normalized := normalizeToolError(toolCtx, err)
-			cancel()
-			return nil, nil, false, normalized
-		}
-		cancel()
-		targets = aliveTargets
+		targets = scope.Filter(discovered)
 		aliveIPs = append([]string(nil), targets...)
 		progress.Emit("info", "nmap", "nmap alive hosts=%v", targets)
 		if len(targets) == 0 {
 			progress.Emit("info", "target", "no live hosts discovered; skip port scan")
 		}
 	} else if opts.DiscoveryMode == DiscoveryAssumeUp && len(targets) > 0 {
+		targets = scope.Addresses()
 		aliveIPs = append([]string(nil), targets...)
 		progress.Emit("info", "target", "assume-up: skip alive discovery, treat %d host(s) as up", len(targets))
 	}

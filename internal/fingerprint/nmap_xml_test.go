@@ -31,6 +31,27 @@ func TestParseNmapXMLExtractsServiceFields(t *testing.T) {
 	}
 }
 
+func TestParseNmapXMLUsesIPAddressWhenMACAlsoPresent(t *testing.T) {
+	xmlInput := []byte(`
+<nmaprun>
+  <host>
+    <address addr="192.0.2.10" addrtype="ipv4"/>
+    <address addr="00:11:22:33:44:55" addrtype="mac"/>
+    <ports>
+      <port protocol="tcp" portid="443"><state state="open"/><service name="https"/></port>
+    </ports>
+  </host>
+</nmaprun>`)
+
+	fingerprints, _, err := ParseNmapXML(xmlInput)
+	if err != nil {
+		t.Fatalf("ParseNmapXML returned error: %v", err)
+	}
+	if len(fingerprints) != 1 || fingerprints[0].IP != "192.0.2.10" {
+		t.Fatalf("fingerprints = %#v, want IPv4 address", fingerprints)
+	}
+}
+
 func TestParseNmapXMLKeepsTCPAndUDPSamePort(t *testing.T) {
 	xmlInput := []byte(`
 <nmaprun>

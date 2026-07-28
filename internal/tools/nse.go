@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/xml"
+	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -29,7 +30,11 @@ func RunNSE(ctx context.Context, runner Runner, binaryPath string, ip string, po
 }
 
 func RunNSEWithOutput(ctx context.Context, runner Runner, binaryPath string, ip string, port int, scripts []string, extraArgs []string) ([]NSEScripResult, []byte, error) {
-	args := []string{"-p", strconv.Itoa(port), "--script", strings.Join(scripts, ","), ip, "-oX", "-"}
+	args := []string{"-p", strconv.Itoa(port), "--script", strings.Join(scripts, ",")}
+	if address, err := netip.ParseAddr(ip); err == nil && !address.Is4() {
+		args = append(args, "-6")
+	}
+	args = append(args, ip, "-oX", "-")
 	args = append(args, extraArgs...)
 
 	out, err := runner.Run(ctx, binaryPath, args)

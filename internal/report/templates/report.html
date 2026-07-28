@@ -546,10 +546,23 @@
         <h1>AnchorScan 扫描安全报告</h1>
       </div>
       <div style="font-size: 0.85rem; color: var(--muted); text-align: right;">
-        报告自动生成时间: <span class="report-generated-at">2026-07-08</span>
-        {{if .DiscoveryMode}}<br>主机发现模式: {{.DiscoveryMode}}{{end}}
+        报告自动生成时间: <span class="report-generated-at">{{if .Provenance}}{{.Provenance.FinishedAt}}{{else}}2026-07-08{{end}}</span>
       </div>
     </header>
+
+    {{if .Provenance}}
+    <section class="panel" style="border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
+      <p class="eyebrow">扫描 provenance</p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; font-size: 0.85rem; color: var(--text);">
+        <div><span style="color: var(--muted);">AnchorScan 版本:</span> {{.Provenance.Version}}</div>
+        <div><span style="color: var(--muted);">开始时间:</span> {{.Provenance.StartedAt}}</div>
+        <div><span style="color: var(--muted);">结束时间:</span> {{.Provenance.FinishedAt}}</div>
+        <div><span style="color: var(--muted);">发现模式:</span> {{if .DiscoveryMode}}{{.DiscoveryMode}}{{else}}auto{{end}}</div>
+        <div><span style="color: var(--muted);">执行引擎:</span> {{if .Provenance.Engines}}{{range .Provenance.Engines}}{{.}} {{end}}{{else}}—{{end}}</div>
+      </div>
+      {{if .Provenance.Scope}}<div style="margin-top: 0.5rem; font-size: 0.82rem; color: var(--muted); word-break: break-all;">授权范围: {{.Provenance.Scope}}</div>{{end}}
+    </section>
+    {{end}}
     
     <!-- Dynamic Stats Dashboard -->
     <div class="stats-grid">

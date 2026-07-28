@@ -12,7 +12,9 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
+	"github.com/P0m32Kun/anchorscan/internal/version"
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
 
@@ -33,15 +35,17 @@ type ScanOptions struct {
 	TesterIP             string
 	Notes                string
 	IncludeInReport      bool
+	DiscoveryMode        string
 	Targets              []string
+	Scope                target.Scope
 	Ports                string
 	Tools                ToolPaths
 	ProfileName          string
 	HostWorkers          int
 	ExtraArgs            ToolExtraArgs
 	Timeouts             ToolTimeouts
-	DiscoveryMode        string
 	ConfigSnapshot       string
+	RulePaths            []string
 	JSONReportPath       string
 	ArtifactRoot         string
 	NSERules             map[string][]string
@@ -55,6 +59,7 @@ type ScanOptions struct {
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
 	artifactDir := ""
 	partialErrors := false
+	var prov RunProvenance
 
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
@@ -64,6 +69,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		return err
 	}
 	opts.DiscoveryMode = discoveryMode
+	if err := config.ValidateScopeSafeToolArgs(opts.ExtraArgs); err != nil {
+		return err
+	}
 	ctx, finishLease, abortLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
 	if err != nil {
 		return err
@@ -96,6 +104,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		}
 	}
 	if opts.RunID != "" && scanStore != nil {
+		startedAt := time.Now()
 		if err := scanStore.SaveScanRun(store.ScanRun{
 			RunID:           opts.RunID,
 			ProjectID:       opts.ProjectID,
@@ -110,13 +119,25 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			Ports:           opts.Ports,
 			Profile:         opts.ProfileName,
 			Status:          "running",
-			StartedAt:       time.Now(),
+			StartedAt:       startedAt,
 			ConfigSnapshot:  opts.ConfigSnapshot,
 			ArtifactDir:     artifactDir,
 		}); err != nil {
 			return err
 		}
 		runSaved = true
+		prov = BuildRunProvenance(ProvenanceOptions{
+			Version:        version.Version,
+			RulePaths:      opts.RulePaths,
+			NSERules:       opts.NSERules,
+			TagRules:       opts.TagRules,
+			Tools:          opts.Tools,
+			ConfigSnapshot: opts.ConfigSnapshot,
+			Scope:          opts.ConfigSnapshot,
+		}, startedAt, time.Time{}, nil)
+		if err := SaveRunProvenance(scanStore, opts.RunID, prov); err != nil {
+			return err
+		}
 	}
 
 	if opts.RecordDetectionCheck == nil && scanStore != nil {
@@ -150,12 +171,26 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 			})
 		}
 	}
+	finishedAt := time.Now()
+	prov.FinishedAt = finishedAt
+	artifactHashes, err := HashArtifactFiles(artifactDir)
+	if err != nil {
+		return err
+	}
+	prov.ArtifactHashes = artifactHashes
+
 	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)
-	return report.WriteJSON(opts.JSONReportPath, report.BuildWithScanDataAndDetectionChecks(allFingerprints, allFindings, report.ScanData{
+	scanReport := report.BuildWithScanDataAndDetectionChecks(allFingerprints, allFindings, report.ScanData{
 		DiscoveryMode: opts.DiscoveryMode,
 		AliveIPs:      aliveIPs,
 		OpenPorts:     openPorts,
-	}, detectionChecks))
+	}, detectionChecks)
+	reportProv := ReportProvenance(prov, EnginesFromDetectionChecks(detectionChecks))
+	scanReport.Provenance = &reportProv
+	if err := report.WriteJSON(opts.JSONReportPath, scanReport); err != nil {
+		return err
+	}
+	return SaveRunProvenance(scanStore, opts.RunID, prov)
 }
 
 func logf(opts ScanOptions, format string, args ...any) {

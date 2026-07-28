@@ -23,9 +23,10 @@
   service: ["ssh"]
   nuclei_tags: ["ssh"]
   # 排除 nuclei 官方 default-login 爆破模板（账密组合巨大，且易触发账户锁定）。
-  # 弱口令检测改由 RBKD 自有的 ssh-mini-brute 模板（ssh tag、无 default-login tag）承担，
-  # 该模板最多 2 用户 × 2 密码、首次命中即停。
+  # 弱口令检测改由 AnchorScan 自带的 ssh-mini-brute 模板（2 用户 × 2 密码）承担，
+  # 该模板通过 -t 精确调用，最多 4 次尝试、首次命中即停。
   exclude_tags: ["default-login"]
+  template: "nuclei-templates/ssh-mini-brute.yaml"
   target: "hostport"
 - name: ftp
   service: ["ftp"]

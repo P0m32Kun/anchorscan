@@ -28,7 +28,7 @@ func TestEnrichWebBuildsHTTPXCommandAndParsesJSON(t *testing.T) {
 		t.Fatalf("unexpected http result: %#v", got)
 	}
 
-	wantArgs := []string{"/opt/httpx", "-json", "-silent", "-status-code", "-title", "-tech-detect", "-follow-redirects", "-u", "https://192.168.1.10:8443"}
+	wantArgs := []string{"/opt/httpx", "-json", "-silent", "-status-code", "-title", "-tech-detect", "-u", "https://192.168.1.10:8443"}
 	if !reflect.DeepEqual(runner.args, wantArgs) {
 		t.Fatalf("args mismatch: got %#v want %#v", runner.args, wantArgs)
 	}

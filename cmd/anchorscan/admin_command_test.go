@@ -32,12 +32,42 @@ func TestExecuteToolsCheckReportsConfiguredTools(t *testing.T) {
 	}
 }
 
+func TestExecuteDoctorPrintsOptionalWarningsAndVersions(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := filepath.Join(dir, "tool")
+	writeFile(t, toolPath, "#!/bin/sh\necho scanner 1.2.3\n")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
+
+	var stdout bytes.Buffer
+	err := run([]string{"doctor", "--config", configPath, "--db", filepath.Join(dir, "scan.db"), "--reports", dir}, &stdout, &bytes.Buffer{}, cliDeps{})
+	if err != nil {
+		t.Fatalf("warnings must not fail doctor: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{
+		"rustscan: ok scanner 1.2.3",
+		"nmap: ok scanner 1.2.3",
+		"httpx: warning",
+		"nuclei: warning",
+		"rdpscan: warning",
+		"nse rules: ok 1 rules",
+		"tag rules: ok 1 rules",
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected %q in %q", want, stdout.String())
+		}
+	}
+}
+
 func TestExecuteDoctorPrintsChecks(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := filepath.Join(dir, "tool")
-	writeFile(t, toolPath, "")
+	writeFile(t, toolPath, "#!/bin/sh\necho scanner 1.2.3\n")
 	configPath := filepath.Join(dir, "config.yaml")
 	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
 
 	var stdout bytes.Buffer
 	err := run([]string{"doctor", "--config", configPath, "--db", filepath.Join(dir, "scan.db"), "--reports", dir}, &stdout, &bytes.Buffer{}, cliDeps{})

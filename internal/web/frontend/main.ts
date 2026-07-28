@@ -6,6 +6,7 @@ import ScanCreate from './ScanCreate.vue';
 import ThemeToggle from './ThemeToggle.vue';
 import ToolRunFeedback from './ToolRunFeedback.vue';
 import Workbench from './Workbench.vue';
+import { normalizeOutcome, normalizeSeverity } from './workbench-api';
 import { initTheme } from './theme';
 
 initTheme();
@@ -43,7 +44,16 @@ function mountWorkbench() {
   props.incomplete_checks ||= [];
   props.verifications ||= [];
   props.zones ||= [];
-  props.zone_names ||= {};
+  props.verifications = props.verifications.map((verification: Record<string, unknown>) => ({
+    ...verification,
+    Outcome: normalizeOutcome(verification.Outcome),
+    Severity: normalizeSeverity(verification.Severity),
+  }));
+  props.candidates = props.candidates.map((candidate: Record<string, unknown>) => ({
+    ...candidate,
+    Assets: Array.isArray(candidate.Assets) ? candidate.Assets : [],
+    Sources: Array.isArray(candidate.Sources) ? candidate.Sources : [],
+  }));
   props.counts ||= { positive: 0, negative: 0, incomplete: 0 };
   createApp(Workbench, props).mount(mountPoint);
   mountPoint.dataset.mounted = 'true';

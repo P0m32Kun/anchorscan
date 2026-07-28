@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Overrides struct {
 	ProfileName  string
@@ -73,6 +76,67 @@ func ResolveScan(cfg Config, overrides Overrides) (EffectiveScan, error) {
 		}
 	}
 	return out, nil
+}
+
+func ValidateScopeSafeToolArgs(args ToolArgs) error {
+	for _, item := range []struct {
+		name string
+		args []string
+	}{
+		{"rustscan", args.Rustscan},
+		{"nmap", args.Nmap},
+		{"httpx", args.Httpx},
+		{"nuclei", args.Nuclei},
+	} {
+		if err := validateScopeSafeArgs(item.name, item.args); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateScopeSafeArgs(tool string, args []string) error {
+	allowed := map[string]map[string]bool{
+		"rustscan": {
+			"--batch-size": true, "--timeout": true, "--tries": true, "--ulimit": true,
+		},
+		"nmap": {
+			"-T0": false, "-T1": false, "-T2": false, "-T3": false, "-T4": false, "-T5": false,
+			"-sV": false, "--version-light": false,
+			"--max-retries": true, "--scan-delay": true, "--min-rate": true, "--max-rate": true,
+			"--host-timeout": true, "--version-intensity": true,
+		},
+		"httpx": {
+			"-rate-limit": true, "-threads": true, "-timeout": true, "-retries": true,
+		},
+		"nuclei": {
+			"-rate-limit": true, "-c": true, "-retries": true, "-timeout": true,
+		},
+	}
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		flag, _, hasValue := strings.Cut(arg, "=")
+		takesValue, ok := allowed[tool][flag]
+		if !ok {
+			return fmt.Errorf("%s args are not allowed by the scan scope: %s", tool, arg)
+		}
+		if !takesValue {
+			if hasValue {
+				return fmt.Errorf("%s arg does not accept a value: %s", tool, flag)
+			}
+			continue
+		}
+		if !hasValue {
+			if i+1 >= len(args) {
+				return fmt.Errorf("%s arg requires a value: %s", tool, flag)
+			}
+			if strings.HasPrefix(args[i+1], "-") {
+				return fmt.Errorf("%s arg requires a non-flag value: %s", tool, flag)
+			}
+			i++
+		}
+	}
+	return nil
 }
 
 func builtInProfiles() map[string]Profile {

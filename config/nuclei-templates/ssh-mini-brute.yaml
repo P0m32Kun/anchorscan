@@ -1,0 +1,39 @@
+id: ssh-mini-brute
+
+info:
+  name: SSH Mini Brute Force
+  author: anchorscan
+  severity: high
+  description: Check for common SSH weak credentials using a tiny wordlist (2 users x 2 passwords, up to 4 attempts).
+  metadata:
+    max-request: 4
+  tags: ssh,brute,network
+
+javascript:
+  - pre-condition: |
+      var m = require("nuclei/ssh");
+      var c = m.SSHClient();
+      var response = c.ConnectSSHInfoMode(Host, Port);
+      // only bruteforce if ssh allows password based authentication
+      response["UserAuth"].includes("password")
+    code: |
+      var m = require("nuclei/ssh");
+      var c = m.SSHClient();
+      c.Connect(Host, Port, Username, Password);
+    args:
+      Host: "{{Host}}"
+      Port: "{{Port}}"
+      Username: "{{usernames}}"
+      Password: "{{passwords}}"
+    threads: 1
+    attack: clusterbomb
+    payloads:
+      usernames: payloads/users-mini.txt
+      passwords: payloads/passwords-mini.txt
+    stop-at-first-match: true
+    matchers:
+      - type: dsl
+        dsl:
+          - "response == true"
+          - "success == true"
+        condition: and

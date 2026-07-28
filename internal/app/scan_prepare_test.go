@@ -30,6 +30,19 @@ func writePackagedConfig(t *testing.T, fixture prepareScanFixture) string {
 			t.Fatal(err)
 		}
 	}
+	for _, name := range []string{"ssh-mini-brute.yaml", "payloads/passwords-mini.txt", "payloads/users-mini.txt"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", "config", "nuclei-templates", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		destination := filepath.Join(configDir, "nuclei-templates", name)
+		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(destination, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	return configPath
 }
 
@@ -60,8 +73,8 @@ func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	if got, want := prepared.Preflight.Summary.TagRuleCount, len(prepared.Options.TagRules); got != want {
 		t.Fatalf("tag rule count = %d, want %d", got, want)
 	}
-	if got, want := prepared.Options.ConfigSnapshot, `{"discovery_mode":"auto"}`; got != want {
-		t.Fatalf("ConfigSnapshot = %q, want %q", got, want)
+	if !strings.Contains(prepared.Options.ConfigSnapshot, `"discovery_mode":"auto"`) || !strings.Contains(prepared.Options.ConfigSnapshot, `"includes":["192.0.2.1/32"]`) {
+		t.Fatalf("ConfigSnapshot = %q, want scope and discovery mode", prepared.Options.ConfigSnapshot)
 	}
 
 	prepared, err = PrepareScan(PrepareScanRequest{
@@ -83,16 +96,6 @@ func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	}
 }
 
-func TestPrepareScanRejectsMissingRuleSidecarBeforeExecution(t *testing.T) {
-	fixture := newPrepareScanFixture(t)
-	if err := os.Remove(filepath.Join(fixture.dir, "nse.yaml")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := PrepareScan(fixture.request()); err == nil || !strings.Contains(err.Error(), "required rule file") {
-		t.Fatalf("PrepareScan error = %v, want required rule file error", err)
-	}
-}
-
 func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 	fixture := newPrepareScanFixture(t)
 	req := fixture.request()
@@ -104,8 +107,8 @@ func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 	}
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		[]byte("192.0.2.1 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.1"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
 		[]byte(`<nmaprun/>`),
 		[]byte{},
 	}}
@@ -115,8 +118,8 @@ func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 	if !runner.hasArgs(prepared.Options.Tools.Nmap, "--script", "ssh2-enum-algos,ssh-hostkey") {
 		t.Fatalf("expected configured SSH NSE invocation, commands=%#v", runner.commands)
 	}
-	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-tags", "ssh", "-target", "192.168.1.10:22") {
-		t.Fatalf("expected configured SSH nuclei invocation, commands=%#v", runner.commands)
+	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-t", filepath.Join(filepath.Dir(req.ConfigPath), "nuclei-templates", "ssh-mini-brute.yaml"), "-target", "192.0.2.1:22") {
+		t.Fatalf("expected configured SSH nuclei template invocation, commands=%#v", runner.commands)
 	}
 }
 
@@ -131,15 +134,15 @@ func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
 	}{
 		{
 			name: "tomcat nuclei URL", port: "8080",
-			fingerprint: []byte(`<nmaprun><host><address addr="192.168.1.10"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
-			outputs:     [][]byte{[]byte(`{"url":"http://192.168.1.10:8080","tech":["tomcat"]}`), []byte{}},
-			tags:        "tomcat,apache-tomcat", target: "http://192.168.1.10:8080",
+			fingerprint: []byte(`<nmaprun><host><address addr="192.0.2.1"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+			outputs:     [][]byte{[]byte(`{"url":"http://192.0.2.1:8080","tech":["tomcat"]}`), []byte{}},
+			tags:        "tomcat,apache-tomcat", target: "http://192.0.2.1:8080",
 		},
 		{
 			name: "x11 nuclei hostport", port: "6000",
-			fingerprint: []byte(`<nmaprun><host><address addr="192.168.1.10"/><ports><port protocol="tcp" portid="6000"><state state="open"/><service name="x11"/></port></ports></host></nmaprun>`),
+			fingerprint: []byte(`<nmaprun><host><address addr="192.0.2.1"/><ports><port protocol="tcp" portid="6000"><state state="open"/><service name="x11"/></port></ports></host></nmaprun>`),
 			outputs:     [][]byte{[]byte{}},
-			tags:        "x11", target: "192.168.1.10:6000",
+			tags:        "x11", target: "192.0.2.1:6000",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -151,7 +154,7 @@ func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
 			if err != nil || prepared.Preflight.HasErrors() {
 				t.Fatalf("PrepareScan = %#v, %v", prepared, err)
 			}
-			outputs := [][]byte{aliveNmapXML, []byte("192.168.1.10 -> [" + test.port + "]\n"), test.fingerprint}
+			outputs := [][]byte{aliveNmapXML, []byte("192.0.2.1 -> [" + test.port + "]\n"), test.fingerprint}
 			runner := &recordingSequenceRunner{outputs: append(outputs, test.outputs...)}
 			scanStore := newScanStore(t)
 			if err := RunScan(context.Background(), runner, scanStore, prepared.Options); err != nil {

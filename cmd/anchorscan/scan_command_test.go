@@ -26,7 +26,8 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	for _, want := range []string{
 		"Usage: anchorscan scan",
 		"--target",
-		"IP range",
+		"IPv6",
+		"CIDR",
 		"--ports",
 		"top1000",
 		"--profile",
@@ -117,6 +118,27 @@ func TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails(t *testing.T) {
 	}
 }
 
+func TestExecuteScanRejectsInvalidScopeBeforeOpeningStore(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "scan:\n  ports: 80\n  profile: normal\n")
+	storeOpened := false
+
+	err := run([]string{"scan", "--config", configPath, "--target=-Pn", "--db", filepath.Join(dir, "scan.db"), "--json", filepath.Join(dir, "report.json")}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{
+		newRunner: func() tools.Runner { return failRunner{} },
+		openStore: func(string) (*store.Store, error) {
+			storeOpened = true
+			return nil, errors.New("store must not open")
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "invalid target") {
+		t.Fatalf("run error = %v, want invalid target", err)
+	}
+	if storeOpened {
+		t.Fatal("scope rejection opened the store")
+	}
+}
+
 func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
@@ -126,6 +148,7 @@ func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -172,6 +195,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
 	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeScanRuleFiles(t, dir)
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	var stdout, stderr bytes.Buffer
@@ -248,6 +272,7 @@ profiles:
     httpx_args: ["-rate-limit", "20"]
     nuclei_args: ["-rate-limit", "10"]
 `)
+	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
@@ -290,6 +315,7 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 	htmlPath := filepath.Join(dir, "report.html")
 
 	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\nscan:\n  ports: 8080\n")
+	writeScanRuleFiles(t, dir)
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
@@ -338,4 +364,10 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 			t.Fatalf("expected log %q in stderr %q", line, stderr.String())
 		}
 	}
+}
+
+func writeScanRuleFiles(t *testing.T, dir string) {
+	t.Helper()
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "http: [http-title]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n")
 }

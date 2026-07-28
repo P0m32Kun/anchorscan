@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { getJSON, normalizeOutcome, normalizeSeverity, normalizeVerificationDetail, uploadEvidence } from './workbench-api';
 
 type ProjectAsset = {
   IP: string;
@@ -59,6 +60,14 @@ type EvidenceItem = {
   Height: number;
   Caption: string;
   Position: number;
+};
+
+type PendingEvidence = {
+  file: File;
+  caption: string;
+  objectUrl: string;
+  status: 'pending' | 'uploading' | 'uploaded' | 'failed';
+  error?: string;
 };
 
 type VerificationDetail = {
@@ -350,8 +359,9 @@ const verifyOutcome = ref('confirmed');
 const verifyDescription = ref('');
 const verifyRemediation = ref('');
 const verifyCurrent = ref<VerificationDetail | null>(null);
-const verifyPendingFiles = ref<{ file: File; caption: string; objectUrl: string }[]>([]);
+const verifyPendingFiles = ref<PendingEvidence[]>([]);
 const verifySaving = ref(false);
+const verifyUploadError = ref('');
 
 function resetVerifyDialog() {
   verifyKey.value = '';
@@ -363,6 +373,7 @@ function resetVerifyDialog() {
   verifyDescription.value = '';
   verifyRemediation.value = '';
   verifyCurrent.value = null;
+  verifyUploadError.value = '';
   for (const f of verifyPendingFiles.value) URL.revokeObjectURL(f.objectUrl);
   verifyPendingFiles.value = [];
 }
@@ -374,7 +385,7 @@ async function openVerifyDialog(c: Candidate) {
   verifyKey.value = verificationKey(c.ZoneID, c.GroupKey);
   verifyZoneId.value = c.ZoneID;
   verifyTitle.value = c.Title;
-  verifySeverity.value = c.Severity || 'high';
+  verifySeverity.value = normalizeSeverity(c.Severity);
   verifyDescription.value = c.Description || '';
   verifyRemediation.value = c.Remediation || '';
   verifyOutcome.value = 'confirmed';
@@ -383,18 +394,21 @@ async function openVerifyDialog(c: Candidate) {
   if (v?.ID) {
     verifyId.value = v.ID;
     try {
-      const res = await fetch(`/projects/${props.project_id}/verifications/${v.ID}`);
-      if (res.ok) verifyCurrent.value = await res.json();
+      const detail = normalizeVerificationDetail(await getJSON<VerificationDetail>(
+        `/projects/${props.project_id}/verifications/${v.ID}`,
+        '读取验证详情失败',
+      ));
+      verifyCurrent.value = detail;
       if (verifyCurrent.value?.Verification) {
         const ver = verifyCurrent.value.Verification;
         verifyTitle.value = ver.Title;
-        verifySeverity.value = ver.Severity;
-        verifyOutcome.value = ver.Outcome;
+        verifySeverity.value = normalizeSeverity(ver.Severity);
+        verifyOutcome.value = normalizeOutcome(ver.Outcome);
         verifyDescription.value = ver.Description || '';
         verifyRemediation.value = ver.Remediation || '';
       }
     } catch {
-      // ignore
+      showToast('读取验证详情失败；可继续编辑并重试保存', 'error');
     }
   }
   verifyDialog.value?.showModal();
@@ -402,7 +416,7 @@ async function openVerifyDialog(c: Candidate) {
 }
 
 function stageVerifyFile(file: File) {
-  verifyPendingFiles.value.push({ file, caption: '', objectUrl: URL.createObjectURL(file) });
+  verifyPendingFiles.value.push({ file, caption: '', objectUrl: URL.createObjectURL(file), status: 'pending' });
 }
 
 function removeVerifyPending(idx: number) {
@@ -436,15 +450,12 @@ async function deleteEvidence(verificationID: string, evidenceID: string, event:
   }
 }
 
-async function uploadEvidence(file: File, caption: string, verificationID: string) {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('caption', caption);
-  const res = await fetch(`/projects/${props.project_id}/verifications/${verificationID}/evidence`, {
-    method: 'POST',
-    body: form,
-  });
-  if (!res.ok) throw new Error((await res.text()).trim() || '上传失败');
+async function uploadVerificationEvidence(file: File, caption: string, verificationID: string): Promise<EvidenceItem> {
+  return await uploadEvidence<EvidenceItem>(
+    `/projects/${props.project_id}/verifications/${verificationID}/evidence`,
+    file,
+    caption,
+  );
 }
 
 type VerificationRequestPayload = {
@@ -502,9 +513,11 @@ function verificationUpdateRequestPayload(c: Candidate): VerificationUpdateReque
 }
 
 async function saveVerification() {
+  if (verifySaving.value) return;
   const c = activeCandidate.value;
   if (!c) return;
   verifySaving.value = true;
+  verifyUploadError.value = '';
   try {
     const payload = verificationRequestPayload(c);
     let res: Response;
@@ -525,11 +538,27 @@ async function saveVerification() {
         const created = (await res.json()) as Verification;
         vid = created.ID;
         verifyId.value = vid;
+        verifyCurrent.value = { Verification: created, Assets: [], Sources: [], Evidence: [] };
       }
     }
     if (!res.ok) throw new Error((await res.text()).trim() || '保存失败');
-    for (const f of verifyPendingFiles.value) {
-      await uploadEvidence(f.file, f.caption, vid);
+    for (const pending of verifyPendingFiles.value) {
+      pending.status = 'uploading';
+      try {
+        const evidence = await uploadVerificationEvidence(pending.file, pending.caption, vid);
+        verifyCurrent.value?.Evidence.push(evidence);
+        URL.revokeObjectURL(pending.objectUrl);
+        pending.status = 'uploaded';
+      } catch (error: any) {
+        pending.status = 'failed';
+        pending.error = error.message || '上传失败';
+      }
+    }
+    verifyPendingFiles.value = verifyPendingFiles.value.filter((pending) => pending.status !== 'uploaded');
+    if (verifyPendingFiles.value.some((pending) => pending.status === 'failed')) {
+      verifyUploadError.value = '验证已保存，但部分截图上传失败；请重试失败项。';
+      showToast(verifyUploadError.value, 'error');
+      return;
     }
     showToast('验证已保存', 'success');
     verifyDialog.value?.close();
@@ -541,6 +570,26 @@ async function saveVerification() {
   }
 }
 
+async function retryVerifyEvidence(index: number) {
+  const pending = verifyPendingFiles.value[index];
+  if (!pending || !verifyId.value || pending.status === 'uploading') return;
+  pending.status = 'uploading';
+  pending.error = undefined;
+  try {
+    const evidence = await uploadVerificationEvidence(pending.file, pending.caption, verifyId.value);
+    verifyCurrent.value?.Evidence.push(evidence);
+    URL.revokeObjectURL(pending.objectUrl);
+    const currentIndex = verifyPendingFiles.value.indexOf(pending);
+    if (currentIndex >= 0) verifyPendingFiles.value.splice(currentIndex, 1);
+    if (!verifyPendingFiles.value.some((item) => item.status === 'failed')) verifyUploadError.value = '';
+    showToast('截图已上传', 'success');
+  } catch (error: any) {
+    pending.status = 'failed';
+    pending.error = error.message || '上传失败';
+    showToast(pending.error || '上传失败', 'error');
+  }
+}
+
 // ---------- Negative dialog ----------
 const negativeDialog = ref<HTMLDialogElement>();
 const negGroup = ref<NegativeGroup | null>(null);
@@ -548,8 +597,11 @@ const negTitle = ref('');
 const negSeverity = ref('low');
 const negDescription = ref('');
 const negZoneId = ref('');
-const negPendingFiles = ref<{ file: File; caption: string; objectUrl: string }[]>([]);
+const negPendingFiles = ref<PendingEvidence[]>([]);
 const negSaving = ref(false);
+const negVerificationId = ref('');
+const negUploadedEvidence = ref<EvidenceItem[]>([]);
+const negUploadError = ref('');
 
 function resetNegativeDialog() {
   negGroup.value = null;
@@ -557,6 +609,9 @@ function resetNegativeDialog() {
   negSeverity.value = 'low';
   negDescription.value = '';
   negZoneId.value = '';
+  negVerificationId.value = '';
+  negUploadedEvidence.value = [];
+  negUploadError.value = '';
   for (const f of negPendingFiles.value) URL.revokeObjectURL(f.objectUrl);
   negPendingFiles.value = [];
 }
@@ -571,7 +626,7 @@ function openNegativeDialog(group: NegativeGroup) {
 }
 
 function stageNegFile(file: File) {
-  negPendingFiles.value.push({ file, caption: '', objectUrl: URL.createObjectURL(file) });
+  negPendingFiles.value.push({ file, caption: '', objectUrl: URL.createObjectURL(file), status: 'pending' });
 }
 
 function removeNegPending(idx: number) {
@@ -581,43 +636,63 @@ function removeNegPending(idx: number) {
 }
 
 async function saveNegative() {
-  if (!negGroup.value?.Assets?.length) return;
+  if (negSaving.value || !negGroup.value?.Assets?.length) return;
   if (negPendingFiles.value.length === 0) {
     showToast('请至少上传一张截图作为证据', 'error');
     return;
   }
   negSaving.value = true;
+  negUploadError.value = '';
   try {
-    const assets = negGroup.value.Assets.map((a, i) => ({
-      ip: a.IP,
-      port: a.Port,
-      protocol: a.Protocol || 'tcp',
-      asset_name: hostPort(a),
-      position: i,
-    }));
-    const key = buildNegativeVerificationKey(negZoneId.value, negTitle.value);
-    const res = await fetch(`/projects/${props.project_id}/verifications`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        zone_id: negZoneId.value,
-        vulnerability_key: key,
-        outcome: 'not_observed',
-        title: negTitle.value.trim(),
-        severity: negSeverity.value,
-        description: negDescription.value.trim(),
-        remediation: '',
-        notes: '',
-        included: false,
-        position: 0,
-        assets,
-        sources: [],
-      }),
-    });
-    if (!res.ok) throw new Error((await res.text()).trim() || '创建失败');
-    const created = (await res.json()) as Verification;
-    for (const f of negPendingFiles.value) {
-      await uploadEvidence(f.file, f.caption, created.ID);
+    let verificationID = negVerificationId.value;
+    if (!verificationID) {
+      const assets = negGroup.value.Assets.map((a, i) => ({
+        ip: a.IP,
+        port: a.Port,
+        protocol: a.Protocol || 'tcp',
+        asset_name: hostPort(a),
+        position: i,
+      }));
+      const key = buildNegativeVerificationKey(negZoneId.value, negTitle.value);
+      const res = await fetch(`/projects/${props.project_id}/verifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zone_id: negZoneId.value,
+          vulnerability_key: key,
+          outcome: 'not_observed',
+          title: negTitle.value.trim(),
+          severity: negSeverity.value,
+          description: negDescription.value.trim(),
+          remediation: '',
+          notes: '',
+          included: false,
+          position: 0,
+          assets,
+          sources: [],
+        }),
+      });
+      if (!res.ok) throw new Error((await res.text()).trim() || '创建失败');
+      verificationID = (await res.json() as Verification).ID;
+      negVerificationId.value = verificationID;
+    }
+    for (const pending of negPendingFiles.value) {
+      pending.status = 'uploading';
+      try {
+        const evidence = await uploadVerificationEvidence(pending.file, pending.caption, verificationID);
+        negUploadedEvidence.value.push(evidence);
+        URL.revokeObjectURL(pending.objectUrl);
+        pending.status = 'uploaded';
+      } catch (error: any) {
+        pending.status = 'failed';
+        pending.error = error.message || '上传失败';
+      }
+    }
+    negPendingFiles.value = negPendingFiles.value.filter((pending) => pending.status !== 'uploaded');
+    if (negPendingFiles.value.some((pending) => pending.status === 'failed')) {
+      negUploadError.value = '负向验证已创建，但部分截图上传失败；请重试失败项。';
+      showToast(negUploadError.value, 'error');
+      return;
     }
     showToast('负向验证已提交', 'success');
     negativeDialog.value?.close();
@@ -626,6 +701,26 @@ async function saveNegative() {
     showToast(e.message || '提交失败', 'error');
   } finally {
     negSaving.value = false;
+  }
+}
+
+async function retryNegativeEvidence(index: number) {
+  const pending = negPendingFiles.value[index];
+  if (!pending || !negVerificationId.value || pending.status === 'uploading') return;
+  pending.status = 'uploading';
+  pending.error = undefined;
+  try {
+    const evidence = await uploadVerificationEvidence(pending.file, pending.caption, negVerificationId.value);
+    negUploadedEvidence.value.push(evidence);
+    URL.revokeObjectURL(pending.objectUrl);
+    const currentIndex = negPendingFiles.value.indexOf(pending);
+    if (currentIndex >= 0) negPendingFiles.value.splice(currentIndex, 1);
+    if (!negPendingFiles.value.some((item) => item.status === 'failed')) negUploadError.value = '';
+    showToast('截图已上传', 'success');
+  } catch (error: any) {
+    pending.status = 'failed';
+    pending.error = error.message || '上传失败';
+    showToast(pending.error || '上传失败', 'error');
   }
 }
 
@@ -946,7 +1041,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
     </dialog>
 
     <!-- Verify dialog -->
-    <dialog ref="verifyDialog" class="panel verify-dialog" aria-labelledby="verify-dialog-title" @paste="(e) => onPaste(e, 'verify')" @dragover.prevent @drop="(e) => onDrop(e, 'verify')">
+    <dialog ref="verifyDialog" class="panel verify-dialog" aria-labelledby="verify-dialog-title" @close="resetVerifyDialog" @paste="(e) => onPaste(e, 'verify')" @dragover.prevent @drop="(e) => onDrop(e, 'verify')">
       <form class="form-grid" @submit.prevent="saveVerification">
         <div class="full-width panel-heading" style="margin-bottom: 0; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
           <h3 id="verify-dialog-title">验证 / 编辑</h3>
@@ -998,11 +1093,13 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
             <span>选择一张或多张 PNG/JPEG 截图</span>
           </label>
           <div class="paste-hint" tabindex="0" @click="verifyDialog?.querySelector<HTMLInputElement>('input[type=file]')?.click()">点击这里后按 Ctrl/Cmd+V 粘贴截图；也可直接拖入本弹窗</div>
+          <p v-if="verifyUploadError" class="meta-line" role="alert">{{ verifyUploadError }}</p>
           <ul class="evidence-list">
             <li v-for="(f, i) in verifyPendingFiles" :key="f.objectUrl" class="evidence-item">
               <img :src="f.objectUrl" alt="" />
-              <span>{{ f.caption || '待上传' }}</span>
-              <button type="button" class="button button-small" @click="removeVerifyPending(i)">删除</button>
+              <span>{{ f.status === 'failed' ? `上传失败：${f.error}` : f.status === 'uploading' ? '上传中…' : '待上传' }}</span>
+              <button v-if="f.status === 'failed'" type="button" class="button button-small" @click="retryVerifyEvidence(i)">重试</button>
+              <button v-else type="button" class="button button-small" :disabled="f.status === 'uploading'" @click="removeVerifyPending(i)">删除</button>
             </li>
             <li v-for="e in verifyCurrent?.Evidence" :key="e.ID" class="evidence-item">
               <img :src="`/projects/${project_id}/verifications/${verifyId}/evidence/${e.ID}`" alt="" loading="lazy" />
@@ -1019,7 +1116,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
     </dialog>
 
     <!-- Negative dialog -->
-    <dialog ref="negativeDialog" class="panel negative-dialog" aria-labelledby="negative-dialog-title" @paste="(e) => onPaste(e, 'negative')" @dragover.prevent @drop="(e) => onDrop(e, 'negative')">
+    <dialog ref="negativeDialog" class="panel negative-dialog" aria-labelledby="negative-dialog-title" @close="resetNegativeDialog" @paste="(e) => onPaste(e, 'negative')" @dragover.prevent @drop="(e) => onDrop(e, 'negative')">
       <form class="form-grid" @submit.prevent="saveNegative">
         <div class="full-width panel-heading" style="margin-bottom: 0; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
           <h3 id="negative-dialog-title">提交负向验证</h3>
@@ -1060,11 +1157,17 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
             <span>选择一张或多张 PNG/JPEG 截图</span>
           </label>
           <div class="paste-hint" tabindex="0">点击这里后按 Ctrl/Cmd+V 粘贴截图；也可直接拖入本弹窗</div>
+          <p v-if="negUploadError" class="meta-line" role="alert">{{ negUploadError }}</p>
           <ul class="evidence-list">
             <li v-for="(f, i) in negPendingFiles" :key="f.objectUrl" class="evidence-item">
               <img :src="f.objectUrl" alt="" />
-              <span>{{ f.caption || '无说明' }}</span>
-              <button type="button" class="button button-small" @click="removeNegPending(i)">删除</button>
+              <span>{{ f.status === 'failed' ? `上传失败：${f.error}` : f.status === 'uploading' ? '上传中…' : '待上传' }}</span>
+              <button v-if="f.status === 'failed'" type="button" class="button button-small" @click="retryNegativeEvidence(i)">重试</button>
+              <button v-else type="button" class="button button-small" :disabled="f.status === 'uploading'" @click="removeNegPending(i)">删除</button>
+            </li>
+            <li v-for="e in negUploadedEvidence" :key="e.ID" class="evidence-item">
+              <img :src="`/projects/${project_id}/verifications/${negVerificationId}/evidence/${e.ID}`" alt="" loading="lazy" />
+              <span>已上传：{{ e.Caption || '无说明' }}</span>
             </li>
           </ul>
         </div>

@@ -72,6 +72,9 @@ func TestToolDetailPageRendersNmapHelpAndPresets(t *testing.T) {
 		`data-set-raw-args="-sn 192.168.1.10"`,
 		"data-tool-run-feedback",
 		"Local Lab",
+		"原生参数会绕过默认安全限制",
+		"参数会审计保存",
+		"不会进入客户报告",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body: %s", want, body)

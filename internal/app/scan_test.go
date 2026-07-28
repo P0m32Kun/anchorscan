@@ -15,6 +15,7 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 )
 
 var aliveNmapXML = []byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)
@@ -631,4 +632,125 @@ func containsEvent(events []store.ScanEvent, level string, stage string, target 
 		}
 	}
 	return false
+}
+
+func TestScanAssumeUpSkipsAliveDiscovery(t *testing.T) {
+	runner := &recordingSequenceRunner{
+		outputs: [][]byte{
+			[]byte("192.0.2.10 -> [22]\n"),
+			[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+		},
+		errors: []error{nil, nil},
+	}
+	dir := t.TempDir()
+	err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
+		RunID:          "run-assume-up",
+		Targets:        []string{"192.0.2.10"},
+		Ports:          "22",
+		DiscoveryMode:  "assume-up",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		JSONReportPath: filepath.Join(dir, "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.hasArg("nmap", "-sn") {
+		t.Fatal("assume-up should not run nmap alive discovery (-sn)")
+	}
+	if !runner.hasArg("rustscan", "192.0.2.10") {
+		t.Fatal("assume-up should still run rustscan port discovery")
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "report.json"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var r report.ScanReport
+	if err := json.Unmarshal(data, &r); err != nil {
+		t.Fatalf("Unmarshal returned error: %v", err)
+	}
+	if r.DiscoveryMode != "assume-up" {
+		t.Fatalf("expected discovery mode assume-up in report, got %q", r.DiscoveryMode)
+	}
+}
+
+func TestNmapHeartbeatEmitsProgressEvents(t *testing.T) {
+	orig := nmapHeartbeatEvery
+	nmapHeartbeatEvery = 50 * time.Millisecond
+	defer func() { nmapHeartbeatEvery = orig }()
+
+	scanStore := newScanStore(t)
+	runner := runnerFunc(func(ctx context.Context, binary string, args []string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case binary == "nmap" && strings.Contains(joined, "-sn"):
+			return []byte(aliveSweepXML("192.0.2.10")), nil
+		case binary == "rustscan":
+			return []byte("192.0.2.10 -> [22]\n"), nil
+		case binary == "nmap" && strings.Contains(joined, "-sV"):
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(150 * time.Millisecond):
+			}
+			return []byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+		default:
+			return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
+		}
+	})
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-heartbeat",
+		Targets:        []string{"192.0.2.10"},
+		Ports:          "22",
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	events, err := scanStore.ListScanEvents("run-heartbeat", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsEvent(events, "info", "heartbeat", "nmap 192.0.2.10 still running") {
+		t.Fatalf("missing nmap heartbeat event in events: %#v", events)
+	}
+}
+
+func TestScanAssumeUpExpandsScopeWithoutExcludedHosts(t *testing.T) {
+	scope, err := target.ParseScope("192.0.2.0/30", "192.0.2.2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rustscanTargets []string
+	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
+		if binary == "nmap" {
+			return nil, fmt.Errorf("assume-up must not run nmap discovery")
+		}
+		if binary != "rustscan" {
+			return nil, fmt.Errorf("unexpected binary %s", binary)
+		}
+		for i, arg := range args {
+			if arg == "-a" && i+1 < len(args) {
+				rustscanTargets = append(rustscanTargets, args[i+1])
+				return []byte(args[i+1] + " -> []\n"), nil
+			}
+		}
+		return nil, fmt.Errorf("rustscan target missing: %v", args)
+	})
+	err = RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
+		RunID:          "run-assume-up-exclude",
+		Targets:        scope.NmapTargets(),
+		Scope:          scope,
+		Ports:          "22",
+		DiscoveryMode:  "assume-up",
+		HostWorkers:    1,
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if got, want := rustscanTargets, []string{"192.0.2.0", "192.0.2.1", "192.0.2.3"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("rustscan targets = %#v, want %#v", got, want)
+	}
 }

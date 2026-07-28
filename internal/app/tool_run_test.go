@@ -216,6 +216,77 @@ func TestRunToolNucleiSavesFindings(t *testing.T) {
 	}
 }
 
+func TestRunToolRecordsRawArgsAuditAndWarning(t *testing.T) {
+	st := newToolRunStore(t)
+	runner := toolRunnerFunc(func(_ string, args []string) ([]byte, error) {
+		return []byte(`{"template-id":"demo","ip":"192.0.2.10","port":"8080","info":{"name":"demo","severity":"info"},"matched-at":"http://192.0.2.10:8080"}` + "\n"), nil
+	})
+
+	err := RunTool(context.Background(), runner, st, ToolRunOptions{
+		RunID: "run-nuclei-raw", Tool: "nuclei", URL: "http://192.0.2.10:8080", Tags: []string{"demo"},
+		Tools: ToolPaths{Nuclei: "nuclei"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		ExtraArgs: ToolExtraArgs{Nuclei: []string{"-rate-limit", "1"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := st.GetScanRun("run-nuclei-raw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Target != "http://192.0.2.10:8080" {
+		t.Fatalf("Target = %q, want raw target not args", run.Target)
+	}
+	if !strings.Contains(run.ConfigSnapshot, `"extra_args"`) || !strings.Contains(run.ConfigSnapshot, `"-rate-limit"`) {
+		t.Fatalf("ConfigSnapshot missing extra_args audit: %s", run.ConfigSnapshot)
+	}
+	events, err := st.ListScanEvents("run-nuclei-raw", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, ev := range events {
+		if strings.Contains(ev.Message, "raw tool arguments supplied") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("missing raw-args warning in events: %#v", events)
+	}
+}
+
+func TestRunToolNativeArgsDoNotLeakIntoTargetField(t *testing.T) {
+	st := newToolRunStore(t)
+	runner := toolRunnerFunc(func(_ string, _ []string) ([]byte, error) { return []byte("ok\n"), nil })
+
+	err := RunTool(context.Background(), runner, st, ToolRunOptions{
+		RunID: "run-native", Tool: "nmap", UseNativeArgs: true, NativeArgs: []string{"--version"},
+		Tools: ToolPaths{Nmap: "nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := st.GetScanRun("run-native")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Target != "" {
+		t.Fatalf("native Target = %q, want empty to avoid leaking raw args", run.Target)
+	}
+	if !strings.Contains(run.ConfigSnapshot, `"native_args"`) || !strings.Contains(run.ConfigSnapshot, `"--version"`) {
+		t.Fatalf("ConfigSnapshot missing native_args audit: %s", run.ConfigSnapshot)
+	}
+	findings, err := st.ListFindings("run-native")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 1 || strings.Contains(findings[0].Target, "--version") {
+		t.Fatalf("finding target leaks native args: %#v", findings)
+	}
+}
+
 func TestRunToolAppliesConfiguredToolTimeout(t *testing.T) {
 	for _, test := range []struct {
 		tool     string

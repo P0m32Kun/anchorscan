@@ -25,6 +25,19 @@ func TestRunNSEBuildsCommandAndParsesScripts(t *testing.T) {
 	}
 }
 
+func TestRunNSEUsesIPv6Mode(t *testing.T) {
+	runner := &fakeRunner{output: []byte(`<nmaprun/>`)}
+
+	_, err := RunNSE(context.Background(), runner, "/opt/nmap", "2001:db8::10", 443, []string{"ssl-cert"}, nil)
+	if err != nil {
+		t.Fatalf("RunNSE returned error: %v", err)
+	}
+	wantArgs := []string{"/opt/nmap", "-p", "443", "--script", "ssl-cert", "-6", "2001:db8::10", "-oX", "-"}
+	if !reflect.DeepEqual(runner.args, wantArgs) {
+		t.Fatalf("args mismatch: got %#v want %#v", runner.args, wantArgs)
+	}
+}
+
 func TestRunNSEWithOutputReturnsRawOutput(t *testing.T) {
 	raw := []byte(`<nmaprun><host><ports><port protocol="tcp" portid="445"><script id="smb-protocols" output="SMBv1 disabled"/></port></ports></host></nmaprun>`)
 	runner := &fakeRunner{output: raw}

@@ -69,17 +69,18 @@ run
 
 func writeTestConfig(t *testing.T, dir string) string {
 	t.Helper()
+	content := `knowledge_base:
+  path: kb.md
+`
 	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte("knowledge_base:\n  path: kb.md\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
-	for name, content := range map[string]string{
-		"nse.yaml":          "redis:\n  - redis-info\n",
-		"service-tags.yaml": "- name: redis\n  service: [redis]\n  nuclei_tags: [redis]\n  target: hostport\n",
-	} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
-			t.Fatalf("WriteFile returned error: %v", err)
-		}
+	if err := os.WriteFile(filepath.Join(dir, "nse.yaml"), []byte("redis: [redis-info]\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile NSE rules returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "service-tags.yaml"), []byte("- name: redis\n  service: [redis]\n  nuclei_tags: [redis]\n  target: hostport\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile tag rules returned error: %v", err)
 	}
 	return path
 }

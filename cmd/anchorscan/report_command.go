@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -42,6 +44,10 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	if err != nil {
 		return err
 	}
+	run, runErr := scanStore.GetScanRun(*runID)
+	if runErr != nil && !errors.Is(runErr, sql.ErrNoRows) {
+		return err
+	}
 	fps, err := scanStore.ListFingerprints(*runID)
 	if err != nil {
 		return err
@@ -55,7 +61,7 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 		return err
 	}
 	discoveryMode := app.DiscoveryAuto
-	if run, err := scanStore.GetScanRun(*runID); err == nil {
+	if runErr == nil {
 		discoveryMode = app.DiscoveryModeFromConfigSnapshot(run.ConfigSnapshot)
 	}
 	reportChecks := make([]report.DetectionCheck, 0, len(checks))
@@ -67,6 +73,18 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 		})
 	}
 	builtReport := report.BuildWithScanDataAndDetectionChecks(fps, findings, report.ScanData{DiscoveryMode: discoveryMode}, reportChecks)
+	manifest, err := scanStore.GetRunProvenance(*runID)
+	if err != nil {
+		return err
+	}
+	if manifest != "" {
+		var p app.RunProvenance
+		if err := json.Unmarshal([]byte(manifest), &p); err != nil {
+			return fmt.Errorf("decode run provenance: %w", err)
+		}
+		rp := app.ReportProvenance(p, app.EnginesFromDetectionChecks(reportChecks))
+		builtReport.Provenance = &rp
+	}
 	if *jsonPath != "" {
 		if err := ensureParentDir(*jsonPath); err != nil {
 			return err

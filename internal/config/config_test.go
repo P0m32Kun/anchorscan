@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -207,11 +208,11 @@ func TestLoadRulesForConfigRejectsMissingAndEmptyFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := LoadNSERulesForConfig(filepath.Join(dir, "config.yaml")); err == nil || !strings.Contains(err.Error(), "empty") {
-		t.Fatalf("NSE error = %v, want empty error", err)
+	if _, err := LoadNSERulesForConfig(filepath.Join(dir, "config.yaml")); !errors.Is(err, ErrEmptyRuleFile) {
+		t.Fatalf("NSE error = %v, want ErrEmptyRuleFile", err)
 	}
-	if _, err := LoadTagRulesForConfig(filepath.Join(dir, "config.yaml")); err == nil || !strings.Contains(err.Error(), "empty") {
-		t.Fatalf("tag error = %v, want empty error", err)
+	if _, err := LoadTagRulesForConfig(filepath.Join(dir, "config.yaml")); !errors.Is(err, ErrEmptyRuleFile) {
+		t.Fatalf("tag error = %v, want ErrEmptyRuleFile", err)
 	}
 }
 

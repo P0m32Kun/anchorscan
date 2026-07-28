@@ -232,6 +232,39 @@ func (s *Store) AppendScanEvent(event ScanEvent) error {
 	return err
 }
 
+func (s *Store) ListScanEventsAfter(runID string, afterID int64, limit int) ([]ScanEvent, error) {
+	rows, err := s.db.Query(
+		`SELECT id, run_id, time, level, stage, message
+		 FROM scan_events
+		 WHERE run_id = ? AND id > ?
+		 ORDER BY id ASC
+		 LIMIT ?`,
+		runID, afterID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	events := make([]ScanEvent, 0)
+	for rows.Next() {
+		var event ScanEvent
+		var at string
+		if err := rows.Scan(&event.ID, &event.RunID, &at, &event.Level, &event.Stage, &event.Message); err != nil {
+			return nil, err
+		}
+
+		event.Time, err = parseTime(at)
+		if err != nil {
+			return nil, err
+		}
+
+		events = append(events, event)
+	}
+
+	return events, rows.Err()
+}
+
 func (s *Store) ListScanEvents(runID string, limit int) ([]ScanEvent, error) {
 	rows, err := s.db.Query(
 		`SELECT id, run_id, time, level, stage, message

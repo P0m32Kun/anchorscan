@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -151,4 +152,34 @@ func parseTime(value string) (time.Time, error) {
 		return time.Time{}, nil
 	}
 	return time.Parse(time.RFC3339Nano, value)
+}
+
+// VacuumInto writes a consistent snapshot of the database to the given path.
+// It uses SQLite's VACUUM INTO statement, which checkpoints WAL and produces a
+// coherent copy without requiring the caller to copy journal files manually.
+func (s *Store) VacuumInto(path string) error {
+	_, err := s.db.Exec(`VACUUM INTO ?`, path)
+	return err
+}
+
+// ActiveRunLease returns the currently held global run lease, if any.
+// A zero RunLease with a nil error means no lease is active.
+func (s *Store) ActiveRunLease() (RunLease, error) {
+	var lease RunLease
+	var heartbeat string
+	var heartbeatNS int64
+	err := s.db.QueryRow(`SELECT run_id, owner_token, heartbeat_at, heartbeat_at_ns FROM run_leases WHERE scope = ?`, globalRunLeaseScope).Scan(&lease.RunID, &lease.OwnerToken, &heartbeat, &heartbeatNS)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return RunLease{}, nil
+		}
+		return RunLease{}, err
+	}
+	lease.HeartbeatAt = time.Unix(0, heartbeatNS).UTC()
+	return lease, nil
+}
+
+// DataRoot returns the filesystem root directory derived from the database path.
+func (s *Store) DataRoot() string {
+	return s.dataRoot
 }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-type ScanEvent = { time: string; level: string; stage: string; message: string };
+type ScanEvent = { id: number; time: string; level: string; stage: string; message: string };
 
 const output = ref('等待启动工具…');
+const events = ref<ScanEvent[]>([]);
 const runID = ref('');
 const busy = ref(false);
 const feedback = ref('');
@@ -11,6 +12,7 @@ const followingOutput = ref(true);
 const terminal = ref<HTMLElement>();
 let form: HTMLFormElement | null = null;
 let stopped = false;
+const eventPageSize = 1000;
 
 function onScroll() {
   const box = terminal.value;
@@ -19,19 +21,22 @@ function onScroll() {
 
 async function poll(run: string) {
   while (!stopped) {
+    const afterID = events.value.at(-1)?.id ?? 0;
     const [eventsResult, statusResult] = await Promise.all([
-      fetch(`/api/runs/${encodeURIComponent(run)}/events`),
+      fetch(`/api/runs/${encodeURIComponent(run)}/events?after_id=${afterID}`),
       fetch(`/api/runs/${encodeURIComponent(run)}/status`),
     ]);
     if (!eventsResult.ok || !statusResult.ok) throw new Error('poll failed');
-    const events = await eventsResult.json() as ScanEvent[];
-    output.value = events.map((event) => `[${event.time}] [${event.level || 'info'}] ${event.stage || 'tool'}: ${event.message}`).join('\n') || '工具已启动，等待输出…';
+    const newEvents = await eventsResult.json() as ScanEvent[];
+    if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
+    output.value = events.value.map((event) => `[${event.time}] [${event.level || 'info'}] ${event.stage || 'tool'}: ${event.message}`).join('\n') || '工具已启动，等待输出…';
     const status = (await statusResult.json() as { status: string }).status;
-    if (status !== 'running') {
+    const hasMoreEvents = newEvents.length === eventPageSize;
+    if (status !== 'running' && !hasMoreEvents) {
       feedback.value = status === 'completed' ? '工具运行已完成。' : `工具运行已结束：${status}。`;
       return;
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    if (status === 'running') await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
 }
 

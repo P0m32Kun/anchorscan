@@ -4,7 +4,6 @@ import (
 	"embed"
 	"html/template"
 	"io"
-	"os"
 	"time"
 )
 
@@ -37,18 +36,4 @@ func RenderProjectHTML(w io.Writer, deliverable ProjectDeliverable) error {
 		return err
 	}
 	return tpl.ExecuteTemplate(w, "project_report.html", deliverable)
-}
-
-// WriteProjectHTML renders the single-file project report to path.
-func WriteProjectHTML(path string, deliverable ProjectDeliverable) error {
-	tpl, err := parseProjectReportTemplate()
-	if err != nil {
-		return err
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	return tpl.ExecuteTemplate(file, "project_report.html", deliverable)
 }

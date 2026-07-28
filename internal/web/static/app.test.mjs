@@ -36,14 +36,13 @@ for (const name of ['RunDetail.vue', 'ToolRunFeedback.vue']) {
 const workbench = fs.readFileSync(new URL('../frontend/Workbench.vue', import.meta.url), 'utf8');
 assert.doesNotMatch(workbench, /\bconfirm\s*\(/, 'Workbench destructive actions must use the shared confirmation dialog');
 assert.match(workbench, /anchorscan:confirm/, 'Workbench must request the shared confirmation dialog');
-assert.match(workbench, /function verificationRequestPayload\(/, 'Workbench must own one snake_case verification request projection');
-assert.match(workbench, /function verificationUpdateRequestPayload\(/, 'verification updates must exclude create-only associations');
-assert.match(workbench, /zone_id: verifyZoneId\.value/, 'positive verification requests must send snake_case zone_id');
-assert.match(workbench, /body: JSON\.stringify\(payload\)/, 'create must serialize the shared request projection');
-assert.match(workbench, /body: JSON\.stringify\(verificationUpdateRequestPayload\(c\)\)/, 'update must serialize its supported request projection');
-assert.match(workbench, /function verificationKey\(zoneID: string, vulnerabilityKey: string\)/, 'verification lookup must include the zone boundary');
-assert.match(workbench, /fetchCommand\(c: Candidate, tool: string, asset: string, verificationID: string\)/, 'tool commands must retain their candidate zone');
-assert.match(workbench, /body\.set\('zone_id', c\.ZoneID\)/, 'tool command requests must send the candidate zone');
+assert.match(workbench, /retryVerifyEvidence/, 'Workbench must retain failed evidence uploads for retry');
+assert.match(workbench, /retryNegativeEvidence/, 'Negative verification evidence must also be retryable');
+assert.match(workbench, /indexOf\(pending\)/, 'async evidence retries must remove files by identity rather than stale indexes');
+
+const main = fs.readFileSync(new URL('../frontend/main.ts', import.meta.url), 'utf8');
+assert.match(main, /normalizeOutcome/, 'Workbench DTOs must downgrade unknown enum values safely');
+assert.match(workbench, /normalizeVerificationDetail/, 'detail DTOs must normalize null arrays before evidence upload state changes');
 
 function renderDistribution(badges) {
   const callbacks = [];

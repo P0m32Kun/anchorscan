@@ -7,6 +7,35 @@ import (
 	"testing"
 )
 
+func TestRunFailsWhenEnabledRuleFilesAreMissingOrEmpty(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	t.Chdir(dir)
+
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "")
+	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
+	if !containsCheck(checks, "nse rules", false) || !containsCheck(checks, "tag rules", false) {
+		t.Fatalf("empty enabled rules must fail: %#v", checks)
+	}
+}
+
+func TestConfiguredInvalidRdpscanFails(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  rdpscan: /missing/rdpscan\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
+
+	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
+	if !containsCheck(checks, "rdpscan", false) || !HasFailures(checks) {
+		t.Fatalf("configured invalid rdpscan must fail: %#v", checks)
+	}
+}
+
 func TestRunReportsMissingTool(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
@@ -61,8 +90,16 @@ func TestRunChecksDatabaseCanOpen(t *testing.T) {
 }
 
 func containsCheck(checks []Check, name string, ok bool) bool {
+	status := StatusFail
+	if ok {
+		status = StatusOK
+	}
+	return containsStatus(checks, name, status)
+}
+
+func containsStatus(checks []Check, name string, status Status) bool {
 	for _, check := range checks {
-		if check.Name == name && check.OK == ok {
+		if check.Name == name && check.Status == status {
 			return true
 		}
 	}
@@ -116,13 +153,15 @@ func TestRdpscanMissingReportsOptionalHint(t *testing.T) {
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
 	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
 
 	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
 	if HasFailures(checks) {
 		t.Fatalf("rdpscan missing should not make doctor fail: %#v", checks)
 	}
-	if !containsCheck(checks, "rdpscan", true) {
-		t.Fatalf("expected rdpscan check ok: %#v", checks)
+	if !containsStatus(checks, "rdpscan", StatusWarning) {
+		t.Fatalf("expected rdpscan warning: %#v", checks)
 	}
 	var found bool
 	for _, c := range checks {

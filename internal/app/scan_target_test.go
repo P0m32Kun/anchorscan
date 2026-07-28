@@ -12,9 +12,33 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
+	"github.com/P0m32Kun/anchorscan/internal/target"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
+
+func TestScopeAllowsFindingRejectsNucleiEndpointOutsideScope(t *testing.T) {
+	scope, err := target.ParseScope("192.0.2.0/24", "192.0.2.20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scopeAllowsFinding(scope, report.Finding{IP: "192.0.2.20"}) {
+		t.Fatal("excluded Nuclei endpoint was allowed")
+	}
+	if scopeAllowsFinding(scope, report.Finding{IP: "198.51.100.10"}) {
+		t.Fatal("out-of-scope Nuclei endpoint was allowed")
+	}
+	if !scopeAllowsFinding(scope, report.Finding{IP: "192.0.2.10"}) {
+		t.Fatal("in-scope Nuclei endpoint was rejected")
+	}
+	if scopeAllowsNucleiFinding(scope, tools.NucleiFinding{IP: "192.0.2.10", MatchedAt: "http://192.0.2.20/"}, report.Finding{IP: "192.0.2.10"}) {
+		t.Fatal("finding with excluded Nuclei evidence was allowed")
+	}
+	if !scopeAllowsNucleiFinding(scope, tools.NucleiFinding{IP: "192.0.2.10", MatchedAt: "http://192.0.2.10/"}, report.Finding{IP: "192.0.2.10"}) {
+		t.Fatal("finding with in-scope Nuclei evidence was rejected")
+	}
+}
 
 func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
 	fallback := fingerprint.ServiceFingerprint{IP: "172.22.0.1", Port: 8080, Protocol: "tcp"}
@@ -33,6 +57,36 @@ func TestFindingFromNucleiUsesResultEndpoint(t *testing.T) {
 	}
 	if finding.Target != "172.22.0.1:6379" {
 		t.Fatalf("finding target = %q", finding.Target)
+	}
+}
+
+func TestRunScanDiscardsOutOfScopeNucleiFinding(t *testing.T) {
+	scope, err := target.ParseScope("192.168.1.10", "192.168.1.20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.168.1.10 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"ip\":\"192.168.1.20\",\"port\":\"22\",\"matched-at\":\"192.168.1.20:22\"}\n"),
+	}}
+	scanStore := newScanStore(t)
+	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-out-of-scope-nuclei", Scope: scope, Targets: scope.NmapTargets(), Ports: "22",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		TagRules:       []TagRule{{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, Target: "hostport"}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	findings, err := scanStore.ListFindings("run-out-of-scope-nuclei")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("out-of-scope findings persisted: %#v", findings)
 	}
 }
 
@@ -71,10 +125,11 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos,ssh-hostkey", "-p", "22") {
 		t.Fatalf("expected nmap NSE invocation with ssh scripts, commands=%#v", runner.commands)
 	}
-	// Nuclei: must be invoked with -tags ssh and -etags default-login (exclude official
-	// brute-force templates; the mini-brute template carries ssh tag but not default-login),
-	// targeting IP:22, jsonl output.
-	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "default-login", "-target", "192.168.1.10:22", "-jsonl") {
+	// Nuclei: SSH is invoked by a custom template path in the default rule, but this
+	// test uses a tag-only fallback rule. The command must still use -tags ssh and
+	// exclude both the global fuzz/dos categories and the official default-login
+	// template (which carries the large SSH wordlist), targeting IP:22 with jsonl output.
+	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "fuzz,dos,default-login", "-target", "192.168.1.10:22", "-jsonl") {
 		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
 	}
 	checks, err := scanStore.ListDetectionChecks("run-ssh-dual")

@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -17,13 +18,26 @@ type nmapRun struct {
 }
 
 type nmapHost struct {
-	Address     nmapAddress  `xml:"address"`
-	Ports       []nmapPort   `xml:"ports>port"`
-	Hostscripts []nmapScript `xml:"hostscript>script"`
+	Addresses   []nmapAddress `xml:"address"`
+	Ports       []nmapPort    `xml:"ports>port"`
+	Hostscripts []nmapScript  `xml:"hostscript>script"`
 }
 
 type nmapAddress struct {
 	Addr string `xml:"addr,attr"`
+	Type string `xml:"addrtype,attr"`
+}
+
+func (h nmapHost) IP() string {
+	for _, address := range h.Addresses {
+		if address.Type != "" && address.Type != "ipv4" && address.Type != "ipv6" {
+			continue
+		}
+		if ip, err := netip.ParseAddr(address.Addr); err == nil {
+			return ip.String()
+		}
+	}
+	return ""
 }
 
 type nmapPort struct {
@@ -75,6 +89,10 @@ func ParseNmapXML(data []byte) ([]ServiceFingerprint, []ImportedScript, error) {
 	var fps []ServiceFingerprint
 	var scripts []ImportedScript
 	for _, host := range doc.Hosts {
+		ip := host.IP()
+		if ip == "" {
+			continue
+		}
 		for _, port := range host.Ports {
 			if port.State.State != "open" {
 				continue
@@ -84,7 +102,7 @@ func ParseNmapXML(data []byte) ([]ServiceFingerprint, []ImportedScript, error) {
 				return nil, nil, err
 			}
 			fps = append(fps, ServiceFingerprint{
-				IP:        host.Address.Addr,
+				IP:        ip,
 				Port:      portID,
 				Protocol:  port.Protocol,
 				Service:   port.Service.Name,
@@ -97,7 +115,7 @@ func ParseNmapXML(data []byte) ([]ServiceFingerprint, []ImportedScript, error) {
 			for _, script := range port.Scripts {
 				scripts = append(scripts, ImportedScript{
 					Scope:    "port",
-					IP:       host.Address.Addr,
+					IP:       ip,
 					Port:     portID,
 					Protocol: port.Protocol,
 					ID:       script.ID,
@@ -108,7 +126,7 @@ func ParseNmapXML(data []byte) ([]ServiceFingerprint, []ImportedScript, error) {
 		for _, script := range host.Hostscripts {
 			scripts = append(scripts, ImportedScript{
 				Scope:  "host",
-				IP:     host.Address.Addr,
+				IP:     ip,
 				ID:     script.ID,
 				Output: script.Output,
 			})

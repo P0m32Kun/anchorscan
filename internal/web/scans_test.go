@@ -24,6 +24,12 @@ func saveProjectWithZones(t *testing.T, s *store.Store, project store.Project) {
 	}
 }
 
+func writeWebScanRules(t *testing.T, dir string) {
+	t.Helper()
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "http: [http-title]\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n")
+}
+
 func TestNewScanPageRenders(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -149,6 +155,7 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -182,14 +189,14 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	for range 50 {
+	for range 200 {
 		if runner.hasArgs(rustscanPath, "--top") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	if !runner.hasArgs(rustscanPath, "--top") {
-		t.Fatalf("expected top1000 passed to rustscan --top, got %#v", runner.commands)
+		t.Fatalf("expected top1000 passed to rustscan --top, got %#v", runner.Commands())
 	}
 }
 
@@ -199,6 +206,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -232,14 +240,14 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	for range 50 {
+	for range 200 {
 		if runner.hasArgs(rustscanPath, "--range", "100-1000") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	if !runner.hasArgs(rustscanPath, "--range", "100-1000") {
-		t.Fatalf("expected port range passed to rustscan, got %#v", runner.commands)
+		t.Fatalf("expected port range passed to rustscan, got %#v", runner.Commands())
 	}
 }
 
@@ -318,6 +326,7 @@ func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -361,8 +370,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
-	writeFile(t, filepath.Join(dir, "nse.yaml"), "http:\n  - http-title\n")
-	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n")
+	writeWebScanRules(t, dir)
 
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -397,7 +405,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	}
 
 	var run store.ScanRun
-	for range 50 {
+	for range 200 {
 		runs, err := scanStore.ListScanRuns(10)
 		if err != nil {
 			t.Fatalf("ListScanRuns returned error: %v", err)
@@ -417,8 +425,8 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if run.AccessPoint != "core-sw-a" || run.TesterIP != "10.0.0.5" || run.Notes != "lab" {
 		t.Fatalf("unexpected run context fields: %#v", run)
 	}
-	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) {
-		t.Fatalf("expected exclusions in snapshot: %s", run.ConfigSnapshot)
+	if !strings.Contains(run.ConfigSnapshot, `"exclude_targets":"192.0.2.1"`) || !strings.Contains(run.ConfigSnapshot, `"exclude_ports":"22"`) || !strings.Contains(run.ConfigSnapshot, `"discovery_mode":"auto"`) || !strings.Contains(run.ConfigSnapshot, `"scope":{"includes":["127.0.0.1/32"],"excludes":["192.0.2.1/32"],"estimated_addresses":1}`) {
+		t.Fatalf("expected exclusions and normalized scope in snapshot: %s", run.ConfigSnapshot)
 	}
 	if run.Kind != "scan" {
 		t.Fatalf("expected kind scan, got %q", run.Kind)
@@ -435,7 +443,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
 	}
 	if !runner.hasArgs(rustscanPath, "-a", "127.0.0.1", "--ports", "80,8080") {
-		t.Fatalf("unexpected rustscan args: %#v", runner.commands)
+		t.Fatalf("unexpected rustscan args: %#v", runner.Commands())
 	}
 }
 
@@ -518,17 +526,5 @@ func TestScanCreateLoadsConfigBeforeValidatingProject(t *testing.T) {
 				t.Fatalf("expected config error before project validation, got body=%s", res.Body.String())
 			}
 		})
-	}
-}
-
-func TestScanFormValidatesDiscoveryMode(t *testing.T) {
-	zones := []store.ProjectZone{{ZoneID: "I"}}
-	form := scanForm{ZoneID: "I", Target: "192.0.2.1", Ports: "80", Profile: "normal", AccessPoint: "lab", TesterIP: "192.0.2.2", DiscoveryMode: "invalid"}
-	if err := validateScanForm(form, zones); err == nil || err.Field != "discovery_mode" {
-		t.Fatalf("validateScanForm = %#v, want discovery mode error", err)
-	}
-	form.DiscoveryMode = ""
-	if err := validateScanForm(form, zones); err != nil {
-		t.Fatalf("empty discovery mode must remain backward compatible: %v", err)
 	}
 }

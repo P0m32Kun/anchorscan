@@ -1,7 +1,9 @@
 package fingerprint
 
 import (
-	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -25,7 +27,7 @@ func Classify(fp ServiceFingerprint) ServiceFingerprint {
 		if fp.Tunnel == "ssl" || strings.Contains(service, "https") || strings.Contains(service, "ssl/http") {
 			scheme = "https"
 		}
-		out.URL = fmt.Sprintf("%s://%s:%d", scheme, fp.IP, fp.Port)
+		out.URL = (&url.URL{Scheme: scheme, Host: net.JoinHostPort(fp.IP, strconv.Itoa(fp.Port))}).String()
 	}
 
 	return out
