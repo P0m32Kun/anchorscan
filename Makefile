@@ -11,8 +11,9 @@ VERSION_PACKAGE := github.com/P0m32Kun/anchorscan/internal/version
 VERSION_LDFLAGS = -X $(VERSION_PACKAGE).Version=$(VERSION) $(LDFLAGS)
 PACKAGE_NAME := $(APP)-$(VERSION)-$(GOOS)-$(GOARCH)
 PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
+PACKAGE_ARCHIVE ?= $(DIST_DIR)/$(PACKAGE_NAME).tar.gz
 
-.PHONY: test docx-test build package package-test web-smoke pr-check clean
+.PHONY: test docx-test build package package-test package-smoke security-check web-smoke pr-check clean
 
 test:
 	go test ./...
@@ -38,10 +39,17 @@ package: web
 	cp docs/deploy.md $(PACKAGE_DIR)/docs/deploy.md
 	cp tools/docx-render/.python-version tools/docx-render/pyproject.toml tools/docx-render/uv.lock tools/docx-render/render_docx.py $(PACKAGE_DIR)/tools/docx-render/
 	cp tools/docx-render/templates/project-report.docx $(PACKAGE_DIR)/tools/docx-render/templates/project-report.docx
-	tar -C $(DIST_DIR) -czf $(DIST_DIR)/$(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
+	tar -C $(DIST_DIR) -czf $(PACKAGE_ARCHIVE) $(PACKAGE_NAME)
 
-package-test: package
-	ANCHORSCAN_PACKAGE_ARCHIVE="$(abspath $(DIST_DIR)/$(PACKAGE_NAME).tar.gz)" ANCHORSCAN_PACKAGE_NAME="$(PACKAGE_NAME)" ANCHORSCAN_PACKAGE_VERSION="$(VERSION)" go test -tags packageintegration ./scripts
+package-smoke:
+	ANCHORSCAN_PACKAGE_ARCHIVE="$(abspath $(PACKAGE_ARCHIVE))" ANCHORSCAN_PACKAGE_NAME="$(PACKAGE_NAME)" ANCHORSCAN_PACKAGE_VERSION="$(VERSION)" go test -tags packageintegration ./scripts
+
+package-test: package package-smoke
+
+security-check:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+	npm audit --audit-level=high --omit=dev
+	uv lock --check --project tools/docx-render
 
 web-smoke: build
 	npm run test:web

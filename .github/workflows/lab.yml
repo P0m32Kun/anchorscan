@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 70
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up shared lab
         run: |
@@ -27,7 +27,7 @@ jobs:
           cat > "$LAB_DIR/docker-compose.yml" << 'COMPOSE'
           services:
             nginx:
-              image: nginx:alpine
+              image: nginx:1.31.3-alpine3.24@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
               container_name: lab-nginx
               networks:
                 lab-net:
@@ -55,7 +55,7 @@ jobs:
                 timeout: 5s
                 retries: 5
             grafana:
-              image: grafana/grafana:10.0.0
+              image: grafana/grafana:10.0.0@sha256:4d5308c296c49ec57b6e73854b041c731edab19571f41fa1c588dbd7288eba38
               container_name: lab-grafana
               networks:
                 lab-net:
@@ -73,7 +73,7 @@ jobs:
                 timeout: 3s
                 retries: 5
             redis:
-              image: redis:7-alpine
+              image: redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
               container_name: lab-redis
               networks:
                 lab-net:
@@ -87,7 +87,7 @@ jobs:
                 timeout: 3s
                 retries: 3
             mariadb:
-              image: mariadb:11
+              image: mariadb:11.4.12@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
               container_name: lab-mariadb
               networks:
                 lab-net:
@@ -103,7 +103,7 @@ jobs:
                 timeout: 5s
                 retries: 5
             ssh:
-              image: lscr.io/linuxserver/openssh-server:latest
+              image: lscr.io/linuxserver/openssh-server@sha256:9c5e178975fcc3917853f5e37cbf135ad7deb11de504ab0f460cc81a2e1eb539
               container_name: lab-ssh
               networks:
                 lab-net:
@@ -118,7 +118,7 @@ jobs:
               ports:
                 - "10022:2222"
             samba:
-              image: dperson/samba
+              image: dperson/samba@sha256:66088b78a19810dd1457a8f39340e95e663c728083efa5fe7dc0d40b2478e869
               container_name: lab-samba
               networks:
                 lab-net:
@@ -131,7 +131,7 @@ jobs:
               ports:
                 - "1445:445"
             unknown-tcp:
-              image: python:3.12-alpine
+              image: python:3.12.13-alpine3.24@sha256:6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df
               container_name: lab-unknown
               networks:
                 lab-net:
@@ -164,7 +164,7 @@ jobs:
           COMPOSE
           # tomcat-vuln Dockerfile
           cat > "$LAB_DIR/apps/tomcat-vuln/Dockerfile" << 'DOCKERFILE'
-          FROM tomcat:9.0-jdk8-temurin
+          FROM tomcat:9.0.120-jdk8-temurin@sha256:e24e53508b465f13726bd630278b360108961a9976c8caa89a1ad59f6785dcb8
           RUN cp -r /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps/
           COPY tomcat-users.xml /usr/local/tomcat/conf/tomcat-users.xml
           RUN sed -i 's|allow="[^"]*"|allow="0.0.0.0/0"|g' /usr/local/tomcat/webapps/manager/META-INF/context.xml || true
@@ -204,19 +204,19 @@ jobs:
           echo "Lab set up at $LAB_DIR"
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
 
       - name: Install real scan tools
         run: |
           sudo apt-get update
           sudo apt-get install -y nmap
-          cargo install rustscan --locked
+          cargo install rustscan@2.4.1 --locked
           go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1
           go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.4.4
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
@@ -249,7 +249,7 @@ jobs:
 
       - name: Upload laboratory evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: real-tool-lab-evidence
           path: test-artifacts/real-tool-lab

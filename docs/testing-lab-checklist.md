@@ -39,6 +39,16 @@ Current automated coverage:
 - 自动化不会使用不存在的测试 IP，而是从 `$SHARED_LAB_DIR`（未设置时为 `~/DEV/lab`）的 `docker-compose.yml` 启动或复用容器，并通过 `docker inspect` 获取真实容器 IP。
 - 如果你在 macOS 上跑这套用例，并希望从宿主机直接访问容器 IP，请保持 `docker-mac-net-connect` 可用。
 
+## CI Lab Image Maintenance
+
+`.github/workflows/lab.yml` pins every CI lab image by immutable SHA-256 digest and records tool versions in its evidence artifact. To intentionally update an image, first select and test a versioned tag locally, then replace it with the digest returned by:
+
+```bash
+docker buildx imagetools inspect <image:version> --format '{{json .Manifest}}'
+```
+
+Update the tag and digest together, retain the version in the image reference, and run `make pr-check` before merging. Do not replace a digest with `latest` or a floating major/minor tag.
+
 ## Lab Startup Baseline
 
 Start or refresh the local lab:

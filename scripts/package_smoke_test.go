@@ -50,6 +50,7 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 		binaryName += ".exe"
 	}
 	assertBinaryVersion(t, filepath.Join(packageDir, binaryName), version)
+	assertBinaryStarts(t, filepath.Join(packageDir, binaryName))
 
 	for _, relativePath := range []string{
 		"config/default.yaml.example",
@@ -120,6 +121,13 @@ func TestBuildVersionCanBeInjected(t *testing.T) {
 		t.Fatalf("build development version: %v\n%s", err, output)
 	}
 	assertBinaryVersion(t, devBinary, "dev")
+}
+
+func assertBinaryStarts(t *testing.T, binary string) {
+	t.Helper()
+	if output, err := exec.Command(binary, "--help").CombinedOutput(); err != nil {
+		t.Fatalf("start %s: %v\n%s", binary, err, output)
+	}
 }
 
 func assertBinaryVersion(t *testing.T, binary, version string) {
