@@ -17,7 +17,7 @@ PACKAGE_ARCHIVE ?= $(DIST_DIR)/$(PACKAGE_NAME).tar.gz
 
 test:
 	go test ./...
-	node --test internal/web/static/*.test.mjs
+	node --test internal/web/static/*.test.mjs internal/web/frontend/*.test.mjs
 
 docx-test:
 	uv run --project tools/docx-render python -m unittest discover -s tools/docx-render -p 'test_*.py'

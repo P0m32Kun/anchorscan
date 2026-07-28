@@ -443,7 +443,9 @@ try {
   await page.goto(`${baseURL}${projectURL}/workbench`, { waitUntil: 'networkidle' });
   await page.locator('[data-workbench][data-mounted="true"]').waitFor();
   await assert.doesNotReject(() => page.getByRole('heading', { name: 'SMB 签名未启用' }).waitFor());
-  await page.getByRole('button', { name: '验证 / 编辑' }).first().click();
+  const verifyButton = page.getByRole('button', { name: '验证 / 编辑' }).first();
+  await verifyButton.focus();
+  await verifyButton.click();
   const dialog = page.locator('dialog.verify-dialog');
   await assert.doesNotReject(() => dialog.waitFor());
   await page.waitForFunction(() => {
@@ -496,6 +498,7 @@ try {
   await page.waitForFunction((expected) => document.querySelectorAll('dialog.verify-dialog .evidence-item button').length === expected, evidenceDeleteCount - 1);
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
+  assert.equal(await verifyButton.evaluate((button) => document.activeElement === button), true, 'closing the verification dialog should restore focus to its trigger');
 
   // Workbench command dialog regression: generated command text should render.
   await page.locator('details.context-actions summary').first().click();

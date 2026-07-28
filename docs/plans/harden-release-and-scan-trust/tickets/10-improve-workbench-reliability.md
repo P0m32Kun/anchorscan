@@ -4,7 +4,7 @@
 
 **Blocked by:** 09 — 强化发布与 CI 门禁。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -24,11 +24,17 @@
 
 ## 验收
 
-- [ ] 先写部分 Evidence 失败会失去恢复入口的失败测试。
-- [ ] 实现最小逐文件状态和重试，不引入全局状态库。
-- [ ] 抽取 DTO/API client 与实际修改涉及的 dialog，未触及区域不机械拆分。
-- [ ] 相关 object URL、重复提交和错误反馈有行为测试。
-- [ ] `npm run typecheck:web`、聚焦测试、`make test`、`make pr-check` 通过。
+- [x] 先写部分 Evidence 失败会失去恢复入口的失败测试。
+- [x] 实现最小逐文件状态和重试，不引入全局状态库。
+- [x] 抽取 DTO/API client 与实际修改涉及的 dialog，未触及区域不机械拆分。
+- [x] 相关 object URL、重复提交和错误反馈有行为测试。
+- [x] `npm run typecheck:web`、聚焦测试、`make test`、`make pr-check` 通过。
+
+## 验收记录
+
+- Playwright 以一个已创建的 Verification 模拟同批 Evidence 的首次上传失败与后续成功，确认成功项保留、失败项可重试、关闭对话框后焦点回到触发按钮。
+- `workbench-api.test.mjs` 直接验证 null 数组和未知 enum 的 DTO 降级；浏览器和 API client 继续保持 Vue island 的局部边界。
+- 已运行 `npm run typecheck:web`、`make web-smoke`、`make test`、`make pr-check`、`make security-check`；双轴 review 的 High 已修复。
 
 ## 非目标
 
