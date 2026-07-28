@@ -2,7 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-07-17
-- 关联计划：`docs/plans/harden-scan-confidence/`
+- 关联计划：`docs/plans/archive/harden-scan-confidence/`
 
 ## 背景（Context）
 

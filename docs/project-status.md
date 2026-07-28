@@ -63,8 +63,8 @@ Implemented capabilities:
 | `config/ports-highrisk.txt` | high-risk port preset (ops-remapped + ICS/SCADA + standard services) |
 | `config/ports-top1000.txt` | common port preset used by `top1000` |
 | `config/nuclei-templates/` | custom Nuclei templates bundled with the release (e.g., SSH mini-brute with 2 users × 2 passwords) |
-| `config/service-tags.yaml` | dual-engine nuclei tag mapping (26+ services; non-SSH services may hit their `default-login` templates, SSH uses the bundled `ssh-mini-brute` template) |
-| `config/nse.yaml` | dual-engine NSE script mapping (information-collection scripts per service) |
+| `config/service-tags.yaml` | nuclei tag mapping (26+ services; non-SSH services may hit their `default-login` templates, SSH uses the bundled `ssh-mini-brute` template) |
+| `config/nse.yaml` | nmap NSE script mapping for services with applicable scripts |
 | `internal/fingerprint/normalize.go` | service normalization aliases |
 
 Third-party tools are configured by path. AnchorScan does not package `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
@@ -84,7 +84,7 @@ These are generated locally and should not be treated as source:
 - One active pipeline scan or single-tool run is allowed per database; persisted Run Leases prevent competing processes from owning work concurrently.
 - Web static resources are embedded in the Go binary. Rebuild the binary after frontend changes before judging browser behavior.
 - `nmap -sV --version-intensity 7` can be slow on `1-65535` full-range scans. This is expected; use narrow ports for lab checks.
-- nuclei and NSE run as a dual-engine matrix: every discovered service with configured rules runs both engines. `config/service-tags.yaml` maps 26+ common services (SSH, FTP, Redis, MySQL, SMB, etc.) to nuclei tags. Non-SSH services may hit their service-specific `default-login` templates for weak-credential coverage; SSH uses the bundled `config/nuclei-templates/ssh-mini-brute.yaml` template (2 users × 2 passwords, up to 4 attempts, `stop-at-first-match`) to avoid the official large dictionary. `config/nse.yaml` maps the same services to nmap NSE scripts. Services without NSE scripts (elasticsearch, kafka, kubernetes, winrm) run nuclei only.
+- nuclei 与 NSE 根据服务指纹和各自规则独立调度：`config/service-tags.yaml` 映射 nuclei tags，`config/nse.yaml` 只为有适用 NSE 的服务映射脚本。服务可能运行两个引擎、其中一个，或在无规则时被跳过；Detection Coverage 记录实际执行事实。
 - Manual nuclei runs can target explicit tags or one template path from the CLI/Web single-tool flow.
 - BlueKeep / CVE-2019-0708 can be checked by the optional `rdpscan` engine. Missing configuration does not block scans; `SAFE` and `UNKNOWN` do not become confirmed vulnerabilities.
 - Unknown services should not be forced into the Web pipeline.

@@ -29,7 +29,7 @@ Current automated coverage:
 - 终端英文逗号分隔目标
 - 指定端口列表扫描
 - Web 项目创建
-- 项目默认目标发起扫描
+- 在 Project/Zone 下填写本次目标、端口和 Profile 发起扫描
 - 排除目标
 - 排除端口
 - 项目删除时联动清理数据库与托管报告目录

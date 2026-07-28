@@ -14,7 +14,7 @@ This directory is the authoritative index for architectural decisions that still
 
 | Status | Decision |
 | --- | --- |
-| Historical accepted | [ADR-0004: Identify built-in DetectionCheck candidates](archive/0004-identify-builtin-detection-checks.md) |
+| Rolled back | [ADR-0004: Identify built-in DetectionCheck candidates](archive/0004-identify-builtin-detection-checks.md) |
 | Superseded by ADR-0006 | [ADR-0005: Exclude BlueKeep from default built-in probes](archive/0005-exclude-bluekeep-from-default-builtin-probes.md) |
 | Superseded by ADR-0007 | [ADR-0006: Adopt Rapid7 BlueKeep baseline](archive/0006-adopt-rapid7-bluekeep-scan-baseline.md) |
 | Historical accepted | [ADR-0007: Defer default built-in probes pending a safe candidate](archive/0007-defer-default-builtin-probe-until-safe-candidate.md) |
