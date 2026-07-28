@@ -132,6 +132,43 @@ class RenderDocxTests(unittest.TestCase):
                     left_chars = indent.get(f"{{{W}}}leftChars")
                     self.assertTrue(left_chars is None or int(left_chars) == 0, f"label {label!r} must not be indented")
 
+    def test_runtime_renders_multi_paragraph_description_with_first_line_indent(self) -> None:
+        context = json.loads((ROOT / "fixtures/project_report.json").read_text())
+        context = copy.deepcopy(context)
+        context["network_zones"][0]["confirmed"][0]["description_lines"] = [
+            "第一段漏洞描述。",
+            "第二段漏洞描述，补充说明。",
+            "第三段漏洞描述。",
+        ]
+        for zone in context["network_zones"]:
+            for key in ("confirmed", "not_observed"):
+                for verification in zone[key]:
+                    verification["evidence"] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "report.docx"
+            render(context, ROOT / "templates/project-report.docx", destination)
+            with zipfile.ZipFile(destination) as archive:
+                document = ET.fromstring(archive.read("word/document.xml"))
+
+        text = "".join(document.itertext())
+        for value in ("第一段漏洞描述。", "第二段漏洞描述，补充说明。", "第三段漏洞描述。"):
+            self.assertEqual(text.count(value), 1, value)
+        description_paragraphs = [
+            paragraph
+            for paragraph in document.findall(".//w:p", NS)
+            if "".join(paragraph.itertext()).strip() in (
+                "第一段漏洞描述。",
+                "第二段漏洞描述，补充说明。",
+                "第三段漏洞描述。",
+            )
+        ]
+        self.assertEqual(len(description_paragraphs), 3, "each description line must be its own paragraph")
+        for paragraph in description_paragraphs:
+            indent = paragraph.find("w:pPr/w:ind", NS)
+            self.assertIsNotNone(indent, "description paragraph must be indented")
+            self.assertEqual(indent.get(f"{{{W}}}firstLineChars"), "200")
+
     def test_jpeg_images_keep_landscape_and_portrait_aspect_ratios(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             landscape = Path(tmp) / "landscape.jpg"

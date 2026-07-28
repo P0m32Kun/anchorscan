@@ -86,6 +86,7 @@ Do not change persisted `DetectionCheck` rows when rules change. They are facts 
 - Within one zone, matching vulnerabilities from any included runs aggregate their assets and sources into one candidate and one verification.
 - DOCX outputs one chapter per zone and joins unique access points, tester IPs, targets, exclusions, and notes in first-seen order; it must not create a subchapter per scan run.
 - DOCX multi-line zone context fields (`access_points_text`, `tester_ips_text`, `targets_text`, `exclusions_text`, `notes_text`) are newline-delimited strings. The template must render each value as a separate, indented paragraph using a Jinja loop over `splitlines()`; never as a single paragraph with embedded literal newlines.
+- Verification descriptions are provided as a pre-split list `description_lines`. The template must render each element as a separate paragraph with the same first-line indent as the surrounding body text; do not render the raw `description` string as a single paragraph.
 
 ### 4. Validation & Error Matrix
 
@@ -108,7 +109,7 @@ Do not change persisted `DetectionCheck` rows when rules change. They are facts 
 - HTTP regression: reject updates that move a verification outside its project zones.
 - HTTP regression: update a `not_observed` verification's title/description/severity while it has evidence.
 - Frontend static/type check: verify snake_case payloads, composite zone/key identity, and command `zone_id` propagation.
-- Report unit/render tests: two included runs in one zone produce one zone chapter and deduplicated aggregated access context; each access point/IP/target renders in its own indented paragraph.
+- Report unit/render tests: two included runs in one zone produce one zone chapter and deduplicated aggregated access context; each access point/IP/target renders in its own indented paragraph; each `description_lines` paragraph has consistent first-line indent.
 - Web browser smoke: verification create/update payloads use snake_case and preserve multi-run assets/sources; footer shows the linked version without a `v` prefix. |
 
 ### 7. Wrong vs Correct

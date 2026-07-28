@@ -48,6 +48,7 @@ type docxVerification struct {
 	Heading          string         `json:"heading,omitempty"`
 	Title            string         `json:"title,omitempty"`
 	Description      string         `json:"description,omitempty"`
+	DescriptionLines []string       `json:"description_lines,omitempty"`
 	AssetsText       string         `json:"assets_text,omitempty"`
 	RemediationLines []string       `json:"remediation_lines,omitempty"`
 	PortsText        string         `json:"ports_text,omitempty"`
@@ -115,6 +116,7 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 			zone.Confirmed = append(zone.Confirmed, docxVerification{
 				Heading:          v.Title + "（" + severityLabel(v.Severity) + "）",
 				Description:      v.Description,
+				DescriptionLines: docxRemediationLines(v.Description),
 				AssetsText:       v.AssetsText,
 				RemediationLines: docxRemediationLines(v.Remediation),
 				Evidence:         evidencePaths(v.Evidence),

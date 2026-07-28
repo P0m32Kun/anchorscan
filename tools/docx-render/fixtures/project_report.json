@@ -53,6 +53,9 @@
             {
               "image": "evidence-02-tall"
             }
+          ],
+          "description_lines": [
+            "目标服务使用了容易猜测的认证口令。"
           ]
         }
       ],
@@ -64,7 +67,8 @@
             {
               "image": "evidence-03-wide"
             }
-          ]
+          ],
+          "description_lines": []
         }
       ]
     },
@@ -80,11 +84,16 @@
           "heading": "过期组件（中危）",
           "description": "目标使用的组件版本已停止安全维护。",
           "assets_text": "10.10.3.20:443",
-          "remediation_lines": ["评估兼容性后升级到仍受支持的稳定版本。"],
+          "remediation_lines": [
+            "评估兼容性后升级到仍受支持的稳定版本。"
+          ],
           "evidence": [
             {
               "image": "evidence-03-wide"
             }
+          ],
+          "description_lines": [
+            "目标使用的组件版本已停止安全维护。"
           ]
         }
       ],
@@ -96,7 +105,8 @@
             {
               "image": "evidence-01-wide"
             }
-          ]
+          ],
+          "description_lines": []
         }
       ]
     },
@@ -112,11 +122,16 @@
           "heading": "不安全默认配置（低危）",
           "description": "目标服务保留了不必要的默认配置。",
           "assets_text": "172.16.1.30:80",
-          "remediation_lines": ["删除示例配置并关闭不需要的默认功能。"],
+          "remediation_lines": [
+            "删除示例配置并关闭不需要的默认功能。"
+          ],
           "evidence": [
             {
               "image": "evidence-02-tall"
             }
+          ],
+          "description_lines": [
+            "目标服务保留了不必要的默认配置。"
           ]
         }
       ],
@@ -128,7 +143,8 @@
             {
               "image": "evidence-03-wide"
             }
-          ]
+          ],
+          "description_lines": []
         }
       ]
     }

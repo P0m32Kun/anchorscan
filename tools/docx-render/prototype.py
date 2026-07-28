@@ -266,6 +266,7 @@ def prepare_network_zone_block(body: etree._Element, untouched: dict[str, bytes]
 
     p = lambda text: with_text(normal, text)
     indented_p = lambda text: with_left_chars(with_text(normal, text), 200)
+    description_p = lambda text: with_first_line_chars(with_text(normal, text), 200)
     remediation_p = lambda text: with_first_line_chars(with_text(normal, text), 200)
     h3 = lambda text: with_text(heading3, text)
     h4 = lambda text: with_text(heading4, text)
@@ -299,7 +300,9 @@ def prepare_network_zone_block(body: etree._Element, untouched: dict[str, bytes]
         paragraph("{%p for verification in network_zone.confirmed %}"),
         h3("{{ verification.heading }}"),
         h4("漏洞描述"),
-        p("{{ verification.description }}"),
+        paragraph("{%p for para in verification.description_lines %}"),
+        description_p("{{ para }}"),
+        paragraph("{%p endfor %}"),
         h4("漏洞详情"),
         paragraph("{%p for evidence in verification.evidence %}"),
         p("{{ evidence.image }}"),
