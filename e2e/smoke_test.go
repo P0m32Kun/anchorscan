@@ -77,7 +77,15 @@ func TestCLIEndToEndMultiIPSpecifiedPorts(t *testing.T) {
 		t.Fatalf("unexpected run status %#v", runs[0])
 	}
 	if runs[0].Target != targetValue {
-		t.Fatalf("expected stored targets %q, got %q", targetValue, runs[0].Target)
+		// ScanScope normalizes targets (ParseScope -> sort.Slice), so the stored
+		// Target list is sorted rather than in input order; compare as a set.
+		got := strings.Split(runs[0].Target, ",")
+		want := strings.Split(targetValue, ",")
+		sort.Strings(got)
+		sort.Strings(want)
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("expected stored targets %q (set), got %q", targetValue, runs[0].Target)
+		}
 	}
 	if runs[0].Ports != "8080,6379" {
 		t.Fatalf("expected stored ports 8080,6379, got %q", runs[0].Ports)
