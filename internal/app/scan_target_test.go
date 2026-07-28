@@ -133,8 +133,24 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
 	}
 	checks, err := scanStore.ListDetectionChecks("run-ssh-dual")
-	if err != nil || len(checks) != 3 || checks[0].Status != "completed" || checks[1].Status != "completed" || checks[2].Engine != "rdpscan" || checks[2].Status != "skipped" {
+	if err != nil || len(checks) != 4 {
 		t.Fatalf("detection checks = %#v, %v", checks, err)
+	}
+	checkByEngine := map[string]store.DetectionCheck{}
+	for _, c := range checks {
+		checkByEngine[c.Engine] = c
+	}
+	if c, ok := checkByEngine["nse"]; !ok || c.Status != "completed" {
+		t.Fatalf("expected nse completed, got %#v", checkByEngine["nse"])
+	}
+	if c, ok := checkByEngine["nuclei"]; !ok || c.Status != "completed" {
+		t.Fatalf("expected nuclei completed, got %#v", checkByEngine["nuclei"])
+	}
+	if c, ok := checkByEngine["rdpscan"]; !ok || c.Status != "skipped" {
+		t.Fatalf("expected rdpscan skipped, got %#v", checkByEngine["rdpscan"])
+	}
+	if c, ok := checkByEngine["dameng"]; !ok || c.Status != "skipped" {
+		t.Fatalf("expected dameng skipped, got %#v", checkByEngine["dameng"])
 	}
 }
 
@@ -212,8 +228,24 @@ func TestRunScanContinuesAfterNSEFailure(t *testing.T) {
 		t.Fatalf("findings = %#v, %v", findings, err)
 	}
 	checks, err := scanStore.ListDetectionChecks("run-nse-failed")
-	if err != nil || len(checks) != 3 || checks[0].Engine != "nse" || checks[0].Status != "failed" || checks[1].Engine != "nuclei" || checks[1].Status != "completed" || checks[2].Engine != "rdpscan" || checks[2].Status != "skipped" {
+	if err != nil || len(checks) != 4 {
 		t.Fatalf("checks = %#v, %v", checks, err)
+	}
+	checkByEngine := map[string]store.DetectionCheck{}
+	for _, c := range checks {
+		checkByEngine[c.Engine] = c
+	}
+	if c, ok := checkByEngine["nse"]; !ok || c.Status != "failed" {
+		t.Fatalf("expected nse failed, got %#v", checkByEngine["nse"])
+	}
+	if c, ok := checkByEngine["nuclei"]; !ok || c.Status != "completed" {
+		t.Fatalf("expected nuclei completed, got %#v", checkByEngine["nuclei"])
+	}
+	if c, ok := checkByEngine["rdpscan"]; !ok || c.Status != "skipped" {
+		t.Fatalf("expected rdpscan skipped, got %#v", checkByEngine["rdpscan"])
+	}
+	if c, ok := checkByEngine["dameng"]; !ok || c.Status != "skipped" {
+		t.Fatalf("expected dameng skipped, got %#v", checkByEngine["dameng"])
 	}
 }
 
@@ -526,7 +558,20 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListDetectionChecks returned error: %v", err)
 	}
-	if len(checks) != 3 || checks[1].Engine != "nuclei" || checks[1].Status != "failed" || checks[1].ReasonCode != "command_failed" || checks[2].Engine != "rdpscan" {
+	if len(checks) != 4 {
 		t.Fatalf("detection checks = %#v, want failed nuclei command check", checks)
+	}
+	checkByEngine := map[string]store.DetectionCheck{}
+	for _, c := range checks {
+		checkByEngine[c.Engine] = c
+	}
+	if c, ok := checkByEngine["nuclei"]; !ok || c.Status != "failed" || c.ReasonCode != "command_failed" {
+		t.Fatalf("expected nuclei failed command, got %#v", c)
+	}
+	if c, ok := checkByEngine["rdpscan"]; !ok {
+		t.Fatalf("expected rdpscan record, got %#v", c)
+	}
+	if c, ok := checkByEngine["dameng"]; !ok {
+		t.Fatalf("expected dameng record, got %#v", c)
 	}
 }

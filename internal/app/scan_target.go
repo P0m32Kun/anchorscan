@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
+	"github.com/P0m32Kun/anchorscan/internal/fingerprint/probes"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/target"
@@ -117,6 +118,23 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		if opts.PersistFingerprint != nil {
 			if err := opts.PersistFingerprint(fp); err != nil {
 				return result, err
+			}
+		}
+
+		// Dameng active protocol fingerprinting: nmap has no service probe for
+		// Dameng and usually reports padl2sim/unknown/tcpwrapped on port 5236 (or
+		// any custom port). Fire a lightweight DM handshake probe on weakly
+		// identified non-web ports before the vulnerability engines run.
+		if !fp.IsWeb && opts.Tools.Dameng != "" && shouldProbeDameng(fp) {
+			progress.Emit("info", "dameng-probe", "dameng-probe %s:%d (nmap service=%q product=%q)", fp.IP, fp.Port, fp.Service, fp.Product)
+			if enriched, ok := probes.DetectDameng(ctx, fp); ok {
+				fp = enriched
+				progress.Emit("info", "dameng-probe", "dameng-probe %s:%d matched", fp.IP, fp.Port)
+				if opts.PersistFingerprint != nil {
+					if err := opts.PersistFingerprint(fp); err != nil {
+						return result, err
+					}
+				}
 			}
 		}
 
@@ -352,9 +370,129 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				}
 			}
 		}
+
+		// Dameng default-password detector — optional fourth engine. Execution is
+		// triggered only when active protocol fingerprinting (or a future nmap
+		// probe) normalizes the service to "dameng", so custom ports are covered
+		// without a fixed port list.
+		switch {
+		case fp.Normalized != "dameng":
+			if err := recordDetectionCheck(opts, fp, "dameng", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case opts.Tools.Dameng == "":
+			if err := recordDetectionCheck(opts, fp, "dameng", "skipped", "tool_unconfigured", "dameng detector is not configured", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		default:
+			progress.Emit("info", "dameng", "dameng %s:%d default password check", fp.IP, fp.Port)
+			started := time.Now()
+			stageFailed := false
+			if err := recordDetectionCheck(opts, fp, "dameng", "running", "", "", started, time.Time{}); err != nil {
+				return TargetScan{}, err
+			}
+			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Dameng)
+			checker := opts.DamengChecker
+			if checker == nil {
+				checker = tools.DefaultDamengChecker
+			}
+			damengResult, err := tools.RunDamengDefaultPassword(toolCtx, checker, fp.IP, fp.Port)
+			operatorCanceled := isOperatorCanceled(toolCtx)
+			cancel()
+			out := []byte(damengResult.Output)
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("dameng", fp.IP, strconv.Itoa(fp.Port))+".txt", out); writeErr != nil {
+				_ = recordDetectionCheck(opts, fp, "dameng", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "dameng", "dameng %s:%d artifact failed: %v", fp.IP, fp.Port, writeErr)
+			}
+			if err != nil {
+				status, reason := "failed", "command_failed"
+				if operatorCanceled {
+					status, reason = "canceled", "run_canceled"
+				}
+				_ = recordDetectionCheck(opts, fp, "dameng", status, reason, err.Error(), started, time.Now())
+				if operatorCanceled {
+					return result, context.Canceled
+				}
+				result.HadErrors = true
+				stageFailed = true
+				progress.Emit("error", "dameng", "dameng %s:%d failed: %v", fp.IP, fp.Port, err)
+			}
+			if err == nil {
+				switch damengResult.Verdict {
+				case tools.DamengVulnerable:
+					finding := report.Finding{
+						IP:       fp.IP,
+						Port:     fp.Port,
+						Protocol: fp.Protocol,
+						Source:   "dameng",
+						ID:       "dameng-default-password",
+						Severity: "high",
+						Summary:  "Dameng Database Default Password (SYSDBA/SYSDBA)",
+						Target:   fp.IP,
+						Output:   strings.TrimSpace(string(out)),
+					}
+					if err := persistFinding(opts, finding); err != nil {
+						_ = recordDetectionCheck(opts, fp, "dameng", "failed", "persistence_failed", err.Error(), started, time.Now())
+						return result, err
+					}
+					allFindings = append(allFindings, finding)
+					progress.Emit("info", "dameng", "dameng %s:%d VULNERABLE default password", fp.IP, fp.Port)
+				case tools.DamengSafe:
+					progress.Emit("info", "dameng", "dameng %s:%d SAFE default password changed", fp.IP, fp.Port)
+				default:
+					progress.Emit("info", "dameng", "dameng %s:%d UNKNOWN (no conclusion, see artifact)", fp.IP, fp.Port)
+				}
+			}
+			if !stageFailed {
+				if err := recordDetectionCheck(opts, fp, "dameng", "completed", "", "", started, time.Now()); err != nil {
+					return TargetScan{}, err
+				}
+			}
+		}
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
+}
+
+// shouldProbeDameng decides whether a fingerprint is weak enough that the
+// active Dameng protocol probe is worth running. Known database and web
+// services are skipped to avoid wasting packets.
+func shouldProbeDameng(fp fingerprint.ServiceFingerprint) bool {
+	if fp.Normalized == "dameng" {
+		return false
+	}
+	known := map[string]bool{
+		"mysql":    true,
+		"mariadb":  true,
+		"postgres": true,
+		"mssql":    true,
+		"redis":    true,
+		"mongodb":  true,
+		"oracle":   true,
+		"http":     true,
+		"https":    true,
+		"ssh":      true,
+		"smb":      true,
+		"rdp":      true,
+		"ftp":      true,
+		"smtp":     true,
+		"dns":      true,
+		"snmp":     true,
+		"telnet":   true,
+		"vnc":      true,
+	}
+	if known[fp.Normalized] {
+		return false
+	}
+	// Also skip when nmap already gave a confident product name that maps to a
+	// non-Dameng database or middleware.
+	product := strings.ToLower(fp.Product)
+	if strings.Contains(product, "dameng") || strings.Contains(product, "dm") {
+		return false
+	}
+	return true
 }
 
 func filterScopeFingerprints(scope target.Scope, fingerprints []fingerprint.ServiceFingerprint) []fingerprint.ServiceFingerprint {

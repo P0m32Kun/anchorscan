@@ -50,6 +50,7 @@ type ScanOptions struct {
 	ArtifactRoot         string
 	NSERules             map[string][]string
 	TagRules             []TagRule
+	DamengChecker        tools.DamengAuthChecker
 	PersistFingerprint   func(fingerprint.ServiceFingerprint) error
 	PersistFinding       func(report.Finding) error
 	RecordDetectionCheck func(store.DetectionCheck) error

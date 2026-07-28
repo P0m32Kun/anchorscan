@@ -22,6 +22,10 @@ type ToolPaths struct {
 	Httpx    string `yaml:"httpx"`
 	Nuclei   string `yaml:"nuclei"`
 	Rdpscan  string `yaml:"rdpscan"`
+	// Dameng is an on/off switch for the built-in Dameng default-password
+	// detector. It does not point to an external binary; any non-empty value
+	// enables the detector.
+	Dameng string `yaml:"dameng"`
 }
 
 type ToolTimeouts struct {
@@ -31,6 +35,7 @@ type ToolTimeouts struct {
 	NSE      string `yaml:"nse"`
 	Nuclei   string `yaml:"nuclei"`
 	Rdpscan  string `yaml:"rdpscan"`
+	Dameng   string `yaml:"dameng"`
 }
 
 type ToolDurations struct {
@@ -40,6 +45,7 @@ type ToolDurations struct {
 	NSE      time.Duration
 	Nuclei   time.Duration
 	Rdpscan  time.Duration
+	Dameng   time.Duration
 }
 
 func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
@@ -73,11 +79,14 @@ func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
 	if out.Rdpscan, err = parse("rdpscan", timeouts.Rdpscan); err != nil {
 		return out, err
 	}
+	if out.Dameng, err = parse("dameng", timeouts.Dameng); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
 func (timeouts ToolTimeouts) Normalized() ToolTimeouts {
-	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan} {
+	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan, &timeouts.Dameng} {
 		if *value == "" {
 			*value = "0"
 		}

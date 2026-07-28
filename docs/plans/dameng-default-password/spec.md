@@ -31,42 +31,43 @@ AnchorScan 的双引擎漏洞检测（nuclei + NSE）在国产数据库达梦（
 
 ## 3. 待纠正的事实错误（实现时一并修复）
 
-调研中发现既有数据存在**端口错误**，会让 POC 打不到真实目标：
-
-1. `docs/research/vulnerability-coverage-official-sources.md` 第 48 项将达梦端口列为 `12345`，应为 **`5236`**。`12345` 与达梦无关。
-2. `config/ports-highrisk.txt` 当前**含 `12345`、缺 `5236`**，方向反了。实现时需：加入 `5236`，并处置 `12345`（若无其他用途则移除）。
+`docs/research/vulnerability-coverage-official-sources.md` 第 48 项将达梦端口列为 `12345`，应为 **`5236`**。`12345` 本身是 NetBus 等木马常用端口，与达梦无关，应继续保留在 `config/ports-highrisk.txt` 中；实现时只修正文档端口，不改动端口表。
 
 ## 4. 技术路线决策（已定）
 
-为什么**不能**走 nuclei / NSE，必须用 anchorscan 内置原生 Go 检测器：
+为什么**不能**只走 nuclei / NSE 做默认口令检测，必须用 anchorscan 内置原生 Go 检测器：
 
 | 路线 | 结论 | 原因 |
 |---|---|---|
-| nuclei network/tcp 模板（手写握手） | ❌ 不可行 | 私有协议 + 口令非对称加密协商，模板无法构造正确握手字节；跨大版本协议不兼容。这是 nuclei 官方至今无达梦模板的根因。 |
-| nuclei code 模板（Go 调驱动） | ❌ 务实不可行 | 需 code 模板签名 + 本地装驱动 + `-code` 开关；anchorscan 当前调度 nuclei 用 `-tags` 不传 `-code`，改造成本 > 自写。 |
-| NSE 脚本（Lua） | ❌ 不可行 | Lua 无达梦客户端，手写协议比 Go 难得多，官方库无即为证据。 |
+| nuclei network/tcp 模板做**口令检测** | ❌ 不可行 | 私有协议 + 口令非对称加密协商，模板无法构造正确握手字节；跨大版本协议不兼容。 |
+| nuclei code 模板做口令检测 | ❌ 务实不可行 | 需 code 模板签名 + 本地装驱动 + `-code` 开关；改造成本 > 自写。 |
+| NSE 脚本做口令检测 | ❌ 不可行 | Lua 无达梦客户端，手写协议比 Go 难得多。 |
 | **内置原生 Go 检测器** | ✅ 采用 | 本项目即 Go；用达梦 Go 驱动发起真实登录，`Ping()` 成功判默认口令存在。 |
 
-**挂载范式**：仿照 `internal/app/scan_target.go` 中 `rdpscan`（BlueKeep）作为 `scanTarget()` 内可选引擎段，复用其三态 verdict + `recordDetectionCheck` 记录样板。
+**指纹识别**：nmap 对达梦没有 service probe，常把 5236 报成 `padl2sim` 或 `unknown`。因此**不能依赖固定端口或服务名**。MVP 采用 Nuclei 社区 `javascript/detection/dameng-detect.yaml` 中的主动协议握手包做轻量级指纹识别，命中后再跑 Go 检测器。该探测包只握手、不登录，对目标影响小。
+
+**挂载范式**：
+- 指纹识别：新增 `internal/fingerprint/probes/dameng.go`。
+- 漏洞检测：仿照 `internal/app/scan_target.go` 中 `rdpscan` 作为可选引擎段，复用其三态 verdict + `recordDetectionCheck` 记录样板。
 
 ## 5. 涉及文件与改动点
 
 | 层 | 文件 | 改动 |
 |---|---|---|
+| 主动指纹 | `internal/fingerprint/probes/dameng.go`（新增） | 使用 nuclei 社区探测包做协议指纹识别，返回命中状态并更新 `Normalized` |
 | 工具层 | `internal/tools/dameng.go`（新增） | 检测器实现：`Ping()` 判定，返回 verdict + output |
-| 指纹层 | `internal/fingerprint/normalize.go` | `aliases` 增加达梦归一化（nmap 若返回 `dm`/自定义串 → 统一名） |
-| 调度层 | `internal/app/scan_target.go` | 在 `scanTarget()` 末尾增加 `dameng` 引擎段，仿 `rdpscan` |
-| 配置层 | `config/default.yaml` + `.example` | `tools` 增加 `dameng` 开关（可选，默认启用） |
-| 配置层 | `config/ports-highrisk.txt` | 加 `5236`，处置 `12345`（见 §3） |
-| 报告/前端 | `internal/report/*`、`internal/web/*` | 新 finding source `dameng` 的展示与图标 |
-| 研究文档 | `docs/research/vulnerability-coverage-official-sources.md` | 第 48 项端口 `12345` → `5236`（见 §3） |
+| 指纹层 | `internal/fingerprint/normalize.go` | `aliases` 增加达梦归一化 |
+| 调度层 | `internal/app/scan_target.go` | nmap 后增加达梦主动识别；末尾增加 `dameng` 引擎段，仿 `rdpscan` |
+| 配置层 | `config/default.yaml` + `.example` | `tools` 增加 `dameng` 开关（默认启用），`timeouts` 增加 `dameng` |
+| 研究文档 | `docs/research/vulnerability-coverage-official-sources.md` | 第 48 项端口 `12345` → `5236` |
 
 ## 6. 关键设计点与风险
 
-1. **指纹识别是真正难点（最高风险）**：nmap `-sV` 对 5236 多半识别为 `unknown`/`tcpwrapped`（达梦无 nmap service probe）。触发条件**不能只靠 `Normalized`**，应采用「端口 ∈ 达梦常用端口 {5236,5237,5238,…} **且** nmap 未明确归为 mysql/postgres/mssql/redis 等已知 DB」复合条件，可能还需加一个轻量的达梦握手特征探测（读服务端首包 DM 协议头）。
-2. **依赖供应链**：`gitee.com/chunanyong/dm` 在 gitee，CI/GOPROXY 能否拉取需验证；若受限改用 `github.com/ganl/go-dm`。新增依赖会增大产物体积与供应链面，需评估。
-3. **跨层回归风险**：新增依赖影响构建；改 `scanTarget()` 调度影响所有扫描路径，需全量回归。
-4. **误报控制**：`sql.Open` 本身不发网络包，判定必须以 `Ping()`（真实握手）成功为准；连接超时与认证失败要区分（认证失败 = 服务在但非默认口令，不算漏洞）。
+1. **指纹识别不固定端口**：主动协议探测不依赖 nmap 服务名，达梦跑在任意端口都可能被识别。触发 POC 的唯一条件是 `fp.Normalized == "dameng"`。
+2. **误报控制**：`sql.Open` 本身不发网络包，判定必须以 `Ping()`（真实握手）成功为准；连接超时与认证失败要区分（认证失败 = 服务在但非默认口令，不算漏洞）。
+3. **依赖供应链**：`github.com/ganl/go-dm` 是 GitHub 镜像，CI/GOPROXY 友好。新增依赖会增大产物体积与供应链面，需评估。
+4. **跨层回归风险**：新增依赖影响构建；改 `scanTarget()` 调度影响所有扫描路径，需全量回归。
+5. **保守的协议响应匹配**：MVP 阶段对主动探测响应采用宽松匹配（非空 + 4 字节长度字段合理），后续可随真实抓包收紧。
 
 ## 7. 验收标准
 
@@ -79,8 +80,9 @@ AnchorScan 的双引擎漏洞检测（nuclei + NSE）在国产数据库达梦（
 
 ## 8. 测试策略（无真实达梦环境如何 TDD）
 
-- **检测器接口抽离**：把"发起登录并判定"抽象为可注入的 `dialer`/`connector` 接口，生产实现调真驱动，测试用假连接器返回（握手成功 / 认证失败 / 网络错误）三种结果，验证 verdict 映射。
-- **触发条件单元测试**：用表驱动测试验证端口/归一化服务名复合判定（5236+unknown 触发、5236+mysql 不触发、3306+mysql 不触发等）。
+- **检测器接口抽离**：把"发起登录并判定"抽象为可注入的 `DamengAuthChecker` 接口，生产实现调真驱动，测试用假连接器返回（握手成功 / 认证失败 / 网络错误）三种结果，验证 verdict 映射。
+- **主动指纹识别单元测试**：用本地 fake TCP server 返回模拟 DM 响应，验证 `DetectDameng` 命中与未命中。
+- **触发条件单元测试**：用表驱动测试验证 `fp.Normalized == "dameng"` 时 dameng 引擎段才会被调用；nmap 已明确识别为 mysql 等已知服务时不触发主动探测。
 - **真实环境验证（可选，非门禁）**：用达梦官方 Docker 镜像（若可获取）或本地安装做端到端冒烟，作为 manual 验收证据。
 - 遵循 `docs/testing-strategy.md`，选最低充分测试缝，避免跨层重复覆盖。
 
