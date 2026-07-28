@@ -38,10 +38,11 @@ assert.doesNotMatch(workbench, /\bconfirm\s*\(/, 'Workbench destructive actions 
 assert.match(workbench, /anchorscan:confirm/, 'Workbench must request the shared confirmation dialog');
 assert.match(workbench, /retryVerifyEvidence/, 'Workbench must retain failed evidence uploads for retry');
 assert.match(workbench, /retryNegativeEvidence/, 'Negative verification evidence must also be retryable');
-assert.match(workbench, /@close="resetVerifyDialog"/, 'closing the verification dialog must release object URLs');
+assert.match(workbench, /indexOf\(pending\)/, 'async evidence retries must remove files by identity rather than stale indexes');
 
 const main = fs.readFileSync(new URL('../frontend/main.ts', import.meta.url), 'utf8');
-assert.match(main, /normalizeEnum/, 'Workbench DTOs must downgrade unknown enum values safely');
+assert.match(main, /normalizeOutcome/, 'Workbench DTOs must downgrade unknown enum values safely');
+assert.match(workbench, /normalizeVerificationDetail/, 'detail DTOs must normalize null arrays before evidence upload state changes');
 
 function renderDistribution(badges) {
   const callbacks = [];

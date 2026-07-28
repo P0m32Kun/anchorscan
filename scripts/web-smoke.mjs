@@ -460,15 +460,23 @@ try {
     }
     await route.continue();
   });
-  await dialog.locator('input[type=file]').setInputFiles({
-    name: 'retry.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL1XwAAAABJRU5ErkJggg==', 'base64'),
-  });
+  await dialog.locator('input[type=file]').setInputFiles([
+    {
+      name: 'retry-failed.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL1XwAAAABJRU5ErkJggg==', 'base64'),
+    },
+    {
+      name: 'retry-succeeds.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL1XwAAAABJRU5ErkJggg==', 'base64'),
+    },
+  ]);
   await dialog.getByRole('button', { name: '保存验证' }).click();
   await assert.doesNotReject(() => dialog.getByRole('alert').waitFor());
   const retryButton = dialog.getByRole('button', { name: '重试' });
   await assert.doesNotReject(() => retryButton.waitFor());
+  assert.equal(await dialog.locator('.evidence-item').getByRole('button', { name: '删除' }).count(), 2, 'a successful sibling upload must remain visible while another file can be retried');
   await retryButton.click();
   await assert.doesNotReject(() => retryButton.waitFor({ state: 'hidden' }));
   await page.unroute(`**/projects/${projectID}/verifications/browser-evidence/evidence`);

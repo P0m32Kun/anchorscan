@@ -6,6 +6,7 @@ import ScanCreate from './ScanCreate.vue';
 import ThemeToggle from './ThemeToggle.vue';
 import ToolRunFeedback from './ToolRunFeedback.vue';
 import Workbench from './Workbench.vue';
+import { normalizeOutcome, normalizeSeverity } from './workbench-api';
 import { initTheme } from './theme';
 
 initTheme();
@@ -34,10 +35,6 @@ function mountScanCreate() {
   mountPoint.dataset.mounted = 'true';
 }
 
-function normalizeEnum(value: unknown, allowed: readonly string[], fallback: string) {
-  return typeof value === 'string' && allowed.includes(value) ? value : fallback;
-}
-
 function mountWorkbench() {
   const mountPoint = document.querySelector<HTMLElement>('[data-workbench]');
   if (!mountPoint) return;
@@ -49,8 +46,8 @@ function mountWorkbench() {
   props.zones ||= [];
   props.verifications = props.verifications.map((verification: Record<string, unknown>) => ({
     ...verification,
-    Outcome: normalizeEnum(verification.Outcome, ['confirmed', 'inconclusive', 'not_observed'], 'inconclusive'),
-    Severity: normalizeEnum(verification.Severity, ['critical', 'high', 'medium', 'low', 'info'], 'info'),
+    Outcome: normalizeOutcome(verification.Outcome),
+    Severity: normalizeSeverity(verification.Severity),
   }));
   props.candidates = props.candidates.map((candidate: Record<string, unknown>) => ({
     ...candidate,

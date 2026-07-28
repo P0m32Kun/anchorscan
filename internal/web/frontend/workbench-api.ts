@@ -1,3 +1,28 @@
+const outcomes = ['confirmed', 'inconclusive', 'not_observed'] as const;
+const severities = ['critical', 'high', 'medium', 'low', 'info'] as const;
+
+export function normalizeOutcome(value: unknown) {
+  return typeof value === 'string' && outcomes.includes(value as typeof outcomes[number]) ? value : 'inconclusive';
+}
+
+export function normalizeSeverity(value: unknown) {
+  return typeof value === 'string' && severities.includes(value as typeof severities[number]) ? value : 'low';
+}
+
+export function normalizeVerificationDetail<T extends Record<string, unknown>>(detail: T): T {
+  const verification = detail.Verification as Record<string, unknown> | undefined;
+  return {
+    ...detail,
+    Verification: verification ? {
+      ...verification,
+      Outcome: normalizeOutcome(verification.Outcome),
+      Severity: normalizeSeverity(verification.Severity),
+    } : verification,
+    Assets: Array.isArray(detail.Assets) ? detail.Assets : [],
+    Sources: Array.isArray(detail.Sources) ? detail.Sources : [],
+    Evidence: Array.isArray(detail.Evidence) ? detail.Evidence : [],
+  } as T;
+}
 async function errorMessage(response: Response, fallback: string): Promise<string> {
   return (await response.text()).trim() || fallback;
 }
