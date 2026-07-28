@@ -57,6 +57,49 @@ type ScanOptions struct {
 	Logf                 func(format string, args ...any)
 }
 
+// newRunningScanRun builds the initial scan_runs row for a scan that is about
+// to start. It is shared by recordScanStart and RunScan so both write the same
+// shape of row.
+func newRunningScanRun(opts ScanOptions, artifactDir string, startedAt time.Time) store.ScanRun {
+	return store.ScanRun{
+		RunID:           opts.RunID,
+		ProjectID:       opts.ProjectID,
+		ZoneID:          opts.ZoneID,
+		Kind:            "scan",
+		Label:           opts.Label,
+		AccessPoint:     opts.AccessPoint,
+		TesterIP:        opts.TesterIP,
+		Notes:           opts.Notes,
+		IncludeInReport: opts.IncludeInReport,
+		Target:          strings.Join(opts.Targets, ","),
+		Ports:           opts.Ports,
+		Profile:         opts.ProfileName,
+		Status:          "running",
+		StartedAt:       startedAt,
+		ConfigSnapshot:  opts.ConfigSnapshot,
+		ArtifactDir:     artifactDir,
+	}
+}
+
+// recordScanStart synchronously records the initial scan_runs row before the
+// scan goroutine starts. The web UI redirects to the run detail page as soon
+// as Manager.Start returns; without this the detail request can race RunScan's
+// asynchronous save and render a 404 for a run that exists moments later.
+// RunScan upserts the same row once its own setup completes.
+func recordScanStart(scanStore *store.Store, opts ScanOptions) error {
+	if scanStore == nil || opts.RunID == "" {
+		return nil
+	}
+	artifactDir := ""
+	if strings.TrimSpace(opts.ArtifactRoot) != "" {
+		artifactDir = filepath.Join(opts.ArtifactRoot, opts.RunID)
+		if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+			return err
+		}
+	}
+	return scanStore.SaveScanRun(newRunningScanRun(opts, artifactDir, time.Now()))
+}
+
 func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ScanOptions) (runErr error) {
 	artifactDir := ""
 	partialErrors := false
@@ -106,24 +149,7 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	}
 	if opts.RunID != "" && scanStore != nil {
 		startedAt := time.Now()
-		if err := scanStore.SaveScanRun(store.ScanRun{
-			RunID:           opts.RunID,
-			ProjectID:       opts.ProjectID,
-			ZoneID:          opts.ZoneID,
-			Kind:            "scan",
-			Label:           opts.Label,
-			AccessPoint:     opts.AccessPoint,
-			TesterIP:        opts.TesterIP,
-			Notes:           opts.Notes,
-			IncludeInReport: opts.IncludeInReport,
-			Target:          strings.Join(opts.Targets, ","),
-			Ports:           opts.Ports,
-			Profile:         opts.ProfileName,
-			Status:          "running",
-			StartedAt:       startedAt,
-			ConfigSnapshot:  opts.ConfigSnapshot,
-			ArtifactDir:     artifactDir,
-		}); err != nil {
+		if err := scanStore.SaveScanRun(newRunningScanRun(opts, artifactDir, startedAt)); err != nil {
 			return err
 		}
 		runSaved = true

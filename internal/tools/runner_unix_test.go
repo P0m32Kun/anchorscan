@@ -51,11 +51,7 @@ func TestExecRunnerKillsProcessTreeOnCancel(t *testing.T) {
 		t.Fatal("runner did not return after cancellation")
 	}
 
-	if err := syscall.Kill(childPID, 0); err == nil {
-		t.Fatalf("child process %d is still running", childPID)
-	} else if err != syscall.ESRCH {
-		t.Fatalf("check child process %d: %v", childPID, err)
-	}
+	waitForProcessExit(t, childPID)
 }
 
 func TestExecRunnerKillsProcessTreeOnTimeout(t *testing.T) {
@@ -94,9 +90,27 @@ func TestExecRunnerKillsProcessTreeOnTimeout(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("runner did not return after timeout")
 	}
-	if err := syscall.Kill(childPID, 0); err == nil {
-		t.Fatalf("child process %d is still running", childPID)
-	} else if err != syscall.ESRCH {
-		t.Fatalf("check child process %d: %v", childPID, err)
+	waitForProcessExit(t, childPID)
+}
+
+// waitForProcessExit polls until the process is gone. SIGKILL delivery and
+// reaping of an orphaned grandchild (reparented to init after its parent in
+// the same process group is killed) are asynchronous, so a one-shot
+// Kill(pid, 0) check can race the zombie window on busy or slower systems.
+func waitForProcessExit(t *testing.T, pid int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		err := syscall.Kill(pid, 0)
+		if err == syscall.ESRCH {
+			return
+		}
+		if err != nil && err != syscall.EPERM {
+			t.Fatalf("check child process %d: %v", pid, err)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("child process %d is still running", pid)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
