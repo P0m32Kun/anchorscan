@@ -452,7 +452,29 @@ try {
   });
   const focusedName = await page.evaluate(() => document.activeElement?.getAttribute('name') || document.activeElement?.tagName || '');
   assert.ok(focusedName === 'title' || focusedName === 'INPUT', `verify dialog first focusable should be reachable, got ${focusedName}`);
-  const evidenceDeleteButton = dialog.locator('.evidence-item').getByRole('button', { name: '删除' });
+  let evidenceUploadAttempts = 0;
+  await page.route(`**/projects/${projectID}/verifications/browser-evidence/evidence`, async (route) => {
+    if (route.request().method() === 'POST' && ++evidenceUploadAttempts === 1) {
+      await route.fulfill({ status: 500, body: 'simulated evidence upload failure' });
+      return;
+    }
+    await route.continue();
+  });
+  await dialog.locator('input[type=file]').setInputFiles({
+    name: 'retry.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL1XwAAAABJRU5ErkJggg==', 'base64'),
+  });
+  await dialog.getByRole('button', { name: '保存验证' }).click();
+  await assert.doesNotReject(() => dialog.getByRole('alert').waitFor());
+  const retryButton = dialog.getByRole('button', { name: '重试' });
+  await assert.doesNotReject(() => retryButton.waitFor());
+  await retryButton.click();
+  await assert.doesNotReject(() => retryButton.waitFor({ state: 'hidden' }));
+  await page.unroute(`**/projects/${projectID}/verifications/browser-evidence/evidence`);
+  const evidenceDeleteButtons = dialog.locator('.evidence-item').getByRole('button', { name: '删除' });
+  const evidenceDeleteCount = await evidenceDeleteButtons.count();
+  const evidenceDeleteButton = evidenceDeleteButtons.first();
   await evidenceDeleteButton.click();
   const evidenceConfirmDialog = page.getByRole('dialog', { name: '删除截图' });
   await assert.doesNotReject(() => evidenceConfirmDialog.waitFor());
@@ -463,7 +485,7 @@ try {
   await assert.doesNotReject(() => evidenceConfirmDialog.waitFor());
   await evidenceConfirmDialog.getByRole('button', { name: '删除' }).click();
   await assert.doesNotReject(() => page.getByText('截图已删除').waitFor());
-  await assert.doesNotReject(() => evidenceDeleteButton.waitFor({ state: 'hidden' }));
+  await page.waitForFunction((expected) => document.querySelectorAll('dialog.verify-dialog .evidence-item button').length === expected, evidenceDeleteCount - 1);
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
 
