@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { getJSON, postJSON, uploadEvidence } from './workbench-api';
 
 type ProjectAsset = {
   IP: string;
@@ -389,8 +390,10 @@ async function openVerifyDialog(key: string) {
   if (v?.ID) {
     verifyId.value = v.ID;
     try {
-      const res = await fetch(`/projects/${props.project_id}/verifications/${v.ID}`);
-      if (res.ok) verifyCurrent.value = await res.json();
+      verifyCurrent.value = await getJSON<VerificationDetail>(
+        `/projects/${props.project_id}/verifications/${v.ID}`,
+        '读取验证详情失败',
+      );
       if (verifyCurrent.value?.Verification) {
         const ver = verifyCurrent.value.Verification;
         verifyTitle.value = ver.Title;
@@ -442,16 +445,12 @@ async function deleteEvidence(verificationID: string, evidenceID: string, event:
   }
 }
 
-async function uploadEvidence(file: File, caption: string, verificationID: string): Promise<EvidenceItem> {
-  const form = new FormData();
-  form.append('file', file);
-  form.append('caption', caption);
-  const res = await fetch(`/projects/${props.project_id}/verifications/${verificationID}/evidence`, {
-    method: 'POST',
-    body: form,
-  });
-  if (!res.ok) throw new Error((await res.text()).trim() || '上传失败');
-  return await res.json() as EvidenceItem;
+async function uploadVerificationEvidence(file: File, caption: string, verificationID: string): Promise<EvidenceItem> {
+  return await uploadEvidence<EvidenceItem>(
+    `/projects/${props.project_id}/verifications/${verificationID}/evidence`,
+    file,
+    caption,
+  );
 }
 
 function buildVerificationPayload(c: Candidate): VerificationDetail['Verification'] & { assets: any[]; sources: any[] } {
@@ -532,7 +531,7 @@ async function saveVerification() {
     for (const pending of verifyPendingFiles.value) {
       pending.status = 'uploading';
       try {
-        const evidence = await uploadEvidence(pending.file, pending.caption, vid);
+        const evidence = await uploadVerificationEvidence(pending.file, pending.caption, vid);
         verifyCurrent.value?.Evidence.push(evidence);
         URL.revokeObjectURL(pending.objectUrl);
         pending.status = 'uploaded';
@@ -563,7 +562,7 @@ async function retryVerifyEvidence(index: number) {
   pending.status = 'uploading';
   pending.error = undefined;
   try {
-    const evidence = await uploadEvidence(pending.file, pending.caption, verifyId.value);
+    const evidence = await uploadVerificationEvidence(pending.file, pending.caption, verifyId.value);
     verifyCurrent.value?.Evidence.push(evidence);
     URL.revokeObjectURL(pending.objectUrl);
     verifyPendingFiles.value.splice(index, 1);
@@ -663,7 +662,7 @@ async function saveNegative() {
     for (const pending of negPendingFiles.value) {
       pending.status = 'uploading';
       try {
-        await uploadEvidence(pending.file, pending.caption, verificationID);
+        await uploadVerificationEvidence(pending.file, pending.caption, verificationID);
         URL.revokeObjectURL(pending.objectUrl);
         pending.status = 'uploaded';
       } catch (error: any) {
@@ -693,7 +692,7 @@ async function retryNegativeEvidence(index: number) {
   pending.status = 'uploading';
   pending.error = undefined;
   try {
-    await uploadEvidence(pending.file, pending.caption, negVerificationId.value);
+    await uploadVerificationEvidence(pending.file, pending.caption, negVerificationId.value);
     URL.revokeObjectURL(pending.objectUrl);
     negPendingFiles.value.splice(index, 1);
     if (!negPendingFiles.value.some((item) => item.status === 'failed')) negUploadError.value = '';
