@@ -10,7 +10,7 @@
 
 ### 方式一：下载预编译归档（推荐）
 
-到 [Releases 页面](../../releases) 下载并解压对应平台的 `.tar.gz` 归档（支持 linux/amd64、darwin/arm64、windows/amd64），无需安装 Go 环境。归档内包含 DOCX 导出 sidecar 与正式模板；使用 DOCX 导出还需安装 [uv](https://docs.astral.sh/uv/)。
+到 [Releases 页面](https://github.com/P0m32Kun/anchorscan/releases) 下载并解压对应平台的 `.tar.gz` 归档（支持 linux/amd64、darwin/arm64、windows/amd64），无需安装 Go 环境。归档内包含 DOCX 导出 sidecar 与正式模板；使用 DOCX 导出还需安装 [uv](https://docs.astral.sh/uv/)。
 
 ```bash
 # Linux / macOS 示例

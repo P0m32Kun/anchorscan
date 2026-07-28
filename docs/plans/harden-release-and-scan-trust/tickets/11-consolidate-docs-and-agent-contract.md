@@ -4,7 +4,7 @@
 
 **Blocked by:** 10 — 改善 Workbench 失败恢复与职责边界。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`code-review`、`ponytail`。
 
@@ -24,12 +24,17 @@
 
 ## 验收
 
-- [ ] 删除 `STATE.md`，所有入口指向存在的当前或 archive 文档。
-- [ ] README/deploy 不重复维护完整 quick start。
-- [ ] project-status 版本来源不再要求手工同步程序常量。
-- [ ] ADR 索引能唯一定位当前和历史决策。
-- [ ] issue tracker 与实际可用 Matt skills 一致。
-- [ ] 全部 Markdown 相对路径检查通过。
+- [x] 删除 `STATE.md`，所有入口指向存在的当前或 archive 文档。
+- [x] README/deploy 不重复维护完整 quick start。
+- [x] project-status 版本来源不再要求手工同步程序常量。
+- [x] ADR 索引能唯一定位当前和历史决策。
+- [x] issue tracker 与实际可用 Matt skills 一致。
+- [x] 全部 Markdown 相对路径检查通过。
+
+## 验收记录
+
+- `scripts/check_markdown_links.mjs` 检查仓库 Markdown 的本地相对链接，并已接入 `make pr-check`。
+- `make pr-check` 和 `make doc-check` 已通过。
 
 ## 非目标
 

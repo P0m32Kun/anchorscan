@@ -27,7 +27,7 @@ The current direction explicitly does not include:
 
 ## Current Baseline
 
-The project is at the v2.0.0 local-operator baseline.
+The project is a local-operator baseline; release builds derive their displayed version from the `v*` release tag, while development builds display an explicit development version.
 
 Implemented capabilities:
 
@@ -98,9 +98,9 @@ These are generated locally and should not be treated as source:
 - [docs/testing-lab-checklist.md](testing-lab-checklist.md) - 外部 Docker 实验室的启动与验收清单
 - [docs/testing-results-template.md](testing-results-template.md) - 可复制的实验室结果记录模板
 - [docs/troubleshooting-lab.md](troubleshooting-lab.md) - 按扫描阶段组织的实验室故障排查
-- [docs/adr/](adr/) - 仍生效的架构决策；被替代的决策位于 `docs/adr/archive/`
+- [docs/adr/README.md](adr/README.md) - accepted ADR index; historical/superseded decisions are under `docs/adr/archive/`
 - [docs/research/](research/) - 外部资料调研与来源记录
-- [docs/plans/](plans/) - 当前可执行计划（目前没有）
+- [docs/plans/harden-release-and-scan-trust/](plans/harden-release-and-scan-trust/) - 当前加固计划与 ticket
 - [docs/plans/archive/](plans/archive/) - 已完成计划的规格、设计与验收历史记录
 
 ## Recommended Next Steps

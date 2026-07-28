@@ -13,11 +13,14 @@ PACKAGE_NAME := $(APP)-$(VERSION)-$(GOOS)-$(GOARCH)
 PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
 PACKAGE_ARCHIVE ?= $(DIST_DIR)/$(PACKAGE_NAME).tar.gz
 
-.PHONY: test docx-test build package package-test package-smoke security-check web-smoke pr-check clean
+.PHONY: test doc-check docx-test build package package-test package-smoke security-check web-smoke pr-check clean
 
 test:
 	go test ./...
 	node --test internal/web/static/*.test.mjs internal/web/frontend/*.test.mjs
+
+doc-check:
+	node scripts/check_markdown_links.mjs
 
 docx-test:
 	uv run --project tools/docx-render python -m unittest discover -s tools/docx-render -p 'test_*.py'
@@ -54,7 +57,7 @@ security-check:
 web-smoke: build
 	npm run test:web
 
-pr-check: test docx-test build package-test web-smoke
+pr-check: test doc-check docx-test build package-test web-smoke
 
 clean:
 	rm -rf $(DIST_DIR)
