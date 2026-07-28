@@ -103,7 +103,9 @@ jobs:
 
       - name: Smoke test native release archive
         env:
-          ANCHORSCAN_PACKAGE_ARCHIVE: dist/anchorscan-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+          # go test sets CWD to the package dir (scripts/), so the archive path
+          # must be absolute.
+          ANCHORSCAN_PACKAGE_ARCHIVE: ${{ github.workspace }}/dist/anchorscan-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
           ANCHORSCAN_PACKAGE_NAME: anchorscan-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}
           ANCHORSCAN_PACKAGE_VERSION: ${{ github.ref_name }}
         run: go test -tags packageintegration ./scripts

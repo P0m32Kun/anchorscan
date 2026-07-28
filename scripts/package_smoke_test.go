@@ -105,7 +105,13 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 func TestBuildVersionCanBeInjected(t *testing.T) {
 	repoRoot := filepath.Clean(filepath.Join(testFileDir(t), ".."))
 	injectedVersion := "v9.8.7-linker-test"
-	binary := filepath.Join(t.TempDir(), "anchorscan")
+	// go build -o uses the exact name given; on Windows the binary must carry
+	// the .exe extension to be executable.
+	binaryName := "anchorscan"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	binary := filepath.Join(t.TempDir(), binaryName)
 
 	cmd := exec.Command("go", "build", "-trimpath", "-ldflags", "-X github.com/P0m32Kun/anchorscan/internal/version.Version="+injectedVersion, "-o", binary, "./cmd/anchorscan")
 	cmd.Dir = repoRoot
@@ -114,7 +120,7 @@ func TestBuildVersionCanBeInjected(t *testing.T) {
 	}
 	assertBinaryVersion(t, binary, injectedVersion)
 
-	devBinary := filepath.Join(t.TempDir(), "anchorscan")
+	devBinary := filepath.Join(t.TempDir(), binaryName)
 	cmd = exec.Command("go", "build", "-trimpath", "-o", devBinary, "./cmd/anchorscan")
 	cmd.Dir = repoRoot
 	if output, err := cmd.CombinedOutput(); err != nil {
