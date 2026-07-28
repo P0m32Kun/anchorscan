@@ -30,7 +30,16 @@ func TestWorkflowsPinActionsAndReleaseArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"make package-smoke", "sha256sum anchorscan-*.tar.gz > checksums.txt", "dist/checksums.txt"} {
+	for _, want := range []string{
+		"needs: smoke",
+		"runs-on: ${{ matrix.runner }}",
+		"goos: linux",
+		"goos: darwin",
+		"goos: windows",
+		"go test -tags packageintegration ./scripts",
+		"sha256sum anchorscan-*.tar.gz > checksums.txt",
+		"dist/checksums.txt",
+	} {
 		if !strings.Contains(string(release), want) {
 			t.Fatalf("release workflow does not contain %q", want)
 		}
