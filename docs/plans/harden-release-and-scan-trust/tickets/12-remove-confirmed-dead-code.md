@@ -4,7 +4,7 @@
 
 **Blocked by:** 11 — 收敛文档与 Agent 执行契约。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`（仅行为变化）、`code-review`、`ponytail`。
 
@@ -25,12 +25,17 @@
 
 ## 验收
 
-- [ ] 每个删除项在实施时重新确认引用；出现新调用即从 ticket 移除而不是强删。
-- [ ] Resolve 签名简化后所有调用者编译，端口行为测试不变。
-- [ ] 不删除 `ports-top1000.txt`、`ports-highrisk.txt`、`tools.Runner`、`app.Progress` 或 DOCX sidecar。
-- [ ] 不按行数拆 `style.css`/Workbench，不批量清空 archive。
-- [ ] `make test`、`go vet ./...`、`make pr-check` 通过。
-- [ ] 双轴 review 无阻断项后将本计划归档。
+- [x] 每个删除项在实施时重新确认引用；出现新调用即从 ticket 移除而不是强删。
+- [x] Resolve 签名简化后所有调用者编译，端口行为测试不变。
+- [x] 不删除 `ports-top1000.txt`、`ports-highrisk.txt`、`tools.Runner`、`app.Progress` 或 DOCX sidecar。
+- [x] 不按行数拆 `style.css`/Workbench，不批量清空 archive。
+- [x] `make test`、`go vet ./...`、`make pr-check` 通过。
+- [x] 双轴 review 无阻断项后将本计划归档。
+
+## 验收记录
+
+- `WriteProjectHTML`、`ports-top100.txt` 与空 `app/report.go` 均以文本检索确认无生产引用后删除。
+- review 确认没有 blocker/high；端口解析仅收紧此前会被 `fmt.Sscanf` 部分接受的非法尾随输入。
 
 ## 非目标
 
