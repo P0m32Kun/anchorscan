@@ -46,6 +46,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Verify release version injection
+        run: make release-check VERSION="${GITHUB_REF_NAME}" BUILD_FLAGS=-trimpath LDFLAGS="-s -w"
+
       - name: Build release archive
         env:
           CGO_ENABLED: 0

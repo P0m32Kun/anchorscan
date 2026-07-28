@@ -120,6 +120,35 @@ func TestCreateVerificationRejectsUnknownProjectZone(t *testing.T) {
 	}
 }
 
+func TestUpdateVerificationRejectsZoneOutsideProject(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, projectID, verificationID, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+
+	payload := verificationUpdateRequest{ZoneID: "outside", Outcome: "inconclusive", Title: "must not move"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+projectID+"/verifications/"+verificationID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", res.Code, res.Body.String())
+	}
+
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer s.Close()
+	got, err := s.GetVerification(verificationID)
+	if err != nil {
+		t.Fatalf("GetVerification returned error: %v", err)
+	}
+	if got.Verification.ZoneID != "I" {
+		t.Fatalf("verification moved to invalid zone: %#v", got.Verification)
+	}
+}
+
 func TestEvidenceUploadRejectsNonImage(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
@@ -269,6 +298,68 @@ func TestCreateVerificationEndpoint(t *testing.T) {
 	}
 	if v.Title != "Created via API" || v.ProjectID != "p1" {
 		t.Fatalf("unexpected verification: %#v", v)
+	}
+}
+
+func TestCreateVerificationSameZonePreservesSnakeCaseAssociationsAndUploadsEvidence(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, projectID, _, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+
+	body := bytes.NewBufferString(`{
+		"zone_id":"I",
+		"vulnerability_key":"redis-default-login",
+		"outcome":"confirmed",
+		"title":"Created from same-zone candidates",
+		"severity":"high",
+		"description":"details",
+		"remediation":"fix it",
+		"notes":"",
+		"included":true,
+		"position":0,
+		"assets":[
+			{"ip":"10.0.0.1","port":6379,"protocol":"tcp","asset_name":"Redis 1","position":0},
+			{"ip":"10.0.0.2","port":6379,"protocol":"tcp","asset_name":"Redis 2","position":1}
+		],
+		"sources":[
+			{"run_id":"run-I-1","source":"nuclei","finding_id":"redis-default-logins","ip":"10.0.0.1","port":6379,"protocol":"tcp"},
+			{"run_id":"run-I-2","source":"nuclei","finding_id":"redis-default-logins","ip":"10.0.0.2","port":6379,"protocol":"tcp"}
+		]
+	}`)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+projectID+"/verifications", body)
+	req.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+	var created store.Verification
+	if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal returned error: %v", err)
+	}
+	if created.ZoneID != "I" {
+		t.Fatalf("ZoneID = %q, want I", created.ZoneID)
+	}
+
+	stored, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	defer stored.Close()
+	withAssociations, err := stored.GetVerification(created.ID)
+	if err != nil {
+		t.Fatalf("GetVerification returned error: %v", err)
+	}
+	if len(withAssociations.Assets) != 2 || withAssociations.Assets[1].AssetName != "Redis 2" {
+		t.Fatalf("assets = %#v", withAssociations.Assets)
+	}
+	if len(withAssociations.Sources) != 2 || withAssociations.Sources[0].RunID != "run-I-1" || withAssociations.Sources[1].FindingID != "redis-default-logins" {
+		t.Fatalf("sources = %#v", withAssociations.Sources)
+	}
+
+	evidence := uploadEvidence(t, handler, "/projects/"+projectID+"/verifications/"+created.ID+"/evidence", generateTestPNG(t), "same-zone proof")
+	if evidence.Code != http.StatusCreated {
+		t.Fatalf("evidence upload = %d: %s", evidence.Code, evidence.Body.String())
 	}
 }
 

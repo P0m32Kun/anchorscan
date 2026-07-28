@@ -34,19 +34,14 @@ type docxSummaryRow struct {
 }
 
 type docxZone struct {
-	Name        string             `json:"name"`
-	Sessions    []docxSession      `json:"sessions,omitempty"`
-	Confirmed   []docxVerification `json:"confirmed,omitempty"`
-	NotObserved []docxVerification `json:"not_observed,omitempty"`
-}
-
-type docxSession struct {
-	Label          string `json:"label"`
-	AccessPoint    string `json:"access_point"`
-	TesterIP       string `json:"tester_ip"`
-	TargetsText    string `json:"targets_text"`
-	ExclusionsText string `json:"exclusions_text"`
-	Notes          string `json:"notes"`
+	Name             string             `json:"name"`
+	AccessPointsText string             `json:"access_points_text"`
+	TesterIPsText    string             `json:"tester_ips_text"`
+	TargetsText      string             `json:"targets_text"`
+	ExclusionsText   string             `json:"exclusions_text"`
+	NotesText        string             `json:"notes_text"`
+	Confirmed        []docxVerification `json:"confirmed,omitempty"`
+	NotObserved      []docxVerification `json:"not_observed,omitempty"`
 }
 
 type docxVerification struct {
@@ -111,11 +106,11 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 			continue
 		}
 		zone := docxZone{Name: z.Zone.Name}
-		for _, session := range z.Sessions {
-			zone.Sessions = append(zone.Sessions, docxSession{
-				Label: session.Label, AccessPoint: session.AccessPoint, TesterIP: session.TesterIP, TargetsText: docxTargetsText(session.Targets), ExclusionsText: session.Exclusions, Notes: session.Notes,
-			})
-		}
+		zone.AccessPointsText = uniqueSessionText(z.Sessions, func(session DeliverableSession) []string { return []string{session.AccessPoint} })
+		zone.TesterIPsText = uniqueSessionText(z.Sessions, func(session DeliverableSession) []string { return []string{session.TesterIP} })
+		zone.TargetsText = uniqueSessionText(z.Sessions, func(session DeliverableSession) []string { return docxTargetItems(session.Targets) })
+		zone.ExclusionsText = uniqueSessionText(z.Sessions, func(session DeliverableSession) []string { return []string{session.Exclusions} })
+		zone.NotesText = uniqueSessionText(z.Sessions, func(session DeliverableSession) []string { return []string{session.Notes} })
 		for _, v := range z.Confirmed {
 			zone.Confirmed = append(zone.Confirmed, docxVerification{
 				Heading:          v.Title + "（" + severityLabel(v.Severity) + "）",
@@ -152,15 +147,29 @@ func BuildDocxContext(deliverable ProjectDeliverable, now time.Time) DocxContext
 	}
 }
 
-func docxTargetsText(targets string) string {
-	items := strings.FieldsFunc(targets, func(r rune) bool {
+func docxTargetItems(targets string) []string {
+	return strings.FieldsFunc(targets, func(r rune) bool {
 		return r == ',' || r == ';' || r == '\n' || r == '\r' || r == '\t' || r == ' '
 	})
-	if len(items) == 0 {
-		return ""
+}
+
+func uniqueSessionText(sessions []DeliverableSession, values func(DeliverableSession) []string) string {
+	seen := make(map[string]struct{})
+	items := make([]string, 0, len(sessions))
+	for _, session := range sessions {
+		for _, value := range values(session) {
+			value = strings.TrimSpace(value)
+			if value == "" {
+				continue
+			}
+			if _, ok := seen[value]; ok {
+				continue
+			}
+			seen[value] = struct{}{}
+			items = append(items, value)
+		}
 	}
-	indent := strings.Repeat("\u3000", 4)
-	return "\n" + indent + strings.Join(items, "\n"+indent)
+	return strings.Join(items, "\n")
 }
 
 func docxRemediationLines(value string) []string {

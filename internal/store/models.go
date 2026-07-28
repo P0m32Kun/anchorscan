@@ -89,22 +89,22 @@ type Verification struct {
 }
 
 type VerificationAsset struct {
-	VerificationID string
-	IP             string
-	Port           int
-	Protocol       string
-	AssetName      string
-	Position       int
+	VerificationID string `json:"verification_id"`
+	IP             string `json:"ip"`
+	Port           int    `json:"port"`
+	Protocol       string `json:"protocol"`
+	AssetName      string `json:"asset_name"`
+	Position       int    `json:"position"`
 }
 
 type VerificationSource struct {
-	VerificationID string
-	RunID          string
-	Source         string
-	FindingID      string
-	IP             string
-	Port           int
-	Protocol       string
+	VerificationID string `json:"verification_id"`
+	RunID          string `json:"run_id"`
+	Source         string `json:"source"`
+	FindingID      string `json:"finding_id"`
+	IP             string `json:"ip"`
+	Port           int    `json:"port"`
+	Protocol       string `json:"protocol"`
 }
 
 type VerificationEvidence struct {

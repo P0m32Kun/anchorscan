@@ -106,11 +106,14 @@ go build -o dist/anchorscan.exe ./cmd/anchorscan
 ## 常用命令
 
 ```bash
-make test      # 运行全部测试
+make test      # 运行 Go 与 JavaScript 测试
 make build     # 编译到 dist/anchorscan
 make package   # 打包到 dist/
-make pr-check  # 完整质量门禁（首次执行前运行 npm ci 与 npx playwright install chromium）
+make pr-check  # PR 质量门禁：测试、构建/打包和 Playwright Chromium smoke
+make e2e       # 使用真实扫描器运行 Docker 实验室 E2E
 ```
+
+首次运行 `make pr-check` 前执行 `npm ci` 和 `npx playwright install chromium`。测试分层与选型原则见 [docs/testing-strategy.md](./docs/testing-strategy.md)。
 
 导入已有的 Nmap XML：
 

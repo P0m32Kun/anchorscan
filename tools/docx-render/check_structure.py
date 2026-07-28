@@ -207,12 +207,11 @@ def verify_template_slots(source: Path, template: Path) -> None:
         "{%tr if summary_empty %}",
         "{%p for network_zone in network_zones %}",
         "{{ network_zone.name }}",
-        "{%p for session in network_zone.sessions %}",
-        "{{ session.access_point }}",
-        "{{ session.tester_ip }}",
-        "{{ session.targets_text }}",
-        "{{ session.exclusions_text }}",
-        "{{ session.notes }}",
+        "{{ network_zone.access_points_text }}",
+        "{{ network_zone.tester_ips_text }}",
+        "{{ network_zone.targets_text }}",
+        "{{ network_zone.exclusions_text }}",
+        "{{ network_zone.notes_text }}",
         "{%p for verification in network_zone.confirmed %}",
         "{{ verification.heading }}",
         "{{ verification.description }}",
@@ -235,6 +234,7 @@ def verify_template_slots(source: Path, template: Path) -> None:
     }
     missing = sorted(token for token in required if token not in template_text)
     assert not missing, f"missing visible slots: {missing}"
+    assert "network_zone.sessions" not in template_text, "zone sections must not loop over runs"
     assert not body_image_parts(template), "template contains example body images"
     assert chapter_two_signature(template) == chapter_two_signature(source), "chapter 2 changed"
     assert "南京南瑞信息通信科技有限公司" in template_text

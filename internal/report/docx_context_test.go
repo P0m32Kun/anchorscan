@@ -103,16 +103,17 @@ func TestBuildDocxContextIncludesReportRunSessions(t *testing.T) {
 	zones := []ProjectZone{{ZoneID: "I", Name: "I区"}}
 	runs := []ProjectRun{
 		{RunID: "r1", ZoneID: "I", Status: "completed", IncludeInReport: true, Label: "核心交换机", AccessPoint: "SW-01", TesterIP: "10.0.0.10", Target: "10.0.1.1,10.0.1.2 10.0.1.3", ExcludeTargets: "10.0.1.99", ExcludePorts: "22", Notes: "夜间窗口"},
-		{RunID: "r2", ZoneID: "I", Status: "completed", IncludeInReport: false, Label: "不纳入"},
+		{RunID: "r2", ZoneID: "I", Status: "completed_with_errors", IncludeInReport: true, Label: "汇聚交换机", AccessPoint: "SW-02", TesterIP: "10.0.0.11", Target: "10.0.2.0/24 10.0.1.2", ExcludeTargets: "10.0.2.99", ExcludePorts: "23", Notes: "补充窗口"},
+		{RunID: "r3", ZoneID: "I", Status: "completed", IncludeInReport: false, Label: "不纳入"},
 	}
 	deliverable := BuildProjectDeliverable(project, zones, runs, nil, time.Unix(1, 0))
 	context := BuildDocxContext(deliverable, time.Unix(1, 0))
 
-	if len(context.NetworkZones) != 1 || len(context.NetworkZones[0].Sessions) != 1 {
+	if len(context.NetworkZones) != 1 {
 		t.Fatalf("zones = %#v", context.NetworkZones)
 	}
-	session := context.NetworkZones[0].Sessions[0]
-	if session.Label != "核心交换机" || session.AccessPoint != "SW-01" || session.TesterIP != "10.0.0.10" || session.TargetsText != "\n\u3000\u3000\u3000\u300010.0.1.1\n\u3000\u3000\u3000\u300010.0.1.2\n\u3000\u3000\u3000\u300010.0.1.3" || session.ExclusionsText != "目标：10.0.1.99；端口：22" || session.Notes != "夜间窗口" {
-		t.Fatalf("session = %#v", session)
+	zone := context.NetworkZones[0]
+	if zone.AccessPointsText != "SW-01\nSW-02" || zone.TesterIPsText != "10.0.0.10\n10.0.0.11" || zone.TargetsText != "10.0.1.1\n10.0.1.2\n10.0.1.3\n10.0.2.0/24" {
+		t.Fatalf("zone-level access context = %#v", zone)
 	}
 }

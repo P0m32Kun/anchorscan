@@ -65,3 +65,107 @@ if _, err := config.LoadTagRulesForConfig(configPath); err != nil {
 ```
 
 Do not change persisted `DetectionCheck` rows when rules change. They are facts about the historical run, not a recalculated view of current configuration.
+
+## Scenario: Zone-scoped verification aggregation
+
+### 1. Scope / Trigger
+
+- A project network zone, not an individual scan run or target subnet, is the verification and report aggregation boundary.
+- This contract spans the Vue workbench, verification HTTP endpoints, store JSON decoding, command generation, and DOCX context.
+
+### 2. Signatures
+
+- Create: `POST /projects/{projectID}/verifications` with `zone_id`, `vulnerability_key`, and optional `assets` / `sources`.
+- Update: `POST /projects/{projectID}/verifications/{verificationID}` with the editable verification fields; it does not replace assets or sources.
+- Candidate command form: `POST /projects/{projectID}/candidates/{vulnerabilityKey}/commands` with `zone_id`.
+
+### 3. Contracts
+
+- JSON association fields are snake_case: assets use `asset_name`; sources use `run_id` and `finding_id`.
+- The frontend lookup identity is `(zone_id, vulnerability_key)`. Identical vulnerabilities in different zones must never share edit state or evidence.
+- Within one zone, matching vulnerabilities from any included runs aggregate their assets and sources into one candidate and one verification.
+- DOCX outputs one chapter per zone and joins unique access points, tester IPs, targets, exclusions, and notes in first-seen order; it must not create a subchapter per scan run.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Create or update `zone_id` is absent or not owned by the project | HTTP 400: `zone_id is not part of this project`. |
+| Candidate command has `zone_id` | Resolve the candidate only inside that zone. |
+| Same vulnerability key in two zones | Maintain two independent verification records and UI entries. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: two I-zone runs for different subnets both find SSH weak credentials; the workbench has one I-zone candidate with both IPs, and the report lists both scan access contexts in its one I-zone chapter.
+- Base: a single run retains the same zone-level lists and verification behavior.
+- Bad: keying the workbench map only by `vulnerability_key`, or silently decoding snake_case association fields into zero values.
+
+### 6. Tests Required
+
+- HTTP regression: create verification with snake_case asset/source fields, assert they persist, then upload PNG evidence.
+- HTTP regression: reject updates that move a verification outside its project zones.
+- Frontend static/type check: verify snake_case payloads, composite zone/key identity, and command `zone_id` propagation.
+- Report unit/render tests: two included runs in one zone produce one zone chapter and deduplicated aggregated access context; render all DOCX pages to PNG for layout QA.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```ts
+verificationMap[v.vulnerability_key] = v
+```
+
+#### Correct
+
+```ts
+verificationMap[`${v.zone_id}\x00${v.vulnerability_key}`] = v
+```
+
+## Scenario: Release version injection
+
+### 1. Scope / Trigger
+
+- The visible CLI and Web version must be derived from the release tag, not a manually maintained Go constant.
+
+### 2. Signatures
+
+- Build input: `make build VERSION=vX.Y.Z` or `make package VERSION=vX.Y.Z`.
+- Verification: `make release-check VERSION=vX.Y.Z`.
+- Linker target: `github.com/P0m32Kun/anchorscan/internal/version.Version`.
+
+### 3. Contracts
+
+- `version.Version` is a mutable development fallback (`dev`) so Go linker `-X` can override it.
+- Build display version strips only the leading `v`; both CLI and Web consume the same linked value.
+- The release workflow runs `release-check` against the Git tag before producing cross-platform archives.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Host release check build | `anchorscan version` exactly equals `anchorscan version X.Y.Z`. |
+| Cross-compiled target | Do not execute its binary locally; package it after host release check passes. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: tag `v2.0.1` renders as `2.0.1` in CLI and Web.
+- Base: local untagged builds display `dev` or the configured make version.
+- Bad: keeping a source constant synchronized by hand with tags.
+
+### 6. Tests Required
+
+- Run `make release-check VERSION=v9.8.7` and `make package VERSION=v9.8.7` in CI or release verification.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+const Version = "2.0.1"
+```
+
+#### Correct
+
+```go
+var Version = "dev" // linked with -X during the build
+```

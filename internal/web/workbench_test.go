@@ -354,7 +354,7 @@ func TestWorkbenchCanIncludeConfirmedAfterEvidence(t *testing.T) {
 		t.Fatalf("upload returned %d: %s", uploadRes.Code, uploadRes.Body.String())
 	}
 
-	update := verificationUpdateRequest{Included: true, Outcome: "confirmed", Title: v.Title, Severity: v.Severity}
+	update := verificationUpdateRequest{ZoneID: v.ZoneID, Included: true, Outcome: "confirmed", Title: v.Title, Severity: v.Severity}
 	updateBody, _ := json.Marshal(update)
 	updateReq := httptest.NewRequest(http.MethodPost, "/projects/"+project.ID+"/verifications/"+v.ID, bytes.NewReader(updateBody))
 	updateReq.Header.Set("Content-Type", "application/json")

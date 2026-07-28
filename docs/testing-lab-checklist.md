@@ -1,6 +1,6 @@
 # AnchorScan Local Lab Checklist
 
-Use this checklist to verify the fixed pipeline, SQLite persistence, and JSON/HTML reports against the local lab.
+Use this checklist to verify the fixed pipeline, SQLite persistence, and JSON/HTML reports against the local lab. Test-layer selection is defined in [testing-strategy.md](./testing-strategy.md).
 
 ## Scope
 
@@ -20,7 +20,7 @@ Verify these paths only:
 Before manual walkthroughs, you can run the automated baseline:
 
 ```bash
-go test -tags=e2e ./e2e -v
+make e2e
 ```
 
 Current automated coverage:

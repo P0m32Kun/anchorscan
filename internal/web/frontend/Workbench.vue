@@ -134,12 +134,16 @@ const moreOpen = ref(false);
 
 const verificationMap = computed(() => {
   const map: Record<string, Verification> = {};
-  for (const v of props.verifications) map[v.VulnerabilityKey] = v;
+  for (const v of props.verifications) map[verificationKey(v.ZoneID, v.VulnerabilityKey)] = v;
   return map;
 });
 
+function verificationKey(zoneID: string, vulnerabilityKey: string) {
+  return `${zoneID}\x00${vulnerabilityKey}`;
+}
+
 const candidateStatus = (c: Candidate) => {
-  const v = verificationMap.value[c.GroupKey];
+  const v = verificationMap.value[verificationKey(c.ZoneID, c.GroupKey)];
   if (!v) return 'pending';
   if (v.Included) return 'included';
   return v.Outcome;
@@ -290,9 +294,11 @@ function openCommandDialog() {
   commandDialog.value?.showModal();
 }
 
-async function fetchCommand(key: string, tool: string, asset: string, verificationID: string) {
+async function fetchCommand(c: Candidate, tool: string, asset: string, verificationID: string) {
+  const key = c.GroupKey;
   const url = `/projects/${props.project_id}/candidates/${encodeURIComponent(key)}/commands`;
   const body = new URLSearchParams({ tool });
+  body.set('zone_id', c.ZoneID);
   if (asset && asset !== 'all') body.set('asset', asset);
   if (verificationID) body.set('verification_id', verificationID);
   body.set('return', `/projects/${props.project_id}/workbench`);
@@ -305,13 +311,13 @@ async function fetchCommand(key: string, tool: string, asset: string, verificati
   return (await res.json()) as CommandResult;
 }
 
-async function runCommand(key: string, tool: string, asset: string) {
+async function runCommand(c: Candidate, tool: string, asset: string) {
   commandLoading.value = true;
   commandTitle.value = `生成 ${tool} 命令`;
   openCommandDialog();
-  const v = verificationMap.value[key];
+  const v = verificationMap.value[verificationKey(c.ZoneID, c.GroupKey)];
   try {
-    const data = await fetchCommand(key, tool, asset, v?.ID || '');
+    const data = await fetchCommand(c, tool, asset, v?.ID || '');
     commandBody.value = (data.commands || []).map((c) => c.full_command).join('\n\n');
     commandWarning.value = data.warning || '';
     commandToolLink.value = data.tool_link || '';
@@ -361,13 +367,11 @@ function resetVerifyDialog() {
   verifyPendingFiles.value = [];
 }
 
-const activeCandidate = computed(() => props.candidates.find((c) => c.GroupKey === verifyKey.value));
+const activeCandidate = computed(() => props.candidates.find((c) => verificationKey(c.ZoneID, c.GroupKey) === verifyKey.value));
 
-async function openVerifyDialog(key: string) {
+async function openVerifyDialog(c: Candidate) {
   resetVerifyDialog();
-  const c = props.candidates.find((x) => x.GroupKey === key);
-  if (!c) return;
-  verifyKey.value = c.GroupKey;
+  verifyKey.value = verificationKey(c.ZoneID, c.GroupKey);
   verifyZoneId.value = c.ZoneID;
   verifyTitle.value = c.Title;
   verifySeverity.value = c.Severity || 'high';
@@ -375,7 +379,7 @@ async function openVerifyDialog(key: string) {
   verifyRemediation.value = c.Remediation || '';
   verifyOutcome.value = 'confirmed';
 
-  const v = verificationMap.value[c.GroupKey];
+  const v = verificationMap.value[verificationKey(c.ZoneID, c.GroupKey)];
   if (v?.ID) {
     verifyId.value = v.ID;
     try {
@@ -443,7 +447,24 @@ async function uploadEvidence(file: File, caption: string, verificationID: strin
   if (!res.ok) throw new Error((await res.text()).trim() || '上传失败');
 }
 
-function buildVerificationPayload(c: Candidate): VerificationDetail['Verification'] & { assets: any[]; sources: any[] } {
+type VerificationRequestPayload = {
+  zone_id: string;
+  vulnerability_key: string;
+  outcome: string;
+  title: string;
+  severity: string;
+  description: string;
+  remediation: string;
+  notes: string;
+  included: boolean;
+  position: number;
+  assets: { ip: string; port: number; protocol: string; asset_name: string; position: number }[];
+  sources: { run_id: string; source: string; finding_id: string; ip: string; port: number; protocol: string }[];
+};
+
+type VerificationUpdateRequestPayload = Omit<VerificationRequestPayload, 'assets' | 'sources'>;
+
+function verificationRequestPayload(c: Candidate): VerificationRequestPayload {
   const assets = (c.Assets || []).map((a, i) => ({
     ip: a.IP,
     port: a.Port,
@@ -460,21 +481,24 @@ function buildVerificationPayload(c: Candidate): VerificationDetail['Verificatio
     protocol: s.Protocol,
   }));
   return {
-    ID: verifyId.value,
-    ProjectID: props.project_id,
-    ZoneID: verifyZoneId.value,
-    VulnerabilityKey: c.GroupKey,
-    Outcome: verifyOutcome.value,
-    Title: verifyTitle.value.trim(),
-    Severity: verifySeverity.value,
-    Description: verifyDescription.value.trim(),
-    Remediation: verifyRemediation.value.trim(),
-    Notes: '',
-    Included: verifyOutcome.value === 'confirmed' || verifyOutcome.value === 'not_observed',
-    Position: 0,
+    zone_id: verifyZoneId.value,
+    vulnerability_key: c.GroupKey,
+    outcome: verifyOutcome.value,
+    title: verifyTitle.value.trim(),
+    severity: verifySeverity.value,
+    description: verifyDescription.value.trim(),
+    remediation: verifyRemediation.value.trim(),
+    notes: '',
+    included: verifyOutcome.value === 'confirmed' || verifyOutcome.value === 'not_observed',
+    position: 0,
     assets,
     sources,
   };
+}
+
+function verificationUpdateRequestPayload(c: Candidate): VerificationUpdateRequestPayload {
+  const { assets: _assets, sources: _sources, ...payload } = verificationRequestPayload(c);
+  return payload;
 }
 
 async function saveVerification() {
@@ -482,25 +506,14 @@ async function saveVerification() {
   if (!c) return;
   verifySaving.value = true;
   try {
-    const payload = buildVerificationPayload(c);
+    const payload = verificationRequestPayload(c);
     let res: Response;
     let vid = verifyId.value;
     if (vid) {
       res = await fetch(`/projects/${props.project_id}/verifications/${vid}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zone_id: payload.ZoneID,
-          vulnerability_key: payload.VulnerabilityKey,
-          outcome: payload.Outcome,
-          title: payload.Title,
-          severity: payload.Severity,
-          description: payload.Description,
-          remediation: payload.Remediation,
-          notes: '',
-          included: payload.Included,
-          position: payload.Position,
-        }),
+        body: JSON.stringify(verificationUpdateRequestPayload(c)),
       });
     } else {
       res = await fetch(`/projects/${props.project_id}/verifications`, {
@@ -812,7 +825,7 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
       </section>
 
       <section class="panel workbench-candidates">
-        <article v-for="c in filteredCandidates" :key="c.GroupKey" class="candidate-card" :data-key="c.GroupKey">
+        <article v-for="c in filteredCandidates" :key="verificationKey(c.ZoneID, c.GroupKey)" class="candidate-card" :data-key="verificationKey(c.ZoneID, c.GroupKey)">
           <div class="candidate-header">
             <h3>{{ c.Title }} <span class="severity-badge" :class="`sev-${c.Severity}`">{{ c.Severity }}</span></h3>
             <div class="candidate-meta">
@@ -832,19 +845,19 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
                   <code>{{ hostPort(a) }}</code>
                   <a v-if="a.Target" :href="a.Target" target="_blank" class="asset-link">{{ a.Target }}</a>
                   <button type="button" class="button button-small" @click="copyText(hostPort(a), 'IP:PORT')">复制 IP:PORT</button>
-                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'nuclei', hostPort(a))">Nuclei</button>
-                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'nmap', hostPort(a))">Nmap</button>
+                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c, 'nuclei', hostPort(a))">Nuclei</button>
+                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c, 'nmap', hostPort(a))">Nmap</button>
                 </li>
               </ul>
             </details>
             <div class="candidate-actions">
-              <button type="button" class="button button-secondary" @click="openVerifyDialog(c.GroupKey)">验证 / 编辑</button>
+              <button type="button" class="button button-secondary" @click="openVerifyDialog(c)">验证 / 编辑</button>
               <details class="context-actions">
                 <summary class="button button-secondary">更多操作</summary>
                 <div class="context-menu">
-                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'nuclei', 'all')">Nuclei 命令</button>
-                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'nmap', 'all')">Nmap 命令</button>
-                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c.GroupKey, 'msf', 'all')">MSF 命令</button>
+                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c, 'nuclei', 'all')">Nuclei 命令</button>
+                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c, 'nmap', 'all')">Nmap 命令</button>
+                  <button v-if="!c.IsPending" type="button" class="button button-small" @click="runCommand(c, 'msf', 'all')">MSF 命令</button>
                   <button type="button" class="button button-small" @click="copyText(c.Title, '标题')">复制标题</button>
                   <button type="button" class="button button-small" @click="copyCard(c)">复制整条</button>
                 </div>

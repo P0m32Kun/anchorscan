@@ -53,7 +53,6 @@ type workbenchData struct {
 	NegativeGroups     []negativeFingerprintGroup
 	IncompleteChecks   []incompleteWorkbenchItem
 	Verifications      []store.Verification
-	VerificationMap    map[string]store.Verification
 	PositiveCount      int
 	NegativeCount      int
 	IncompleteCount    int
@@ -241,10 +240,6 @@ func (s *server) buildWorkbenchData(projectID string) (workbenchData, error) {
 	for _, z := range zones {
 		zoneNames[z.ZoneID] = z.Name
 	}
-	verificationMap := make(map[string]store.Verification, len(verifications))
-	for _, v := range verifications {
-		verificationMap[v.VulnerabilityKey] = v
-	}
 	var candidates []workbenchCandidate
 	var negatives []report.ProjectNegativeCandidate
 	var incompletes []incompleteWorkbenchItem
@@ -285,7 +280,6 @@ func (s *server) buildWorkbenchData(projectID string) (workbenchData, error) {
 		NegativeGroups:     negativeGroups,
 		IncompleteChecks:   incompletes,
 		Verifications:      verifications,
-		VerificationMap:    verificationMap,
 		PositiveCount:      posCount,
 		NegativeCount:      len(negativeGroups),
 		IncompleteCount:    incCount,
@@ -402,7 +396,11 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 
 	var cand *report.ProjectVulnerabilityCandidate
 	var candZoneID string
+	zoneID := strings.TrimSpace(r.FormValue("zone_id"))
 	for _, zone := range projReport.Zones {
+		if zoneID != "" && zone.Zone.ZoneID != zoneID {
+			continue
+		}
 		for i := range zone.PositiveCandidates {
 			if zone.PositiveCandidates[i].GroupKey == key {
 				c := zone.PositiveCandidates[i]

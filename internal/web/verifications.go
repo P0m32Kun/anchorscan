@@ -125,20 +125,12 @@ func (s *server) createVerification(w http.ResponseWriter, r *http.Request, proj
 		http.Error(w, "title is required", http.StatusBadRequest)
 		return
 	}
-	zones, err := s.store.ListProjectZones(projectID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	validZone := false
-	for _, zone := range zones {
-		if zone.ZoneID == req.ZoneID {
-			validZone = true
-			break
+	if err := s.requireProjectZone(projectID, req.ZoneID); err != nil {
+		if err.Error() == "zone_id is not part of this project" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-	}
-	if !validZone {
-		http.Error(w, "zone_id is not part of this project", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -207,6 +199,14 @@ func (s *server) updateVerification(w http.ResponseWriter, r *http.Request, proj
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	if err := s.requireProjectZone(projectID, req.ZoneID); err != nil {
+		if err.Error() == "zone_id is not part of this project" {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if outcomeIncluded(req.Outcome) {
 		count, err := s.store.CountVerificationEvidence(verificationID)
 		if err != nil {
@@ -237,6 +237,19 @@ func (s *server) updateVerification(w http.ResponseWriter, r *http.Request, proj
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (s *server) requireProjectZone(projectID, zoneID string) error {
+	zones, err := s.store.ListProjectZones(projectID)
+	if err != nil {
+		return err
+	}
+	for _, zone := range zones {
+		if zone.ZoneID == zoneID {
+			return nil
+		}
+	}
+	return fmt.Errorf("zone_id is not part of this project")
 }
 
 func (s *server) listEvidence(w http.ResponseWriter, r *http.Request, projectID, verificationID string) {

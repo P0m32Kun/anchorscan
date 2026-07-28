@@ -31,16 +31,11 @@
   "network_zones": [
     {
       "name": "I区",
-      "sessions": [
-        {
-          "label": "生产控制区扫描任务",
-          "access_point": "调度数据网接入点",
-          "tester_ip": "10.10.1.250",
-          "targets_text": "\n　　　　10.10.1.10\n　　　　10.10.1.11",
-          "exclusions_text": "10.10.1.1",
-          "notes": ""
-        }
-      ],
+      "access_points_text": "调度数据网接入点\n生产控制补充接入点",
+      "tester_ips_text": "10.10.1.250\n10.10.1.251",
+      "targets_text": "10.10.1.12\n10.10.2.0/24",
+      "exclusions_text": "10.10.1.1\n10.10.2.1",
+      "notes_text": "首轮扫描\n补充扫描",
       "confirmed": [
         {
           "heading": "弱口令（严重）",
@@ -75,16 +70,11 @@
     },
     {
       "name": "III区",
-      "sessions": [
-        {
-          "label": "管理信息区扫描任务",
-          "access_point": "管理信息网接入点",
-          "tester_ip": "10.10.3.250",
-          "targets_text": "10.10.3.0/24",
-          "exclusions_text": "",
-          "notes": "仅验证明确授权的服务。"
-        }
-      ],
+      "access_points_text": "管理信息网接入点",
+      "tester_ips_text": "10.10.3.250",
+      "targets_text": "10.10.3.0/24",
+      "exclusions_text": "",
+      "notes_text": "仅验证明确授权的服务。",
       "confirmed": [
         {
           "heading": "过期组件（中危）",
@@ -112,16 +102,11 @@
     },
     {
       "name": "互联网接入区",
-      "sessions": [
-        {
-          "label": "互联网接入区扫描任务",
-          "access_point": "互联网边界测试接入点",
-          "tester_ip": "172.16.1.250",
-          "targets_text": "172.16.1.0/24",
-          "exclusions_text": "",
-          "notes": ""
-        }
-      ],
+      "access_points_text": "互联网边界测试接入点",
+      "tester_ips_text": "172.16.1.250",
+      "targets_text": "172.16.1.0/24",
+      "exclusions_text": "",
+      "notes_text": "",
       "confirmed": [
         {
           "heading": "不安全默认配置（低危）",

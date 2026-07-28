@@ -236,7 +236,7 @@ jobs:
             httpx -version
             nuclei -version
           } | tee test-artifacts/real-tool-lab/evidence.txt
-          go test -tags=e2e ./e2e -timeout 55m -v 2>&1 | tee test-artifacts/real-tool-lab/test.log
+          make e2e 2>&1 | tee test-artifacts/real-tool-lab/test.log
 
       - name: Collect laboratory diagnostics
         if: always()

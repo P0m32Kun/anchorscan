@@ -24,7 +24,7 @@ ROOT = Path(__file__).parent
 FIXTURES = ROOT / "fixtures"
 OUT = ROOT / "out"
 SOURCE = FIXTURES / "source-template.docx"
-TEMPLATE = OUT / "project-report-placeholder-template.docx"
+TEMPLATE = ROOT / "templates/project-report.docx"
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -259,17 +259,15 @@ def prepare_network_zone_block(body: etree._Element, untouched: dict[str, bytes]
     zone_nodes = [
         paragraph("{%p for network_zone in network_zones %}"),
         with_text(zone_heading, "{{ network_zone.name }}"),
-        paragraph("{%p for session in network_zone.sessions %}"),
-        p("测试设备接入点：{{ session.access_point }}"),
-        p("测试设备 IP：{{ session.tester_ip }}"),
-        p("测试范围：{{ session.targets_text }}"),
-        paragraph("{%p if session.exclusions_text %}"),
-        p("排除范围：{{ session.exclusions_text }}"),
+        p("测试设备接入点：{{ network_zone.access_points_text }}"),
+        p("测试设备 IP：{{ network_zone.tester_ips_text }}"),
+        p("测试范围：{{ network_zone.targets_text }}"),
+        paragraph("{%p if network_zone.exclusions_text %}"),
+        p("排除范围：{{ network_zone.exclusions_text }}"),
         paragraph("{%p endif %}"),
-        paragraph("{%p if session.notes %}"),
-        p("备注：{{ session.notes }}"),
+        paragraph("{%p if network_zone.notes_text %}"),
+        p("备注：{{ network_zone.notes_text }}"),
         paragraph("{%p endif %}"),
-        paragraph("{%p endfor %}"),
         paragraph("{%p for verification in network_zone.confirmed %}"),
         h3("{{ verification.heading }}"),
         h4("漏洞描述"),

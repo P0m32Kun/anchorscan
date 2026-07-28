@@ -56,7 +56,7 @@ class RenderDocxTests(unittest.TestCase):
             ],
         )
         text = "".join(document.itertext())
-        self.assertIn("\u3000\u3000\u3000\u300010.10.1.10", text)
+        self.assertIn("10.10.1.10", text)
         remediation_paragraphs = [
             paragraph
             for paragraph in document.findall(".//w:p", NS)
@@ -84,6 +84,31 @@ class RenderDocxTests(unittest.TestCase):
         text = "".join(document.itertext())
         self.assertIn("其中严重漏洞1个、高危漏洞0个、中危漏洞1个、低危漏洞1个", text)
         self.assertIn("Redis 未授权访问漏洞相关漏洞不存在证明，端口（6379）", text)
+
+    def test_runtime_renders_one_zone_with_multi_run_access_context(self) -> None:
+        context = json.loads((ROOT / "fixtures/project_report.json").read_text())
+        context = copy.deepcopy(context)
+        zone = context["network_zones"][0]
+        self.assertEqual(zone["access_points_text"].splitlines(), ["调度数据网接入点", "生产控制补充接入点"])
+        self.assertEqual(zone["tester_ips_text"].splitlines(), ["10.10.1.250", "10.10.1.251"])
+        for report_zone in context["network_zones"]:
+            for key in ("confirmed", "not_observed"):
+                for verification in report_zone[key]:
+                    verification["evidence"] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "report.docx"
+            render(context, ROOT / "templates/project-report.docx", destination)
+            with zipfile.ZipFile(destination) as archive:
+                document = ET.fromstring(archive.read("word/document.xml"))
+
+        text = "".join(document.itertext())
+        for value in ("调度数据网接入点", "生产控制补充接入点", "10.10.1.250", "10.10.1.251", "10.10.1.12", "10.10.2.0/24"):
+            self.assertEqual(text.count(value), 1, value)
+        self.assertEqual(
+            sum("".join(paragraph.itertext()).strip() == "I区" for paragraph in document.findall(".//w:p", NS)),
+            1,
+        )
 
     def test_jpeg_images_keep_landscape_and_portrait_aspect_ratios(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

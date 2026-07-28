@@ -3,6 +3,6 @@
 // a release bump only needs to touch it once.
 package version
 
-// Version is the current AnchorScan release. Keep it in sync with the latest
-// git tag (e.g. "1.6.1" for tag v1.6.1) and the CHANGELOG.md entry.
-const Version = "1.9.2"
+// Version is the development fallback. Release builds override it with the
+// release tag through Go's linker (-X).
+var Version = "dev"

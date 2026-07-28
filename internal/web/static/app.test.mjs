@@ -36,6 +36,14 @@ for (const name of ['RunDetail.vue', 'ToolRunFeedback.vue']) {
 const workbench = fs.readFileSync(new URL('../frontend/Workbench.vue', import.meta.url), 'utf8');
 assert.doesNotMatch(workbench, /\bconfirm\s*\(/, 'Workbench destructive actions must use the shared confirmation dialog');
 assert.match(workbench, /anchorscan:confirm/, 'Workbench must request the shared confirmation dialog');
+assert.match(workbench, /function verificationRequestPayload\(/, 'Workbench must own one snake_case verification request projection');
+assert.match(workbench, /function verificationUpdateRequestPayload\(/, 'verification updates must exclude create-only associations');
+assert.match(workbench, /zone_id: verifyZoneId\.value/, 'positive verification requests must send snake_case zone_id');
+assert.match(workbench, /body: JSON\.stringify\(payload\)/, 'create must serialize the shared request projection');
+assert.match(workbench, /body: JSON\.stringify\(verificationUpdateRequestPayload\(c\)\)/, 'update must serialize its supported request projection');
+assert.match(workbench, /function verificationKey\(zoneID: string, vulnerabilityKey: string\)/, 'verification lookup must include the zone boundary');
+assert.match(workbench, /fetchCommand\(c: Candidate, tool: string, asset: string, verificationID: string\)/, 'tool commands must retain their candidate zone');
+assert.match(workbench, /body\.set\('zone_id', c\.ZoneID\)/, 'tool command requests must send the candidate zone');
 
 function renderDistribution(badges) {
   const callbacks = [];
