@@ -12,6 +12,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const artifactDir = path.resolve(process.env.E2E_ARTIFACTS_DIR || path.join(repoRoot, 'test-artifacts', 'web-smoke'));
 const binary = path.resolve(process.env.ANCHORSCAN_BINARY || path.join(repoRoot, 'dist', 'anchorscan'));
 const fixture = path.join(repoRoot, 'scripts', 'test-fixtures', 'tool-fixture.sh');
+const expectedVersion = process.env.ANCHORSCAN_EXPECTED_VERSION;
 const consoleLogs = [];
 let serverOutput = '';
 let browser;
@@ -155,6 +156,11 @@ try {
 
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(baseURL, { waitUntil: 'networkidle' });
+  if (expectedVersion) {
+    assert.match(expectedVersion, /^\S+$/, 'ANCHORSCAN_EXPECTED_VERSION must be a non-empty display version');
+    assert.equal(expectedVersion.startsWith('v'), false, 'ANCHORSCAN_EXPECTED_VERSION must not contain a tag prefix');
+    await assert.doesNotReject(() => page.getByText(`AnchorScan Console ${expectedVersion}`, { exact: true }).waitFor());
+  }
 
   // Theme smoke: toggle should apply data-theme immediately and persist across pages.
   assert.ok(['light', 'dark'].includes(await page.evaluate(() => document.documentElement.getAttribute('data-theme'))), 'initial theme not set');
@@ -500,6 +506,67 @@ try {
   await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
   assert.equal(await verifyButton.evaluate((button) => document.activeElement === button), true, 'closing the verification dialog should restore focus to its trigger');
 
+  // New-verification regression: two included runs in one zone must create one
+  // snake_case payload, preserve both sources/assets, and upload PNG evidence.
+  await seedRun(`DELETE FROM verification_evidence WHERE verification_id = 'browser-evidence';
+    DELETE FROM report_verifications WHERE id = 'browser-evidence';
+    INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir, include_in_report) VALUES
+    ('browser-workbench-2', '${projectID}', 'dmz', '192.0.2.51', '445', 'normal', 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{}', '', 1);
+    INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url, protocol, cpe, extrainfo, tunnel) VALUES
+    ('browser-workbench-2', '192.0.2.51', 445, 'smb', '', '', 'smb', 0, '', 'tcp', '', '', '');
+    INSERT INTO findings (run_id, ip, port, source, finding_id, severity, summary, target, output, protocol, scope) VALUES
+    ('browser-workbench-2', '192.0.2.51', 445, 'nuclei', 'smb-signing', 'high', 'Workbench smoke finding', '192.0.2.51:445', '', 'tcp', '');`);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: '验证 / 编辑' }).first().click();
+  await assert.doesNotReject(() => dialog.waitFor());
+  await dialog.locator('input[type=file]').setInputFiles({
+    name: 'same-zone-proof.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL1XwAAAABJRU5ErkJggg==', 'base64'),
+  });
+  const createResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST' && response.url() === `${baseURL}/projects/${projectID}/verifications`,
+  );
+  const evidenceResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST' && /\/evidence$/.test(new URL(response.url()).pathname),
+  );
+  await dialog.getByRole('button', { name: '保存验证' }).click();
+  const createdResponse = await createResponse;
+  assert.equal(createdResponse.status(), 201);
+  const createPayload = createdResponse.request().postDataJSON();
+  assert.equal(createPayload.zone_id, 'dmz');
+  assert.equal(createPayload.ZoneID, undefined, 'create payload must use the public snake_case contract');
+  assert.equal(createPayload.assets.length, 2);
+  assert.deepEqual(new Set(createPayload.sources.map((source) => source.run_id)), new Set(['browser-workbench', 'browser-workbench-2']));
+  const created = await createdResponse.json();
+  assert.equal((await evidenceResponse).status(), 201, 'PNG evidence must be uploaded after creation');
+  await page.waitForURL(`${baseURL}${projectURL}/workbench`);
+
+  await page.getByRole('button', { name: '验证 / 编辑' }).first().click();
+  await assert.doesNotReject(() => dialog.waitFor());
+  await dialog.locator('input[name="title"]').fill('Updated browser verification');
+  const updateRequest = page.waitForRequest((request) =>
+    request.method() === 'POST' && request.url() === `${baseURL}/projects/${projectID}/verifications/${created.ID}`,
+  );
+  await dialog.getByRole('button', { name: '保存验证' }).click();
+  const updatePayload = (await updateRequest).postDataJSON();
+  assert.deepEqual(
+    Object.keys(updatePayload).sort(),
+    ['description', 'included', 'notes', 'outcome', 'position', 'remediation', 'severity', 'title', 'vulnerability_key', 'zone_id'],
+    'update payload must use only the public snake_case contract',
+  );
+  assert.equal(updatePayload.zone_id, 'dmz');
+  assert.equal(updatePayload.assets, undefined, 'update payload must not leak create-only relations');
+  assert.equal(updatePayload.sources, undefined, 'update payload must not leak create-only relations');
+  await page.waitForURL(`${baseURL}${projectURL}/workbench`);
+  const updatedVerification = await page.evaluate(async ({ projectID, verificationID }) => {
+    const response = await fetch(`/projects/${projectID}/verifications/${verificationID}`);
+    if (!response.ok) throw new Error(await response.text());
+    return await response.json();
+  }, { projectID, verificationID: created.ID });
+  assert.equal(updatedVerification.Verification.Title, 'Updated browser verification');
+  assert.equal(updatedVerification.Verification.ZoneID, 'dmz');
+
   // Workbench command dialog regression: generated command text should render.
   await page.locator('details.context-actions summary').first().click();
   await page.getByRole('button', { name: 'Nuclei 命令' }).first().click();
@@ -516,7 +583,10 @@ try {
   await assert.doesNotReject(() => commandDialog.waitFor({ state: 'hidden' }));
 
   await page.setViewportSize({ width: 1440, height: 960 });
-  await page.goto(`${baseURL}/config`);
+  await page.goto(`${baseURL}/config`, { waitUntil: 'networkidle' });
+  await page.locator('.settings-nav').waitFor();
+  await page.evaluate(() => document.getElementById('config-appearance').scrollIntoView({ block: 'center' }));
+  await page.waitForTimeout(500);
   assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'theme preference should persist on config page');
 
   assert.equal(await page.locator('.settings-nav a[href="#config-appearance"]').evaluate(el => el.classList.contains('active')), true, 'appearance should be active initially');

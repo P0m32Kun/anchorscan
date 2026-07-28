@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { getJSON, normalizeOutcome, normalizeSeverity, normalizeVerificationDetail, uploadEvidence } from './workbench-api';
+import { getJSON, normalizeOutcome, normalizeSeverity, normalizeVerificationDetail, postJSON, uploadEvidence } from './workbench-api';
 
 type ProjectAsset = {
   IP: string;
@@ -616,11 +616,32 @@ function resetNegativeDialog() {
   negPendingFiles.value = [];
 }
 
-function openNegativeDialog(group: NegativeGroup) {
+async function openNegativeDialog(group: NegativeGroup) {
   resetNegativeDialog();
   negGroup.value = group;
   negZoneId.value = group.ZoneID;
   negTitle.value = group.Title || group.Service || '服务';
+  negSeverity.value = 'low';
+  negDescription.value = '';
+
+  const key = buildNegativeVerificationKey(group.ZoneID, negTitle.value);
+  const v = verificationMap.value[verificationKey(group.ZoneID, key)];
+  if (v?.ID) {
+    negVerificationId.value = v.ID;
+    negTitle.value = v.Title;
+    negSeverity.value = normalizeSeverity(v.Severity);
+    negDescription.value = v.Description || '';
+    try {
+      const detail = normalizeVerificationDetail(await getJSON<VerificationDetail>(
+        `/projects/${props.project_id}/verifications/${v.ID}`,
+        '读取负向验证详情失败',
+      ));
+      negUploadedEvidence.value = detail.Evidence;
+    } catch (e: any) {
+      negUploadError.value = e.message || '读取已上传截图失败';
+    }
+  }
+
   negativeDialog.value?.showModal();
   nextTick(() => negativeDialog.value?.querySelector<HTMLInputElement>('input[name="negative-title"]')?.focus());
 }
@@ -635,9 +656,25 @@ function removeNegPending(idx: number) {
   negPendingFiles.value.splice(idx, 1);
 }
 
+function negativeUpdatePayload(): Omit<VerificationRequestPayload, 'assets' | 'sources'> {
+  const key = buildNegativeVerificationKey(negZoneId.value, negTitle.value);
+  return {
+    zone_id: negZoneId.value,
+    vulnerability_key: key,
+    outcome: 'not_observed',
+    title: negTitle.value.trim(),
+    severity: negSeverity.value,
+    description: negDescription.value.trim(),
+    remediation: '',
+    notes: '',
+    included: false,
+    position: 0,
+  };
+}
+
 async function saveNegative() {
   if (negSaving.value || !negGroup.value?.Assets?.length) return;
-  if (negPendingFiles.value.length === 0) {
+  if (negPendingFiles.value.length === 0 && negUploadedEvidence.value.length === 0) {
     showToast('请至少上传一张截图作为证据', 'error');
     return;
   }
@@ -653,27 +690,12 @@ async function saveNegative() {
         asset_name: hostPort(a),
         position: i,
       }));
-      const key = buildNegativeVerificationKey(negZoneId.value, negTitle.value);
-      const res = await fetch(`/projects/${props.project_id}/verifications`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zone_id: negZoneId.value,
-          vulnerability_key: key,
-          outcome: 'not_observed',
-          title: negTitle.value.trim(),
-          severity: negSeverity.value,
-          description: negDescription.value.trim(),
-          remediation: '',
-          notes: '',
-          included: false,
-          position: 0,
-          assets,
-          sources: [],
-        }),
-      });
-      if (!res.ok) throw new Error((await res.text()).trim() || '创建失败');
-      verificationID = (await res.json() as Verification).ID;
+      const created = await postJSON<Verification>(
+        `/projects/${props.project_id}/verifications`,
+        { ...negativeUpdatePayload(), assets, sources: [] },
+        '创建负向验证失败',
+      );
+      verificationID = created.ID;
       negVerificationId.value = verificationID;
     }
     for (const pending of negPendingFiles.value) {
@@ -690,10 +712,15 @@ async function saveNegative() {
     }
     negPendingFiles.value = negPendingFiles.value.filter((pending) => pending.status !== 'uploaded');
     if (negPendingFiles.value.some((pending) => pending.status === 'failed')) {
-      negUploadError.value = '负向验证已创建，但部分截图上传失败；请重试失败项。';
+      negUploadError.value = '负向验证已提交，但部分截图上传失败；请重试失败项。';
       showToast(negUploadError.value, 'error');
       return;
     }
+    await postJSON<Verification>(
+      `/projects/${props.project_id}/verifications/${verificationID}`,
+      negativeUpdatePayload(),
+      '更新负向验证失败',
+    );
     showToast('负向验证已提交', 'success');
     negativeDialog.value?.close();
     window.location.reload();

@@ -30,7 +30,7 @@ jobs:
         with:
           version: "0.11.32"
 
-      - name: Install browser smoke fixture dependency
+      - name: Install browser smoke fixture dependencies
         run: sudo apt-get update && sudo apt-get install -y sqlite3
 
       - name: Install browser test dependencies

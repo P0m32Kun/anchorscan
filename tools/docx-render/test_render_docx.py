@@ -109,6 +109,28 @@ class RenderDocxTests(unittest.TestCase):
             sum("".join(paragraph.itertext()).strip() == "I区" for paragraph in document.findall(".//w:p", NS)),
             1,
         )
+        paragraphs_with_value = {
+            value: [
+                paragraph
+                for paragraph in document.findall(".//w:p", NS)
+                if value in "".join(paragraph.itertext())
+            ]
+            for value in ("调度数据网接入点", "生产控制补充接入点", "10.10.1.250", "10.10.1.251", "10.10.1.12", "10.10.2.0/24")
+        }
+        for value, paragraphs in paragraphs_with_value.items():
+            self.assertEqual(len(paragraphs), 1, f"{value} should appear in exactly one paragraph")
+            indent = paragraphs[0].find("w:pPr/w:ind", NS)
+            self.assertIsNotNone(indent, f"{value} paragraph must have an indent")
+            self.assertIsNotNone(indent.get(f"{{{W}}}leftChars"), f"{value} paragraph must use leftChars indentation")
+            self.assertGreater(int(indent.get(f"{{{W}}}leftChars")), 0, f"{value} paragraph must be indented")
+        for label in ("测试设备接入点：", "测试设备 IP：", "测试范围："):
+            label_paragraphs = [p for p in document.findall(".//w:p", NS) if label in "".join(p.itertext())]
+            self.assertEqual(len(label_paragraphs), len(context["network_zones"]), f"label {label!r} should appear once per zone")
+            for label_paragraph in label_paragraphs:
+                indent = label_paragraph.find("w:pPr/w:ind", NS)
+                if indent is not None:
+                    left_chars = indent.get(f"{{{W}}}leftChars")
+                    self.assertTrue(left_chars is None or int(left_chars) == 0, f"label {label!r} must not be indented")
 
     def test_jpeg_images_keep_landscape_and_portrait_aspect_ratios(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

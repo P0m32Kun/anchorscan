@@ -391,6 +391,44 @@ func TestCreateVerificationConfirmedAutoIncluded(t *testing.T) {
 	}
 }
 
+func TestUpdateVerificationNotObservedUpdatesTitleAndDescription(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, projectID, verificationID, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+	uploadEvidence(t, handler, "/projects/"+projectID+"/verifications/"+verificationID+"/evidence", generateTestPNG(t), "negative proof")
+
+	payload := verificationUpdateRequest{
+		ZoneID:           "I",
+		Outcome:          "not_observed",
+		Title:            "Updated not observed title",
+		Severity:         "medium",
+		Description:      "Updated description",
+		VulnerabilityKey: "neg:I:http-service-no-known-vuln",
+		Included:         false,
+	}
+	body, _ := json.Marshal(payload)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+projectID+"/verifications/"+verificationID, bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	var v store.Verification
+	if err := json.Unmarshal(res.Body.Bytes(), &v); err != nil {
+		t.Fatalf("unmarshal returned error: %v", err)
+	}
+	if v.Title != "Updated not observed title" || v.Description != "Updated description" || v.Severity != "medium" || v.VulnerabilityKey != "neg:I:http-service-no-known-vuln" {
+		t.Fatalf("unexpected updated verification: %#v", v)
+	}
+	if !v.Included {
+		t.Fatalf("not_observed verification must be included in the report")
+	}
+	if v.Outcome != "not_observed" {
+		t.Fatalf("expected outcome not_observed, got %s", v.Outcome)
+	}
+}
+
 func TestUpdateVerificationConfirmedAutoIncludedWithoutEvidenceFails(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

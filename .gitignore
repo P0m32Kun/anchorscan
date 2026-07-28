@@ -25,6 +25,7 @@
 
 tools/docx-render/.venv/
 tools/docx-render/out/
+tools/docx-render/artifacts/
 
 # config/default.yaml 由首次运行自动生成（工具路径与本机 PATH 相关），不进版本控制
 # config/default.yaml.example 是提交进仓库的参考模板

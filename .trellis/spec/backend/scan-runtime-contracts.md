@@ -85,6 +85,7 @@ Do not change persisted `DetectionCheck` rows when rules change. They are facts 
 - The frontend lookup identity is `(zone_id, vulnerability_key)`. Identical vulnerabilities in different zones must never share edit state or evidence.
 - Within one zone, matching vulnerabilities from any included runs aggregate their assets and sources into one candidate and one verification.
 - DOCX outputs one chapter per zone and joins unique access points, tester IPs, targets, exclusions, and notes in first-seen order; it must not create a subchapter per scan run.
+- DOCX multi-line zone context fields (`access_points_text`, `tester_ips_text`, `targets_text`, `exclusions_text`, `notes_text`) are newline-delimited strings. The template must render each value as a separate, indented paragraph using a Jinja loop over `splitlines()`; never as a single paragraph with embedded literal newlines.
 
 ### 4. Validation & Error Matrix
 
@@ -93,6 +94,7 @@ Do not change persisted `DetectionCheck` rows when rules change. They are facts 
 | Create or update `zone_id` is absent or not owned by the project | HTTP 400: `zone_id is not part of this project`. |
 | Candidate command has `zone_id` | Resolve the candidate only inside that zone. |
 | Same vulnerability key in two zones | Maintain two independent verification records and UI entries. |
+| DOCX layout verification | CI gate is `make docx-test` (OOXML structure + rendered content assertions). LibreOffice/PDF rasterization is a local diagnostic only, not an acceptance gate. |
 
 ### 5. Good/Base/Bad Cases
 
@@ -104,8 +106,10 @@ Do not change persisted `DetectionCheck` rows when rules change. They are facts 
 
 - HTTP regression: create verification with snake_case asset/source fields, assert they persist, then upload PNG evidence.
 - HTTP regression: reject updates that move a verification outside its project zones.
+- HTTP regression: update a `not_observed` verification's title/description/severity while it has evidence.
 - Frontend static/type check: verify snake_case payloads, composite zone/key identity, and command `zone_id` propagation.
-- Report unit/render tests: two included runs in one zone produce one zone chapter and deduplicated aggregated access context; render all DOCX pages to PNG for layout QA.
+- Report unit/render tests: two included runs in one zone produce one zone chapter and deduplicated aggregated access context; each access point/IP/target renders in its own indented paragraph.
+- Web browser smoke: verification create/update payloads use snake_case and preserve multi-run assets/sources; footer shows the linked version without a `v` prefix. |
 
 ### 7. Wrong vs Correct
 

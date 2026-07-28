@@ -49,7 +49,7 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		binaryName += ".exe"
 	}
-	assertBinaryVersion(t, filepath.Join(packageDir, binaryName), version)
+	assertBinaryVersion(t, filepath.Join(packageDir, binaryName), strings.TrimPrefix(version, "v"))
 	assertBinaryStarts(t, filepath.Join(packageDir, binaryName))
 
 	for _, relativePath := range []string{

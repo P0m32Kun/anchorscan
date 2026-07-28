@@ -46,6 +46,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Install release verification dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+          npx playwright install --with-deps chromium
+
       - name: Verify release version injection
         run: make release-check VERSION="${GITHUB_REF_NAME}" BUILD_FLAGS=-trimpath LDFLAGS="-s -w"
 

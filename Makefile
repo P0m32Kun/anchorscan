@@ -16,7 +16,7 @@ PACKAGE_ARCHIVE ?= $(DIST_DIR)/$(PACKAGE_NAME).tar.gz
 E2E_TIMEOUT ?= 55m
 RUNTIME_CONFIG := default.yaml.example nse.yaml service-tags.yaml ports-highrisk.txt ports-top1000.txt
 
-.PHONY: test doc-check docx-test build package package-test package-smoke security-check web-smoke release-check pr-check e2e clean
+.PHONY: test doc-check docx-test docx-visual build package package-test package-smoke security-check web-smoke release-check pr-check e2e clean
 
 test:
 	go test ./...
@@ -27,6 +27,9 @@ doc-check:
 
 docx-test:
 	uv run --project tools/docx-render python -m unittest discover -s tools/docx-render -p 'test_*.py'
+
+docx-visual:
+	uv run --project tools/docx-render python tools/docx-render/visual_check.py
 
 web:
 	npm run build:web

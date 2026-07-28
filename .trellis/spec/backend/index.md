@@ -19,7 +19,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
-| [Scan Runtime Contracts](./scan-runtime-contracts.md) | Required rule sidecars, release package contents, and discovery-mode behavior | Active |
+| [Scan Runtime Contracts](./scan-runtime-contracts.md) | Zone-scoped verification aggregation, report/DOCX contracts, release version injection, and runtime rule sidecars | Active |
 
 ---
 

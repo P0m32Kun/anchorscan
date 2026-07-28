@@ -125,6 +125,18 @@ def without_numbering(paragraph_node: etree._Element) -> etree._Element:
     return paragraph_node
 
 
+def with_left_chars(paragraph_node: etree._Element, chars: int = 200) -> etree._Element:
+    properties = paragraph_node.find("w:pPr", NS)
+    if properties is None:
+        properties = etree.Element(w("pPr"))
+        paragraph_node.insert(0, properties)
+    indent = properties.find("w:ind", NS)
+    if indent is None:
+        indent = etree.SubElement(properties, w("ind"))
+    indent.set(w("leftChars"), str(chars))
+    return paragraph_node
+
+
 def with_first_line_chars(paragraph_node: etree._Element, chars: int) -> etree._Element:
     properties = paragraph_node.find("w:pPr", NS)
     if properties is None:
@@ -253,20 +265,36 @@ def prepare_network_zone_block(body: etree._Element, untouched: dict[str, bytes]
         untouched.pop(f"word/{target}")
 
     p = lambda text: with_text(normal, text)
+    indented_p = lambda text: with_left_chars(with_text(normal, text), 200)
     remediation_p = lambda text: with_first_line_chars(with_text(normal, text), 200)
     h3 = lambda text: with_text(heading3, text)
     h4 = lambda text: with_text(heading4, text)
     zone_nodes = [
         paragraph("{%p for network_zone in network_zones %}"),
         with_text(zone_heading, "{{ network_zone.name }}"),
-        p("测试设备接入点：{{ network_zone.access_points_text }}"),
-        p("测试设备 IP：{{ network_zone.tester_ips_text }}"),
-        p("测试范围：{{ network_zone.targets_text }}"),
+        p("测试设备接入点："),
+        paragraph("{%p for ap in network_zone.access_points_text.splitlines() %}"),
+        indented_p("{{ ap }}"),
+        paragraph("{%p endfor %}"),
+        p("测试设备 IP："),
+        paragraph("{%p for ip in network_zone.tester_ips_text.splitlines() %}"),
+        indented_p("{{ ip }}"),
+        paragraph("{%p endfor %}"),
+        p("测试范围："),
+        paragraph("{%p for target in network_zone.targets_text.splitlines() %}"),
+        indented_p("{{ target }}"),
+        paragraph("{%p endfor %}"),
         paragraph("{%p if network_zone.exclusions_text %}"),
-        p("排除范围：{{ network_zone.exclusions_text }}"),
+        p("排除范围："),
+        paragraph("{%p for exclusion in network_zone.exclusions_text.splitlines() %}"),
+        indented_p("{{ exclusion }}"),
+        paragraph("{%p endfor %}"),
         paragraph("{%p endif %}"),
         paragraph("{%p if network_zone.notes_text %}"),
-        p("备注：{{ network_zone.notes_text }}"),
+        p("备注："),
+        paragraph("{%p for note in network_zone.notes_text.splitlines() %}"),
+        indented_p("{{ note }}"),
+        paragraph("{%p endfor %}"),
         paragraph("{%p endif %}"),
         paragraph("{%p for verification in network_zone.confirmed %}"),
         h3("{{ verification.heading }}"),
