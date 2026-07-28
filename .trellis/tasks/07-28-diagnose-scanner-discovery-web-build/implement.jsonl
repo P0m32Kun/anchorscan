@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/error-handling.md","reason":"Mandatory rule resources must fail closed with actionable, consistent errors across config, doctor, CLI, and Web."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Backend implementation and regression tests span config loading, scan preparation, execution, reporting, and packaging gates."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Discovery mode adds a controlled Web scan-form field and rerun/default behavior."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"The Vue form model must stay aligned with the Go scanForm snapshot contract."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Discovery mode and rule failures flow across CLI/Web adapters, app options, execution, persistence snapshots, and reports."}

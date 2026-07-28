@@ -12,6 +12,27 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
+func TestRunScanAssumeUpSkipsAliveSweep(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte("192.0.2.10 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+	}}
+	if err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
+		RunID: "run-assume-up", Targets: []string{"192.0.2.10"}, Ports: "22", DiscoveryMode: DiscoveryAssumeUp,
+		Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	}); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	for _, command := range runner.commands {
+		if command[0] == "/opt/nmap" && strings.Contains(strings.Join(command, " "), "-sn") {
+			t.Fatalf("assume-up must skip alive sweep: %#v", runner.commands)
+		}
+	}
+	if len(runner.commands) == 0 || runner.commands[0][0] != "/opt/rustscan" {
+		t.Fatalf("first command = %#v, want rustscan", runner.commands)
+	}
+}
+
 func TestRunScanClampsHostWorkers(t *testing.T) {
 	for _, tc := range []struct {
 		name        string

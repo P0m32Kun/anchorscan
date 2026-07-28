@@ -54,6 +54,10 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 	if err != nil {
 		return err
 	}
+	discoveryMode := app.DiscoveryAuto
+	if run, err := scanStore.GetScanRun(*runID); err == nil {
+		discoveryMode = app.DiscoveryModeFromConfigSnapshot(run.ConfigSnapshot)
+	}
 	reportChecks := make([]report.DetectionCheck, 0, len(checks))
 	for _, check := range checks {
 		reportChecks = append(reportChecks, report.DetectionCheck{
@@ -62,7 +66,7 @@ func runReport(args []string, stdout io.Writer, deps cliDeps) error {
 			StartedAt: report.DetectionCheckTime(check.StartedAt), FinishedAt: report.DetectionCheckTime(check.FinishedAt),
 		})
 	}
-	builtReport := report.BuildWithScanDataAndDetectionChecks(fps, findings, report.ScanData{}, reportChecks)
+	builtReport := report.BuildWithScanDataAndDetectionChecks(fps, findings, report.ScanData{DiscoveryMode: discoveryMode}, reportChecks)
 	if *jsonPath != "" {
 		if err := ensureParentDir(*jsonPath); err != nil {
 			return err

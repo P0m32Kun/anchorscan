@@ -9,6 +9,7 @@ BUILD_FLAGS ?=
 LDFLAGS ?=
 PACKAGE_NAME := $(APP)-$(VERSION)-$(GOOS)-$(GOARCH)
 PACKAGE_DIR := $(DIST_DIR)/$(PACKAGE_NAME)
+RUNTIME_CONFIG := default.yaml.example nse.yaml service-tags.yaml ports-highrisk.txt ports-top100.txt ports-top1000.txt
 
 .PHONY: test docx-test build package web-smoke pr-check clean
 
@@ -30,12 +31,18 @@ package: web
 	rm -rf $(PACKAGE_DIR)
 	mkdir -p $(PACKAGE_DIR)/config $(PACKAGE_DIR)/docs $(PACKAGE_DIR)/tools/docx-render/templates
 	go build $(BUILD_FLAGS) $(if $(LDFLAGS),-ldflags="$(LDFLAGS)") -o $(PACKAGE_DIR)/$(BINARY) $(CMD)
-	cp config/default.yaml.example $(PACKAGE_DIR)/config/default.yaml.example
+	cp $(addprefix config/,$(RUNTIME_CONFIG)) $(PACKAGE_DIR)/config/
+	@for file in $(RUNTIME_CONFIG); do \
+		test -s "$(PACKAGE_DIR)/config/$$file" || { echo "missing required runtime config: $$file" >&2; exit 1; }; \
+		done
 	cp README.md $(PACKAGE_DIR)/docs/README.md
 	cp docs/deploy.md $(PACKAGE_DIR)/docs/deploy.md
 	cp tools/docx-render/.python-version tools/docx-render/pyproject.toml tools/docx-render/uv.lock tools/docx-render/render_docx.py $(PACKAGE_DIR)/tools/docx-render/
 	cp tools/docx-render/templates/project-report.docx $(PACKAGE_DIR)/tools/docx-render/templates/project-report.docx
 	tar -C $(DIST_DIR) -czf $(DIST_DIR)/$(PACKAGE_NAME).tar.gz $(PACKAGE_NAME)
+	@for file in $(RUNTIME_CONFIG); do \
+		tar -tzf "$(DIST_DIR)/$(PACKAGE_NAME).tar.gz" | grep -Fxq "$(PACKAGE_NAME)/config/$$file" || { echo "archive missing required runtime config: $$file" >&2; exit 1; }; \
+	done
 
 web-smoke: build
 	npm run test:web

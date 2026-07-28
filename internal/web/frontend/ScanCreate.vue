@@ -10,6 +10,7 @@ type FormValues = {
   exclude_targets: string;
   ports: string;
   exclude_ports: string;
+  discovery_mode: string;
   profile: string;
   label: string;
   access_point: string;
@@ -39,7 +40,7 @@ const submitting = ref(false);
 const optionalOpen = ref(false);
 const errorSummary = ref<HTMLElement>();
 const optionalFields = ['label', 'exclude_targets', 'exclude_ports', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
-const formFields = ['zone_id', 'target', 'exclude_targets', 'ports', 'exclude_ports', 'profile', 'label', 'access_point', 'tester_ip', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
+const formFields = ['zone_id', 'target', 'exclude_targets', 'ports', 'exclude_ports', 'profile', 'discovery_mode', 'label', 'access_point', 'tester_ip', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
 
 const optionalChangedCount = computed(() => {
   const values = [...optionalFields.slice(0, -1).map((field) => form.value[field as keyof FormValues]), artifactRoot.value];
@@ -118,6 +119,15 @@ onMounted(() => {
           <option value="fast">fast (极速/多路并发)</option>
         </select>
         <p v-if="fieldError('profile')" id="error-profile" class="field-error">{{ fieldError('profile') }}</p>
+      </label>
+
+      <label>
+        <span>主机发现模式</span>
+        <select v-model="form.discovery_mode" name="discovery_mode" :aria-describedby="fieldError('discovery_mode') ? 'error-discovery_mode' : undefined">
+          <option value="auto">auto (默认：先探测存活主机)</option>
+          <option value="assume-up">assume-up (跳过存活探测，直接扫描所有目标)</option>
+        </select>
+        <p v-if="fieldError('discovery_mode')" id="error-discovery_mode" class="field-error">{{ fieldError('discovery_mode') }}</p>
       </label>
 
       <label class="full-width">

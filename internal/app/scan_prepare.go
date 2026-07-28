@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"path/filepath"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
@@ -15,6 +16,7 @@ type PrepareScanRequest struct {
 	ExcludeTargets string
 	PortSpec       string
 	ExcludePorts   string
+	DiscoveryMode  string
 	RunID          string
 	ProjectID      string
 	ZoneID         string
@@ -45,6 +47,11 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		return PreparedScan{}, err
 	}
 
+	discoveryMode, err := normalizeDiscoveryMode(req.DiscoveryMode)
+	if err != nil {
+		return PreparedScan{}, err
+	}
+
 	portSpec := req.PortSpec
 	if portSpec == "" {
 		portSpec = cfg.Scan.Ports
@@ -71,6 +78,13 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		return PreparedScan{}, err
 	}
 	tagRules, err := config.LoadTagRulesForConfig(req.ConfigPath)
+	if err != nil {
+		return PreparedScan{}, err
+	}
+
+	configSnapshot, err := json.Marshal(struct {
+		DiscoveryMode string `json:"discovery_mode"`
+	}{DiscoveryMode: discoveryMode})
 	if err != nil {
 		return PreparedScan{}, err
 	}
@@ -108,6 +122,8 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 		HostWorkers:    effective.HostWorkers,
 		ExtraArgs:      extraArgs,
 		Timeouts:       timeouts,
+		DiscoveryMode:  discoveryMode,
+		ConfigSnapshot: string(configSnapshot),
 		JSONReportPath: req.JSONReportPath,
 		ArtifactRoot:   req.ArtifactRoot,
 		NSERules:       nseRules,

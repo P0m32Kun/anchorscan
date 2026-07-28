@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,6 +10,28 @@ import (
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 )
+
+func writePackagedConfig(t *testing.T, fixture prepareScanFixture) string {
+	t.Helper()
+	configDir := filepath.Join(fixture.dir, "package", "config")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(configDir, "default.yaml")
+	if err := os.WriteFile(configPath, []byte(fixture.configYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"nse.yaml", "service-tags.yaml"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", "config", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(configDir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return configPath
+}
 
 func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	fixture := newPrepareScanFixture(t)
@@ -37,8 +60,8 @@ func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	if got, want := prepared.Preflight.Summary.TagRuleCount, len(prepared.Options.TagRules); got != want {
 		t.Fatalf("tag rule count = %d, want %d", got, want)
 	}
-	if prepared.Options.ConfigSnapshot != "" {
-		t.Fatalf("ConfigSnapshot = %q, want zero value", prepared.Options.ConfigSnapshot)
+	if got, want := prepared.Options.ConfigSnapshot, `{"discovery_mode":"auto"}`; got != want {
+		t.Fatalf("ConfigSnapshot = %q, want %q", got, want)
 	}
 
 	prepared, err = PrepareScan(PrepareScanRequest{
@@ -57,6 +80,135 @@ func TestPrepareScanBuildsOptionsFromDefaultsAndOverrides(t *testing.T) {
 	}
 	if got, want := prepared.Options.ExtraArgs.Nmap, []string{"-sV", "--version-light"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("Nmap args = %#v, want %#v", got, want)
+	}
+}
+
+func TestPrepareScanRejectsMissingRuleSidecarBeforeExecution(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	if err := os.Remove(filepath.Join(fixture.dir, "nse.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PrepareScan(fixture.request()); err == nil || !strings.Contains(err.Error(), "required rule file") {
+		t.Fatalf("PrepareScan error = %v, want required rule file error", err)
+	}
+}
+
+func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	req := fixture.request()
+	req.ConfigPath = writePackagedConfig(t, fixture)
+	req.PortSpec = "22"
+	prepared, err := PrepareScan(req)
+	if err != nil || prepared.Preflight.HasErrors() {
+		t.Fatalf("PrepareScan = %#v, %v", prepared, err)
+	}
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.168.1.10 -> [22]\n"),
+		[]byte(`<nmaprun><host><address addr="192.168.1.10"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		[]byte(`<nmaprun/>`),
+		[]byte{},
+	}}
+	if err := RunScan(context.Background(), runner, newScanStore(t), prepared.Options); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if !runner.hasArgs(prepared.Options.Tools.Nmap, "--script", "ssh2-enum-algos,ssh-hostkey") {
+		t.Fatalf("expected configured SSH NSE invocation, commands=%#v", runner.commands)
+	}
+	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-tags", "ssh", "-target", "192.168.1.10:22") {
+		t.Fatalf("expected configured SSH nuclei invocation, commands=%#v", runner.commands)
+	}
+}
+
+func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		port        string
+		fingerprint []byte
+		outputs     [][]byte
+		tags        string
+		target      string
+	}{
+		{
+			name: "tomcat nuclei URL", port: "8080",
+			fingerprint: []byte(`<nmaprun><host><address addr="192.168.1.10"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+			outputs:     [][]byte{[]byte(`{"url":"http://192.168.1.10:8080","tech":["tomcat"]}`), []byte{}},
+			tags:        "tomcat,apache-tomcat", target: "http://192.168.1.10:8080",
+		},
+		{
+			name: "x11 nuclei hostport", port: "6000",
+			fingerprint: []byte(`<nmaprun><host><address addr="192.168.1.10"/><ports><port protocol="tcp" portid="6000"><state state="open"/><service name="x11"/></port></ports></host></nmaprun>`),
+			outputs:     [][]byte{[]byte{}},
+			tags:        "x11", target: "192.168.1.10:6000",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newPrepareScanFixture(t)
+			req := fixture.request()
+			req.ConfigPath = writePackagedConfig(t, fixture)
+			req.PortSpec = test.port
+			prepared, err := PrepareScan(req)
+			if err != nil || prepared.Preflight.HasErrors() {
+				t.Fatalf("PrepareScan = %#v, %v", prepared, err)
+			}
+			outputs := [][]byte{aliveNmapXML, []byte("192.168.1.10 -> [" + test.port + "]\n"), test.fingerprint}
+			runner := &recordingSequenceRunner{outputs: append(outputs, test.outputs...)}
+			scanStore := newScanStore(t)
+			if err := RunScan(context.Background(), runner, scanStore, prepared.Options); err != nil {
+				t.Fatalf("RunScan returned error: %v", err)
+			}
+			if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-tags", test.tags, "-target", test.target) {
+				t.Fatalf("expected configured nuclei invocation, commands=%#v", runner.commands)
+			}
+			if runner.hasArgs(prepared.Options.Tools.Nmap, "--script") {
+				t.Fatalf("expected no NSE invocation, commands=%#v", runner.commands)
+			}
+			checks, err := scanStore.ListDetectionChecks(prepared.Options.RunID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			foundNuclei := false
+			for _, check := range checks {
+				if check.Engine == "nuclei" {
+					foundNuclei = true
+					if check.Status != "completed" {
+						t.Fatalf("nuclei check = %#v, want completed", check)
+					}
+				}
+			}
+			if !foundNuclei {
+				t.Fatalf("expected nuclei detection check, got %#v", checks)
+			}
+		})
+	}
+}
+
+func TestPrepareScanValidatesDiscoveryMode(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	for _, test := range []struct {
+		name string
+		mode string
+		want string
+		err  string
+	}{
+		{name: "default", want: DiscoveryAuto},
+		{name: "assume up", mode: DiscoveryAssumeUp, want: DiscoveryAssumeUp},
+		{name: "invalid", mode: "skip", err: "invalid discovery mode"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := fixture.request()
+			req.DiscoveryMode = test.mode
+			prepared, err := PrepareScan(req)
+			if test.err != "" {
+				if err == nil || !strings.Contains(err.Error(), test.err) {
+					t.Fatalf("error = %v, want %q", err, test.err)
+				}
+				return
+			}
+			if err != nil || prepared.Options.DiscoveryMode != test.want {
+				t.Fatalf("PrepareScan = %#v, %v; want discovery %q", prepared, err, test.want)
+			}
+		})
 	}
 }
 

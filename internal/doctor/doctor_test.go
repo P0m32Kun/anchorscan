@@ -74,6 +74,15 @@ func writeFile(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
 	}
+	if filepath.Ext(path) == ".yaml" && strings.Contains(content, "scan:") {
+		dir := filepath.Dir(path)
+		if err := os.WriteFile(filepath.Join(dir, "nse.yaml"), []byte("http:\n  - http-title\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "service-tags.yaml"), []byte("- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func writeExecutable(t *testing.T, dir string, name string) string {
@@ -83,6 +92,23 @@ func writeExecutable(t *testing.T, dir string, name string) string {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
 	}
 	return path
+}
+
+func TestRunFailsWhenRuleFilesAreMissing(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	for _, fileName := range []string{"nse.yaml", "service-tags.yaml"} {
+		if err := os.Remove(filepath.Join(dir, fileName)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
+	if !containsCheck(checks, "nse rules", false) || !containsCheck(checks, "tag rules", false) {
+		t.Fatalf("expected missing rule failures: %#v", checks)
+	}
 }
 
 func TestRdpscanMissingReportsOptionalHint(t *testing.T) {

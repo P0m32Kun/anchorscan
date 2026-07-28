@@ -72,6 +72,16 @@ func TestExecuteScanReturnsPortErrorBeforeProfileError(t *testing.T) {
 	}
 }
 
+func TestExecuteScanRejectsInvalidDiscoveryMode(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	err := run([]string{"scan", "--config", configPath, "--target", "192.0.2.1", "--discovery", "invalid"}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{})
+	if err == nil || !strings.Contains(err.Error(), "invalid discovery mode") {
+		t.Fatalf("error = %v, want discovery mode error", err)
+	}
+}
+
 func TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

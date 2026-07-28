@@ -361,6 +361,8 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
+	writeFile(t, filepath.Join(dir, "nse.yaml"), "http:\n  - http-title\n")
+	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n")
 
 	scanStore, err := store.Open(dbPath)
 	if err != nil {
@@ -516,5 +518,17 @@ func TestScanCreateLoadsConfigBeforeValidatingProject(t *testing.T) {
 				t.Fatalf("expected config error before project validation, got body=%s", res.Body.String())
 			}
 		})
+	}
+}
+
+func TestScanFormValidatesDiscoveryMode(t *testing.T) {
+	zones := []store.ProjectZone{{ZoneID: "I"}}
+	form := scanForm{ZoneID: "I", Target: "192.0.2.1", Ports: "80", Profile: "normal", AccessPoint: "lab", TesterIP: "192.0.2.2", DiscoveryMode: "invalid"}
+	if err := validateScanForm(form, zones); err == nil || err.Field != "discovery_mode" {
+		t.Fatalf("validateScanForm = %#v, want discovery mode error", err)
+	}
+	form.DiscoveryMode = ""
+	if err := validateScanForm(form, zones); err != nil {
+		t.Fatalf("empty discovery mode must remain backward compatible: %v", err)
 	}
 }

@@ -1,9 +1,10 @@
 package config
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 	"gopkg.in/yaml.v3"
@@ -18,6 +19,9 @@ func LoadNSERules(path string) (map[string][]string, error) {
 	if err := yaml.Unmarshal(data, &rules); err != nil {
 		return nil, err
 	}
+	if len(rules) == 0 {
+		return nil, fmt.Errorf("NSE rules file %q is empty", path)
+	}
 	return rules, nil
 }
 
@@ -29,6 +33,9 @@ func LoadTagRules(path string) ([]vuln.TagRule, error) {
 	}
 	if err := yaml.Unmarshal(data, &rules); err != nil {
 		return nil, err
+	}
+	if len(rules) == 0 {
+		return nil, fmt.Errorf("tag rules file %q is empty", path)
 	}
 	return rules, nil
 }
@@ -43,15 +50,15 @@ func LoadTagRulesForConfig(configPath string) ([]vuln.TagRule, error) {
 
 func loadRuleFileForConfig[T any](configPath string, fileName string, loader func(string) (T, error)) (T, error) {
 	var zero T
-	for _, candidate := range []string{filepath.Join(filepath.Dir(configPath), fileName), filepath.Join("config", fileName)} {
+	candidates := []string{filepath.Join(filepath.Dir(configPath), fileName), filepath.Join("config", fileName)}
+	for _, candidate := range candidates {
 		value, err := loader(candidate)
 		if err == nil {
 			return value, nil
 		}
-		if errors.Is(err, os.ErrNotExist) {
-			continue
+		if !os.IsNotExist(err) {
+			return zero, err
 		}
-		return zero, err
 	}
-	return zero, nil
+	return zero, fmt.Errorf("required rule file %q was not found; checked %s", fileName, strings.Join(candidates, ", "))
 }

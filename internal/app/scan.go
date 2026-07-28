@@ -40,6 +40,7 @@ type ScanOptions struct {
 	HostWorkers          int
 	ExtraArgs            ToolExtraArgs
 	Timeouts             ToolTimeouts
+	DiscoveryMode        string
 	ConfigSnapshot       string
 	JSONReportPath       string
 	ArtifactRoot         string
@@ -58,6 +59,11 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	if opts.ProfileName == "" {
 		opts.ProfileName = "normal"
 	}
+	discoveryMode, err := normalizeDiscoveryMode(opts.DiscoveryMode)
+	if err != nil {
+		return err
+	}
+	opts.DiscoveryMode = discoveryMode
 	ctx, finishLease, abortLease, err := acquireRunLease(ctx, scanStore, opts.RunID, opts.LeaseOwnerToken)
 	if err != nil {
 		return err
@@ -146,8 +152,9 @@ func RunScan(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	}
 	progress.Emit("info", "report", "report json %s", opts.JSONReportPath)
 	return report.WriteJSON(opts.JSONReportPath, report.BuildWithScanDataAndDetectionChecks(allFingerprints, allFindings, report.ScanData{
-		AliveIPs:  aliveIPs,
-		OpenPorts: openPorts,
+		DiscoveryMode: opts.DiscoveryMode,
+		AliveIPs:      aliveIPs,
+		OpenPorts:     openPorts,
 	}, detectionChecks))
 }
 

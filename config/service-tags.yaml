@@ -68,6 +68,10 @@
   service: ["vnc"]
   nuclei_tags: ["vnc"]
   target: "hostport"
+- name: x11
+  service: ["x11"]
+  nuclei_tags: ["x11"]
+  target: "hostport"
 - name: winrm
   # nmap 无 NSE 脚本，仅走 nuclei
   service: ["winrm", "wsman"]

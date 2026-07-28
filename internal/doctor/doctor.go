@@ -1,7 +1,6 @@
 package doctor
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,15 +45,15 @@ func Run(opts Options) []Check {
 		checks = append(checks, Check{Name: "ports", OK: true, Message: "ok"})
 	}
 
-	if _, err := config.LoadNSERules(sidecarPath(opts.ConfigPath, "nse.yaml")); err == nil || errors.Is(err, os.ErrNotExist) {
-		checks = append(checks, Check{Name: "nse rules", OK: true, Message: "ok"})
-	} else {
+	if _, err := config.LoadNSERulesForConfig(opts.ConfigPath); err != nil {
 		checks = append(checks, Check{Name: "nse rules", OK: false, Message: message(err, "ok")})
-	}
-	if _, err := config.LoadTagRules(sidecarPath(opts.ConfigPath, "service-tags.yaml")); err == nil || errors.Is(err, os.ErrNotExist) {
-		checks = append(checks, Check{Name: "tag rules", OK: true, Message: "ok"})
 	} else {
+		checks = append(checks, Check{Name: "nse rules", OK: true, Message: "ok"})
+	}
+	if _, err := config.LoadTagRulesForConfig(opts.ConfigPath); err != nil {
 		checks = append(checks, Check{Name: "tag rules", OK: false, Message: message(err, "ok")})
+	} else {
+		checks = append(checks, Check{Name: "tag rules", OK: true, Message: "ok"})
 	}
 
 	checks = append(checks,
@@ -177,10 +176,6 @@ func message(err error, ok string) string {
 		return ok
 	}
 	return err.Error()
-}
-
-func sidecarPath(configPath string, fileName string) string {
-	return filepath.Join(filepath.Dir(configPath), fileName)
 }
 
 func writableDirWritable(path string) error {

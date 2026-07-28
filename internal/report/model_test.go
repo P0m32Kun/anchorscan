@@ -6,6 +6,13 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 )
 
+func TestBuildIncludesDiscoveryMode(t *testing.T) {
+	got := BuildWithScanData(nil, nil, ScanData{DiscoveryMode: "assume-up"})
+	if got.DiscoveryMode != "assume-up" {
+		t.Fatalf("DiscoveryMode = %q, want assume-up", got.DiscoveryMode)
+	}
+}
+
 func TestBuildDeduplicatesFindingsByIPAndID(t *testing.T) {
 	report := Build(
 		[]fingerprint.ServiceFingerprint{

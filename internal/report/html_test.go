@@ -30,7 +30,7 @@ func TestWriteHTMLStableBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := sha256.Sum256(data)
-	const want = "30e7c8c265f122302ed923510e5ba132a2f172616c862f4ef355d177179ccf78"
+	const want = "ad0ba15120e5928c3385e313119a4d5e2b05932751f1d5cdf65878afcafcb61a"
 	if actual := hex.EncodeToString(got[:]); actual != want {
 		t.Fatalf("unexpected HTML SHA-256: got %s, want %s", actual, want)
 	}

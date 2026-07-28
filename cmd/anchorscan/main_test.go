@@ -128,6 +128,15 @@ func writeFile(t *testing.T, path string, content string) {
 	if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
 		t.Fatalf("WriteFile(%s) returned error: %v", path, err)
 	}
+	if filepath.Ext(path) == ".yaml" && strings.Contains(content, "scan:") {
+		dir := filepath.Dir(path)
+		if err := os.WriteFile(filepath.Join(dir, "nse.yaml"), []byte("http:\n  - http-title\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "service-tags.yaml"), []byte("- name: http\n  service: [http]\n  nuclei_tags: [http]\n  target: url\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func writeExecutable(t *testing.T, dir string, name string) string {

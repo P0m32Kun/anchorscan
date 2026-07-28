@@ -27,6 +27,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	artifactRoot := fs.String("artifacts", filepath.Join("data", "artifacts"), "path to scan artifact directory root")
 	portsSpec := fs.String("ports", "", "ports preset or csv")
 	profileFlag := fs.String("profile", "", "scan profile: slow, normal, or fast")
+	discoveryFlag := fs.String("discovery", "auto", "host discovery mode: auto (alive sweep) or assume-up")
 	hostWorkersFlag := fs.Int("host-workers", 0, "host-level worker count override")
 	rustscanArgsFlag := fs.String("rustscan-args", "", "extra rustscan args")
 	nmapArgsFlag := fs.String("nmap-args", "", "extra nmap args")
@@ -51,6 +52,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		ConfigPath:     *configPath,
 		TargetSpec:     *targetSpec,
 		PortSpec:       *portsSpec,
+		DiscoveryMode:  *discoveryFlag,
 		DBPath:         *dbPath,
 		JSONReportPath: *jsonPath,
 		ArtifactRoot:   strings.TrimSpace(*artifactRoot),
@@ -113,7 +115,9 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		if err != nil {
 			return err
 		}
-		if err := report.WriteHTML(*htmlPath, report.Build(fps, findings)); err != nil {
+		reportData := report.Build(fps, findings)
+		reportData.DiscoveryMode = prepared.Options.DiscoveryMode
+		if err := report.WriteHTML(*htmlPath, reportData); err != nil {
 			return err
 		}
 	}
@@ -149,6 +153,7 @@ Flags:
   --target <value>  Target IP, CIDR, IP range, or comma-separated list
   --ports <value>   top1000, a range like 100-1000, or CSV like 80,443
   --profile slow|normal|fast
+  --discovery auto|assume-up
   --host-workers N
   --rustscan-args "..."
   --nmap-args "..."

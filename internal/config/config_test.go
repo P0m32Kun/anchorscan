@@ -185,6 +185,36 @@ func TestLoadRulesForConfigFallsBackToRootConfig(t *testing.T) {
 	}
 }
 
+func TestLoadRulesForConfigRejectsMissingAndEmptyFiles(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	for _, test := range []struct {
+		name string
+		load func(string) (any, error)
+	}{
+		{name: "missing NSE", load: func(path string) (any, error) { return LoadNSERulesForConfig(path) }},
+		{name: "missing tags", load: func(path string) (any, error) { return LoadTagRulesForConfig(path) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := test.load(configPath); err == nil || !strings.Contains(err.Error(), "required rule file") {
+				t.Fatalf("error = %v, want required rule file error", err)
+			}
+		})
+	}
+
+	dir := t.TempDir()
+	for _, fileName := range []string{"nse.yaml", "service-tags.yaml"} {
+		if err := os.WriteFile(filepath.Join(dir, fileName), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := LoadNSERulesForConfig(filepath.Join(dir, "config.yaml")); err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("NSE error = %v, want empty error", err)
+	}
+	if _, err := LoadTagRulesForConfig(filepath.Join(dir, "config.yaml")); err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("tag error = %v, want empty error", err)
+	}
+}
+
 func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 	nseRules, err := LoadNSERules(filepath.Join("..", "..", "config", "nse.yaml"))
 	if err != nil {
@@ -202,7 +232,7 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 		}
 	}
 	// 仅 nuclei 覆盖、无 NSE 脚本的服务不应出现在 nse.yaml。
-	for _, service := range []string{"elasticsearch", "kafka", "kubernetes", "winrm"} {
+	for _, service := range []string{"elasticsearch", "kafka", "kubernetes", "winrm", "x11"} {
 		if len(nseRules[service]) != 0 {
 			t.Fatalf("did not expect NSE rules for nuclei-only service %s: %#v", service, nseRules)
 		}
@@ -219,7 +249,7 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 	// 所有服务（含非 Web）都应有 nuclei tag 规则，实现双引擎覆盖矩阵。
 	for _, service := range []string{
 		"ssh", "ftp", "telnet", "smtp", "ldap", "dns", "snmp",
-		"rdp", "vnc", "winrm", "redis", "mysql", "postgres",
+		"rdp", "vnc", "x11", "winrm", "redis", "mysql", "postgres",
 		"mssql", "mongodb", "memcached", "elasticsearch",
 		"rabbitmq", "kafka", "mqtt", "smb", "nfs", "rpc",
 		"rsync", "docker", "kubernetes",
@@ -245,6 +275,17 @@ func TestDefaultRuleFilesProvideDualEngineCoverage(t *testing.T) {
 		if rule.Target != "url" && rule.Target != "hostport" {
 			t.Fatalf("rule %s has unexpected target %q (want url or hostport)", rule.Name, rule.Target)
 		}
+	}
+}
+
+func TestDefaultX11RuleRoutesToHostPort(t *testing.T) {
+	rules, err := LoadTagRules(filepath.Join("..", "..", "config", "service-tags.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := vuln.MatchNucleiTags(fingerprint.ServiceFingerprint{IP: "192.0.2.10", Port: 6000, Normalized: "x11"}, vuln.HTTPResult{}, rules)
+	if got, want := match.Tags, []string{"x11"}; !reflect.DeepEqual(got, want) || match.Address != "192.0.2.10:6000" {
+		t.Fatalf("X11 match = %#v, want x11 at host port", match)
 	}
 }
 
