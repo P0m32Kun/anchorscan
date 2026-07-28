@@ -4,7 +4,7 @@
 
 **Blocked by:** 08 — 改善发现策略、进度与取消。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`、`ponytail`。
 
@@ -24,12 +24,12 @@
 
 ## 验收
 
-- [ ] 先写归档缺资源或版本不匹配时 release smoke 失败的测试。
-- [ ] Release workflow 在发布前执行 package smoke。
-- [ ] 生成并上传 checksum。
-- [ ] 加入 `govulncheck`、npm 高危审计和 Python 锁文件检查的稳定入口。
-- [ ] Actions 固定 SHA，lab 镜像至少固定受控版本；变更有维护说明。
-- [ ] `make pr-check` 和 workflow 校验通过。
+- [x] 先写归档缺资源或版本不匹配时 release smoke 失败的测试。
+- [x] Release workflow 在发布前执行 package smoke。
+- [x] 生成并上传 checksum。
+- [x] 加入 `govulncheck`、npm 高危审计和 Python 锁文件检查的稳定入口。
+- [x] Actions 固定 SHA，lab 镜像至少固定受控版本；变更有维护说明。
+- [x] `make pr-check` 和 workflow 校验通过。
 
 ## 非目标
 
