@@ -47,3 +47,24 @@ Packaged mandatory rule sidecars, made scan preparation and doctor fail closed, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: 达梦数据库默认口令检测 MVP
+
+**Date**: 2026-07-28
+**Task**: 达梦数据库默认口令检测 MVP
+**Branch**: `main`
+
+### Summary
+
+实现达梦数据库默认口令检测 MVP：新增主动协议指纹识别（基于 nuclei dameng-detect 探测包），命中后再调用 Go 驱动尝试 SYSDBA/SYSDBA 默认口令；POC 触发由指纹驱动而非固定端口；新增相关单元测试和配置。make test 与 make pr-check 均通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e69b8cd` | (see git log) |
+
+### Status
+
+[OK] **Completed**
