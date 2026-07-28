@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -36,6 +37,13 @@ func (m *Manager) Start(ctx context.Context, opts ScanOptions) (string, error) {
 		m.mu.Unlock()
 		return "", err
 	}
+	// Record the run synchronously so it is addressable as soon as Start
+	// returns; the web UI redirects to the run detail page immediately.
+	if err := recordScanStart(m.store, opts); err != nil {
+		_, _ = m.store.ReleaseRunLease(opts.RunID, ownerToken)
+		m.mu.Unlock()
+		return "", err
+	}
 	runCtx, cancel := context.WithCancel(ctx)
 	opts.LeaseOwnerToken = ownerToken
 	m.activeID = opts.RunID
@@ -62,6 +70,14 @@ func (m *Manager) StartTool(ctx context.Context, opts ToolRunOptions) (string, e
 	if err != nil {
 		m.mu.Unlock()
 		return "", err
+	}
+	// Same as Start: make the tool run addressable before returning.
+	if m.store != nil && opts.RunID != "" {
+		if err := saveToolRun(m.store, opts, time.Now()); err != nil {
+			_, _ = m.store.ReleaseRunLease(opts.RunID, ownerToken)
+			m.mu.Unlock()
+			return "", err
+		}
 	}
 	runCtx, cancel := context.WithCancel(ctx)
 	opts.LeaseOwnerToken = ownerToken

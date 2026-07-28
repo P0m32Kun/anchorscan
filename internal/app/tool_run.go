@@ -148,6 +148,10 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 	return SaveRunProvenance(scanStore, opts.RunID, prov)
 }
 
+// saveToolRun records the tool run row. Manager.StartTool calls it
+// synchronously so the run is addressable as soon as StartTool returns (the
+// web UI redirects to the run page immediately); RunTool upserts the same row
+// after its own setup completes.
 func saveToolRun(scanStore *store.Store, opts ToolRunOptions, startedAt time.Time) error {
 	snapshot, _ := json.Marshal(map[string]any{
 		"tool":            opts.Tool,
