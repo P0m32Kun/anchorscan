@@ -474,12 +474,18 @@ func writeConfig(t *testing.T, root, dir string, paths toolPaths) string {
 		t.Fatal(err)
 	}
 	// The lab runs hermetically (no `nuclei -update-templates`), so tag-based
-	// nuclei rules have no public templates to match. Route the Tomcat check
-	// through the trusted template-rule mechanism (service-tags.yaml `template`
-	// field -> RunNucleiTemplate) via the bundled lab-tomcat.yaml fixture,
-	// instead of raw "-t" profile args, which the scan-scope allowlist rejects.
+	// nuclei rules have no public templates. Route the Tomcat check through the
+	// trusted template-rule mechanism (service-tags.yaml `template` field ->
+	// RunNucleiTemplate) via the bundled lab-tomcat.yaml fixture, instead of
+	// raw "-t" profile args, which the scan-scope allowlist rejects.
+	//
+	// Match on `service: ["http"]`: the lab slow profile omits `nmap -sV`, so
+	// the Tomcat product is empty and httpx tech-detect is not guaranteed; the
+	// shipped default rules rely on their trailing `http-generic` service rule
+	// for exactly this case, which we mirror here.
 	template := filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml")
 	tagRules := fmt.Sprintf(`- name: tomcat
+  service: ["http"]
   product: ["tomcat", "apache tomcat"]
   tech: ["tomcat"]
   template: %q
