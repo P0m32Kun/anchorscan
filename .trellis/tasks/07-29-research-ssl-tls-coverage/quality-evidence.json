@@ -58,8 +58,8 @@
   },
   "delivery": {
     "branch": "codex/research-ssl-tls-coverage",
-    "commit": null,
-    "pr": null,
+    "commit": "4b8194d",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/28",
     "merged_at": null
   }
 }
