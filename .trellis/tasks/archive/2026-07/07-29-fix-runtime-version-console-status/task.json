@@ -3,7 +3,7 @@
   "name": "fix-runtime-version-console-status",
   "title": "修复运行版本、控制台输出与异常完成状态",
   "description": "",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "kun",
   "assignee": "kun",
   "createdAt": "2026-07-29",
-  "completedAt": null,
+  "completedAt": "2026-07-29",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -26,5 +26,13 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "gate_overrides": [
+      {
+        "action": "archive",
+        "reason": "父任务仅做聚合；三个子任务已分别由 PR #9/#10、#11/#12/#23 和 #25 完成并归档，无独立代码交付。",
+        "at": "2026-07-29T15:59:48.464409+00:00"
+      }
+    ]
+  }
 }
