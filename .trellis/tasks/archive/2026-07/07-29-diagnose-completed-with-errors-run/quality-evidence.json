@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T11:10:18Z",
+    "summary": "Ticket 01 已归档；用户授权调查 Ticket 02，并在调查后选择 A：将失效的模板修复计划归档，不实施。",
+    "result": "passed"
+  },
+  "tdd": {
+    "required": false,
+    "red": {
+      "command": null,
+      "result": "not_applicable",
+      "summary": "当前 checkout 不含原计划要修复的模板；为不存在的代码构造 TDD 将形成伪证据。"
+    },
+    "green": {
+      "command": null,
+      "result": "not_applicable",
+      "summary": "用户选择不恢复或引入外部私有模板，故无实现可验证。"
+    }
+  },
+  "verification": [
+    {
+      "command": "git ls-files config | rg 'ssh-mini-brute|nuclei-templates'; rg -n 'ssh-mini-brute' config README.md docs/project-status.md",
+      "result": "passed",
+      "summary": "当前跟踪配置没有 ssh-mini-brute 或项目内置 nuclei-templates；SSH 配置与文档均记录 tags-only 外部模板部署契约。",
+      "at": "2026-07-29T11:10:18Z"
+    },
+    {
+      "command": "docker info --format '{{.ServerVersion}}'",
+      "result": "failed",
+      "summary": "Docker daemon socket 不存在，受控 lab runtime 验证未执行；由于当前 checkout 无待修复模板，用户选择不实施。",
+      "at": "2026-07-29T11:10:18Z"
+    }
+  ],
+  "reviews": {
+    "standards": {"result": "passed", "artifact": ".trellis/tasks/07-29-diagnose-completed-with-errors-run/review-standards.md"},
+    "spec": {"result": "passed", "artifact": ".trellis/tasks/07-29-diagnose-completed-with-errors-run/review-spec.md"}
+  },
+  "delivery": {
+    "branch": "codex/repair-ssh-nuclei-runtime-failure",
+    "commit": "ba762881ed5687e73b02cd52e572529631bd862a",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/11",
+    "merged_at": null
+  }
+}

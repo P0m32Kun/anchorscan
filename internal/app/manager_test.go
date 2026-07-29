@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -53,6 +54,12 @@ func TestManagerAllowsOnlyOneActiveToolRun(t *testing.T) {
 }
 
 func TestManagerRejectsRunHeldByAnotherManager(t *testing.T) {
+	for attempt := 0; attempt < 20; attempt++ {
+		t.Run(fmt.Sprintf("attempt-%d", attempt), testManagerRejectsRunHeldByAnotherManager)
+	}
+}
+
+func testManagerRejectsRunHeldByAnotherManager(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
 	firstStore, err := store.Open(dbPath)
 	if err != nil {
