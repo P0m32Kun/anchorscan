@@ -1,0 +1,4 @@
+{"path":".trellis/tasks/07-29-fix-dameng-timeout-panic/prd.md","kind":"task-prd","reason":"Approved task scope: default 15s timeout and containment of DM-driver panics without changing credentials or scan scope."}
+{"path":".trellis/tasks/07-29-fix-dameng-timeout-panic/design.md","kind":"task-design","reason":"Defines the error classification and localized recovery boundary."}
+{"path":"docs/plans/dameng-default-password/spec.md","kind":"authoritative-spec","reason":"Existing authoritative product context for the native Dameng detector and its established verdict semantics."}
+{"path":"docs/testing-strategy.md","kind":"test-strategy","reason":"Requires the lowest sufficient deterministic tool/app/config seams."}

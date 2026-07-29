@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -24,8 +26,50 @@ type storeProgress struct {
 	now   func() time.Time
 }
 
-// Emit formats the message, forwards it to the logger, and — when attached to a
-// real run — appends a ScanEvent so the web UI's progress feed stays live.
+// ansiEscape removes terminal control sequences before ScanEvent reaches the web UI.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+
+// summarizeScanEvent keeps live progress readable without changing the raw log
+// or tool artifact that remain the diagnostic record.
+func summarizeScanEvent(message string) string {
+	lines := strings.Split(ansiEscape.ReplaceAllString(message, ""), "\n")
+	context := strings.TrimSpace(lines[0])
+	var detail string
+	for _, line := range lines[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" || isScanEventNoise(line) {
+			continue
+		}
+		line = strings.TrimSpace(strings.TrimPrefix(line, "[FTL]"))
+		if line != "" {
+			detail = line
+		}
+	}
+	if detail == "" {
+		return context
+	}
+	if context == "" {
+		return detail
+	}
+	if failedAt := strings.Index(context, " failed:"); failedAt >= 0 {
+		context = context[:failedAt+len(" failed")]
+	}
+	return context + ": " + detail
+}
+
+func isScanEventNoise(line string) bool {
+	lower := strings.ToLower(line)
+	if strings.Contains(lower, "current nuclei version") ||
+		strings.Contains(lower, "current nuclei-templates version") ||
+		strings.Contains(lower, "new templates added") ||
+		strings.Contains(lower, "templates loaded for current scan") {
+		return true
+	}
+	return strings.Trim(line, " _/\\|()[]{}<>-=+*.:") == ""
+}
+
+// Emit formats the message, forwards the original to the logger, and — when
+// attached to a real run — appends a readable ScanEvent for the live feed.
 func (p storeProgress) Emit(level, stage, format string, args ...any) {
 	message := fmt.Sprintf(format, args...)
 	if p.log != nil {
@@ -39,6 +83,6 @@ func (p storeProgress) Emit(level, stage, format string, args ...any) {
 		Time:    p.now(),
 		Level:   level,
 		Stage:   stage,
-		Message: message,
+		Message: summarizeScanEvent(message),
 	})
 }

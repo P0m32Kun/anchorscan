@@ -58,7 +58,7 @@ func TestLoadValidatesToolTimeouts(t *testing.T) {
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load accepted an invalid timeout")
 	}
-	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: 0\n  nse: 150ms\n  nuclei: 1m\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: 0\n  nse: 150ms\n  nuclei: 1m\n  dameng: 0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -66,7 +66,7 @@ func TestLoadValidatesToolTimeouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	timeouts, err := cfg.Timeouts.Durations()
-	if err != nil || timeouts.Rustscan.String() != "2s" || timeouts.NSE.String() != "150ms" || timeouts.Nmap != 0 {
+	if err != nil || timeouts.Rustscan.String() != "2s" || timeouts.NSE.String() != "150ms" || timeouts.Nmap != 0 || timeouts.Dameng != 0 {
 		t.Fatalf("timeouts = %#v, %v", timeouts, err)
 	}
 }

@@ -15,21 +15,33 @@ func TestMatchNucleiTagsFormatsIPv6HostPort(t *testing.T) {
 	}
 }
 
-func TestMatchNucleiTagsReturnsTemplateForSSH(t *testing.T) {
+func TestMatchNucleiTagsSelectsSSHViaTags(t *testing.T) {
 	rules := []TagRule{{
-		Name:       "ssh",
-		Service:    []string{"ssh"},
-		NucleiTags: []string{"ssh"},
-		Template:   "/opt/anchorscan/config/nuclei-templates/ssh-mini-brute.yaml",
-		Target:     "hostport",
+		Name:        "ssh",
+		Service:     []string{"ssh"},
+		NucleiTags:  []string{"ssh"},
+		ExcludeTags: []string{"default-login"},
+		Target:      "hostport",
 	}}
 	fp := fingerprint.ServiceFingerprint{IP: "192.168.1.10", Port: 22, Normalized: "ssh"}
 	got := MatchNucleiTags(fp, HTTPResult{}, rules)
-	if got.Template != rules[0].Template {
-		t.Fatalf("Template = %q, want %q", got.Template, rules[0].Template)
+	if got.Template != "" {
+		t.Fatalf("Template = %q, want empty (SSH routes via -tags, not an in-repo template)", got.Template)
 	}
-	if len(got.ExcludeTags) != 0 {
-		t.Fatalf("template-based match should not carry default excludes, got %#v", got.ExcludeTags)
+	if len(got.Tags) == 0 || got.Tags[0] != "ssh" {
+		t.Fatalf("Tags = %#v, want [ssh]", got.Tags)
+	}
+	if len(got.ExcludeTags) == 0 {
+		t.Fatalf("ExcludeTags = %#v, want to contain default-login", got.ExcludeTags)
+	}
+	foundDefaultLogin := false
+	for _, et := range got.ExcludeTags {
+		if et == "default-login" {
+			foundDefaultLogin = true
+		}
+	}
+	if !foundDefaultLogin {
+		t.Fatalf("ExcludeTags = %#v, want to contain default-login", got.ExcludeTags)
 	}
 }
 

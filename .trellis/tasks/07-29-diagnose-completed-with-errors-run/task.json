@@ -1,0 +1,34 @@
+{
+  "id": "diagnose-completed-with-errors-run",
+  "name": "diagnose-completed-with-errors-run",
+  "title": "调查并处置异常完成扫描运行",
+  "description": "以指定 Run 的持久化检测事实确定 completed_with_errors 根因并处置。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "kun",
+  "assignee": "kun",
+  "createdAt": "2026-07-29",
+  "completedAt": null,
+  "branch": "codex/pi-work-in-progress-20260729",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "07-29-fix-runtime-version-console-status",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "risk": "behavioral",
+    "fixed_point": "356b7070d7ef11c940a9cc83d364543c7c2f3442",
+    "source_of_truth": {
+      "type": "docs-ticket",
+      "spec": "docs/plans/scan-console-and-detection-reliability/spec.md",
+      "ticket": "docs/plans/scan-console-and-detection-reliability/tickets/02-repair-ssh-nuclei-runtime-failure.md"
+    }
+  }
+}

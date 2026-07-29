@@ -16,17 +16,21 @@
 #     带 redis tag），所以 -tags <service> 就能命中该服务的弱口令模板，无需额外
 #     追加全局 default-login tag（那会加载 360 个无关爆破模板，既慢又易触发锁定）。
 #   - SSH 例外：官方 ssh-default-logins 模板含 223 组账密，过于激进，用
-#     exclude_tags 排除它，改由 RBKD 的 ssh-mini-brute 模板（2 用户 × 2 密码）承担。
+#     exclude_tags 排除它；SSH 弱口令改由私有 RBKD-templates 的 ssh-mini-brute
+#     模板（ssh tag、无 default-login tag，2 用户 × 2 密码）承担。RBKD-templates
+#     与官方 nuclei-templates 合并部署在同一目录，由 -tags ssh 一起选中。
 
 # ===== 远程登录 =====
 - name: ssh
   service: ["ssh"]
   nuclei_tags: ["ssh"]
-  # 排除 nuclei 官方 default-login 爆破模板（账密组合巨大，且易触发账户锁定）。
-  # 弱口令检测改由 AnchorScan 自带的 ssh-mini-brute 模板（2 用户 × 2 密码）承担，
-  # 该模板通过 -t 精确调用，最多 4 次尝试、首次命中即停。
+  # 排除官方 ssh-default-logins（223 组账密，过于激进、易触发账户锁定）。
+  # SSH 弱口令由私有 RBKD-templates 的 ssh-mini-brute 模板承担（2 用户 × 2 密码、
+  # 4 次尝试、首次命中即停）。RBKD-templates 与官方 nuclei-templates 合并部署在
+  # 同一目录、一起生效；该模板携带 ssh tag 且不含 default-login tag，故
+  # -tags ssh -exclude-tags default-login 会在合并模板集中精确选中它。
+  # 本项目不内置任何 nuclei 模板，仅用 -tags 选择服务。
   exclude_tags: ["default-login"]
-  template: "nuclei-templates/ssh-mini-brute.yaml"
   target: "hostport"
 - name: ftp
   service: ["ftp"]

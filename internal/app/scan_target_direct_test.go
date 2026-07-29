@@ -3,7 +3,11 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
@@ -150,4 +154,116 @@ func TestScanTargetRecordsNSESkipReasons(t *testing.T) {
 			t.Fatalf("NSE detection check not recorded: %#v", checks)
 		})
 	}
+}
+
+func TestScanTargetHidesUnmatchedDamengProbe(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(time.Second))
+		buf := make([]byte, 4096)
+		_, _ = conn.Read(buf)
+		// Closing without a response is a deterministic non-Dameng reply.
+	}()
+
+	_, portText, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte(fmt.Sprintf("127.0.0.1 -> [%d]\\n", port)),
+		[]byte(fmt.Sprintf(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="%d"><state state="open"/><service name="tcpwrapped"/></port></ports></host></nmaprun>`, port)),
+	}}
+	progress := &recordingProgress{}
+
+	if _, err := scanTarget(context.Background(), runner, ScanOptions{
+		RunID: "run-dameng-probe-miss",
+		Ports: "1",
+		Tools: ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+	}, "127.0.0.1", t.TempDir(), progress); err != nil {
+		t.Fatalf("scanTarget returned error: %v", err)
+	}
+	for _, event := range progress.events {
+		if strings.Contains(event, "dameng-probe") {
+			t.Fatalf("unmatched Dameng probe emitted Console event: %q", event)
+		}
+	}
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Dameng probe did not complete")
+	}
+}
+
+func TestScanTargetShowsMatchedDamengProbe(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(time.Second))
+		buf := make([]byte, 4096)
+		if n, _ := conn.Read(buf); n == 0 {
+			return
+		}
+		_, _ = conn.Write([]byte{8, 0, 0, 0, 0, 0, 0, 0})
+	}()
+
+	_, portText, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte(fmt.Sprintf("127.0.0.1 -> [%d]\\n", port)),
+		[]byte(fmt.Sprintf(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="%d"><state state="open"/><service name="tcpwrapped"/></port></ports></host></nmaprun>`, port)),
+	}}
+	progress := &recordingProgress{}
+
+	scan, err := scanTarget(context.Background(), runner, ScanOptions{
+		RunID:         "run-dameng-probe-match",
+		Ports:         strconv.Itoa(port),
+		Tools:         ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		DamengChecker: &fakeDamengAuthChecker{},
+	}, "127.0.0.1", t.TempDir(), progress)
+	if err != nil {
+		t.Fatalf("scanTarget returned error: %v", err)
+	}
+	if len(scan.Fingerprints) != 1 || scan.Fingerprints[0].Normalized != "dameng" {
+		t.Fatalf("fingerprints = %#v, want matched Dameng fingerprint", scan.Fingerprints)
+	}
+	for _, event := range progress.events {
+		if strings.Contains(event, "dameng-probe 127.0.0.1") && strings.Contains(event, "matched") {
+			<-done
+			return
+		}
+	}
+	t.Fatalf("matched Dameng probe did not emit Console event: %#v", progress.events)
 }

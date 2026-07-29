@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -56,6 +57,23 @@ func (c *damengDriverChecker) Check(ctx context.Context, host string, port int, 
 // DefaultDamengChecker is the production implementation backed by the DM Go driver.
 var DefaultDamengChecker DamengAuthChecker = &damengDriverChecker{}
 
+type damengDriverPanicError struct {
+	value any
+}
+
+func (e *damengDriverPanicError) Error() string {
+	return fmt.Sprintf("dameng driver panic: %v", e.value)
+}
+
+func callDamengChecker(ctx context.Context, checker DamengAuthChecker, host string, port int) (ok bool, detail string, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = &damengDriverPanicError{value: recovered}
+		}
+	}()
+	return checker.Check(ctx, host, port, "SYSDBA", "SYSDBA")
+}
+
 // RunDamengDefaultPassword checks whether a Dameng listener still uses the
 // factory default credential SYSDBA/SYSDBA. Authentication success is treated
 // as vulnerable; authentication failure means the password has been changed;
@@ -66,8 +84,12 @@ func RunDamengDefaultPassword(ctx context.Context, checker DamengAuthChecker, ip
 		checker = DefaultDamengChecker
 	}
 
-	ok, detail, err := checker.Check(ctx, ip, port, "SYSDBA", "SYSDBA")
+	ok, detail, err := callDamengChecker(ctx, checker, ip, port)
 	if err != nil {
+		var panicErr *damengDriverPanicError
+		if errors.As(err, &panicErr) || errors.Is(err, context.DeadlineExceeded) {
+			return DamengResult{Verdict: DamengUnknown, Output: err.Error()}, err
+		}
 		// Distinguish an actual authentication rejection from a connection-level
 		// problem. The DM driver returns errors containing authentication or
 		// login keywords when credentials are rejected; everything else is

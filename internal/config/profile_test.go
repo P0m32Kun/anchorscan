@@ -98,8 +98,11 @@ func TestValidateScopeSafeToolArgsAllowsBenignHttpxSilentAndKeepsNucleiTemplateB
 	}
 	// nuclei -t selects a template and is scope-sensitive (arbitrary template
 	// / local-file paths from untrusted overrides), so it stays rejected.
-	// Trusted configs that need a fixed template use the service-tags.yaml
-	// `template` rule (RunNucleiTemplate) instead of raw -t args.
+	// The default scan pipeline never specifies a template: service-tags.yaml
+	// routes every service (including SSH) through -tags. An operator may still
+	// run a fixed template explicitly via the dedicated web tool-run path
+	// (ToolRunOptions.Template / RunNucleiTemplate), which is audit-logged and
+	// excluded from customer reports.
 	if err := ValidateScopeSafeToolArgs(ToolArgs{Nuclei: []string{"-t", "evil.yaml"}}); err == nil {
 		t.Fatal("nuclei -t must stay rejected by the scan-scope allowlist")
 	}

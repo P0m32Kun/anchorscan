@@ -62,8 +62,7 @@ Implemented capabilities:
 | `config/default.yaml.example` | human-readable config template (committed) |
 | `config/ports-highrisk.txt` | high-risk port preset (ops-remapped + ICS/SCADA + standard services) |
 | `config/ports-top1000.txt` | common port preset used by `top1000` |
-| `config/nuclei-templates/` | custom Nuclei templates bundled with the release (e.g., SSH mini-brute with 2 users × 2 passwords) |
-| `config/service-tags.yaml` | nuclei tag mapping (26+ services; non-SSH services may hit their `default-login` templates, SSH uses the bundled `ssh-mini-brute` template) |
+| `config/service-tags.yaml` | nuclei tag mapping (26+ services; SSH routes via `-tags ssh -exclude-tags default-login` to the RBKD-templates `ssh-mini-brute` template — RBKD-templates is the private set merged into the official nuclei-templates directory; this repo ships no templates) |
 | `config/nse.yaml` | nmap NSE script mapping for services with applicable scripts |
 | `internal/fingerprint/normalize.go` | service normalization aliases |
 

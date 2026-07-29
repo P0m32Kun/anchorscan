@@ -1,0 +1,2 @@
+{"file":".trellis/tasks/07-29-fix-runtime-version-console-status/prd.md","reason":"Parent requirements, scope exclusions, and user decisions for the coordinated fixes."}
+{"file":".trellis/tasks/07-29-fix-runtime-version-console-status/design.md","reason":"Cross-task contracts for version, Console summary, and immutable DetectionCheck facts."}

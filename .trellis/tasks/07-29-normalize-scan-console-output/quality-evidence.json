@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": null,
+    "summary": "用户在本轮明确指示：将旧 planning 输入迁移至已批准 docs/plans 来源 ticket，补齐 ready 证据并通过校验；本 task 尚未启动实现。",
+    "result": "passed"
+  },
+  "tdd": {
+    "required": true,
+    "red": {
+      "command": "go test ./internal/app -run TestStoreProgressPreservesRawLogsAndStoresActionableSummary -count=1; go test ./internal/app -run TestScanTargetHidesUnmatchedDamengProbe -count=1; go test ./internal/app -run TestStoreProgressPreservesRawLogsAndStoresActionableSummary -count=1",
+      "result": "failed",
+      "summary": "纵向 slice 均先失败：ScanEvent 持久化 ANSI/Nuclei 噪声；未匹配 Dameng 探测发出 Console 事件；真实现场 Nuclei banner 仍泄漏到摘要。"
+    },
+    "green": {
+      "command": "go test ./internal/app -run 'TestStoreProgressPreservesRawLogsAndStoresActionableSummary|TestSummarizeScanEventKeepsSingleLineProgress|TestScanTargetHidesUnmatchedDamengProbe|TestScanTargetShowsMatchedDamengProbe' -count=1",
+      "result": "passed",
+      "summary": "最小实现后真实 banner、单行进度与 Dameng probe 的匹配/未匹配事件测试均通过。"
+    }
+  },
+  "verification": [
+    {
+      "command": "make pr-check",
+      "result": "passed",
+      "at": "2026-07-29T00:00:00Z"
+    },
+    {
+      "command": "go test ./internal/app -count=1",
+      "result": "passed",
+      "at": "2026-07-29T00:00:00Z"
+    },
+    {
+      "command": "go vet ./...",
+      "result": "passed",
+      "at": "2026-07-29T00:00:00Z"
+    },
+    {
+      "command": "make harness-check",
+      "result": "passed",
+      "at": "2026-07-29T00:00:00Z"
+    }
+  ],
+  "reviews": {
+    "standards": {"result": "passed", "artifact": ".trellis/tasks/07-29-normalize-scan-console-output/review-standards.md"},
+    "spec": {"result": "passed", "artifact": ".trellis/tasks/07-29-normalize-scan-console-output/review-spec.md"}
+  },
+  "delivery": {
+    "branch": "codex/pi-work-in-progress-20260729",
+    "commit": "9ade2e9",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/9",
+    "merged_at": null
+  }
+}

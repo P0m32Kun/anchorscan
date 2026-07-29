@@ -4,7 +4,7 @@
 
 核心思路是「**指纹驱动、精准分类、服务多引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 按服务指纹和适用规则独立调度 `nuclei`、NSE、`httpx` 等引擎 → 结果统一落入 SQLite → 导出 JSON / HTML / DOCX 报告。RDP 服务可额外启用可选 `rdpscan` 检测 BlueKeep（CVE-2019-0708）。
 
-默认流水线保留非 SSH 服务的弱口令/默认凭据检测；SSH 使用自带的 `config/nuclei-templates/ssh-mini-brute.yaml` 模板，最多 2 用户 × 2 密码（4 次尝试）。使用 `--args` 或 Web 单工具「原生参数」会绕过默认安全限制，调用记录会审计保存但不会进入客户报告。
+默认流水线保留非 SSH 服务的弱口令/默认凭据检测；SSH 通过 `-tags ssh -exclude-tags default-login` 调用私有 RBKD-templates 的 `ssh-mini-brute` 模板（最多 2 用户 × 2 密码，4 次尝试）。RBKD-templates 与官方 nuclei-templates 合并部署在同一目录、一起生效；本项目不内置任何 nuclei 模板，仅用 `-tags` 选择服务。使用 `--args` 或 Web 单工具「原生参数」会绕过默认安全限制，调用记录会审计保存但不会进入客户报告。
 
 ## 快速开始
 

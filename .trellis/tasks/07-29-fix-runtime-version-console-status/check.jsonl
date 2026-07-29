@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Final integration review must protect release version injection and DetectionCheck contracts."}
+{"file":".trellis/tasks/07-29-fix-runtime-version-console-status/implement.md","reason":"Defines parent integration checks and completion gate."}

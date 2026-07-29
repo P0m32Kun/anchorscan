@@ -174,3 +174,122 @@ const Version = "2.0.1"
 ```go
 var Version = "dev" // linked with -X during the build
 ```
+
+## Scenario: Dameng driver failure containment
+
+### 1. Scope / Trigger
+
+- `gitee.com/chunanyong/dm` is an untrusted third-party dependency on the default-password check path and can panic while opening or handshaking a connection.
+- The Dameng checker must turn only driver/checker panics and deadline expiry into an auditable optional-engine failure; worker orchestration must not recover arbitrary scan panics.
+
+### 2. Signatures
+
+- Tool boundary: `tools.RunDamengDefaultPassword(ctx context.Context, checker DamengAuthChecker, ip string, port int) (DamengResult, error)`.
+- Driver seam: `DamengAuthChecker.Check(ctx, host, port, username, password) (ok bool, detail string, err error)`.
+- New-install configuration: `timeouts.dameng: "15s"`; an explicitly configured `"0"` retains the existing no-deadline behavior.
+
+### 3. Contracts
+
+- Recover at a helper whose body is only the `checker.Check(...)` call. Its recovered error text starts with `dameng driver panic:`.
+- A recovered driver panic or `context.DeadlineExceeded` returns `DamengUnknown` **and a non-nil error**. `scanTarget` then persists `failed/command_failed` with the diagnostic detail, writes no Finding, and completes the Run as `completed_with_errors` under its existing partial-failure aggregation.
+- Authentication rejection remains `DamengSafe`; successful authentication remains `DamengVulnerable`; ordinary connection or protocol errors remain `DamengUnknown` with a nil error.
+
+### 4. Validation & Error Matrix
+
+| Condition | `RunDamengDefaultPassword` result | Scan persistence |
+|---|---|---|
+| `checker.Check` panics | `DamengUnknown`, non-nil `dameng driver panic:` error | `failed/command_failed`, diagnostic Detail, no Finding |
+| Checker returns/wraps `context.DeadlineExceeded` | `DamengUnknown`, non-nil error | `failed/command_failed`, deadline Detail, no Finding |
+| Authentication rejection | `DamengSafe`, nil error | completed check, no Finding |
+| Ordinary non-auth connection/protocol error | `DamengUnknown`, nil error | existing completed unknown path |
+| Authentication succeeds | `DamengVulnerable`, nil error | completed check and default-password Finding |
+
+### 5. Good/Base/Bad Cases
+
+- Good: a new configuration uses `15s`; a user can deliberately retain unlimited behavior with `dameng: "0"`.
+- Base: a non-auth network error is still an unknown result rather than a scan engine failure.
+- Bad: recovering at `RunScan`/a worker goroutine, which masks unrelated application defects; or returning nil for a driver panic, which falsely records a completed unknown check.
+
+### 6. Tests Required
+
+- Tool tests inject a panicking checker and a deadline error; assert the panic diagnostic/non-nil error and retain vulnerable, safe, and ordinary-network mappings.
+- App/store tests for both panic and deadline assert `completed_with_errors`, Dameng `failed/command_failed`, diagnostic `DetectionCheck.Detail`, and zero Findings.
+- Config tests assert generated and shipped defaults are `15s`, and `ToolTimeouts.Durations()` accepts explicit Dameng `0`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+ok, detail, err := checker.Check(ctx, ip, port, "SYSDBA", "SYSDBA") // panic escapes scan worker
+if err != nil {
+    return DamengResult{Verdict: DamengUnknown, Output: detail}, nil
+}
+```
+
+#### Correct
+
+```go
+ok, detail, err := callDamengChecker(ctx, checker, ip, port) // recovery is scoped to Check
+var panicErr *damengDriverPanicError
+if errors.As(err, &panicErr) || errors.Is(err, context.DeadlineExceeded) {
+    return DamengResult{Verdict: DamengUnknown, Output: err.Error()}, err
+}
+```
+
+## Scenario: ScanEvent console summaries
+
+### 1. Scope / Trigger
+
+- `storeProgress.Emit` is the boundary between raw scan diagnostics and the persisted `store.ScanEvent` feed consumed by the Web Console.
+- External tools, especially Nuclei, can embed ANSI sequences and a complete ASCII banner inside an error string. Persisting that output makes the Console unreadable; dropping it from logs/artifacts loses diagnostic evidence.
+
+### 2. Signatures
+
+- Producer: `app.Progress.Emit(level, stage, format string, args ...any)`.
+- Adapter: `storeProgress.Emit` logs the formatted raw message and appends `store.ScanEvent{Message: ...}`.
+- Consumer: the Web Console reads `ScanEvent.Message`; artifact writers retain tool output independently.
+
+### 3. Contracts
+
+- Log callbacks receive the original formatted message. Artifact content, DetectionCheck status/reason/detail, runner arguments, and Run status are not changed by event summarization.
+- Persisted ScanEvent messages remove ANSI escapes, ASCII-only banner lines, known Nuclei version/template-load notices, and retain the final `[FTL]` reason with the preceding scan-stage context.
+- A normal single-line progress event retains its semantic content after ANSI removal.
+- An unmatched Dameng protocol probe emits no ScanEvent; a successful match emits its existing `dameng-probe ... matched` event.
+
+### 4. Validation & Error Matrix
+
+| Condition | Log / artifact | ScanEvent |
+|---|---|---|
+| Nuclei multiline error with final `[FTL]` | Preserve full raw output | Stage context plus final actionable reason, no ANSI/banner/version/template-load noise |
+| Single-line progress with ANSI | Preserve original log | Same progress text without ANSI |
+| Dameng probe misses | Probe behavior unchanged | No `dameng-probe` event |
+| Dameng probe matches | Fingerprint/enrichment unchanged | One matched event |
+
+### 5. Good/Base/Bad Cases
+
+- Good: the Console says `nuclei 192.0.2.10:443 failed: Could not run nuclei: no templates provided for scan`, while logs retain the complete Nuclei banner and diagnostics.
+- Base: `rustscan 192.0.2.10 open=[22,443]` remains recognizably the same progress event.
+- Bad: logging the summary instead of the raw text, persisting raw Nuclei banner output, or emitting a Console event for every failed Dameng candidate probe.
+
+### 6. Tests Required
+
+- App/store test: a realistic Nuclei multiline error proves raw log preservation and exact persisted event summary.
+- Unit test: ANSI is removed from ordinary one-line progress.
+- Deterministic loopback fixture: a non-Dameng reply emits no probe event; a valid Dameng response preserves the matched event and enriched fingerprint.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+p.log("%s", summarizeScanEvent(message))
+_ = p.store.AppendScanEvent(store.ScanEvent{Message: message})
+```
+
+#### Correct
+
+```go
+p.log("%s", message)
+_ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)})
+```
