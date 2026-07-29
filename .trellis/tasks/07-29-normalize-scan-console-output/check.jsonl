@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Project quality criteria for tests and review."}
+{"file":".trellis/tasks/07-29-normalize-scan-console-output/prd.md","reason":"Defines Console visibility requirements and non-goals."}
+{"file":".trellis/tasks/07-29-normalize-scan-console-output/implement.md","reason":"Lists focused regression seams and non-regression checks."}

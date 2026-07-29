@@ -1,0 +1,30 @@
+{
+  "id": "fix-runtime-version-console-status",
+  "name": "fix-runtime-version-console-status",
+  "title": "修复运行版本、控制台输出与异常完成状态",
+  "description": "",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "kun",
+  "assignee": "kun",
+  "createdAt": "2026-07-29",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-29-fix-console-version-contract",
+    "07-29-normalize-scan-console-output",
+    "07-29-diagnose-completed-with-errors-run"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

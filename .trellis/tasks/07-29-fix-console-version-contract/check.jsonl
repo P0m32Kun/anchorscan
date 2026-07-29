@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Release version-injection contract that the focused checks must preserve."}
+{"file":".trellis/tasks/07-29-fix-console-version-contract/prd.md","reason":"Defines the acceptance criteria for dev fallback and packaged release version verification."}

@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Defines mutable dev fallback and linker-injected display-version requirements."}
+{"file":".trellis/tasks/07-29-fix-console-version-contract/prd.md","reason":"Approved child requirements and scope exclusions for the version contract confirmation."}

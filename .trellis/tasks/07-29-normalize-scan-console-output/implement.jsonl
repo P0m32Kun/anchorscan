@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Requires release behavior and scan facts to remain unchanged while console event handling is repaired."}
+{"file":"docs/plans/archive/report-workbench-usability-fixes/tickets/07-terminal-output-normalize.md","reason":"Prior terminal normalization contract establishes ANSI handling and test expectations."}
+{"file":".trellis/tasks/07-29-normalize-scan-console-output/design.md","reason":"Documents the event-vs-log separation seam and deterministic summary contract."}

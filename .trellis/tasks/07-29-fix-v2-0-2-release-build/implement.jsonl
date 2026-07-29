@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Defines the release version-injection and package validation contract that this smoke-test repair must preserve."}
+{"file":".trellis/tasks/07-29-fix-v2-0-2-release-build/research/root-cause.md","reason":"Records the failing workflow evidence, deterministic reproduction, and isolated repair boundaries."}
