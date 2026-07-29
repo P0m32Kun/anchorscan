@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T00:00:00Z",
+    "result": "passed",
+    "summary": "用户确认：默认 Nuclei tags 契约已通过 PR #12 合并后，继续并激活 Spark 服务检测规则任务。"
+  },
+  "delivery": {
+    "branch": "codex/add-spark-detection-rules",
+    "commit": null,
+    "pr": null,
+    "merged_at": null
+  }
+}
