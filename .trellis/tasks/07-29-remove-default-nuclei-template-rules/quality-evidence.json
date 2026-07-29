@@ -29,7 +29,7 @@
   },
   "delivery": {
     "branch": "codex/repair-ssh-nuclei-runtime-failure",
-    "commit": null,
+    "commit": "ce252a8",
     "pr": null,
     "merged_at": null
   }
