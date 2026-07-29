@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T00:00:00Z",
+    "result": "passed",
+    "summary": "用户批准执行：仅同步已由 PR #13 合并的 Spark 任务元数据，并保持默认 Nuclei 模板规则任务不变。"
+  },
+  "delivery": {
+    "branch": "codex/sync-task-metadata",
+    "commit": null,
+    "pr": null,
+    "merged_at": null
+  }
+}
