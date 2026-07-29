@@ -34,6 +34,13 @@ const contextGate = read('.trellis/scripts/common/task_context.py');
 for (const anchor of ['_real_context_entries(target_dir / name, repo_root) == 0', 'seed-only or has no valid curated entries']) {
   if (!contextGate.includes(anchor)) errors.push(`task context: missing seed-only JSONL rejection`);
 }
+if (!contextGate.includes('if not delivery.get("commit") or not delivery.get("pr"):')) {
+  errors.push('task context: missing delivery commit/PR gate');
+}
+const completeGate = contextGate.slice(contextGate.indexOf('if mode == "complete":'), contextGate.indexOf('\n    if errors:'));
+if (/not\s+delivery\.get\("merged_at"\)/.test(completeGate)) {
+  errors.push('task context: merged_at must remain an observed field, not a complete gate');
+}
 for (const relative of ['.trellis/spec/backend/index.md', '.trellis/spec/frontend/index.md']) {
   const text = read(relative);
   for (const section of ['Pre-Development Checklist', 'Quality Check']) {
@@ -53,6 +60,22 @@ for (const relative of ['.codex/agents/trellis-check.toml', '.pi/agents/trellis-
   requireText(relative, 'must not claim independent review', 'self-check boundary');
 }
 requireText('.pi/prompts/trellis-continue.md', 'Standards review', 'continue review route');
+for (const [relative, text, label] of [
+  ['.trellis/workflow.md', 'Never open a follow-up PR solely', 'non-recursive delivery'],
+  ['.trellis/workflow.md', 'Do not ask again for branch creation, commit, push, PR, merge, archive, or journal.', 'continuous delivery autonomy'],
+  ['.trellis/workflow.md', 'Trellis upstream changes, global installation, or npm publication', 'external delivery escalation'],
+  ['.agents/skills/trellis-continue/SKILL.md', '分支、提交、push、PR、合并、归档和 journal 都直接执行', 'local continue autonomy'],
+  ['.agents/skills/trellis-continue/SKILL.md', 'Trellis 上游、全局安装、npm 发布等外部持久变更升级', 'local continue escalation'],
+  ['.agents/skills/trellis-finish-work/SKILL.md', 'Under continuous authorization, archive/journal are routine', 'local finish autonomy'],
+  ['.agents/skills/trellis-finish-work/SKILL.md', 'Trellis upstream/global-install/npm-publication actions', 'local finish escalation'],
+  ['.pi/prompts/trellis-continue.md', '分支、提交、push、PR、合并、归档和 journal 都直接执行', 'Pi continue autonomy'],
+  ['.pi/prompts/trellis-continue.md', 'Trellis 上游、全局安装、npm 发布等外部持久变更需要升级', 'Pi continue escalation'],
+  ['.pi/prompts/trellis-finish-work.md', 'Under continuous authorization, archive/journal are routine', 'Pi finish autonomy'],
+  ['.pi/prompts/trellis-finish-work.md', 'Trellis upstream/global-install/npm-publication actions', 'Pi finish escalation'],
+  ['.agents/skills/trellis-finish-work/SKILL.md', 'Do not create a follow-up metadata PR', 'local finish non-recursive delivery'],
+  ['.pi/prompts/trellis-continue.md', '不得产生纯元数据后续 PR', 'Pi non-recursive delivery'],
+  ['.pi/prompts/trellis-finish-work.md', 'Do not create a follow-up metadata PR', 'Pi finish non-recursive delivery'],
+]) requireText(relative, text, label);
 
 const walkTasks = (dir) => existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
   const path = `${dir}/${entry.name}`;
