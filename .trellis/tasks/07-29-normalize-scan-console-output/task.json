@@ -3,7 +3,7 @@
   "name": "normalize-scan-console-output",
   "title": "规范扫描控制台工具输出",
   "description": "保留可行动进度和错误，过滤工具 banner、ANSI 与探测噪声。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/pi-work-in-progress-20260729",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -22,5 +22,13 @@
   "parent": "07-29-fix-runtime-version-console-status",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "risk": "behavioral",
+    "fixed_point": "356b7070d7ef11c940a9cc83d364543c7c2f3442",
+    "source_of_truth": {
+      "type": "docs-ticket",
+      "spec": "docs/plans/scan-console-and-detection-reliability/spec.md",
+      "ticket": "docs/plans/scan-console-and-detection-reliability/tickets/01-normalize-scan-console-output.md"
+    }
+  }
 }

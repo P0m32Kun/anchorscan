@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": null,
+    "summary": "来源 ticket 已获产品批准，但 Ticket 02 受 Ticket 01 完整归档阻塞；在其成为 frontier 前不记录 task 实施批准。",
+    "result": "unobserved"
+  },
+  "tdd": {
+    "required": true,
+    "red": {
+      "command": null,
+      "result": "unobserved",
+      "summary": "未开始实施。"
+    },
+    "green": {
+      "command": null,
+      "result": "unobserved",
+      "summary": "未开始实施。"
+    }
+  },
+  "verification": [
+    {
+      "command": "make harness-check",
+      "result": "passed",
+      "at": "2026-07-29T00:00:00Z"
+    }
+  ],
+  "reviews": {
+    "standards": {"result": "unobserved", "artifact": null},
+    "spec": {"result": "unobserved", "artifact": null}
+  },
+  "delivery": {
+    "branch": "codex/pi-work-in-progress-20260729",
+    "commit": null,
+    "pr": null,
+    "merged_at": null
+  }
+}

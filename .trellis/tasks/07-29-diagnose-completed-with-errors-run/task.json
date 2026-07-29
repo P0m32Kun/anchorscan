@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/pi-work-in-progress-20260729",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -22,5 +22,13 @@
   "parent": "07-29-fix-runtime-version-console-status",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "risk": "behavioral",
+    "fixed_point": "356b7070d7ef11c940a9cc83d364543c7c2f3442",
+    "source_of_truth": {
+      "type": "docs-ticket",
+      "spec": "docs/plans/scan-console-and-detection-reliability/spec.md",
+      "ticket": "docs/plans/scan-console-and-detection-reliability/tickets/02-repair-ssh-nuclei-runtime-failure.md"
+    }
+  }
 }
