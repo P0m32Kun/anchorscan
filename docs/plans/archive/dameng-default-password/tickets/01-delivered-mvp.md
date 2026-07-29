@@ -22,4 +22,4 @@
 - 未观察到真实达梦实例的端到端验证记录。
 
 这些缺失只作为历史事实记录；不得补写为已执行。新行为任务从
-[`docs/agents/task-evidence.md`](../../../agents/task-evidence.md) 的证据格式开始记录。
+[`docs/agents/task-evidence.md`](../../../../agents/task-evidence.md) 的证据格式开始记录。

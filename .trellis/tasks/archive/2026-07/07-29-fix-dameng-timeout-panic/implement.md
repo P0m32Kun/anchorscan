@@ -6,7 +6,7 @@
 4. Change only the Dameng default in `internal/config/init.go` and `config/default.yaml.example` from `0` to `15s`; extend default/example consistency or parsing tests so explicit `0` remains supported.
 5. Record Docker validation as deferred: the investigated third-party images did not yield a reliable configurable `SYSDBA/SYSDBA` fixture. Do not continue image investigation or add a container dependency in this task.
 6. Run focused packages (`go test ./internal/tools ./internal/app ./internal/config`), then `make test` and `go vet ./...`. Run `make pr-check` if its toolchain prerequisites are available; otherwise record the exact blocker.
-7. Run independent standards/spec review against the fixed point and `docs/plans/dameng-default-password/tickets/02-harden-timeout-and-panic-isolation.md`; resolve blocker/high findings and repeat focused verification.
+7. Run independent standards/spec review against the fixed point and `docs/plans/archive/dameng-default-password/tickets/02-harden-timeout-and-panic-isolation.md`; resolve blocker/high findings and repeat focused verification.
 8. Update the ticket status to `done` only after verification and review; update the relevant project spec if implementation reveals a durable contract not captured here.
 
 ## Risky Files and Rollback

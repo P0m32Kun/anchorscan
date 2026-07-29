@@ -1,8 +1,8 @@
 # 执行记录 — 达梦数据库默认口令检测 MVP
 
 该归档 task 不再承载需求或验收文本。唯一权威来源是
-[`docs/plans/dameng-default-password/spec.md`](../../../../../docs/plans/dameng-default-password/spec.md)
-及其 [`01-delivered-mvp` ticket](../../../../../docs/plans/dameng-default-password/tickets/01-delivered-mvp.md)。
+[`docs/plans/archive/dameng-default-password/spec.md`](../../../../../docs/plans/archive/dameng-default-password/spec.md)
+及其 [`01-delivered-mvp` ticket](../../../../../docs/plans/archive/dameng-default-password/tickets/01-delivered-mvp.md)。
 
 ## 已交付范围
 

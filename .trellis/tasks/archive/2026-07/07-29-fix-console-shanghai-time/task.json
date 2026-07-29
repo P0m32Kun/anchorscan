@@ -26,7 +26,7 @@
     "fixed_point": "58f2fbb2e6392a70d79481d7b2b63ac9d2dcfb6a",
     "source_of_truth": {
       "type": "trellis-prd",
-      "prd": ".trellis/tasks/07-29-fix-console-shanghai-time/prd.md"
+      "prd": ".trellis/tasks/archive/2026-07/07-29-fix-console-shanghai-time/prd.md"
     }
   }
 }

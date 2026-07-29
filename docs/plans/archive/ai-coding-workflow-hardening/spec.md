@@ -1,12 +1,12 @@
 # AI 编码工作流加固
 
-**Status:** in_progress
+**Status:** completed
 
 ## 背景
 
 2026-07-28 的 AI 编码工作流审查发现，AnchorScan 已有完整的规则、测试命令和 Trellis 基础设施，但多数关键约束仍依赖 Agent 提示词自律：`main` 无分支保护，PR CI 可被直接提交绕过；`docs/plans/` 与 Trellis 出现状态分叉；TDD/独立双轴评审没有进入默认 Trellis 状态机；任务开始和归档不检查持久证据。
 
-审查报告是本计划的证据基线：[`docs/reports/ai-coding-workflow-review-2026-07-28.md`](../../reports/ai-coding-workflow-review-2026-07-28.md)。
+审查报告是本计划的证据基线：[`docs/reports/ai-coding-workflow-review-2026-07-28.md`](../../../reports/ai-coding-workflow-review-2026-07-28.md)。
 
 ## 目标
 

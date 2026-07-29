@@ -26,7 +26,7 @@
     "fixed_point": "02aa410e9e6b0291f1dfe8da475d7a44291f022e",
     "source_of_truth": {
       "type": "trellis-prd",
-      "prd": ".trellis/tasks/07-29-fix-console-version-contract/prd.md"
+      "prd": ".trellis/tasks/archive/2026-07/07-29-fix-console-version-contract/prd.md"
     }
   }
 }

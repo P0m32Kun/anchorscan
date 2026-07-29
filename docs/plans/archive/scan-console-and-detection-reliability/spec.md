@@ -2,7 +2,7 @@
 
 ## 状态
 
-已批准。仅 Ticket 01 是当前 ready frontier；Ticket 02 保持已批准但受其完成归档阻塞。
+已完成并归档：Ticket 01 已交付，Ticket 02 经调查判定为过时且不实施。
 
 ## 背景
 

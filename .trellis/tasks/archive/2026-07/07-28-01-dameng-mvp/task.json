@@ -25,8 +25,8 @@
   "meta": {
     "source_of_truth": {
       "type": "docs-ticket",
-      "spec": "docs/plans/dameng-default-password/spec.md",
-      "ticket": "docs/plans/dameng-default-password/tickets/01-delivered-mvp.md"
+      "spec": "docs/plans/archive/dameng-default-password/spec.md",
+      "ticket": "docs/plans/archive/dameng-default-password/tickets/01-delivered-mvp.md"
     },
     "risk": "behavioral",
     "fixed_point": null

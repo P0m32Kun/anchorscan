@@ -99,7 +99,7 @@ These are generated locally and should not be treated as source:
 - [docs/troubleshooting-lab.md](troubleshooting-lab.md) - 按扫描阶段组织的实验室故障排查
 - [docs/adr/README.md](adr/README.md) - accepted ADR index; historical/superseded decisions are under `docs/adr/archive/`
 - [docs/research/](research/) - 外部资料调研与来源记录
-- [docs/plans/harden-release-and-scan-trust/](plans/harden-release-and-scan-trust/) - 当前加固计划与 ticket
+- [docs/plans/archive/harden-release-and-scan-trust/](plans/archive/harden-release-and-scan-trust/) - 已完成的加固计划与 ticket
 - [docs/plans/archive/](plans/archive/) - 已完成计划的规格、设计与验收历史记录
 
 ## Recommended Next Steps

@@ -10,7 +10,7 @@ AnchorScan 将 Trellis 用于会话任务，而将跨会话需求保存在 `docs
 - 生命周期调用点：`.trellis/scripts/task.py` 与 `.trellis/scripts/common/task_store.py`；
 - self-check / 独立评审边界：`.trellis/workflow.md`；
 - 可机器验证的项目防漂移检查：`scripts/check_ai_workflow.mjs`；
-- 项目级数据模型和边界：`docs/plans/ai-coding-workflow-hardening/technical-design.md`。
+- 项目级数据模型和边界：`docs/plans/archive/ai-coding-workflow-hardening/technical-design.md`。
 
 两项已合并的真实行为变更提供了使用证据：
 
