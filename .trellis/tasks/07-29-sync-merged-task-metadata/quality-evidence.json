@@ -15,7 +15,7 @@
   "delivery": {
     "branch": "codex/sync-task-metadata",
     "commit": "6fbb167",
-    "pr": null,
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/14",
     "merged_at": null
   }
 }
