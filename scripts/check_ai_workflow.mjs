@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const rootArg = process.argv.indexOf('--root');
@@ -48,6 +48,31 @@ for (const relative of ['.trellis/spec/backend', '.trellis/spec/frontend']) {
 }
 for (const relative of ['.codex/agents/trellis-implement.toml', '.pi/agents/trellis-implement.md', '.trellis/agents/implement.md']) {
   requireText(relative, 'TDD Red', 'TDD anchor');
+}
+for (const relative of ['.codex/agents/trellis-check.toml', '.pi/agents/trellis-check.md', '.trellis/agents/check.md']) {
+  requireText(relative, 'must not claim independent review', 'self-check boundary');
+}
+requireText('.pi/prompts/trellis-continue.md', 'Standards review', 'continue review route');
+
+const walkTasks = (dir) => existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+  const path = `${dir}/${entry.name}`;
+  return entry.isDirectory() ? walkTasks(path) : entry.name === 'task.json' ? [path] : [];
+}) : [];
+for (const taskPath of walkTasks(resolve(root, '.trellis/tasks'))) {
+  const task = JSON.parse(readFileSync(taskPath, 'utf8'));
+  const taskDir = taskPath.slice(0, -'/task.json'.length);
+  if (task.status === 'completed' && existsSync(`${taskDir}/quality-evidence.json`)) {
+    const evidence = JSON.parse(readFileSync(`${taskDir}/quality-evidence.json`, 'utf8'));
+    if (evidence.schema === 1 && (task.meta?.bootstrap || typeof task.meta?.fixed_point === 'string')) {
+      const delivery = evidence.delivery ?? {};
+      if (!delivery.commit || !delivery.pr) errors.push(`${taskPath}: completed evidence lacks delivery commit/PR`);
+    }
+  }
+  const source = task.meta?.source_of_truth;
+  if (source?.type === 'docs-ticket' && typeof source.ticket === 'string') {
+    const ticket = read(source.ticket);
+    if (task.status === 'planning' && !ticket.includes('**Status:** ready-for-agent')) errors.push(`${taskPath}: planning task references non-ready ticket`);
+  }
 }
 if (errors.length) {
   console.error(`AI workflow contract failed:\n- ${errors.join('\n- ')}`);
