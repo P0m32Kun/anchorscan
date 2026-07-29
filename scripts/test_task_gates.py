@@ -25,9 +25,9 @@ class TaskGateCLITest(unittest.TestCase):
         )
         self.task_dir = self.root / ".trellis" / "tasks" / "fixture"
         self.task_dir.mkdir(parents=True)
-        (self.root / "docs").mkdir()
-        (self.root / "docs" / "spec.md").write_text("# spec\n", encoding="utf-8")
-        (self.root / "docs" / "ticket.md").write_text(
+        (self.root / "docs" / "plans").mkdir(parents=True)
+        (self.root / "docs" / "plans" / "spec.md").write_text("# spec\n", encoding="utf-8")
+        (self.root / "docs" / "plans" / "ticket.md").write_text(
             "# ticket\n\n**Status:** ready-for-agent\n", encoding="utf-8"
         )
         for name in ("prd.md", "design.md", "implement.md"):
@@ -43,8 +43,8 @@ class TaskGateCLITest(unittest.TestCase):
                         "fixed_point": "0123456789abcdef",
                         "source_of_truth": {
                             "type": "docs-ticket",
-                            "spec": "docs/spec.md",
-                            "ticket": "docs/ticket.md",
+                            "spec": "docs/plans/spec.md",
+                            "ticket": "docs/plans/ticket.md",
                         },
                     },
                 }
@@ -82,8 +82,32 @@ class TaskGateCLITest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertIn("branch is required", result.stdout + result.stderr)
 
+    def test_ready_rejects_main_as_task_branch(self) -> None:
+        data = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        data["branch"] = "main"
+        (self.task_dir / "task.json").write_text(json.dumps(data), encoding="utf-8")
+
+        result = self.run_task("validate", "fixture", "--ready")
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("must not be main", result.stdout + result.stderr)
+
+    def test_ready_rejects_missing_context_path(self) -> None:
+        for name in ("implement.jsonl", "check.jsonl"):
+            (self.task_dir / name).write_text(
+                '{"file": "docs/plans/missing.md", "reason": "fixture"}\n', encoding="utf-8"
+            )
+        (self.task_dir / "quality-evidence.json").write_text(
+            json.dumps({"schema": 1, "approval": {"result": "passed"}}), encoding="utf-8"
+        )
+
+        result = self.run_task("validate", "fixture", "--ready")
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("no valid curated entries", result.stdout + result.stderr)
+
     def test_ready_rejects_source_ticket_not_ready_for_agent(self) -> None:
-        (self.root / "docs" / "ticket.md").write_text(
+        (self.root / "docs" / "plans" / "ticket.md").write_text(
             "# ticket\n\n**Status:** planning\n", encoding="utf-8"
         )
 
@@ -91,6 +115,17 @@ class TaskGateCLITest(unittest.TestCase):
 
         self.assertNotEqual(0, result.returncode)
         self.assertIn("ready-for-agent", result.stdout + result.stderr)
+
+    def test_ready_rejects_source_outside_docs_plans(self) -> None:
+        (self.root / "docs" / "outside.md").write_text("# outside\n", encoding="utf-8")
+        data = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        data["meta"]["source_of_truth"]["spec"] = "docs/plans/../outside.md"
+        (self.task_dir / "task.json").write_text(json.dumps(data), encoding="utf-8")
+
+        result = self.run_task("validate", "fixture", "--ready")
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("docs/plans", result.stdout + result.stderr)
 
     def test_forced_start_requires_and_records_reason(self) -> None:
         result = self.run_task("start", "fixture", "--force")
@@ -118,7 +153,7 @@ class TaskGateCLITest(unittest.TestCase):
     def make_complete(self) -> None:
         for name in ("implement.jsonl", "check.jsonl"):
             (self.task_dir / name).write_text(
-                '{"file": "docs/spec.md", "reason": "fixture"}\n', encoding="utf-8"
+                '{"file": "docs/plans/spec.md", "reason": "fixture"}\n', encoding="utf-8"
             )
         (self.task_dir / "quality-evidence.json").write_text(
             json.dumps(
@@ -147,7 +182,7 @@ class TaskGateCLITest(unittest.TestCase):
 
     def test_complete_rejects_unchecked_source_ticket_item(self) -> None:
         self.make_complete()
-        (self.root / "docs" / "ticket.md").write_text(
+        (self.root / "docs" / "plans" / "ticket.md").write_text(
             "# ticket\n\n- [ ] Ship the gate\n", encoding="utf-8"
         )
 

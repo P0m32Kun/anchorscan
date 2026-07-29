@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 
 from .config import get_codex_dispatch_mode, get_context_injection_limits
-from .git import branch_exists_locally
+from .git import branch_exists_locally, run_git
 from .io import read_json
 from .log import Colors, colored
 from .paths import FILE_TASK_JSON, get_repo_root
@@ -269,7 +269,29 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
     return errors
 
 
-def _real_context_entries(path: Path) -> int:
+def _is_repo_relative_file(path: str, repo_root: Path) -> bool:
+    """Return whether ``path`` is an existing file inside the repository."""
+    candidate = (repo_root / path).resolve()
+    try:
+        candidate.relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    return candidate.is_file()
+
+
+def _is_docs_plan_file(path: str, repo_root: Path) -> bool:
+    """Return whether ``path`` resolves to an existing file under docs/plans."""
+    if not path.startswith("docs/plans/"):
+        return False
+    candidate = (repo_root / path).resolve()
+    try:
+        candidate.relative_to((repo_root / "docs" / "plans").resolve())
+    except ValueError:
+        return False
+    return candidate.is_file()
+
+
+def _real_context_entries(path: Path, repo_root: Path) -> int:
     """Return valid JSONL entries that reference actual context, excluding seeds."""
     if not path.is_file():
         return 0
@@ -279,7 +301,14 @@ def _real_context_entries(path: Path) -> int:
             data = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if data.get("file"):
+        file_path = data.get("file")
+        reason = data.get("reason")
+        if (
+            isinstance(file_path, str)
+            and isinstance(reason, str)
+            and reason.strip()
+            and _is_repo_relative_file(file_path, repo_root)
+        ):
             count += 1
     return count
 
@@ -304,6 +333,13 @@ def validate_task_gate(target_dir: Path, repo_root: Path, mode: str) -> int:
         for field in ("branch", "base_branch"):
             if not isinstance(task.get(field), str) or not task[field].strip():
                 errors += _gate_error(f"{field} is required")
+        branch = task.get("branch")
+        if isinstance(branch, str) and branch.strip() == "main":
+            errors += _gate_error("branch must not be main")
+        if isinstance(branch, str) and branch.strip():
+            rc, current_branch, _ = run_git(["branch", "--show-current"], cwd=repo_root)
+            if rc == 0 and current_branch.strip() and current_branch.strip() != branch:
+                errors += _gate_error("current git branch must match task.branch")
         if not isinstance(meta.get("fixed_point"), str) or not meta["fixed_point"].strip():
             errors += _gate_error("meta.fixed_point is required")
         source = meta.get("source_of_truth")
@@ -312,8 +348,8 @@ def validate_task_gate(target_dir: Path, repo_root: Path, mode: str) -> int:
         elif source.get("type") == "docs-ticket":
             for key in ("spec", "ticket"):
                 value = source.get(key)
-                if not isinstance(value, str) or not (repo_root / value).is_file():
-                    errors += _gate_error(f"source_of_truth.{key} must reference an existing file")
+                if not isinstance(value, str) or not _is_docs_plan_file(value, repo_root):
+                    errors += _gate_error(f"source_of_truth.{key} must reference an existing docs/plans file")
             ticket = source.get("ticket")
             if mode == "ready" and isinstance(ticket, str) and (repo_root / ticket).is_file():
                 if "**Status:** ready-for-agent" not in (repo_root / ticket).read_text(encoding="utf-8"):
@@ -324,8 +360,8 @@ def validate_task_gate(target_dir: Path, repo_root: Path, mode: str) -> int:
                 errors += _gate_error(f"{artifact} is required")
         if get_codex_dispatch_mode(repo_root) == "auto":
             for name in ("implement.jsonl", "check.jsonl"):
-                if _real_context_entries(target_dir / name) == 0:
-                    errors += _gate_error(f"{name} is seed-only or has no curated entries")
+                if _real_context_entries(target_dir / name, repo_root) == 0:
+                    errors += _gate_error(f"{name} is seed-only or has no valid curated entries")
 
     evidence_path = target_dir / "quality-evidence.json"
     evidence = read_json(evidence_path)
