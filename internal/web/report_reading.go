@@ -29,6 +29,7 @@ type runReportReading struct {
 	FilteredFingerprints []fingerprint.ServiceFingerprint
 	FilteredFindings     []report.Finding
 	FilteredChecks       []report.DetectionCheck
+	ServiceFacets        []serviceFacet
 	DetectionCoverage    *report.DetectionCoverage
 	Built                report.ScanReport
 	ViewInput            reportViewInput
@@ -40,6 +41,7 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 	vulnerabilityView := view == "vulnerabilities"
 
 	filteredFingerprints := filterFingerprints(in.Fingerprints, filters)
+	serviceFacets := buildServiceFacets(filterFingerprints(in.Fingerprints, filters.withoutServiceFilters()))
 	filteredFindings := filterFindingsForView(in.Findings, in.Fingerprints, filters, in.Catalog, vulnerabilityView)
 	filteredChecks := filterDetectionChecks(in.DetectionChecks, filteredFingerprints)
 
@@ -58,6 +60,7 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 		Findings:          filteredFindings,
 		DetectionChecks:   built.DetectionChecks,
 		DetectionCoverage: detectionCoverage,
+		ServiceFacets:     serviceFacets,
 		Query:             in.Query,
 		Catalog:           in.Catalog,
 		// CommandTools must be computed by the handler — it depends on
@@ -68,6 +71,7 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 		FilteredFingerprints: filteredFingerprints,
 		FilteredFindings:     filteredFindings,
 		FilteredChecks:       filteredChecks,
+		ServiceFacets:        serviceFacets,
 		DetectionCoverage:    detectionCoverage,
 		Built:                built,
 		ViewInput:            viewInput,

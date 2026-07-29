@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T00:00:00Z",
+    "result": "passed",
+    "summary": "用户已审阅最终规划，并批准启动报告服务筛选与未识别服务排除的实现。"
+  },
+  "tdd": {
+    "required": true,
+    "red": {
+      "command": "go test ./internal/web -run TestFilterFindingsExcludesUnidentifiedSingleProtocolFallback -count=1",
+      "result": "failed",
+      "evidence": "协议为空的 Finding 未按唯一 Fingerprint 协议回退关联，因此 tcpwrapped、unknown 和空服务三组均未被排除。"
+    },
+    "green": {
+      "command": "go test ./internal/web -run TestFilterFindingsExcludesUnidentifiedSingleProtocolFallback -count=1 && npm run build:web && make web-smoke",
+      "result": "passed"
+    }
+  },
+  "verification": [
+    {"command": "go test ./internal/web -count=1", "result": "passed"},
+    {"command": "go vet ./...", "result": "passed"},
+    {"command": "make test", "result": "passed"},
+    {"command": "make pr-check", "result": "passed"},
+    {"command": "make web-smoke", "result": "passed", "summary": "报告服务 facet、未识别排除、分页重置和清除交互的 Playwright 断言通过。"}
+  ],
+  "reviews": {
+    "standards": {"agent": "reviewer", "result": "passed", "summary": "独立复审确认协议为空 Finding 回退关联、空 facet 交互及 Playwright 覆盖均通过。"},
+    "spec": {"agent": "reviewer", "result": "passed", "summary": "独立验收复审确认所有 PRD 验收条件满足。"}
+  },
+  "delivery": {
+    "branch": "codex/enhance-report-service-filters",
+    "commit": "3682f73",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/17"
+  },
+  "notes": "未运行 make e2e：本变更只影响报告读取、HTTP 查询和浏览器交互，不涉及真实扫描器协作。"
+}

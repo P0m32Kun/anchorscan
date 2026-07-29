@@ -434,12 +434,13 @@ func (s *server) buildCommand(tool string, finding report.Finding) (report.Detec
 
 func reportFiltersFromValues(values url.Values) reportFilters {
 	return reportFilters{
-		IP:         values.Get("ip"),
-		Port:       values.Get("port"),
-		Service:    values.Get("service"),
-		Keyword:    values.Get("q"),
-		Severity:   values.Get("severity"),
-		Severities: parseSeverityFilters(values),
-		Source:     values.Get("source"),
+		IP:                  values.Get("ip"),
+		Port:                values.Get("port"),
+		Service:             values.Get("service"),
+		ExcludeUnidentified: values.Get("exclude_unidentified") == "1",
+		Keyword:             values.Get("q"),
+		Severity:            values.Get("severity"),
+		Severities:          parseSeverityFilters(values),
+		Source:              values.Get("source"),
 	}
 }

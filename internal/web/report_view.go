@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -18,6 +19,7 @@ type reportViewModel struct {
 	Run                        store.ScanRun
 	RunMeta                    runMetaView
 	Filters                    reportFilters
+	ServiceFacetsJSON          string
 	Fingerprints               any
 	Findings                   any
 	DetectionChecks            []report.DetectionCheck
@@ -49,6 +51,7 @@ type reportViewInput struct {
 	Findings          []report.Finding
 	DetectionChecks   []report.DetectionCheck
 	DetectionCoverage *report.DetectionCoverage
+	ServiceFacets     []serviceFacet
 	Query             url.Values
 	Catalog           *knowledgebase.Catalog
 	CommandTools      map[string]commandToolsView
@@ -84,6 +87,7 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 		Run:                        in.Run,
 		RunMeta:                    newRunMetaView(in.Run),
 		Filters:                    reportFiltersFromValues(query),
+		ServiceFacetsJSON:          marshalServiceFacets(in.ServiceFacets),
 		Fingerprints:               assetPage.Items,
 		Findings:                   findingPage.Items,
 		DetectionChecks:            in.DetectionChecks,
@@ -104,6 +108,14 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 		AssetTXTURL:                "/reports/" + runID + "/assets.txt?" + withQuery(copyBase, "kind", "url"),
 		ExportHTML:                 "/reports/" + runID + "/export?" + withQuery(copyBase, "format", "html"),
 	}
+}
+
+func marshalServiceFacets(facets []serviceFacet) string {
+	encoded, err := json.Marshal(facets)
+	if err != nil {
+		return "[]"
+	}
+	return string(encoded)
 }
 
 func vulnerabilityAssetCopyText(groups ...[]report.VulnerabilityDelivery) string {

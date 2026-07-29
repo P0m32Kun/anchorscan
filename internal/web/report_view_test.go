@@ -97,3 +97,20 @@ func TestVulnerabilityAssetCopyTextCombinesFilteredGroups(t *testing.T) {
 		t.Fatalf("copy text = %q", got)
 	}
 }
+
+func TestBuildReportViewModelPreservesServiceFiltersInExports(t *testing.T) {
+	model := buildReportViewModel(reportViewInput{
+		Run:   store.ScanRun{RunID: "r"},
+		Query: url.Values{"exclude_unidentified": {"1"}, "assets_page": {"2"}, "findings_page": {"3"}},
+		ServiceFacets: []serviceFacet{
+			{RawValue: "", Label: "未识别（空）", Count: 1},
+		},
+		Catalog: &knowledgebase.Catalog{},
+	})
+	if strings.Contains(model.ExportHTML, "assets_page") || strings.Contains(model.ExportHTML, "findings_page") || !strings.Contains(model.ExportHTML, "exclude_unidentified=1") {
+		t.Fatalf("ExportHTML = %q", model.ExportHTML)
+	}
+	if !strings.Contains(model.ServiceFacetsJSON, `"raw_value":""`) || !strings.Contains(model.ServiceFacetsJSON, "未识别（空）") {
+		t.Fatalf("ServiceFacetsJSON = %q", model.ServiceFacetsJSON)
+	}
+}
