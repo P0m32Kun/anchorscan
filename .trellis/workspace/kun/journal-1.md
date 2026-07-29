@@ -202,3 +202,40 @@ Merged Web Console Shanghai time formatting; archived completed task.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: 完成 TLS 覆盖研究
+
+**Date**: 2026-07-30
+**Task**: 完成 TLS 覆盖研究
+**Branch**: `codex/research-ssl-tls-coverage`
+
+### Summary
+
+完成 SSL/TLS 四类覆盖矩阵，归档研究任务；未修改扫描规则。
+
+### Main Changes
+
+- 确认 Web 识别部分覆盖、弱套件检测仅为外部模板依赖的条件路径，证书/CVE 检测未接通。
+- 提出锁定外部输入、证书采集、协议套件基线和单 CVE 验证四个需重新批准的候选任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4b8194d` | (see git log) |
+| `155b856` | (see git log) |
+| `bf8176f` | (see git log) |
+
+### Testing
+
+- [OK] go test ./internal/config ./internal/app ./internal/fingerprint/... ./internal/vuln/...
+- [OK] git diff --check；独立 Standards 与 Spec/AC 审查通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 收敛 07-29-triage-bug-record 的最终规划，纠正已完成子任务数量并申请后续实施批准。
