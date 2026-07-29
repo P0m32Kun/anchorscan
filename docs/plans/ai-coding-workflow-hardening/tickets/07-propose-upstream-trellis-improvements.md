@@ -4,7 +4,7 @@
 
 **Blocked by:** 06 — 添加 harness-check 并接入 PR CI；且至少两个真实行为变更已通过新流程完成。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `research`、`code-review`。
 
@@ -24,10 +24,14 @@
 
 ## 验收
 
-- [ ] 至少两个 AnchorScan 真实任务的证据表明 gate 降低了已知风险。
-- [ ] 提案明确哪些规则属于项目配置而非框架默认。
-- [ ] 提案包含向后兼容和迁移策略。
-- [ ] 用户明确授权前不创建上游 PR 或修改全局安装。
+- [x] 至少两个 AnchorScan 真实任务的证据表明 gate 降低了已知风险。
+- [x] 提案明确哪些规则属于项目配置而非框架默认。
+- [x] 提案包含向后兼容和迁移策略。
+- [x] 未获用户明确授权；未创建上游 PR，也未修改全局安装。
+
+## 完成记录
+
+- 2026-07-29：项目内提案草案见 [`upstream-trellis-proposal.md`](../upstream-trellis-proposal.md)；已完成 Standards/Spec 双轴只读审查、Markdown 链接检查和 `make harness-check`。本 ticket 仅完成草案，不发起上游写入。
 
 ## 非目标
 
