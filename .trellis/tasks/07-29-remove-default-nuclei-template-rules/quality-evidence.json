@@ -30,7 +30,7 @@
   "delivery": {
     "branch": "codex/repair-ssh-nuclei-runtime-failure",
     "commit": "ce252a8",
-    "pr": null,
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/12",
     "merged_at": null
   }
 }
