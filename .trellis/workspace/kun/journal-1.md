@@ -159,3 +159,25 @@ Packaged mandatory rule sidecars, made scan preparation and doctor fail closed, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: Complete report service filters
+
+**Date**: 2026-07-29
+**Task**: Complete report service filters
+**Branch**: `codex/enhance-report-service-filters`
+
+### Summary
+
+Implemented and merged report service facets plus exclusion of unidentified services; archived the completed task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3682f73` | (see git log) |
+| `645b58d` | (see git log) |
+
+### Status
+
+[OK] **Completed**
