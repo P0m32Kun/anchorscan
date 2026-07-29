@@ -3,7 +3,7 @@
   "name": "research-unknown-service-enrichment",
   "title": "研究未识别服务通用指纹增强",
   "description": "研究 unknown、tcpwrapped 和空服务名的安全增强路径、请求预算、证据与误报契约，不直接实施宽泛主动探测。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/research-unknown-service-enrichment",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -22,5 +22,12 @@
   "parent": "07-29-triage-bug-record",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "fixed_point": "63a6c899d7258e1ebc9adc94c9c800bd19fe119c",
+    "source_of_truth": {
+      "type": "trellis-prd",
+      "path": ".trellis/tasks/07-29-research-unknown-service-enrichment/prd.md",
+      "origin": "bug记录.md"
+    }
+  }
 }

@@ -1,2 +1,3 @@
 {"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
 {"file": ".trellis/spec/backend/scan-runtime-contracts.md", "reason": "扫描运行时安全边界"}
+{"file": ".trellis/tasks/07-29-research-unknown-service-enrichment/research/unknown-service-enrichment.md", "reason": "核验 PRD 验收标准、证据来源和不实施结论"}
