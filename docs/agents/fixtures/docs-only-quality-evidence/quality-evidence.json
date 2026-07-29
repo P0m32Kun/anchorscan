@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T00:00:00+08:00",
+    "summary": "用户批准 AI 编码工作流加固计划。",
+    "result": "passed"
+  },
+  "tdd": {
+    "required": false,
+    "red": {"command": null, "result": "not_applicable", "summary": "docs-only fixture"},
+    "green": {"command": null, "result": "not_applicable", "summary": "docs-only fixture"}
+  },
+  "verification": [
+    {"command": "node scripts/check_markdown_links.mjs", "result": "passed", "at": "2026-07-29T00:00:00+08:00"}
+  ],
+  "reviews": {
+    "standards": {"result": "unobserved", "artifact": null},
+    "spec": {"result": "unobserved", "artifact": null}
+  },
+  "delivery": {"branch": "codex/reconcile-workflow-authority", "commit": null, "pr": null, "merged_at": null}
+}
