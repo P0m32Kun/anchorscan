@@ -68,3 +68,24 @@ Packaged mandatory rule sidecars, made scan preparation and doctor fail closed, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 修复达梦检测超时与驱动 Panic 隔离
+
+**Date**: 2026-07-29
+**Task**: 修复达梦检测超时与驱动 Panic 隔离
+**Branch**: `main`
+
+### Summary
+
+将新生成的 Dameng timeout 默认值设为 15s；在 checker 调用边界隔离第三方驱动 panic，并将 panic/deadline 保留为可诊断的 DetectionCheck 失败。补齐 tools、app/store 与 config 回归测试，Docker fixture 验证延期。已通过 focused tests、go vet 和 make pr-check。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b7c94f8` | (see git log) |
+
+### Status
+
+[OK] **Completed**
