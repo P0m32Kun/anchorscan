@@ -49,7 +49,6 @@ package: web
 	mkdir -p $(PACKAGE_DIR)/config $(PACKAGE_DIR)/docs $(PACKAGE_DIR)/tools/docx-render/templates
 	go build $(BUILD_FLAGS) -ldflags="$(VERSION_LDFLAGS)" -o $(PACKAGE_DIR)/$(BINARY) $(CMD)
 	cp $(addprefix config/,$(RUNTIME_CONFIG)) $(PACKAGE_DIR)/config/
-	cp -R config/nuclei-templates $(PACKAGE_DIR)/config/
 	@for file in $(RUNTIME_CONFIG); do \
 		test -s "$(PACKAGE_DIR)/config/$$file" || { echo "missing required runtime config: $$file" >&2; exit 1; }; \
 	done

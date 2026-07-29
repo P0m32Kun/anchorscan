@@ -30,19 +30,6 @@ func writePackagedConfig(t *testing.T, fixture prepareScanFixture) string {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"ssh-mini-brute.yaml", "payloads/passwords-mini.txt", "payloads/users-mini.txt"} {
-		data, err := os.ReadFile(filepath.Join("..", "..", "config", "nuclei-templates", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		destination := filepath.Join(configDir, "nuclei-templates", name)
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(destination, data, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 	return configPath
 }
 
@@ -118,8 +105,19 @@ func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 	if !runner.hasArgs(prepared.Options.Tools.Nmap, "--script", "ssh2-enum-algos,ssh-hostkey") {
 		t.Fatalf("expected configured SSH NSE invocation, commands=%#v", runner.commands)
 	}
-	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-t", filepath.Join(filepath.Dir(req.ConfigPath), "nuclei-templates", "ssh-mini-brute.yaml"), "-target", "192.0.2.1:22") {
-		t.Fatalf("expected configured SSH nuclei template invocation, commands=%#v", runner.commands)
+	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-tags", "ssh", "-target", "192.0.2.1:22") {
+		t.Fatalf("expected SSH nuclei -tags invocation, commands=%#v", runner.commands)
+	}
+	// SSH must run via -tags (never an in-repo -t template) and exclude default-login.
+	var nucleiCmd []string
+	for _, cmd := range runner.commands {
+		if len(cmd) > 0 && cmd[0] == prepared.Options.Tools.Nuclei {
+			nucleiCmd = cmd
+			break
+		}
+	}
+	if nucleiCmd != nil && !strings.Contains(strings.Join(nucleiCmd, " "), "default-login") {
+		t.Fatalf("expected nuclei -etags to exclude default-login, command=%#v", nucleiCmd)
 	}
 }
 
