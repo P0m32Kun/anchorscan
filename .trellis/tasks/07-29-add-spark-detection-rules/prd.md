@@ -12,6 +12,11 @@
 - 明确是否包含默认登录、未授权访问或其他主动检查；遵守现有安全限制。
 - 无匹配服务继续记录 `no_matching_rule`，匹配服务按现有 DetectionCheck 契约记录状态。
 
+## Dependencies
+
+- 先完成 `07-29-remove-default-nuclei-template-rules`：默认扫描必须已拒绝 `template:`，Spark 规则才能只依赖 tags 契约实现。
+- 不依赖 SSL/TLS 覆盖调查；其结论不得阻塞 Spark Web UI/API 的独立、低风险 tags 路由。
+
 ## Non-goals
 
 - 不实现通用未知服务识别。
