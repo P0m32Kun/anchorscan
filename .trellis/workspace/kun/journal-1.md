@@ -202,3 +202,40 @@ Merged Web Console Shanghai time formatting; archived completed task.
 ### Status
 
 [OK] **Completed**
+
+
+## Session 10: 完成未识别服务通用增强研究
+
+**Date**: 2026-07-30
+**Task**: 完成未识别服务通用增强研究
+**Branch**: `codex/research-unknown-service-enrichment`
+
+### Summary
+
+完成证据化研究，拒绝通用 unknown/tcpwrapped fallback，并归档研究任务。
+
+### Main Changes
+
+- 新增带一手资料与本机版本证据的研究结论，保留现有 Dameng 专用例外。
+- 将通用探测准入、预算、证据与审计约束写入扫描运行时契约。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9de20a4` | (see git log) |
+| `22dea75` | (see git log) |
+| `9317291` | (see git log) |
+
+### Testing
+
+- [OK] go test ./internal/config ./internal/app ./internal/fingerprint/... ./internal/vuln/...
+- [OK] git diff --check；独立 standards 与 Spec/AC 审查通过。
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- 推进 07-29-research-ssl-tls-coverage，再回到父任务收敛最终规划。
