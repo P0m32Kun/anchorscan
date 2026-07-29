@@ -25,3 +25,4 @@ AnchorScan backend code lives in `cmd/anchorscan/` and `internal/`. Preserve the
 | [Logging](./logging-guidelines.md) | recording operational failures |
 | [Quality](./quality-guidelines.md) | selecting tests and review gates |
 | [Runtime contracts](./scan-runtime-contracts.md) | scan/report compatibility |
+| [Report filter contracts](./report-filter-contracts.md) | shared report filtering, service facets, and query semantics |

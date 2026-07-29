@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -11,16 +12,48 @@ import (
 )
 
 type reportFilters struct {
-	IP         string
-	Port       string
-	Service    string
-	Keyword    string
-	Severity   string
-	Severities []string
-	Source     string
+	IP                  string
+	Port                string
+	Service             string
+	ExcludeUnidentified bool
+	Keyword             string
+	Severity            string
+	Severities          []string
+	Source              string
 }
 
 var supportedSeverities = []string{"critical", "high", "medium", "low", "info"}
+
+type serviceFacet struct {
+	RawValue string `json:"raw_value"`
+	Label    string `json:"label"`
+	Count    int    `json:"count"`
+}
+
+func (filters reportFilters) withoutServiceFilters() reportFilters {
+	filters.Service = ""
+	filters.ExcludeUnidentified = false
+	return filters
+}
+
+func buildServiceFacets(items []fingerprint.ServiceFingerprint) []serviceFacet {
+	counts := make(map[string]int)
+	for _, item := range items {
+		counts[item.Service]++
+	}
+	facets := make([]serviceFacet, 0, len(counts))
+	for rawValue, count := range counts {
+		label := rawValue
+		if rawValue == "" {
+			label = "未识别（空）"
+		}
+		facets = append(facets, serviceFacet{RawValue: rawValue, Label: label, Count: count})
+	}
+	sort.Slice(facets, func(i, j int) bool {
+		return facets[i].RawValue < facets[j].RawValue
+	})
+	return facets
+}
 
 func filterFingerprints(items []fingerprint.ServiceFingerprint, filters reportFilters) []fingerprint.ServiceFingerprint {
 	var out []fingerprint.ServiceFingerprint
@@ -29,6 +62,9 @@ func filterFingerprints(items []fingerprint.ServiceFingerprint, filters reportFi
 			continue
 		}
 		if filters.Service != "" && item.Service != filters.Service {
+			continue
+		}
+		if filters.ExcludeUnidentified && isUnidentifiedService(item.Service) {
 			continue
 		}
 		if filters.Port != "" {
@@ -52,6 +88,9 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 			continue
 		}
 		if filters.Service != "" && !findingMatchesService(item, fps, filters.Service) {
+			continue
+		}
+		if filters.ExcludeUnidentified && findingMatchesUnidentifiedService(item, fps) {
 			continue
 		}
 		if len(filters.Severities) > 0 && !containsValue(filters.Severities, item.Severity) {
@@ -126,13 +165,48 @@ func containsValue(items []string, value string) bool {
 	return false
 }
 
-func findingMatchesService(item report.Finding, fps []fingerprint.ServiceFingerprint, service string) bool {
+func findingMatchesUnidentifiedService(item report.Finding, fps []fingerprint.ServiceFingerprint) bool {
 	for _, fp := range fps {
-		if fp.IP == item.IP && fp.Port == item.Port && fp.Protocol == item.Protocol && fp.Service == service {
+		if findingMatchesFingerprint(item, fp, fps) && isUnidentifiedService(fp.Service) {
 			return true
 		}
 	}
 	return false
+}
+
+func isUnidentifiedService(service string) bool {
+	return service == "" || service == "tcpwrapped" || service == "unknown"
+}
+
+func findingMatchesService(item report.Finding, fps []fingerprint.ServiceFingerprint, service string) bool {
+	for _, fp := range fps {
+		if findingMatchesFingerprint(item, fp, fps) && fp.Service == service {
+			return true
+		}
+	}
+	return false
+}
+
+// findingMatchesFingerprint follows report.Build's fallback association for a
+// protocol-less Finding: it attaches only when the port has one protocol.
+func findingMatchesFingerprint(item report.Finding, candidate fingerprint.ServiceFingerprint, fps []fingerprint.ServiceFingerprint) bool {
+	if item.IP != candidate.IP || item.Port != candidate.Port {
+		return false
+	}
+	if item.Protocol == candidate.Protocol {
+		return true
+	}
+	if item.Protocol != "" || candidate.Protocol == "" {
+		return false
+	}
+
+	protocols := map[string]struct{}{}
+	for _, fp := range fps {
+		if fp.IP == item.IP && fp.Port == item.Port {
+			protocols[fp.Protocol] = struct{}{}
+		}
+	}
+	return len(protocols) == 1
 }
 
 func fingerprintMatchesKeyword(item fingerprint.ServiceFingerprint, keyword string) bool {

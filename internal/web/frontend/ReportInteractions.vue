@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 type Panel = 'severity' | 'service' | 'source';
+type ServiceFacet = { raw_value: string; label: string; count: number };
 type CommandResponse = {
   commands?: Array<{ full_command?: string; target_file?: string; tool_args?: string } | string>;
   full_command?: string;
@@ -23,6 +24,11 @@ const service = ref(current.searchParams.get('service') || '');
 const source = ref(current.searchParams.get('source') || '');
 const view = ref(['hosts', 'vulnerabilities'].includes(current.searchParams.get('view') || '') ? current.searchParams.get('view') || 'ports' : 'ports');
 const severities = ref([...new Set(current.searchParams.getAll('severity').flatMap((item) => item.split(',')))].filter((item) => supportedSeverities.includes(item)));
+const props = defineProps<{ serviceFacets?: ServiceFacet[] }>();
+const serviceFacets = computed(() => props.serviceFacets || []);
+const selectableServiceFacets = computed(() => serviceFacets.value.filter((facet) => facet.raw_value !== ''));
+const emptyServiceFacet = computed(() => serviceFacets.value.find((facet) => facet.raw_value === ''));
+const excludeUnidentified = ref(current.searchParams.get('exclude_unidentified') === '1');
 const commandTitle = ref('生成检测命令');
 const commandMessage = ref('');
 const commandBody = ref('');
@@ -34,6 +40,7 @@ const activeFilters = computed(() => {
   if (value) filters.push({ key: 'search', value, label: current.searchParams.get('ip') ? 'IP' : '关键词' });
   if (port.value.trim()) filters.push({ key: 'port', value: port.value.trim(), label: '端口' });
   if (service.value.trim()) filters.push({ key: 'service', value: service.value.trim(), label: '服务' });
+  if (excludeUnidentified.value) filters.push({ key: 'exclude_unidentified', value: '1', label: '排除未识别服务' });
   if (source.value.trim()) filters.push({ key: 'source', value: source.value.trim(), label: '数据源' });
   for (const severity of severities.value) filters.push({ key: 'severity', value: severity, label: '级别' });
   if (view.value !== 'ports') filters.push({ key: 'view', value: view.value === 'hosts' ? '主机聚合' : '漏洞聚合', label: '视图' });
@@ -50,11 +57,12 @@ function isIPFilter(value: string) {
 
 function applyFilters() {
   const next = new URL(window.location.href);
-  for (const key of ['ip', 'q', 'port', 'service', 'source', 'view', 'severity', 'assets_page', 'findings_page']) next.searchParams.delete(key);
+  for (const key of ['ip', 'q', 'port', 'service', 'exclude_unidentified', 'source', 'view', 'severity', 'assets_page', 'findings_page']) next.searchParams.delete(key);
   const search = searchText.value.trim();
   if (search) next.searchParams.set(isIPFilter(search) ? 'ip' : 'q', search);
   if (port.value.trim()) next.searchParams.set('port', port.value.trim());
   if (service.value.trim()) next.searchParams.set('service', service.value.trim());
+  if (excludeUnidentified.value) next.searchParams.set('exclude_unidentified', '1');
   if (source.value.trim()) next.searchParams.set('source', source.value.trim());
   if (view.value !== 'ports') next.searchParams.set('view', view.value);
   for (const severity of severities.value) next.searchParams.append('severity', severity);
@@ -89,6 +97,7 @@ function removeFilter(key: string, value: string) {
   if (key === 'search') searchText.value = '';
   if (key === 'port') port.value = '';
   if (key === 'service') service.value = '';
+  if (key === 'exclude_unidentified') excludeUnidentified.value = false;
   if (key === 'source') source.value = '';
   if (key === 'severity') severities.value = severities.value.filter((item) => item !== value);
   if (key === 'view') view.value = 'ports';
@@ -265,7 +274,14 @@ onBeforeUnmount(() => {
           <div v-show="openPanel === 'service'" id="report-service-filter" class="popover-panel" role="dialog" aria-label="端口与服务过滤">
             <div class="popover-panel-body popover-form-group">
               <label>特定端口<input v-model="port" inputmode="numeric" placeholder="例如: 80"></label>
-              <label>服务精确匹配<input v-model="service" placeholder="例如: redis"></label>
+              <label>服务精确匹配
+                <select v-model="service">
+                  <option value="">全部服务</option>
+                  <option v-for="facet in selectableServiceFacets" :key="facet.raw_value" :value="facet.raw_value">{{ facet.label }} ({{ facet.count }})</option>
+                </select>
+                <span v-if="emptyServiceFacet" class="meta-line">{{ emptyServiceFacet.label }} ({{ emptyServiceFacet.count }})</span>
+              </label>
+              <label class="popover-checkbox-item"><input v-model="excludeUnidentified" type="checkbox">一键排除未识别服务</label>
             </div>
             <div class="popover-panel-footer"><button class="button button-primary" type="button" @click="applyFilters">应用</button></div>
           </div>

@@ -62,7 +62,13 @@ function mountWorkbench() {
 function mountReportInteractions() {
   const mountPoint = document.querySelector<HTMLElement>('[data-report-interactions]');
   if (!mountPoint) return;
-  createApp(ReportInteractions).mount(mountPoint);
+  let serviceFacets: unknown = [];
+  try {
+    serviceFacets = JSON.parse(mountPoint.dataset.serviceFacets || '[]');
+  } catch {
+    // The server always emits this JSON; retain an empty list if it is malformed.
+  }
+  createApp(ReportInteractions, { serviceFacets }).mount(mountPoint);
   mountPoint.dataset.mounted = 'true';
 }
 

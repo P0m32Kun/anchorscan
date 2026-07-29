@@ -3,7 +3,7 @@
   "name": "enhance-report-service-filters",
   "title": "增强报告服务筛选与未识别服务排除",
   "description": "展示服务类型及数量，保留完整事实，并提供一键排除 tcpwrapped、unknown 和空服务名。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/enhance-report-service-filters",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -22,5 +22,11 @@
   "parent": "07-29-triage-bug-record",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "fixed_point": "58aa4515e6401d489fa6b3b10c6bbfe5c89b181c",
+    "source_of_truth": {
+      "type": "trellis-prd",
+      "prd": ".trellis/tasks/07-29-enhance-report-service-filters/prd.md"
+    }
+  }
 }

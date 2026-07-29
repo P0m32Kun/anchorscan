@@ -380,7 +380,11 @@ try {
   await page.getByRole('button', { name: /导入/ }).click();
   await page.waitForURL(/\/runs\/run-/);
   const runID = page.url().split('/').pop();
-  await page.goto(`${baseURL}/reports/${runID}`);
+  await seedRun(`INSERT INTO fingerprints (run_id, ip, port, service, product, version, normalized, is_web, url, protocol, cpe, extrainfo, tunnel) VALUES
+    ('${runID}', '192.0.2.252', 81, 'tcpwrapped', '', '', 'tcpwrapped', 0, '', 'tcp', '', '', ''),
+    ('${runID}', '192.0.2.253', 82, 'unknown', '', '', 'unknown', 0, '', 'tcp', '', '', ''),
+    ('${runID}', '192.0.2.254', 83, '', '', '', '', 0, '', 'tcp', '', '', '');`);
+  await page.goto(`${baseURL}/reports/${runID}?view=hosts&assets_page=2&findings_page=2`);
   await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
   const reportOutline = page.locator('.report-outline');
   await assert.doesNotReject(() => reportOutline.waitFor());
@@ -395,6 +399,27 @@ try {
   await assert.doesNotReject(() => page.getByRole('dialog', { name: '端口与服务过滤' }).waitFor());
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => page.getByRole('dialog', { name: '端口与服务过滤' }).waitFor({ state: 'hidden' }));
+  await serviceFilter.click();
+  assert.equal(await page.getByRole('option', { name: 'tcpwrapped (1)' }).count(), 1, 'tcpwrapped facet should show its count');
+  assert.equal(await page.getByRole('option', { name: '未识别（空） (1)' }).count(), 0, 'the empty-service facet must not be a selectable all-services option');
+  await assert.doesNotReject(() => page.getByText('未识别（空） (1)', { exact: true }).waitFor());
+  await page.getByRole('checkbox', { name: '一键排除未识别服务' }).check();
+  await page.getByRole('button', { name: '应用', exact: true }).click();
+  await page.waitForURL((url) =>
+    url.searchParams.get('exclude_unidentified') === '1'
+      && url.searchParams.get('view') === 'hosts'
+      && !url.searchParams.has('assets_page')
+      && !url.searchParams.has('findings_page'),
+  );
+  await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
+  await page.getByRole('button', { name: '移除排除未识别服务 1' }).click();
+  await page.waitForURL((url) =>
+    !url.searchParams.has('exclude_unidentified')
+      && url.searchParams.get('view') === 'hosts'
+      && !url.searchParams.has('assets_page')
+      && !url.searchParams.has('findings_page'),
+  );
+  await page.locator('[data-report-interactions][data-mounted="true"]').waitFor();
   await serviceFilter.click();
   await page.getByRole('textbox', { name: '特定端口' }).fill('80');
   await page.getByRole('button', { name: '应用', exact: true }).click();

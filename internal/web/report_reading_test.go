@@ -193,3 +193,41 @@ func TestFilteredChecksMatchFilteredFingerprints(t *testing.T) {
 		t.Fatalf("FilteredChecks = %#v", reading.FilteredChecks)
 	}
 }
+
+func TestBuildRunReportReadingExcludesUnidentifiedAssociatedFacts(t *testing.T) {
+	fps := []fingerprint.ServiceFingerprint{
+		{IP: "10.0.0.1", Port: 80, Service: "tcpwrapped", Protocol: "tcp"},
+		{IP: "10.0.0.2", Port: 6379, Service: "redis", Protocol: "tcp"},
+	}
+	findings := []report.Finding{
+		{IP: "10.0.0.1", Port: 80, Protocol: "tcp", ID: "wrapped"},
+		{IP: "10.0.0.2", Port: 6379, Protocol: "tcp", ID: "redis"},
+	}
+	checks := []report.DetectionCheck{
+		{IP: "10.0.0.1", Port: 80, Protocol: "tcp", Engine: "nse", Status: "completed"},
+		{IP: "10.0.0.2", Port: 6379, Protocol: "tcp", Engine: "nuclei", Status: "completed"},
+	}
+
+	q := url.Values{"exclude_unidentified": {"1"}}
+	reading := buildRunReportReading(runReportReadingInput{
+		Run:             store.ScanRun{RunID: "r", Status: "completed"},
+		Fingerprints:    fps,
+		Findings:        findings,
+		DetectionChecks: checks,
+		Query:           q,
+		Catalog:         &knowledgebase.Catalog{},
+	})
+
+	if len(reading.FilteredFingerprints) != 1 || reading.FilteredFingerprints[0].Service != "redis" {
+		t.Fatalf("FilteredFingerprints = %#v", reading.FilteredFingerprints)
+	}
+	if len(reading.FilteredFindings) != 1 || reading.FilteredFindings[0].ID != "redis" {
+		t.Fatalf("FilteredFindings = %#v", reading.FilteredFindings)
+	}
+	if len(reading.FilteredChecks) != 1 || reading.FilteredChecks[0].Engine != "nuclei" {
+		t.Fatalf("FilteredChecks = %#v", reading.FilteredChecks)
+	}
+	if len(reading.ServiceFacets) != 2 || reading.ServiceFacets[0].RawValue != "redis" || reading.ServiceFacets[1].RawValue != "tcpwrapped" {
+		t.Fatalf("ServiceFacets = %#v", reading.ServiceFacets)
+	}
+}
