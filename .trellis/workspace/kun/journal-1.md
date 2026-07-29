@@ -89,3 +89,25 @@ Packaged mandatory rule sidecars, made scan preparation and doctor fail closed, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: 归档过时 SSH Nuclei 修复计划
+
+**Date**: 2026-07-29
+**Task**: 归档过时 SSH Nuclei 修复计划
+**Branch**: `codex/repair-ssh-nuclei-runtime-failure`
+
+### Summary
+
+确认当前 checkout 不含项目内置 ssh-mini-brute.yaml；Ticket 02 已按用户选择不实施，历史 Run 与检测事实未修改，并已归档任务。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ba76288` | (see git log) |
+| `820f12d` | (see git log) |
+
+### Status
+
+[OK] **Completed**
