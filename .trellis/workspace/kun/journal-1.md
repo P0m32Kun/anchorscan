@@ -181,3 +181,24 @@ Implemented and merged report service facets plus exclusion of unidentified serv
 ### Status
 
 [OK] **Completed**
+
+
+## Session 9: Fix console Shanghai time
+
+**Date**: 2026-07-29
+**Task**: Fix console Shanghai time
+**Branch**: `codex/fix-console-shanghai-time`
+
+### Summary
+
+Merged Web Console Shanghai time formatting; archived completed task.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0e202b4` | (see git log) |
+
+### Status
+
+[OK] **Completed**

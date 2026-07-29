@@ -17,5 +17,10 @@
     {"command": "make pr-check", "result": "passed"}
   ],
   "reviews": {"standards": {"agent": "reviewer", "result": "passed"}, "spec": {"agent": "reviewer", "result": "passed"}},
+  "delivery": {
+    "branch": "codex/fix-console-shanghai-time",
+    "commit": "0e202b45106cedb1e0112df408746f30be43452a",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/20"
+  },
   "notes": "未运行 make e2e：本变更只影响前端文本投影，不涉及真实扫描器协作。"
 }
