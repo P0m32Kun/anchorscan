@@ -3,7 +3,7 @@
   "name": "fix-console-shanghai-time",
   "title": "统一 Web Console 上海时区显示",
   "description": "保持存储与 API 为 UTC，在扫描详情和单工具 Console 统一显示 Asia/Shanghai 毫秒时间。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/fix-console-shanghai-time",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -22,5 +22,11 @@
   "parent": "07-29-triage-bug-record",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "fixed_point": "58f2fbb2e6392a70d79481d7b2b63ac9d2dcfb6a",
+    "source_of_truth": {
+      "type": "trellis-prd",
+      "prd": ".trellis/tasks/07-29-fix-console-shanghai-time/prd.md"
+    }
+  }
 }

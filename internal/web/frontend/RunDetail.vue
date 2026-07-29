@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { formatConsoleTime } from './console-time';
 
 type ScanEvent = { id: number; time: string; level: string; stage: string; message: string };
 type StatusResponse = { status: string; detection_checks: Record<string, number> };
@@ -36,7 +37,7 @@ let hasMoreEvents = false;
 
 const active = computed(() => status.value === 'running');
 const latestEvent = computed(() => events.value.at(-1));
-const output = computed(() => events.value.map((event) => `[${event.time}] [${event.level || 'info'}] ${event.stage || 'engine'}: ${event.message}`).join('\n'));
+const output = computed(() => events.value.map((event) => `[${formatConsoleTime(event.time)}] [${event.level || 'info'}] ${event.stage || 'engine'}: ${event.message}`).join('\n'));
 const progress = computed(() => {
   const event = [...events.value].reverse().find(({ stage }) => stage.toLowerCase() === 'progress');
   const match = event?.message.match(/(\d+)\s*\/\s*(\d+)/);

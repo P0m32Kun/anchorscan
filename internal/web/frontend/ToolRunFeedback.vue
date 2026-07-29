@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { formatConsoleTime } from './console-time';
 
 type ScanEvent = { id: number; time: string; level: string; stage: string; message: string };
 
@@ -29,7 +30,7 @@ async function poll(run: string) {
     if (!eventsResult.ok || !statusResult.ok) throw new Error('poll failed');
     const newEvents = await eventsResult.json() as ScanEvent[];
     if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
-    output.value = events.value.map((event) => `[${event.time}] [${event.level || 'info'}] ${event.stage || 'tool'}: ${event.message}`).join('\n') || '工具已启动，等待输出…';
+    output.value = events.value.map((event) => `[${formatConsoleTime(event.time)}] [${event.level || 'info'}] ${event.stage || 'tool'}: ${event.message}`).join('\n') || '工具已启动，等待输出…';
     const status = (await statusResult.json() as { status: string }).status;
     const hasMoreEvents = newEvents.length === eventPageSize;
     if (status !== 'running' && !hasMoreEvents) {
