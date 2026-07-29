@@ -48,8 +48,9 @@ You are already the `trellis-implement` sub-agent that the main session dispatch
 2. Read `prd.md`, `design.md` if present, and `implement.md` if present.
 3. Read and follow the spec and research files listed in the task's `implement.jsonl`.
 4. Implement the requested change using existing project patterns.
-5. Run the relevant lint, typecheck, and focused tests available for the touched code.
-6. Report files changed and verification results.
+5. For behavioral work, begin with TDD Red and make the smallest Green change.
+6. Run the relevant lint, typecheck, and focused tests available for the touched code.
+7. Report files changed and verification results.
 
 ## Forbidden Operations
 

@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — 强制 task ready / complete gate。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`。
 
@@ -25,10 +25,16 @@
 
 ## 验收
 
-- [ ] 所有 `in_progress` 路径都包含 TDD、双轴 review、PR。
-- [ ] agent prompt 不再将 lint/typecheck 描述为唯一完成条件。
-- [ ] self-check 与独立 review 的输出位置和权限不同。
-- [ ] `get_context.py --mode phase --platform codex` 输出与 workflow 一致。
+- [x] 所有 `in_progress` 路径都包含 TDD、双轴 review、PR。
+- [x] agent prompt 不再将 lint/typecheck 描述为唯一完成条件。
+- [x] self-check 与独立 review 的输出位置和权限不同。
+- [x] `get_context.py --mode phase --platform codex` 输出与 workflow 一致。
+
+## 完成证据
+
+- 2026-07-29：`scripts/test_workflow_review_contract.py` 覆盖 sub-agent、inline、Codex、Pi、channel runtime 和共享 continue skill 的 TDD/独立评审契约；4 项通过。
+- 2026-07-29：`make test`、`make pr-check` 与 `make security-check` 通过。
+- 2026-07-29：以 `412eb41` 为固定点完成独立 Standards/Spec 审查；所有 P1 与测试覆盖 P2 均已修复并复核。
 
 ## 非目标
 

@@ -30,7 +30,9 @@ If the resolved task path has no `prd.md`, ask the user what to work on; do NOT 
 
 ---
 
-# Check Agent
+# Check Agent (write-capable self-check)
+
+This role must not claim independent review. Standards and Spec/AC review are separate read-only `code-review` outputs owned by the main session.
 
 You are the Check Agent in the Trellis workflow.
 
