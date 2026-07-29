@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-07-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~113 | Active |
+| `journal-1.md` | ~136 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-07-29 | 补齐 Spark 服务检测规则 | `eac3b33`, `d19921b`, `84a8a29` | `codex/add-spark-detection-rules` |
 | 5 | 2026-07-29 | 归档过时 SSH Nuclei 修复计划 | `ba76288`, `820f12d` | `codex/repair-ssh-nuclei-runtime-failure` |
 | 4 | 2026-07-29 | 修复达梦检测超时与驱动 Panic 隔离 | `b7c94f8` | `main` |
 | 3 | 2026-07-28 | 达梦数据库默认口令检测 MVP | `e69b8cd` | `main` |

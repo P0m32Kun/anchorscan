@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/07-29-sync-merged-task-metadata/prd.md","reason":"Defines the authorized Spark-only metadata synchronization boundary and acceptance criteria."}
+{"file":".trellis/tasks/07-29-add-spark-detection-rules/task.json","reason":"Current mainline Spark task metadata to archive after reconciling PR #13 delivery facts."}
+{"file":".trellis/tasks/07-29-add-spark-detection-rules/quality-evidence.json","reason":"Current mainline evidence requiring PR #13 merge facts before archival."}
+{"file":"docs/plans/next-session-backlog.md","reason":"Durable backlog document to add with Spark-only completion wording."}
