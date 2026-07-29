@@ -56,7 +56,7 @@ func TestBuildRunProvenanceHashesRuleFiles(t *testing.T) {
 		RulePaths: []string{nsePath, tagPath},
 		NSERules:  map[string][]string{"ssh": {"ssh-brute"}},
 		TagRules: []vuln.TagRule{
-			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, Template: filepath.Join(dir, "ssh-mini.yaml")},
+			{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}},
 		},
 	}, time.Now(), time.Now(), nil)
 

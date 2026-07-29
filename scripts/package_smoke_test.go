@@ -70,7 +70,7 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 			t.Errorf("packaged runtime resource %q: %v", relativePath, err)
 		}
 	}
-	for _, relativePath := range []string{"config/default.yaml", "data", "reports"} {
+	for _, relativePath := range []string{"config/default.yaml", "config/nuclei-templates", "nuclei-templates", "data", "reports"} {
 		if _, err := os.Stat(filepath.Join(packageDir, filepath.FromSlash(relativePath))); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("package must not include local path %q: %v", relativePath, err)
 		}

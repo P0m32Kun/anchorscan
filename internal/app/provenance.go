@@ -85,7 +85,6 @@ func BuildRunProvenance(opts ProvenanceOptions, startedAt, finishedAt time.Time,
 	}
 	if len(opts.TagRules) > 0 {
 		tags := make(map[string][]string, len(opts.TagRules))
-		var templates []string
 		for _, rule := range opts.TagRules {
 			if len(rule.NucleiTags) > 0 {
 				key := rule.Name
@@ -94,14 +93,10 @@ func BuildRunProvenance(opts ProvenanceOptions, startedAt, finishedAt time.Time,
 				}
 				tags[key] = append([]string(nil), rule.NucleiTags...)
 			}
-			if rule.Template != "" {
-				templates = append(templates, rule.Template)
-			}
 		}
 		if len(tags) > 0 {
 			p.Tags = tags
 		}
-		p.TemplateIDs = append(p.TemplateIDs, templates...)
 	}
 	if len(opts.Tags) > 0 {
 		if p.Tags == nil {

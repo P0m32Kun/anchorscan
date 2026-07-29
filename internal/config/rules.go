@@ -34,17 +34,20 @@ func LoadTagRules(path string) ([]vuln.TagRule, error) {
 	if err != nil {
 		return nil, err
 	}
+	var rawRules []map[string]any
+	if err := yaml.Unmarshal(data, &rawRules); err != nil {
+		return nil, err
+	}
+	for _, rawRule := range rawRules {
+		if _, ok := rawRule["template"]; ok {
+			return nil, fmt.Errorf("tag rules file %q uses deprecated template; migrate to nuclei_tags", path)
+		}
+	}
 	if err := yaml.Unmarshal(data, &rules); err != nil {
 		return nil, err
 	}
 	if len(rules) == 0 {
 		return nil, fmt.Errorf("tag rules file %q: %w", path, ErrEmptyRuleFile)
-	}
-	base := filepath.Dir(path)
-	for i := range rules {
-		if rules[i].Template != "" && !filepath.IsAbs(rules[i].Template) {
-			rules[i].Template = filepath.Join(base, rules[i].Template)
-		}
 	}
 	return rules, nil
 }

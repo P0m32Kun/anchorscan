@@ -210,9 +210,8 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		match := vuln.MatchNucleiTags(fp, vuln.HTTPResult{URL: fp.URL, Tech: httpResult.Tech}, opts.TagRules)
 		switch {
 		// MatchNucleiTags returns a zero-value MatchResult (empty Address) when no
-		// rule matches. A template-based match carries an empty Tags slice but a
-		// non-empty Address and Template, so "no match" must key on Address — using
-		// len(Tags)==0 here would wrongly skip every template-based rule.
+		// rule matches. Address remains the match sentinel because tags may be
+		// intentionally empty in a user-provided rule.
 		case match.Address == "":
 			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
@@ -234,15 +233,9 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			var out []byte
 			var err error
 			var artifactKey string
-			if match.Template != "" {
-				progress.Emit("info", "nuclei", "nuclei %s template=%s", match.Address, match.Template)
-				out, err = tools.RunNucleiTemplate(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Template, opts.ExtraArgs.Nuclei)
-				artifactKey = "template"
-			} else {
-				progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
-				out, err = tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
-				artifactKey = strings.Join(match.Tags, ",")
-			}
+			progress.Emit("info", "nuclei", "nuclei %s tags=%v", match.Address, match.Tags)
+			out, err = tools.RunNuclei(toolCtx, runner, opts.Tools.Nuclei, match.Address, match.Tags, match.ExcludeTags, opts.ExtraArgs.Nuclei)
+			artifactKey = strings.Join(match.Tags, ",")
 			operatorCanceled := isOperatorCanceled(toolCtx)
 			cancel()
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), artifactKey)+".jsonl", out); writeErr != nil {

@@ -33,7 +33,7 @@
 ## Requirements
 
 - 保持当前 PR、Release 和真实工具实验室的测试类型及门禁，不为重复 host 验证另建优化任务；后续只有在运行时长或费用数据证明有必要时再评估。
-- 默认自动扫描规则只允许按 tags 调度 Nuclei，不允许 `service-tags.yaml` 使用 `template:`；后续任务移除默认规则的模板字段、路径解析、执行分支及锁定该能力的测试。
+- 默认自动扫描规则只允许按 tags 调度 Nuclei，不允许 `service-tags.yaml` 使用 `template:`；加载到该字段必须明确失败并提示迁移到 `nuclei_tags`，不得静默忽略。后续任务移除默认规则的模板字段、路径解析、执行分支及锁定该能力的测试。
 - 操作者单工具功能继续允许显式 `--template`；该能力与默认自动扫描规则保持分离。
 - Web Console 固定使用 `Asia/Shanghai`，格式为 `YYYY-MM-DD HH:mm:ss.SSS UTC+8`；扫描详情与单工具实时输出必须一致。
 - 数据库和 API 继续使用 UTC/RFC3339，展示转换不得改变排序、轮询或事件增量语义。
@@ -57,9 +57,10 @@
 - 不把数据库和 API 的 UTC 时间改存为上海时间；时区属于展示契约。
 - 不在本任务内直接启动任何修复子任务；规划完成后需单独获得实施批准。
 
-## Pending product decisions
+## Resolved product decisions
 
-1. SSL/TLS 与 Spark 是合并为覆盖率专项，还是拆为独立交付。
+- 旧自定义 `service-tags.yaml` 出现 `template:` 时，配置加载必须失败并提示迁移到 `nuclei_tags`；不得忽略或仅警告。
+- SSL/TLS 覆盖调查与 Spark 服务规则保持独立：前者只产出覆盖证据与后续建议，后者只实现经验证的 Spark 指纹到 tags 路由。
 
 ## Acceptance Criteria
 

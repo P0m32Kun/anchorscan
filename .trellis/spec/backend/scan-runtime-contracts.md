@@ -293,3 +293,59 @@ _ = p.store.AppendScanEvent(store.ScanEvent{Message: message})
 p.log("%s", message)
 _ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)})
 ```
+
+## Scenario: Default Nuclei tag routing
+
+### 1. Scope / Trigger
+
+- Default scan routing is the path from `config/service-tags.yaml` through `config.LoadTagRules`, `vuln.MatchNucleiTags`, and `app.scanTarget`.
+- This does not apply to the explicit single-tool `ToolRunOptions.Template` path.
+
+### 2. Signatures
+
+- Default rule fields: `nuclei_tags`, optional `exclude_tags`, and `target`.
+- Explicit execution: `anchorscan tool nuclei --template <path>` and `tools.RunNucleiTemplate`.
+
+### 3. Contracts
+
+- Default rules select Nuclei templates only with `nuclei_tags`; `template:` is not a supported rule field.
+- `LoadTagRules` rejects a legacy `template:` field with an error directing the operator to migrate to `nuclei_tags`.
+- Default scan execution calls `tools.RunNuclei`, retaining global `fuzz,dos` exclusions plus rule `exclude_tags`; it never calls `RunNucleiTemplate`.
+- Explicit single-tool template execution remains supported and records its template path as tool-run provenance.
+- Release packages must not include `nuclei-templates` directories.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Default rule contains `template:` | Fail preparation before a run starts; error mentions `nuclei_tags`. |
+| Matching default tag rule | Invoke Nuclei with `-tags` and accumulated `-etags`. |
+| Explicit single-tool template | Invoke Nuclei with `-t <path>`. |
+| Packaged archive | Contains `service-tags.yaml` but no `nuclei-templates` directory. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: an SSH default rule runs `-tags ssh -etags fuzz,dos,default-login`.
+- Base: a tags-only default rule retains its tag and exclusion behavior.
+- Bad: resolving a relative template path from `service-tags.yaml`, or silently ignoring a legacy `template:` field.
+
+### 6. Tests Required
+
+- Loader test rejects `template:` and checks the migration error mentions `nuclei_tags`.
+- Scan test checks a default SSH route passes tags and exclusions, not `-t`.
+- Tool-run test checks an explicit template produces `-t <path>`.
+- Package smoke test rejects `nuclei-templates` directories.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+out, err := tools.RunNucleiTemplate(ctx, runner, nuclei, match.Address, rule.Template, args)
+```
+
+#### Correct
+
+```go
+out, err := tools.RunNuclei(ctx, runner, nuclei, match.Address, match.Tags, match.ExcludeTags, args)
+```

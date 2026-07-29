@@ -216,6 +216,25 @@ func TestRunToolNucleiSavesFindings(t *testing.T) {
 	}
 }
 
+func TestRunToolNucleiTemplateUsesExplicitTemplate(t *testing.T) {
+	st := newToolRunStore(t)
+	var gotArgs []string
+	runner := toolRunnerFunc(func(_ string, args []string) ([]byte, error) {
+		gotArgs = append([]string(nil), args...)
+		return nil, nil
+	})
+
+	if err := RunTool(context.Background(), runner, st, ToolRunOptions{
+		RunID: "run-nuclei-template", Tool: "nuclei", URL: "http://192.0.2.10:8080", Template: "cves/demo.yaml",
+		Tools: ToolPaths{Nuclei: "nuclei"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(gotArgs, " "); got != "-target http://192.0.2.10:8080 -t cves/demo.yaml -jsonl" {
+		t.Fatalf("nuclei args = %q", got)
+	}
+}
+
 func TestRunToolRecordsRawArgsAuditAndWarning(t *testing.T) {
 	st := newToolRunStore(t)
 	runner := toolRunnerFunc(func(_ string, args []string) ([]byte, error) {

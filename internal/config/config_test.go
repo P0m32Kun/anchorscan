@@ -98,6 +98,18 @@ func TestLoadTagRulesParsesSnakeCaseFields(t *testing.T) {
 	}
 }
 
+func TestLoadTagRulesRejectsDeprecatedTemplateField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "service-tags.yaml")
+	if err := os.WriteFile(path, []byte("- name: legacy\n  service: [ssh]\n  template: ssh.yaml\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := LoadTagRules(path)
+	if err == nil || !strings.Contains(err.Error(), "template") || !strings.Contains(err.Error(), "nuclei_tags") {
+		t.Fatalf("LoadTagRules error = %v, want template migration error mentioning nuclei_tags", err)
+	}
+}
+
 func TestLoadParsesProfiles(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")

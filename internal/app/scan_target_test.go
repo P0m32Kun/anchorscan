@@ -125,10 +125,9 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos,ssh-hostkey", "-p", "22") {
 		t.Fatalf("expected nmap NSE invocation with ssh scripts, commands=%#v", runner.commands)
 	}
-	// Nuclei: SSH is invoked by a custom template path in the default rule, but this
-	// test uses a tag-only fallback rule. The command must still use -tags ssh and
-	// exclude both the global fuzz/dos categories and the official default-login
-	// template (which carries the large SSH wordlist), targeting IP:22 with jsonl output.
+	// Default scans select Nuclei templates exclusively through service tags.
+	// SSH excludes the official default-login wordlist while preserving the
+	// default fuzz/dos exclusions, targeting IP:22 with JSONL output.
 	if !runner.hasArgs("/opt/nuclei", "-tags", "ssh", "-etags", "fuzz,dos,default-login", "-target", "192.168.1.10:22", "-jsonl") {
 		t.Fatalf("expected nuclei invocation with ssh tags and default-login etags, commands=%#v", runner.commands)
 	}
@@ -573,48 +572,5 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 	}
 	if c, ok := checkByEngine["dameng"]; !ok {
 		t.Fatalf("expected dameng record, got %#v", c)
-	}
-}
-
-// TestRunScanRunsNucleiTemplateRule locks the template-based nuclei contract: a
-// TagRule with a Template (and no NucleiTags) must run nuclei via
-// RunNucleiTemplate (-t <template>), not be skipped. Previously the nuclei
-// switch keyed "no match" on len(match.Tags)==0, which wrongly skipped every
-// template rule because Tags is empty for template matches.
-func TestRunScanRunsNucleiTemplateRule(t *testing.T) {
-	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
-		[]byte("192.168.1.10 -> [8080]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
-		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
-		[]byte("{" + `"template-id":"tomcat-manager-login","info":{"name":"Tomcat Manager Login","severity":"high"},"matched-at":"http://192.168.1.10:8080"` + "}\n"),
-	}}
-	scanStore := newScanStore(t)
-	opts := ScanOptions{
-		RunID:          "run-tmpl",
-		Targets:        []string{"192.168.1.10"},
-		Ports:          "8080",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
-		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
-		TagRules:       []TagRule{{Name: "tomcat", Service: []string{"http"}, Template: "/templates/tomcat.yaml", Target: "url"}},
-	}
-	if err := RunScan(context.Background(), runner, scanStore, opts); err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-	if !runner.hasArgs("/opt/nuclei", "-t", "/templates/tomcat.yaml", "-target", "http://192.168.1.10:8080", "-jsonl") {
-		t.Fatalf("expected nuclei -t template invocation, commands=%#v", runner.commands)
-	}
-	checks, err := scanStore.ListDetectionChecks("run-tmpl")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var nucleiStatus string
-	for _, c := range checks {
-		if c.Engine == "nuclei" {
-			nucleiStatus = c.Status
-		}
-	}
-	if nucleiStatus != "completed" {
-		t.Fatalf("expected nuclei completed, got %q (checks=%#v)", nucleiStatus, checks)
 	}
 }
