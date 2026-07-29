@@ -5,8 +5,11 @@
 #   service      匹配指纹归一化后的服务名（normalize.go 输出）
 #   product      匹配 nmap/httpx 识别的产品名
 #   tech         匹配 httpx 技术栈（仅 Web 服务）
-#   nuclei_tags  传给 nuclei -tags 的标签
+#   nuclei_tags  传给 nuclei -tags 的标签（默认扫描唯一的 Nuclei 选择方式）
+#   exclude_tags 排除传给 nuclei -exclude-tags 的标签
 #   target       url（Web，用 httpx URL）或 hostport（非 Web，用 IP:端口）
+#
+# 默认规则不支持 template；需要精确模板时，请通过 CLI/Web 单工具 --template 显式执行。
 #
 # 匹配逻辑（nuclei_tags.go:32）：service / product / tech 任一命中即生效。
 # 非服务可靠覆盖的引擎会在 nse.yaml 中缺位，自动跳过，无需在此声明。

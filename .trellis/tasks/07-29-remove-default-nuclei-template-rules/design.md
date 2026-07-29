@@ -6,7 +6,7 @@
 
 ## 兼容性
 
-YAML 解码改为严格字段校验；默认 `service-tags.yaml` 含 `template:` 必须返回迁移错误，说明使用 `nuclei_tags`。tags 路径仍使用 `fuzz,dos` 默认排除与规则 `exclude_tags`。不改历史 artifact/DetectionCheck。
+YAML 加载在解析规则前专门检测 `template:`；出现该字段必须返回迁移错误，说明使用 `nuclei_tags`。保留现有未知历史字段的兼容解码行为，避免把本任务扩大为无关配置迁移。tags 路径仍使用 `fuzz,dos` 默认排除与规则 `exclude_tags`。不改历史 artifact/DetectionCheck。
 
 ## 风险与回滚
 

@@ -20,14 +20,12 @@ type TagRule struct {
 	Tech        []string `yaml:"tech"`
 	NucleiTags  []string `yaml:"nuclei_tags"`
 	ExcludeTags []string `yaml:"exclude_tags"`
-	Template    string   `yaml:"template"`
 	Target      string   `yaml:"target"`
 }
 
 type MatchResult struct {
 	Tags        []string
 	ExcludeTags []string
-	Template    string
 	Target      string
 	Address     string
 }
@@ -46,17 +44,12 @@ func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules [
 				address = http.URL
 			}
 			result := MatchResult{
-				Tags:     append([]string(nil), rule.NucleiTags...),
-				Template: rule.Template,
-				Target:   rule.Target,
-				Address:  address,
+				Tags:    append([]string(nil), rule.NucleiTags...),
+				Target:  rule.Target,
+				Address: address,
 			}
-			// Default fuzz/dos exclusions only apply to tag-based selection.
-			// Template-based rules select an exact file and do not need them.
-			if result.Template == "" {
-				result.ExcludeTags = append([]string(nil), defaultExcludedNucleiTags...)
-				result.ExcludeTags = append(result.ExcludeTags, rule.ExcludeTags...)
-			}
+			result.ExcludeTags = append([]string(nil), defaultExcludedNucleiTags...)
+			result.ExcludeTags = append(result.ExcludeTags, rule.ExcludeTags...)
 			return result
 		}
 	}
