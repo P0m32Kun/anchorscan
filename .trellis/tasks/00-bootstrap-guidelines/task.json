@@ -25,5 +25,7 @@
     ".trellis/spec/frontend/"
   ],
   "notes": "First-time setup task created by trellis init (fullstack project)",
-  "meta": {}
+  "meta": {
+    "bootstrap": true
+  }
 }

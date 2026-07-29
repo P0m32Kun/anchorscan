@@ -44,9 +44,11 @@ Every task has its own directory under `.trellis/tasks/{MM-DD-name}/` holding `t
 ```bash
 # Task lifecycle
 python3 ./.trellis/scripts/task.py create "<title>" [--slug <name>] [--parent <dir>]
+python3 ./.trellis/scripts/task.py validate <name> --ready # verify task is ready to start
 python3 ./.trellis/scripts/task.py start <name>          # set active task (session-scoped when available)
 python3 ./.trellis/scripts/task.py current --source      # show active task and source
 python3 ./.trellis/scripts/task.py finish                # clear active task (triggers after_finish hooks)
+python3 ./.trellis/scripts/task.py validate <name> --complete # verify completion evidence
 python3 ./.trellis/scripts/task.py archive <name>        # move to archive/{year-month}/
 python3 ./.trellis/scripts/task.py list [--mine] [--status <s>]
 python3 ./.trellis/scripts/task.py list-archive
@@ -56,7 +58,7 @@ python3 ./.trellis/scripts/task.py list-archive
 # platforms; the AI curates real spec + research entries during planning when needed.
 python3 ./.trellis/scripts/task.py add-context <name> <action> <file> <reason>
 python3 ./.trellis/scripts/task.py list-context <name> [action]
-python3 ./.trellis/scripts/task.py validate <name>
+python3 ./.trellis/scripts/task.py validate <name>        # validate context file syntax and paths
 
 # Task metadata
 python3 ./.trellis/scripts/task.py set-branch <name> <branch>
@@ -435,9 +437,10 @@ Skip this step. Context is loaded directly by the `trellis-before-dev` skill in 
 
 #### 1.4 Activate task `[required · once]`
 
-After artifact review, flip the task status to `in_progress`:
+After artifact review, verify the ready gate and flip the task status to `in_progress`:
 
 ```bash
+python3 ./.trellis/scripts/task.py validate <task-dir> --ready
 python3 ./.trellis/scripts/task.py start <task-dir>
 ```
 
@@ -638,7 +641,22 @@ The AI drives a batched commit of this task's code changes so `/finish-work` can
 - If the user wants different message wording but accepts the file grouping, edit the message and re-confirm once — but if they reject the grouping, exit to manual mode.
 - The batched plan is one prompt; do not prompt per commit.
 
-#### 3.5 Wrap-up reminder
+#### 3.5 Archive only after the completion gate
+
+Before archiving, complete the authoritative source ticket's acceptance items and record the
+required quality evidence. `archive` reruns this check before changing task status or moving
+files, so a failing gate has no archive side effects.
+
+```bash
+python3 ./.trellis/scripts/task.py validate <task-dir> --complete
+python3 ./.trellis/scripts/task.py archive <task-dir>
+```
+
+`--force --reason "..."` is the only emergency bypass for `start` or `archive`; it records the
+reason in `task.json.meta.gate_overrides` before state changes. Do not use it as a normal planning
+shortcut.
+
+#### 3.6 Wrap-up reminder
 
 After the above, remind the user they can run `/finish-work` to wrap up (archive the task, record the session).
 

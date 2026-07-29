@@ -20,7 +20,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .config import (
@@ -56,6 +56,7 @@ from .task_utils import (
     resolve_task_dir,
     run_task_hooks,
 )
+from .task_context import validate_task_gate
 
 
 # =============================================================================
@@ -547,6 +548,27 @@ def cmd_archive(args: argparse.Namespace) -> int:
 
     dir_name = task_dir.name
     task_json_path = task_dir / FILE_TASK_JSON
+
+    force = getattr(args, "force", False)
+    reason = (getattr(args, "reason", None) or "").strip()
+    if force:
+        if not reason:
+            print(colored("Error: --force requires a non-empty --reason", Colors.RED), file=sys.stderr)
+            return 1
+        data = read_json(task_json_path)
+        if not data:
+            print(colored("Error: task.json is missing or invalid", Colors.RED), file=sys.stderr)
+            return 1
+        meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+        overrides = meta.get("gate_overrides") if isinstance(meta.get("gate_overrides"), list) else []
+        overrides.append({"action": "archive", "reason": reason, "at": datetime.now(timezone.utc).isoformat()})
+        meta["gate_overrides"] = overrides
+        data["meta"] = meta
+        if not write_json(task_json_path, data):
+            print(colored("Error: failed to record forced archive reason", Colors.RED), file=sys.stderr)
+            return 1
+    elif validate_task_gate(task_dir, repo_root, "complete"):
+        return 1
 
     # Update status before archiving
     today = datetime.now().strftime("%Y-%m-%d")
