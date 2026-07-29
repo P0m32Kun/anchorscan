@@ -111,3 +111,26 @@ Packaged mandatory rule sidecars, made scan preparation and doctor fail closed, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: 补齐 Spark 服务检测规则
+
+**Date**: 2026-07-29
+**Task**: 补齐 Spark 服务检测规则
+**Branch**: `codex/add-spark-detection-rules`
+
+### Summary
+
+基于 Apache Spark product/httpx tech 指纹新增安全的 spark Nuclei tags 路由；拒绝 8080 端口猜测，排除默认登录与爆破标签，覆盖 PrepareScan、DetectionCheck 和未知 8080 路径。PR #13 已合并。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `eac3b33` | (see git log) |
+| `d19921b` | (see git log) |
+| `84a8a29` | (see git log) |
+
+### Status
+
+[OK] **Completed**
