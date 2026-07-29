@@ -5,9 +5,16 @@
     "result": "passed",
     "summary": "用户批准执行：仅同步已由 PR #13 合并的 Spark 任务元数据，并保持默认 Nuclei 模板规则任务不变。"
   },
+  "verification": [
+    {"command": "python3 scripts/test_task_gates.py", "result": "passed"},
+    {"command": "node scripts/check_markdown_links.mjs", "result": "passed"},
+    {"command": "git diff --cached --check", "result": "passed"},
+    {"command": "allowed-path audit", "result": "passed", "summary": "仅 Spark archive、developer journal/index 和 backlog 路径变更。"},
+    {"command": "task inventory and evidence assertions", "result": "passed", "summary": "Spark 已归档并保留 PR #13/eac3b33/merge 时间；默认 Nuclei 任务仍 in_progress 且无 diff。"}
+  ],
   "delivery": {
     "branch": "codex/sync-task-metadata",
-    "commit": null,
+    "commit": "6fbb167",
     "pr": null,
     "merged_at": null
   }
