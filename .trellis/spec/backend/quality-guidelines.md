@@ -1,51 +1,17 @@
-# Quality Guidelines
+# Backend Quality Guidelines
 
-> Code quality standards for backend development.
+Use the smallest test seam that proves the risk; the full matrix is in [`docs/testing-strategy.md`](../../../docs/testing-strategy.md). Pure rules belong in Go tests, HTTP mapping in `httptest`, SQLite behavior in store/integration tests, and scanner collaboration in `make e2e` only when fixtures cannot prove it.
 
----
+## Required workflow
 
-## Overview
+Behavioral work follows TDD Red → smallest Green → write-capable self-check → read-only Standards review → read-only Spec/AC review → full verification → PR. `trellis-check` is not independent review.
 
-<!--
-Document your project's quality standards here.
+Run `make test` and `go vet ./...` for Go changes, then `make pr-check` before delivery. Use `make e2e` for Docker/real scanner behavior and record why it is required or not applicable.
 
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
+## Do not
 
-(To be filled by the team)
+- Do not bypass `app.PrepareScan` when constructing scan options; it is the shared runtime boundary.
+- Do not silently turn missing configuration/rules into empty results; see [scan-runtime-contracts](./scan-runtime-contracts.md).
+- Do not rewrite persisted DetectionCheck history after rules change.
 
----
-
-## Forbidden Patterns
-
-<!-- Patterns that should never be used and why -->
-
-(To be filled by the team)
-
----
-
-## Required Patterns
-
-<!-- Patterns that must always be used -->
-
-(To be filled by the team)
-
----
-
-## Testing Requirements
-
-<!-- What level of testing is expected -->
-
-(To be filled by the team)
-
----
-
-## Code Review Checklist
-
-<!-- What reviewers should check -->
-
-(To be filled by the team)
+Representative references: `internal/app/scan_prepare.go`, `internal/store/sqlite.go`, and `internal/web/verifications_test.go`.
