@@ -46,9 +46,13 @@ class WorkflowReviewContractTest(unittest.TestCase):
             self.assertIn("must not claim independent review", text, relative)
 
     def test_pi_continue_routes_to_review_before_delivery(self) -> None:
-        text = (ROOT / ".pi/prompts/trellis-continue.md").read_text(encoding="utf-8")
-        self.assertIn("Standards review", text)
-        self.assertIn("Spec/AC review", text)
+        for relative in (
+            ".pi/prompts/trellis-continue.md",
+            ".agents/skills/trellis-continue/SKILL.md",
+        ):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("Standards review", text, relative)
+            self.assertIn("Spec/AC review", text, relative)
 
 
 if __name__ == "__main__":
