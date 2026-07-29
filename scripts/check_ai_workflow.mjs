@@ -30,6 +30,10 @@ for (const needle of ['validate_task_gate(full_path, repo_root, "ready")', 'vali
   const file = needle.includes('full_path') ? '.trellis/scripts/task.py' : '.trellis/scripts/common/task_store.py';
   if (!read(file).includes(needle)) errors.push(`${file}: strict lifecycle gate missing`);
 }
+const contextGate = read('.trellis/scripts/common/task_context.py');
+for (const anchor of ['_real_context_entries(target_dir / name, repo_root) == 0', 'seed-only or has no valid curated entries']) {
+  if (!contextGate.includes(anchor)) errors.push(`task context: missing seed-only JSONL rejection`);
+}
 for (const relative of ['.trellis/spec/backend/index.md', '.trellis/spec/frontend/index.md']) {
   const text = read(relative);
   for (const section of ['Pre-Development Checklist', 'Quality Check']) {

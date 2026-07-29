@@ -16,6 +16,7 @@ const mutate = (dir, relative, from, to) => writeFileSync(join(dir, relative), r
 for (const [name, relative, from, expected] of [
   ['TDD/review', '.trellis/workflow.md', 'TDD Red', 'missing TDD Red'],
   ['task gate', '.trellis/scripts/task.py', 'validate_task_gate(full_path, repo_root, "ready")', 'strict lifecycle gate missing'],
+  ['seed-only JSONL gate', '.trellis/scripts/common/task_context.py', '_real_context_entries(target_dir / name, repo_root) == 0', 'seed-only JSONL rejection'],
   ['placeholder', '.trellis/spec/backend/quality-guidelines.md', '# Backend Quality Guidelines', 'bootstrap placeholder remains'],
 ]) {
   const dir = fixture();
