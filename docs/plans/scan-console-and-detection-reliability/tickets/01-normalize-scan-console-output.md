@@ -4,7 +4,7 @@
 
 **Blocked by:** 无。
 
-**Status:** ready-for-agent.
+**Status:** in-review.
 
 ## 行为契约
 
@@ -21,10 +21,10 @@
 
 ## 验收
 
-- [ ] 新增的摘要回归测试先以旧行为失败，再以最小实现转绿。
-- [ ] 失败 Nuclei 输出不再将 ANSI、banner 或重复文本持久化为 ScanEvent；日志和原始 artifact 保持取证用途。
-- [ ] ScanEvent 仍保留简洁的可行动错误及关键阶段进度。
-- [ ] 未匹配 Dameng 候选探测不污染事件流，匹配事件仍可见。
+- [x] 新增的摘要回归测试先以旧行为失败，再以最小实现转绿。
+- [x] 失败 Nuclei 输出不再将 ANSI、banner 或重复文本持久化为 ScanEvent；日志和原始 artifact 保持取证用途。
+- [x] ScanEvent 仍保留简洁的可行动错误及关键阶段进度。
+- [x] 未匹配 Dameng 候选探测不污染事件流，匹配事件仍可见。
 - [ ] 聚焦测试、self-check、Standards/Spec 双轴只读评审和 `make pr-check` 全部通过；PR、合并与 Trellis complete gate 证据已记录。
 
 ## 非目标

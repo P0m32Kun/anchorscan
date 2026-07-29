@@ -46,8 +46,8 @@
   },
   "delivery": {
     "branch": "codex/pi-work-in-progress-20260729",
-    "commit": null,
-    "pr": null,
+    "commit": "9ade2e9",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/9",
     "merged_at": null
   }
 }
