@@ -40,8 +40,8 @@
   },
   "delivery": {
     "branch": "codex/add-spark-detection-rules",
-    "commit": null,
-    "pr": null,
+    "commit": "eac3b33",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/13",
     "merged_at": null
   }
 }
