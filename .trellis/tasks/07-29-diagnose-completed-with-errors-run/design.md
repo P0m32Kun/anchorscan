@@ -1,5 +1,5 @@
-# 执行设计引用
+# 归档设计引用
 
-根因、受控实验室边界、模板尝试上限、DetectionCheck 历史事实契约和回滚形状以权威 [Spec](../../../docs/plans/scan-console-and-detection-reliability/spec.md) 与 [Ticket 02](../../../docs/plans/scan-console-and-detection-reliability/tickets/02-repair-ssh-nuclei-runtime-failure.md) 为准。
+归档依据及未来重新立项的约束以权威 [Ticket 02](../../../docs/plans/scan-console-and-detection-reliability/tickets/02-repair-ssh-nuclei-runtime-failure.md) 为准。
 
-本 task 的固定点、分支、来源引用和质量状态保存在 `task.json` 与 `quality-evidence.json`，不复制产品设计。
+本 task 不恢复或引入外部私有模板；任何未来 SSH 小字典检测必须由新的批准任务定义模板供应、版本、部署位置、2x2 尝试预算与受控 runtime 验证。

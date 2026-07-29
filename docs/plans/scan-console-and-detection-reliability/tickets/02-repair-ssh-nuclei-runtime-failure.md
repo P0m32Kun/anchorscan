@@ -1,40 +1,23 @@
-# 02 - 修复 SSH Nuclei 模板运行时失败
+# 02 - 归档 SSH Nuclei 模板运行时修复（过时）
 
-**What to build:** 修复 `config/nuclei-templates/ssh-mini-brute.yaml` 的运行时错误，使受控 SSH fixture 上的 Nuclei 检查可执行，同时保留 DetectionCheck 失败和 Run `completed_with_errors` 的既有历史事实语义。
+**Status:** done（不实施）。
 
-**Blocked by:** 01 - 规范扫描 Console 工具输出已归档。该阻塞仅用于维持一次一个 ready frontier，并非产品代码依赖。
+## 处置结论
 
-**Status:** ready-for-agent；在 Ticket 01 归档前不得开始。
+原计划假设仓库存在 `config/nuclei-templates/ssh-mini-brute.yaml`，并要求修复其 Nuclei JavaScript 运行时错误。调查已证明该假设不成立：当前仓库未跟踪或打包任何 Nuclei 模板；`config/service-tags.yaml` 对 SSH 仅按 `ssh` tag 调度并排除官方 `default-login` 大字典；`README.md` 与 `docs/project-status.md` 同样声明私有 RBKD 模板由外部合并部署，而非项目内置资源。
 
-## 已确认根因
+历史 Run `run-20260729-093454.039551000` 的 `190.10.10.201:22/tcp` nuclei `failed/command_failed` 与 artifact `nuclei-190.10.10.201-22-template.jsonl` 记录的最终错误 `Could not run nuclei: no templates provided for scan` 是不可变执行事实。历史记录称 Nuclei v3.11.0 对该路径的静态 `-validate` 曾通过，但当前 checkout 不含该模板，无法复现或归因该历史环境的部署状态。
 
-现场 `run-20260729-093454.039551000` 唯一失败 DetectionCheck 是 `190.10.10.201:22/tcp` 的 `nuclei failed/command_failed`。对应 artifact 为 `nuclei-190.10.10.201-22-template.jsonl`，最终错误是 `Could not run nuclei: no templates provided for scan`。大量 `skipped/no_matching_rule` 是未适用，不是失败。
+## 保留事实与非目标
 
-静态 `nuclei -validate -t config/nuclei-templates/ssh-mini-brute.yaml` 已在 Nuclei v3.11.0 通过，不能证明 SSH JavaScript 模板运行时可执行。因此修复必须包含受控 fixture 的实际运行验证。
+- 历史 Run、artifact、DetectionCheck 与 `completed_with_errors` 状态保持不变。
+- `skipped/no_matching_rule` 仍表示未适用，不改写为失败。
+- 不扫描现场 IP `190.10.10.201`，不启动凭据尝试，不修改 Nuclei 路由、模板选择或产品代码。
+- 若未来需要 SSH 小字典检测，必须以独立产品任务定义模板供应者、固定版本/部署位置、2x2 尝试预算、首次命中停止和受控 lab runtime 验证；不得复活本 ticket 的失效实现方案。
 
-## 行为契约
+## 归档验收
 
-- 历史 Run、artifact 和 DetectionCheck 不得修改；该 Run 继续是 `completed_with_errors`。
-- 修复后的模板在受控 OpenSSH 服务上不发生 template runtime error。
-- 尝试预算保持 2 个用户名 x 2 个密码，首次命中停止；不得扩展为官方大字典或对现场 IP 重跑。
-- Nuclei 模板实际失败仍应持久化 `failed/command_failed`，Run 仍正确为 `completed_with_errors`。
-- RBKD `HEAD:javascript/default-logins/ssh-mini-brute.yaml` 仅为只读对照。其固定 `Port: "22"` 与项目模板的 `{{Port}}` 语义不同，未经 fixture A/B 验证不得直接替换。
-
-## 测试 seam
-
-- App fake Runner/Store：Nuclei 失败持久化 `failed/command_failed` 且 Run 为 `completed_with_errors`。
-- Docker 实验室：确认 daemon 可用后，在 `../lab` OpenSSH fixture 实际运行模板；容器地址 `172.22.0.2:22`、宿主映射 `127.0.0.1:10022`、实验凭据 `lab/lab`。不得扫描原现场地址。
-
-## 验收
-
-- [ ] 新增失败状态回归测试先以旧行为失败，再以最小修复转绿。
-- [ ] 根因结论准确链接到上述 DetectionCheck 和 artifact，而非把 skipped 项解释为失败。
-- [ ] 修复后的模板在受控 SSH 服务实际运行且无 template runtime error，保持 2x2/首次命中停止上限；静态 `-validate` 只作辅助。
-- [ ] 测试证明此类 Nuclei runtime failure 保留 `failed/command_failed`，Run 仍为 `completed_with_errors`。
-- [ ] 聚焦测试、self-check、Standards/Spec 双轴只读评审和 `make pr-check` 全部通过；PR、合并与 Trellis complete gate 证据已记录。
-
-## 非目标
-
-- 对生产/现场地址重新扫描。
-- 修改 Nuclei 路由、模板选择或历史扫描事实。
-- 将 SSH 弱口令检测扩大为通用凭据爆破。
+- [x] 已关联历史失败事实：`190.10.10.201:22/tcp` 的 nuclei `failed/command_failed`、`nuclei-190.10.10.201-22-template.jsonl` artifact、最终错误 `Could not run nuclei: no templates provided for scan`；未将 skipped 记录误判为失败。
+- [x] 已验证当前 checkout 没有 `ssh-mini-brute.yaml` 或其他项目内置 Nuclei 模板，并记录 tags-only 的当前部署契约。
+- [x] 已明确选择不实施，不触碰历史事实、生产地址、凭据预算或产品代码。
+- [x] 已将后续可能的外部模板部署需求拆分为独立、需重新批准的产品决策。

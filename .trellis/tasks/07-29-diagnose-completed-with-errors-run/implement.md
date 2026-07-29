@@ -1,5 +1,7 @@
-# 执行计划引用
+# 归档执行计划
 
-Ticket 01 归档、来源 ticket 获批、`quality-evidence.json` 记录实施批准且 `validate --ready` 通过后，按 Ticket 02 的测试 seam 执行：Red -> 最小 Green -> self-check -> Standards/Spec 双轴独立评审 -> `make pr-check` -> PR。
+1. 记录当前 checkout 没有项目内置 `ssh-mini-brute.yaml`、当前 SSH 仅 tags 调度的调查结论。
+2. 确认不修改历史 Run、artifact、DetectionCheck 或产品代码。
+3. 将权威 Ticket 02 标记为不实施，记录 complete evidence 并归档本 task。
 
-实施前必须加载 `trellis-before-dev` 及 `implement.jsonl` 引用的上下文。不得在本迁移阶段实施产品代码或触碰历史 Run。
+不执行 TDD、Docker lab 或现场扫描：它们针对不存在的本地模板，不能证明当前产品行为。

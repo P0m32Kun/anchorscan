@@ -3,7 +3,7 @@
   "name": "diagnose-completed-with-errors-run",
   "title": "调查并处置异常完成扫描运行",
   "description": "以指定 Run 的持久化检测事实确定 completed_with_errors 根因并处置。",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": "codex/pi-work-in-progress-20260729",
+  "branch": "codex/repair-ssh-nuclei-runtime-failure",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -24,7 +24,7 @@
   "notes": "",
   "meta": {
     "risk": "behavioral",
-    "fixed_point": "356b7070d7ef11c940a9cc83d364543c7c2f3442",
+    "fixed_point": "69c7670b17a7125e5cb1f86760a4c7f73d005bbb",
     "source_of_truth": {
       "type": "docs-ticket",
       "spec": "docs/plans/scan-console-and-detection-reliability/spec.md",
