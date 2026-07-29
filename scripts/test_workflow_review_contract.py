@@ -11,10 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 class WorkflowReviewContractTest(unittest.TestCase):
     def test_workflow_orders_tdd_independent_reviews_and_pr(self) -> None:
         text = (ROOT / ".trellis/workflow.md").read_text(encoding="utf-8")
-        self.assertIn(
-            "TDD Red -> Green -> self-check -> Standards review -> Spec/AC review -> full verification -> PR",
-            text,
-        )
+        for state in ("in_progress", "in_progress-inline"):
+            start = text.index(f"[workflow-state:{state}]")
+            end = text.index(f"[/workflow-state:{state}]", start)
+            self.assertIn(
+                "TDD Red -> Green -> self-check -> Standards review -> Spec/AC review -> full verification -> PR",
+                text[start:end],
+                state,
+            )
         self.assertIn("trellis-check is a write-capable self-check", text)
         self.assertIn("code-review", text)
 
@@ -28,6 +32,9 @@ class WorkflowReviewContractTest(unittest.TestCase):
             start = text.index(f"[{platform_block}]")
             end = text.index(f"[/{platform_block}]", start)
             self.assertIn("TDD Red", text[start:end], platform_block)
+        inline_start = text.index("[codex-inline, Kilo, Antigravity, Devin]", text.index("#### 2.1"))
+        inline_end = text.index("[/codex-inline, Kilo, Antigravity, Devin]", inline_start)
+        self.assertIn("TDD Red", text[inline_start:inline_end])
 
     def test_all_agent_surfaces_preserve_role_boundaries(self) -> None:
         for relative in (
