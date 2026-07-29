@@ -6,16 +6,16 @@ Task Management Script.
 Usage:
     python3 task.py create "<title>" [--slug <name>] [--assignee <dev>] [--priority P0|P1|P2|P3] [--parent <dir>] [--package <pkg>] [--no-start]
     python3 task.py add-context <dir> <file> <path> [reason] # Add jsonl entry
-    python3 task.py validate <dir>              # Validate jsonl files
+    python3 task.py validate <dir> [--ready|--complete]  # Validate context or lifecycle evidence
     python3 task.py list-context <dir>          # List jsonl entries
-    python3 task.py start <dir>                 # Set active task
+    python3 task.py start <dir> [--force --reason <text>]  # Set active task
     python3 task.py current [--source] [--json] # Show active task
     python3 task.py finish                      # Clear active task
     python3 task.py set-branch <dir> <branch>   # Set git branch
     python3 task.py set-base-branch <dir> <branch>  # Set PR target branch
     python3 task.py set-scope <dir> <scope>     # Set scope for PR title
     python3 task.py set-meta <dir> <key> <value>  # Set a task metadata key
-    python3 task.py archive <task-dir>          # Archive completed task
+    python3 task.py archive <task-dir> [--force --reason <text>]  # Archive completed task
     python3 task.py list                        # List active tasks
     python3 task.py list-archive [month]        # List archived tasks
     python3 task.py add-subtask <parent-dir> <child-dir>     # Link child to parent
@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 
 from common.log import Colors, colored
 from common.paths import (
@@ -63,12 +64,29 @@ from common.task_context import (
     cmd_add_context,
     cmd_validate,
     cmd_list_context,
+    validate_task_gate,
 )
 
 
 # =============================================================================
 # Command: start / finish
 # =============================================================================
+
+def _record_gate_override(task_json_path, action: str, reason: str) -> bool:
+    """Persist an explicit lifecycle-gate bypass before state mutation."""
+    data = read_json(task_json_path)
+    if not data:
+        return False
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    overrides = meta.get("gate_overrides") if isinstance(meta.get("gate_overrides"), list) else []
+    overrides.append({
+        "action": action,
+        "reason": reason,
+        "at": datetime.now(timezone.utc).isoformat(),
+    })
+    meta["gate_overrides"] = overrides
+    data["meta"] = meta
+    return write_json(task_json_path, data)
 
 def cmd_start(args: argparse.Namespace) -> int:
     """Set active task."""
@@ -85,6 +103,18 @@ def cmd_start(args: argparse.Namespace) -> int:
     if not full_path.is_dir():
         print(colored(f"Error: Task not found: {task_input}", Colors.RED))
         print("Hint: Use task name (e.g., 'my-task') or full path (e.g., '.trellis/tasks/01-31-my-task')")
+        return 1
+
+    force = getattr(args, "force", False)
+    reason = (getattr(args, "reason", None) or "").strip()
+    if force:
+        if not reason:
+            print(colored("Error: --force requires a non-empty --reason", Colors.RED))
+            return 1
+        if not _record_gate_override(full_path / FILE_TASK_JSON, "start", reason):
+            print(colored("Error: failed to record forced start reason", Colors.RED))
+            return 1
+    elif validate_task_gate(full_path, repo_root, "ready"):
         return 1
 
     # Convert to relative path for storage
@@ -501,6 +531,8 @@ def main() -> int:
     # validate
     p_validate = subparsers.add_parser("validate", help="Validate context files")
     p_validate.add_argument("dir", help="Task directory")
+    p_validate.add_argument("--ready", action="store_true", help="Require planning-ready evidence")
+    p_validate.add_argument("--complete", action="store_true", help="Require completion evidence")
 
     # list-context
     p_listctx = subparsers.add_parser("list-context", help="List context entries")
@@ -509,6 +541,8 @@ def main() -> int:
     # start
     p_start = subparsers.add_parser("start", help="Set active task")
     p_start.add_argument("dir", help="Task directory")
+    p_start.add_argument("--force", action="store_true", help="Bypass ready gate (requires --reason)")
+    p_start.add_argument("--reason", help="Persistent reason for a forced bypass")
 
     # current
     p_current = subparsers.add_parser("current", help="Show active task")
@@ -545,6 +579,8 @@ def main() -> int:
     p_archive = subparsers.add_parser("archive", help="Archive task")
     p_archive.add_argument("name", help="Task directory or name")
     p_archive.add_argument("--no-commit", action="store_true", help="Skip auto git commit after archive")
+    p_archive.add_argument("--force", action="store_true", help="Bypass complete gate (requires --reason)")
+    p_archive.add_argument("--reason", help="Persistent reason for a forced bypass")
 
     # list
     p_list = subparsers.add_parser("list", help="List tasks")

@@ -21,6 +21,7 @@ RUNTIME_CONFIG := default.yaml.example nse.yaml service-tags.yaml ports-highrisk
 test:
 	go test ./...
 	node --test internal/web/static/*.test.mjs internal/web/frontend/*.test.mjs
+	python3 scripts/test_task_gates.py
 
 doc-check:
 	node scripts/check_markdown_links.mjs

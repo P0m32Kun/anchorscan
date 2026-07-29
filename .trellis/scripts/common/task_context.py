@@ -21,8 +21,8 @@ import argparse
 import json
 from pathlib import Path
 
-from .config import get_context_injection_limits
-from .git import branch_exists_locally
+from .config import get_codex_dispatch_mode, get_context_injection_limits
+from .git import branch_exists_locally, run_git
 from .io import read_json
 from .log import Colors, colored
 from .paths import FILE_TASK_JSON, get_repo_root
@@ -118,6 +118,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
     if not target_dir.is_dir():
         print(colored("Error: task directory required", Colors.RED))
         return 1
+
+    mode = "complete" if getattr(args, "complete", False) else "ready" if getattr(args, "ready", False) else None
+    if mode:
+        return validate_task_gate(target_dir, repo_root, mode)
 
     print(colored("=== Validating Context Files ===", Colors.BLUE))
     print(f"Target dir: {target_dir}")
@@ -236,19 +240,25 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
         if extension in _CODE_FILE_EXTENSIONS and not _is_exempt_from_code_file_warning(
             file_path, task_rel
         ):
+            warning = (
+                f"{file_name}:{line_num}: Warning: {file_path} looks like a code file — "
+                "implement/check.jsonl should reference spec/research docs; "
+                "agents read code themselves"
+            )
             print(
-                f"  {colored(f'{file_name}:{line_num}: Warning: {file_path} looks like a code file — '
-                             'implement/check.jsonl should reference spec/research docs; '
-                             'agents read code themselves', Colors.YELLOW)}"
+                f"  {colored(warning, Colors.YELLOW)}"
             )
 
         if max_file_bytes:
             size = full_path.stat().st_size
             if size > max_file_bytes:
+                warning = (
+                    f"{file_name}:{line_num}: Warning: {file_path} is {size} bytes, "
+                    "exceeds context_injection.max_file_bytes "
+                    f"({max_file_bytes}); injection will truncate it"
+                )
                 print(
-                    f"  {colored(f'{file_name}:{line_num}: Warning: {file_path} is {size} bytes, '
-                                 f'exceeds context_injection.max_file_bytes ({max_file_bytes}); '
-                                 'injection will truncate it', Colors.YELLOW)}"
+                    f"  {colored(warning, Colors.YELLOW)}"
                 )
 
     if errors == 0:
@@ -257,6 +267,140 @@ def _validate_jsonl(jsonl_file: Path, repo_root: Path, task_dir: Path | None = N
         print(f"  {colored(f'{file_name}: ✗ ({errors} errors)', Colors.RED)}")
 
     return errors
+
+
+def _is_repo_relative_file(path: str, repo_root: Path) -> bool:
+    """Return whether ``path`` is an existing file inside the repository."""
+    candidate = (repo_root / path).resolve()
+    try:
+        candidate.relative_to(repo_root.resolve())
+    except ValueError:
+        return False
+    return candidate.is_file()
+
+
+def _is_docs_plan_file(path: str, repo_root: Path) -> bool:
+    """Return whether ``path`` resolves to an existing file under docs/plans."""
+    if not path.startswith("docs/plans/"):
+        return False
+    candidate = (repo_root / path).resolve()
+    try:
+        candidate.relative_to((repo_root / "docs" / "plans").resolve())
+    except ValueError:
+        return False
+    return candidate.is_file()
+
+
+def _real_context_entries(path: Path, repo_root: Path) -> int:
+    """Return valid JSONL entries that reference actual context, excluding seeds."""
+    if not path.is_file():
+        return 0
+    count = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        file_path = data.get("file")
+        reason = data.get("reason")
+        if (
+            isinstance(file_path, str)
+            and isinstance(reason, str)
+            and reason.strip()
+            and _is_repo_relative_file(file_path, repo_root)
+        ):
+            count += 1
+    return count
+
+
+def _gate_error(message: str) -> int:
+    print(colored(f"  ✗ {message}", Colors.RED))
+    return 1
+
+
+def validate_task_gate(target_dir: Path, repo_root: Path, mode: str) -> int:
+    """Validate readiness/completion without mutating task or session state."""
+    task = read_json(target_dir / FILE_TASK_JSON)
+    if not task:
+        return _gate_error("task.json is missing or invalid")
+    meta = task.get("meta") if isinstance(task.get("meta"), dict) else {}
+    bootstrap = bool(meta.get("bootstrap"))
+    risk = meta.get("risk", "behavioral")
+    errors = 0
+    print(colored(f"=== Validating {mode} gate ===", Colors.BLUE))
+
+    if not bootstrap:
+        for field in ("branch", "base_branch"):
+            if not isinstance(task.get(field), str) or not task[field].strip():
+                errors += _gate_error(f"{field} is required")
+        branch = task.get("branch")
+        if isinstance(branch, str) and branch.strip() == "main":
+            errors += _gate_error("branch must not be main")
+        if isinstance(branch, str) and branch.strip():
+            rc, current_branch, _ = run_git(["branch", "--show-current"], cwd=repo_root)
+            if rc == 0 and current_branch.strip() and current_branch.strip() != branch:
+                errors += _gate_error("current git branch must match task.branch")
+        if not isinstance(meta.get("fixed_point"), str) or not meta["fixed_point"].strip():
+            errors += _gate_error("meta.fixed_point is required")
+        source = meta.get("source_of_truth")
+        if not isinstance(source, dict) or source.get("type") not in {"docs-ticket", "trellis-prd"}:
+            errors += _gate_error("meta.source_of_truth is required")
+        elif source.get("type") == "docs-ticket":
+            for key in ("spec", "ticket"):
+                value = source.get(key)
+                if not isinstance(value, str) or not _is_docs_plan_file(value, repo_root):
+                    errors += _gate_error(f"source_of_truth.{key} must reference an existing docs/plans file")
+            ticket = source.get("ticket")
+            if mode == "ready" and isinstance(ticket, str) and (repo_root / ticket).is_file():
+                if "**Status:** ready-for-agent" not in (repo_root / ticket).read_text(encoding="utf-8"):
+                    errors += _gate_error("source ticket must be ready-for-agent")
+        required_artifacts = ("prd.md", "design.md", "implement.md") if risk == "behavioral" else ("prd.md",)
+        for artifact in required_artifacts:
+            if not (target_dir / artifact).is_file():
+                errors += _gate_error(f"{artifact} is required")
+        if get_codex_dispatch_mode(repo_root) == "auto":
+            for name in ("implement.jsonl", "check.jsonl"):
+                if _real_context_entries(target_dir / name, repo_root) == 0:
+                    errors += _gate_error(f"{name} is seed-only or has no valid curated entries")
+
+    evidence_path = target_dir / "quality-evidence.json"
+    evidence = read_json(evidence_path)
+    if evidence is not None and not isinstance(evidence, dict):
+        errors += _gate_error("quality-evidence.json must be a JSON object")
+        evidence = None
+    if evidence and evidence.get("schema") != 1:
+        errors += _gate_error("quality-evidence.json schema=1 is required")
+    if risk == "behavioral" and not bootstrap:
+        if not evidence or evidence.get("approval", {}).get("result") != "passed":
+            errors += _gate_error("quality-evidence.json approval.result=passed is required")
+
+    if mode == "complete":
+        source = meta.get("source_of_truth")
+        if isinstance(source, dict) and source.get("type") == "docs-ticket":
+            ticket = source.get("ticket")
+            if isinstance(ticket, str) and (repo_root / ticket).is_file():
+                if "- [ ]" in (repo_root / ticket).read_text(encoding="utf-8"):
+                    errors += _gate_error("source ticket still has unchecked acceptance items")
+        if not evidence:
+            errors += _gate_error("quality-evidence.json is required")
+        else:
+            tdd = evidence.get("tdd", {})
+            if tdd.get("required") and (tdd.get("red", {}).get("result") != "failed" or tdd.get("green", {}).get("result") != "passed"):
+                errors += _gate_error("TDD red=failed and green=passed evidence is required")
+            if not any(v.get("result") == "passed" for v in evidence.get("verification", []) if isinstance(v, dict)):
+                errors += _gate_error("at least one passed verification is required")
+            reviews = evidence.get("reviews", {})
+            if reviews.get("standards", {}).get("result") != "passed" or reviews.get("spec", {}).get("result") != "passed":
+                errors += _gate_error("passed standards and spec reviews are required")
+            delivery = evidence.get("delivery", {})
+            if not delivery.get("commit") or not delivery.get("pr"):
+                errors += _gate_error("delivery commit and PR are required")
+
+    if errors:
+        print(colored(f"✗ {mode} gate failed ({errors} errors)", Colors.RED))
+        return 1
+    print(colored(f"✓ {mode} gate passed", Colors.GREEN))
+    return 0
 
 
 # =============================================================================

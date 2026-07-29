@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — 对齐权威计划并定义任务证据。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`。
 
@@ -33,11 +33,20 @@
 
 ## 验收
 
-- [ ] 每个新 gate 都有先失败后转绿的证据。
-- [ ] start/archive 失败保持文件树和任务状态不变。
-- [ ] inline、sub-agent、bootstrap 豁免的行为被明确测试。
-- [ ] `task.py validate` 不再把 0-entry context 描述为 planning-ready。
-- [ ] 现有正常 archive task 可在补齐 required evidence 的 fixture 下通过。
+- [x] 每个新 gate 都有先失败后转绿的证据。
+- [x] start/archive 失败保持文件树和任务状态不变。
+- [x] inline、sub-agent、bootstrap 豁免的行为被明确测试。
+- [x] `task.py validate` 不再把 0-entry context 描述为 planning-ready。
+- [x] 现有正常 archive task 可在补齐 required evidence 的 fixture 下通过。
+
+## 完成证据
+
+- 2026-07-29：`python3 scripts/test_task_gates.py -v`，14 项 task lifecycle
+  文件系统集成测试通过；其中新增用例先复现了 seed-only、非法 schema、未就绪 source
+  ticket、`main` 分支、缺失/越界 JSONL 路径等门禁缺口。
+- 2026-07-29：`make pr-check` 通过；`make security-check` 通过。
+- 2026-07-29：以 `663f5c1` 为固定点完成独立 Standards 和 Spec 双轴评审；审查发现的
+  `main`/错误分支、无效上下文与 CI 未覆盖问题均已修复并复核关闭。
 
 ## 非目标
 
