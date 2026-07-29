@@ -226,7 +226,9 @@ Sub-agent dispatch protocol applies to all platforms and all sub-agents, includi
 
 [workflow-state:in_progress]
 Tools: `trellis-implement` / `trellis-research` are sub-agent types only (Task/Agent tool, NOT Skill; there is no skill by these names). `trellis-update-spec` is a skill. `trellis-check` exists as both; prefer the Agent form when verifying after code changes.
-Flow: `trellis-implement` -> `trellis-check` -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+For behavioral or high-risk work, follow this fixed order: TDD Red -> Green -> self-check -> Standards review -> Spec/AC review -> full verification -> PR.
+`trellis-check is a write-capable self-check`; it may fix code, but it must not claim independent review. Run `code-review` (or two isolated read-only reviewers) after self-check, from the recorded fixed point and authoritative ticket/spec.
+Flow: `trellis-implement` -> `trellis-check` -> `code-review` -> full verification -> PR -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Main-session default: dispatch implement/check sub-agents. Sub-agent self-exemption: if already running as `trellis-implement`, do NOT spawn another `trellis-implement` or `trellis-check`; if already running as `trellis-check`, do NOT spawn another `trellis-check` or `trellis-implement`. Dispatch is main session only.
 Dispatch prompt starts with `Active task: <task path from task.py current>`. Read context: jsonl entries -> `prd.md` -> `design.md if present` -> `implement.md if present`.
 [/workflow-state:in_progress]
@@ -237,7 +239,8 @@ Dispatch prompt starts with `Active task: <task path from task.py current>`. Rea
      instead of dispatching sub-agents. -->
 
 [workflow-state:in_progress-inline]
-Flow: `trellis-before-dev` -> edit -> `trellis-check` -> validation -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
+For behavioral or high-risk work: TDD Red -> Green -> self-check -> Standards review -> Spec/AC review -> full verification -> PR.
+Flow: `trellis-before-dev` -> edit -> `trellis-check` -> `code-review` -> full verification -> PR -> `trellis-update-spec` -> commit (Phase 3.4) -> `/trellis:finish-work`.
 Do not dispatch implement/check sub-agents in inline mode.
 Read context: `prd.md` -> `design.md if present` -> `implement.md if present`, plus relevant spec/research loaded by skills.
 [/workflow-state:in_progress-inline]
@@ -480,7 +483,7 @@ Goal: turn reviewed planning artifacts into code that passes quality checks.
 Spawn the implement sub-agent:
 
 - **Agent type**: `trellis-implement`
-- **Task description**: Implement the reviewed task artifacts, consulting materials under `{TASK_DIR}/research/`; finish by running project lint and type-check
+- **Task description**: Start with TDD Red, make the smallest Green change, then run focused tests and self-check; record commands/results in task evidence
 - **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then tell the spawned agent it is already the `trellis-implement` sub-agent and must implement directly, not spawn another `trellis-implement` / `trellis-check`.
 
 The platform hook/plugin auto-handles:
@@ -523,8 +526,8 @@ The platform prelude auto-handles the context load requirement:
 1. Load the `trellis-before-dev` skill to read project guidelines
 2. Read `{TASK_DIR}/prd.md`, then `design.md` if present, then `implement.md` if present
 3. Consult materials under `{TASK_DIR}/research/`
-4. Implement the code per reviewed artifacts
-5. Run project lint and type-check
+4. Write and observe the focused TDD Red test, then implement the smallest Green change
+5. Run focused tests and write-capable self-check; record commands/results in task evidence
 
 [/codex-inline, Kilo, Antigravity, Devin]
 
@@ -535,10 +538,10 @@ The platform prelude auto-handles the context load requirement:
 Spawn the check sub-agent:
 
 - **Agent type**: `trellis-check`
-- **Task description**: Review all code changes against specs and task artifacts; fix any findings directly; ensure lint and type-check pass
+- **Task description**: Perform a write-capable self-check, fix in-scope findings, and run focused verification; this is not independent review
 - **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then tell the spawned agent it is already the `trellis-check` sub-agent and must review/fix directly, not spawn another `trellis-check` / `trellis-implement`.
 
-The check agent's job:
+The check agent's job (write-capable self-check, not independent review):
 - Review code changes against specs
 - Review code changes against `prd.md`, `design.md` if present, and `implement.md` if present
 - Auto-fix issues it finds
@@ -556,6 +559,8 @@ Load the `trellis-check` skill and verify the code per its guidance:
 If issues are found → fix → re-check, until green.
 
 [/codex-inline, Kilo, Antigravity, Devin]
+
+**Independent review and delivery**: after self-check, run `code-review` from the recorded fixed point against the authoritative ticket/spec. Standards review and Spec/AC review are separate read-only outputs; neither may edit the implementation. Then run full verification, open a PR, and record all results in task evidence.
 
 **Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python3 ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.
 

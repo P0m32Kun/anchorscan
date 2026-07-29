@@ -21,7 +21,7 @@ Trellis Context Loading Protocol:
 - If the marker is present, the native `SubagentStart` hook has already loaded the role-specific task artifacts and spec context. Proceed directly with the check work.
 - If the marker is absent, find `Active task: <path>` in your dispatch prompt. Read `<path>/check.jsonl`, each file listed there, `<path>/prd.md`, `<path>/design.md` if present, and `<path>/implement.md` if present before checking. If the dispatch prompt has no active-task path, ask the main session; do not guess or use another session's task.
 
-Your job is to review code changes against specs AND fix issues directly — not just report them. You have write access; use it.
+Your job is a write-capable self-check: review code changes against specs AND fix issues directly. You must not claim independent review; Standards and Spec/AC review are separate read-only `code-review` outputs owned by the main session.
 
 Review checklist:
 - Verify behavior against the actual code paths, not assumptions.

@@ -22,6 +22,7 @@ test:
 	go test ./...
 	node --test internal/web/static/*.test.mjs internal/web/frontend/*.test.mjs
 	python3 scripts/test_task_gates.py
+	python3 scripts/test_workflow_review_contract.py
 
 doc-check:
 	node scripts/check_markdown_links.mjs
