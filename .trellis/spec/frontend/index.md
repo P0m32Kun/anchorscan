@@ -1,39 +1,27 @@
 # Frontend Development Guidelines
 
-> Best practices for frontend development in this project.
+The Vue 3 workbench is under `internal/web/frontend/`; its HTTP contract is implemented in `internal/web/`. Use the vocabulary in [`CONTEXT.md`](../../../CONTEXT.md).
 
----
+## Pre-Development Checklist
 
-## Overview
+- [ ] Read [`docs/testing-strategy.md`](../../../docs/testing-strategy.md) and the relevant backend handler/DTO before changing UI data flow.
+- [ ] Keep server payload fields explicit and match the public snake_case contract (see `Workbench.vue` and `workbench-api.ts`).
+- [ ] Select the lowest sufficient seam: Node unit test for pure normalization, `httptest` for HTTP mapping, Playwright only for browser behavior.
+- [ ] For behavioral work, record TDD Red → Green, then self-check and independent Standards/Spec review.
 
-This directory contains guidelines for frontend development. Fill in each file with your project's specific conventions.
+## Quality Check
 
----
+- Run `make test`; run `npm run build:web` for Vue/type changes.
+- Run `make pr-check` before a PR; run `make e2e` only for real-tool behavior.
+- Review browser changes with representative Playwright smoke and keep diagnostics actionable.
 
-## Guidelines Index
+## Guides
 
-| Guide | Description | Status |
-|-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Component Guidelines](./component-guidelines.md) | Component patterns, props, composition, and workbench dialog contracts | Active |
-| [Hook Guidelines](./hook-guidelines.md) | Custom hooks, data fetching patterns | To fill |
-| [State Management](./state-management.md) | Local state, global state, server state | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Type Safety](./type-safety.md) | Type patterns, validation | To fill |
-
----
-
-## How to Fill These Guidelines
-
-For each guideline file:
-
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+| Guide | Use when |
+| --- | --- |
+| [Directory structure](./directory-structure.md) | adding modules or assets |
+| [Components](./component-guidelines.md) | dialogs, props, accessibility |
+| [Hooks](./hook-guidelines.md) | composables and request helpers |
+| [State](./state-management.md) | local, derived, or server state |
+| [Types](./type-safety.md) | DTO normalization and runtime boundaries |
+| [Quality](./quality-guidelines.md) | tests, review, and delivery gates |

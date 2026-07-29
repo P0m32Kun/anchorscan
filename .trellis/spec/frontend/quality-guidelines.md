@@ -1,51 +1,15 @@
-# Quality Guidelines
+# Frontend Quality Guidelines
 
-> Code quality standards for frontend development.
+Use Node tests for pure DTO/normalization behavior, handler tests for HTTP mapping, and Playwright smoke only where the browser is part of the contract. Follow [`docs/testing-strategy.md`](../../../docs/testing-strategy.md).
 
----
+## Required workflow
 
-## Overview
+Behavioral work follows TDD Red → smallest Green → write-capable self-check → read-only Standards review → read-only Spec/AC review → full verification → PR. Run `make test`, `npm run build:web`, and `make pr-check`; use `make e2e` only for real-tool behavior.
 
-<!--
-Document your project's quality standards here.
+## Do not
 
-Questions to answer:
-- What patterns are forbidden?
-- What linting rules do you enforce?
-- What are your testing requirements?
-- What code review standards apply?
--->
+- Do not invent alternate DTO casing: public association fields are snake_case.
+- Do not key verification state by vulnerability key alone; use `(zone_id, vulnerability_key)`.
+- Do not add browser-only test modes or production test endpoints.
 
-(To be filled by the team)
-
----
-
-## Forbidden Patterns
-
-<!-- Patterns that should never be used and why -->
-
-(To be filled by the team)
-
----
-
-## Required Patterns
-
-<!-- Patterns that must always be used -->
-
-(To be filled by the team)
-
----
-
-## Testing Requirements
-
-<!-- What level of testing is expected -->
-
-(To be filled by the team)
-
----
-
-## Code Review Checklist
-
-<!-- What reviewers should check -->
-
-(To be filled by the team)
+Representative references: `internal/web/frontend/Workbench.vue`, `internal/web/frontend/workbench-api.ts`, and `internal/web/frontend/workbench-api.test.mjs`.

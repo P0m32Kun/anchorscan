@@ -1,54 +1,5 @@
-# Directory Structure
+# Backend Directory Structure
 
-> How backend code is organized in this project.
+`cmd/anchorscan/` owns CLI wiring. `internal/app/` orchestrates domain workflows, `internal/store/` owns SQLite persistence, `internal/web/` owns HTTP/HTML boundaries, `internal/report/` builds delivery views, and `internal/tools/` wraps external processes. Keep orchestration out of handlers and persistence details out of `app`.
 
----
-
-## Overview
-
-<!--
-Document your project's backend directory structure here.
-
-Questions to answer:
-- How are modules/packages organized?
-- Where does business logic live?
-- Where are API endpoints defined?
-- How are utilities and helpers organized?
--->
-
-(To be filled by the team)
-
----
-
-## Directory Layout
-
-```
-<!-- Replace with your actual structure -->
-src/
-├── ...
-└── ...
-```
-
----
-
-## Module Organization
-
-<!-- How should new features/modules be organized? -->
-
-(To be filled by the team)
-
----
-
-## Naming Conventions
-
-<!-- File and folder naming rules -->
-
-(To be filled by the team)
-
----
-
-## Examples
-
-<!-- Link to well-organized modules as examples -->
-
-(To be filled by the team)
+Example: `internal/app/scan_prepare.go` prepares shared ScanOptions; handlers call app boundaries rather than duplicating validation.

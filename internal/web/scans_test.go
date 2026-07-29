@@ -249,6 +249,17 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 	if !runner.hasArgs(rustscanPath, "--range", "100-1000") {
 		t.Fatalf("expected port range passed to rustscan, got %#v", runner.Commands())
 	}
+	for range 200 {
+		runs, err := scanStore.ListScanRuns(10)
+		if err != nil {
+			t.Fatalf("ListScanRuns returned error: %v", err)
+		}
+		if len(runs) == 1 && runs[0].Status != "running" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("scan did not finish before temporary directory cleanup")
 }
 
 func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {

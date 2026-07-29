@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — 对齐 TDD、独立评审、workflow 与代理。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`code-review`。
 
@@ -25,11 +25,16 @@
 
 ## 验收
 
-- [ ] 两个 index 均有可执行 checklist。
-- [ ] 质量文档引用 `make test`、`go vet ./...`、`make pr-check` 和适用的 `make e2e`。
-- [ ] 规范清楚规定 TDD、双轴 review 与最低充分 seam。
-- [ ] 每项关键规则至少有一个真实代码/文档引用。
-- [ ] bootstrap task 的未勾选项归零后才归档。
+- [x] 两个 index 均有可执行 checklist。
+- [x] 质量文档引用 `make test`、`go vet ./...`、`make pr-check` 和适用的 `make e2e`。
+- [x] 规范清楚规定 TDD、双轴 review 与最低充分 seam。
+- [x] 每项关键规则至少有一个真实代码/文档引用。
+- [x] bootstrap task 的未勾选项归零后才归档。
+
+## 完成证据
+
+- 2026-07-29：模板残留搜索、`node scripts/check_markdown_links.mjs` 与 `git diff --check` 通过。
+- 2026-07-29：独立 Standards/Spec 审查通过；bootstrap checklist 的三项依据真实 spec 内容勾选后，`task.py validate --complete` 通过并归档。
 
 ## 非目标
 
