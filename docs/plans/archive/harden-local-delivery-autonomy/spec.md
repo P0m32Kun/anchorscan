@@ -1,6 +1,6 @@
 # 本地交付自治与非递归收尾加固
 
-**Status:** in_progress
+**Status:** completed
 
 ## 背景
 
@@ -66,4 +66,4 @@
 
 - 本目录的 ticket 是本工作的唯一权威；每次只实施一个已解除阻塞的 frontier ticket。
 - 交付前记录 `origin/main` 作为 review fixed point，并按
-  [`docs/agents/issue-tracker.md`](../../agents/issue-tracker.md) 完成 TDD（适用时）、验证和双轴审查。
+  [`docs/agents/issue-tracker.md`](../../../agents/issue-tracker.md) 完成 TDD（适用时）、验证和双轴审查。

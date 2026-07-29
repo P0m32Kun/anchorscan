@@ -23,7 +23,7 @@
 4. 选择一个新建的 docs-only fixture task 验证 metadata 可被解析。
 
 本 ticket 同时将已批准的工作流审查报告、spec、技术设计和全部依赖 ticket 纳入
-`docs/plans/ai-coding-workflow-hardening/`。这是建立跨会话唯一权威来源的必要前置，
+`docs/plans/archive/ai-coding-workflow-hardening/`。这是建立跨会话唯一权威来源的必要前置，
 不是对后续实现的提前交付。
 
 ## 验收

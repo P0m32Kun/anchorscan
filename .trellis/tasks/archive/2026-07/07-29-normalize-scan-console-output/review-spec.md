@@ -1,7 +1,7 @@
 # Spec and acceptance-criteria review
 
 - Fixed point: `356b7070d7ef11c940a9cc83d364543c7c2f3442`
-- Authority: `docs/plans/scan-console-and-detection-reliability/spec.md` and `tickets/01-normalize-scan-console-output.md`.
+- Authority: `docs/plans/archive/scan-console-and-detection-reliability/spec.md` and `tickets/01-normalize-scan-console-output.md`.
 - Method: independent read-only review of the Ticket 01 candidate diff.
 
 ## Result

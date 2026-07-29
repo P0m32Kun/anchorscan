@@ -26,7 +26,7 @@
     "fixed_point": "58aa4515e6401d489fa6b3b10c6bbfe5c89b181c",
     "source_of_truth": {
       "type": "trellis-prd",
-      "prd": ".trellis/tasks/07-29-enhance-report-service-filters/prd.md"
+      "prd": ".trellis/tasks/archive/2026-07/07-29-enhance-report-service-filters/prd.md"
     }
   }
 }

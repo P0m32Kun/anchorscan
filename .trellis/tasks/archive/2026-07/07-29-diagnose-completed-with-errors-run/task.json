@@ -27,8 +27,8 @@
     "fixed_point": "69c7670b17a7125e5cb1f86760a4c7f73d005bbb",
     "source_of_truth": {
       "type": "docs-ticket",
-      "spec": "docs/plans/scan-console-and-detection-reliability/spec.md",
-      "ticket": "docs/plans/scan-console-and-detection-reliability/tickets/02-repair-ssh-nuclei-runtime-failure.md"
+      "spec": "docs/plans/archive/scan-console-and-detection-reliability/spec.md",
+      "ticket": "docs/plans/archive/scan-console-and-detection-reliability/tickets/02-repair-ssh-nuclei-runtime-failure.md"
     }
   }
 }

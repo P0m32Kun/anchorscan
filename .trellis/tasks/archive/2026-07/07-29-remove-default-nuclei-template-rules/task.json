@@ -26,7 +26,7 @@
     "fixed_point": "bbd1c1067d8e354208e23fb39ca993a204c12139",
     "source_of_truth": {
       "type": "trellis-prd",
-      "prd": ".trellis/tasks/07-29-remove-default-nuclei-template-rules/prd.md"
+      "prd": ".trellis/tasks/archive/2026-07/07-29-remove-default-nuclei-template-rules/prd.md"
     }
   }
 }

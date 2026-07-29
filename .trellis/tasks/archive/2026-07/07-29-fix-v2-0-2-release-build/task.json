@@ -3,7 +3,7 @@
   "name": "fix-v2-0-2-release-build",
   "title": "修复 v2.0.2 Tag Release 构建失败",
   "description": "",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,7 +11,7 @@
   "creator": "kun",
   "assignee": "kun",
   "createdAt": "2026-07-29",
-  "completedAt": null,
+  "completedAt": "2026-07-30",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
@@ -22,5 +22,13 @@
   "parent": null,
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "gate_overrides": [
+      {
+        "action": "archive",
+        "reason": "PR #3 已合并；v2.0.2 release run 30383917510 成功，GitHub Release 已发布三平台归档与 checksums。",
+        "at": "2026-07-29T16:04:44.972690+00:00"
+      }
+    ]
+  }
 }

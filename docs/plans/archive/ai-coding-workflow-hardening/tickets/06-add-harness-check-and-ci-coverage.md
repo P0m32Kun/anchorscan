@@ -4,7 +4,9 @@
 
 **Blocked by:** 05 — 完成项目 spec bootstrap。
 
-**Status:** ready-for-agent
+**Status:** done
+
+**Delivery:** PR #8（`f1a46f4`）已合并，`quality-gate` 通过。
 
 **Execution skills:** `implement`、`tdd`、`code-review`。
 

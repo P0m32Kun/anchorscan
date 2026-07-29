@@ -5,8 +5,8 @@
   "meta": {
     "source_of_truth": {
       "type": "docs-ticket",
-      "spec": "docs/plans/ai-coding-workflow-hardening/spec.md",
-      "ticket": "docs/plans/ai-coding-workflow-hardening/tickets/02-reconcile-authority-and-task-evidence.md"
+      "spec": "docs/plans/archive/ai-coding-workflow-hardening/spec.md",
+      "ticket": "docs/plans/archive/ai-coding-workflow-hardening/tickets/02-reconcile-authority-and-task-evidence.md"
     },
     "risk": "docs",
     "fixed_point": "0f107087ad4c3ff4ac3d2e9eef887214b1eb244c"

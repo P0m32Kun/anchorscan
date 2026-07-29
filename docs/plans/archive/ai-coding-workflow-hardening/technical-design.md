@@ -40,7 +40,7 @@ Trellis task 负责会话、研究、执行上下文和本地证据。新增字�
 ## 2. 证据模型
 
 每个行为变更 task 使用 `<task>/quality-evidence.json`，由执行步骤渐进更新。
-完整且唯一的 JSON 契约见 [`docs/agents/task-evidence.md`](../../agents/task-evidence.md)；
+完整且唯一的 JSON 契约见 [`docs/agents/task-evidence.md`](../../../agents/task-evidence.md)；
 下例只是该 v1 契约的摘要，不得另行扩展或放宽字段：
 
 ```json
