@@ -134,3 +134,28 @@ Packaged mandatory rule sidecars, made scan preparation and doctor fail closed, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: 同步已合并 Spark 任务元数据
+
+**Date**: 2026-07-29
+**Task**: 同步已合并 Spark 任务元数据
+**Branch**: `codex/sync-task-metadata`
+
+### Summary
+
+通过 PR #14 将已合并 Spark PR #13 的任务归档、merge evidence、journal 与跨会话 backlog 同步至 main；默认 Nuclei 模板规则任务保持 in_progress 且未改动。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6fbb167` | (see git log) |
+| `5542145` | (see git log) |
+| `5a2b11f` | (see git log) |
+| `2de7b10` | (see git log) |
+| `8a2e013` | (see git log) |
+
+### Status
+
+[OK] **Completed**
