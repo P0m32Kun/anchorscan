@@ -12,9 +12,9 @@
 
 ## Acceptance Criteria
 
-- [ ] CLI 与 Web 对开发构建显示 `dev`，并有最低充分自动化验证。
-- [ ] Release/package 的现有 linker 注入与 Web smoke 继续验证正式显示版本。
-- [ ] 若当前实现已满足契约，记录验证证据，不作无意义代码修改。
+- [x] CLI 与 Web 对开发构建显示 `dev`，并有最低充分自动化验证。
+- [x] Release/package 的现有 linker 注入与 Web smoke 继续验证正式显示版本。
+- [x] 若当前实现已满足契约，记录验证证据，不作无意义代码修改。
 
 ## Out of Scope
 

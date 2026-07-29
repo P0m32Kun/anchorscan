@@ -12,7 +12,7 @@
   "assignee": "kun",
   "createdAt": "2026-07-29",
   "completedAt": null,
-  "branch": null,
+  "branch": "codex/fix-console-version-contract",
   "base_branch": "main",
   "worktree_path": null,
   "commit": null,
@@ -22,5 +22,11 @@
   "parent": "07-29-fix-runtime-version-console-status",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "fixed_point": "02aa410e9e6b0291f1dfe8da475d7a44291f022e",
+    "source_of_truth": {
+      "type": "trellis-prd",
+      "prd": ".trellis/tasks/07-29-fix-console-version-contract/prd.md"
+    }
+  }
 }

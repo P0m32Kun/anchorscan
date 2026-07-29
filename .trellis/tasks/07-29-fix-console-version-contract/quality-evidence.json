@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T00:00:00Z",
+    "result": "passed",
+    "summary": "用户要求收敛 fix-console-version-contract：当前实现已满足契约，记录验证证据，不作无意义代码修改。"
+  },
+  "tdd": {"required": false},
+  "verification": [
+    {"command": "go test ./cmd/anchorscan -run TestVersionCommandPrintsVersion -count=1", "result": "passed"},
+    {"command": "go test -tags packageintegration ./scripts -run TestBuildVersionCanBeInjected -count=1", "result": "passed"},
+    {"command": "go test ./internal/web -run 'TestHomePageRenders|TestReportPageRendersCurrentVersion' -count=1", "result": "passed"},
+    {"command": "make release-check", "result": "passed"},
+    {"command": "make web-smoke", "result": "passed"}
+  ],
+  "reviews": {"standards": {"agent": "reviewer", "result": "passed"}, "spec": {"agent": "reviewer", "result": "passed"}},
+  "notes": "未运行 make e2e：本任务仅验证版本显示契约，不涉及真实扫描器协作。"
+}
