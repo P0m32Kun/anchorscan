@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — 明确非递归交付与持续自治。
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Execution skills:** `implement`、`tdd`、`code-review`。
 
@@ -21,10 +21,20 @@ Node `scripts/check_ai_workflow.mjs --root <fixture>` 是唯一测试 seam。fix
 
 ## 验收
 
-- [ ] completed task 缺 commit/PR 仍失败，缺 `merged_at` 不失败。
-- [ ] 删除 delivery PR 闭环或持续自治声明会使 checker 失败。
-- [ ] 删除上游/全局/npm 显式授权边界会使 checker 失败。
-- [ ] fixture 测试、harness-check 和 pr-check 均通过。
+- [x] completed task 缺 commit/PR 仍失败，缺 `merged_at` 不失败。
+- [x] 删除 delivery PR 闭环或持续自治声明会使 checker 失败。
+- [x] 删除上游/全局/npm 显式授权边界会使 checker 失败。
+- [x] fixture 测试、harness-check 和 pr-check 均通过。
+
+## 完成证据
+
+- Fixed point：`941a97575321979066351ca4b7dc38d354410ad8`（`origin/main`）。
+- TDD：先新增 fixture 断言，`node scripts/check_ai_workflow.test.mjs` 因缺 delivery
+  contract 检查失败；补齐最小 checker 后转绿。
+- `node scripts/check_ai_workflow.test.mjs`、`make harness-check`、`git diff --check` 与
+  `make pr-check` 通过。
+- Standards/Spec 双轴审查完成；将 `merged_at` 检查限制为 complete gate，并补齐 local/Pi
+  continue/finish 的自治与升级契约 fixture。
 
 ## 非目标
 
