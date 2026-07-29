@@ -1,8 +1,10 @@
 # Spec — 达梦数据库默认口令检测器
 
-**Status:** backlog（未排期，待有时间实现）
+**Status:** completed
 
-本计划为 backlog 占位，**调研与路线决策已完成**（2026-07-28），只待排期实施。下次接手可直接按 §9 启动，无需重新调研。
+达梦默认口令检测 MVP 已于 2026-07-28 交付。权威交付 ticket 是
+[`tickets/01-delivered-mvp.md`](tickets/01-delivered-mvp.md)；归档 Trellis task
+`07-28-01-dameng-mvp` 只保存执行记录和该 ticket 的引用。
 
 ## 1. 背景与覆盖缺口
 
@@ -29,9 +31,12 @@ AnchorScan 的双引擎漏洞检测（nuclei + NSE）在国产数据库达梦（
 | DSN 格式 | `dm://SYSDBA:SYSDBA@host:5236`（密码含特殊字符需 `url.PathEscape` + `&escapeProcess=true`） |
 | 用法 | `import _ "gitee.com/chunanyong/dm"` → `sql.Open("dm", dsn)` → `db.Ping()` 成功即默认口令存在 |
 
-## 3. 待纠正的事实错误（实现时一并修复）
+## 3. 已纠正的端口记录
 
-`docs/research/vulnerability-coverage-official-sources.md` 第 48 项将达梦端口列为 `12345`，应为 **`5236`**。`12345` 本身是 NetBus 等木马常用端口，与达梦无关，应继续保留在 `config/ports-highrisk.txt` 中；实现时只修正文档端口，不改动端口表。
+`docs/research/vulnerability-coverage-official-sources.md` 第 48 项已修正为达梦默认端口
+**`5236`**。`config/ports-highrisk.txt` 同时保留 `5236`（达梦）和 `12345`
+（其他高风险服务）；后者不是达梦端口，不应移除。早期实施 PRD 中“移除 `12345`”的
+表述是错误的，产品配置保持正确。
 
 ## 4. 技术路线决策（已定）
 
@@ -69,14 +74,15 @@ AnchorScan 的双引擎漏洞检测（nuclei + NSE）在国产数据库达梦（
 4. **跨层回归风险**：新增依赖影响构建；改 `scanTarget()` 调度影响所有扫描路径，需全量回归。
 5. **保守的协议响应匹配**：MVP 阶段对主动探测响应采用宽松匹配（非空 + 4 字节长度字段合理），后续可随真实抓包收紧。
 
-## 7. 验收标准
+## 7. 交付状态与验收证据
 
-- 对运行默认口令 `SYSDBA/SYSDBA` 的达梦实例，检测器报告「达梦数据库默认口令」漏洞（high/critical）。
-- 对改过口令的达梦实例，检测器**不**误报（认证失败视为无漏洞，仅记录检测已运行）。
-- 对非达梦服务（如 5236 上跑别的服务），检测器不误报、不崩溃。
-- 达梦端口 5236 进入高危端口预设，默认扫描可覆盖。
-- 检测结果在 HTML/JSON/DOCX 报告中正确展示，`detection_checks` 有完整审计记录。
-- 全量测试与静态检查通过。
+- [x] `e69b8cd` 实现主动指纹识别、默认口令检测器、指纹驱动调度和检测审计记录。
+- [x] `5236` 已在高危端口预设中；`12345` 仍作为非达梦高危端口保留。
+- [x] 归档 task 的实现与设计文档存在：
+  `.trellis/tasks/archive/2026-07/07-28-01-dameng-mvp/`。
+- [x] 单元测试覆盖主动探测命中/未命中、verdict 映射和调度条件。
+- [ ] 对真实默认口令达梦实例的端到端观察：未记录为本次已知证据。
+- [ ] 原始 Red/Green、独立评审、完整 PR URL：未记录为本次已知证据，不作追溯性补写。
 
 ## 8. 测试策略（无真实达梦环境如何 TDD）
 
@@ -86,15 +92,14 @@ AnchorScan 的双引擎漏洞检测（nuclei + NSE）在国产数据库达梦（
 - **真实环境验证（可选，非门禁）**：用达梦官方 Docker 镜像（若可获取）或本地安装做端到端冒烟，作为 manual 验收证据。
 - 遵循 `docs/testing-strategy.md`，选最低充分测试缝，避免跨层重复覆盖。
 
-## 9. 下次接手指引
+## 9. 后续工作
 
-1. 本 spec 即完整起点，先读本文件全文 + `docs/research/vulnerability-coverage-official-sources.md` 第 48 项。
-2. 创建 `tickets/01-dameng-default-password-detector.md`，按 §5/§6 拆步骤，状态置 `ready-for-agent` 前先与用户确认。
-3. 第一个不确定项优先验证：**`gitee.com/chunanyong/dm` 能否在项目 CI 的 GOPROXY 下拉取**（决定驱动选型）。
-4. 按 `docs/agents/issue-tracker.md` 流程实施（fixed point → implement → tdd → code-review → done）。
+本 MVP 已完成。后续若扩展达梦协议版本识别、凭证策略或真实环境 E2E，应新建 ticket，
+而非复用本交付 ticket。
 
 ---
 
 ## 变更记录
 
-- 2026-07-28 — 初版。完成调研与路线决策（nuclei/NSE 均无 → 原生 Go 检测器），固化为 backlog spec。同时记录了 research 文档/高危端口表的端口事实错误（§3）待实现时纠正。
+- 2026-07-28 — 初版。完成调研与路线决策（nuclei/NSE 均无 → 原生 Go 检测器）。
+- 2026-07-29 — 对齐已交付实现、归档 Trellis task 与权威 spec；明确历史未观测证据，并纠正 `12345` 保留规则的冲突表述。

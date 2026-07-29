@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": null,
+    "summary": "Historical task: no approval artifact was retained.",
+    "result": "unobserved"
+  },
+  "tdd": {
+    "required": true,
+    "red": {"command": null, "result": "unobserved", "summary": "No Red artifact was retained."},
+    "green": {"command": null, "result": "unobserved", "summary": "No Green artifact was retained."}
+  },
+  "verification": [
+    {"command": "repository tests", "result": "unobserved", "at": null}
+  ],
+  "reviews": {
+    "standards": {"result": "unobserved", "artifact": null},
+    "spec": {"result": "unobserved", "artifact": null}
+  },
+  "delivery": {
+    "branch": null,
+    "commit": "e69b8cd",
+    "pr": null,
+    "merged_at": null
+  },
+  "notes": "No historical fixed point was retained; task.json records fixed_point as null rather than guessing."
+}
