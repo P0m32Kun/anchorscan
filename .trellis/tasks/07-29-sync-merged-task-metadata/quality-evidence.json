@@ -12,6 +12,10 @@
     {"command": "allowed-path audit", "result": "passed", "summary": "仅 Spark archive、developer journal/index 和 backlog 路径变更。"},
     {"command": "task inventory and evidence assertions", "result": "passed", "summary": "Spark 已归档并保留 PR #13/eac3b33/merge 时间；默认 Nuclei 任务仍 in_progress 且无 diff。"}
   ],
+  "reviews": {
+    "standards": {"agent": "reviewer", "result": "passed", "summary": "独立只读复审：APPROVED。"},
+    "spec": {"agent": "reviewer", "result": "passed", "summary": "独立只读验收复审：APPROVED。"}
+  },
   "delivery": {
     "branch": "codex/sync-task-metadata",
     "commit": "6fbb167",
