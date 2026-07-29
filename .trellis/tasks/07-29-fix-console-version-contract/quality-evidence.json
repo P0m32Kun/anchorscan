@@ -14,5 +14,10 @@
     {"command": "make web-smoke", "result": "passed"}
   ],
   "reviews": {"standards": {"agent": "reviewer", "result": "passed"}, "spec": {"agent": "reviewer", "result": "passed"}},
+  "delivery": {
+    "branch": "codex/fix-console-version-contract",
+    "commit": "84681d5",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/25"
+  },
   "notes": "未运行 make e2e：本任务仅验证版本显示契约，不涉及真实扫描器协作。"
 }
