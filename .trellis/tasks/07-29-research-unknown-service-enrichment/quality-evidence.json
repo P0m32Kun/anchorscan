@@ -58,8 +58,8 @@
   },
   "delivery": {
     "branch": "codex/research-unknown-service-enrichment",
-    "commit": null,
-    "pr": null,
+    "commit": "9de20a4",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/27",
     "merged_at": null
   }
 }
