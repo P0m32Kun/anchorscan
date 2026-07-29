@@ -302,6 +302,74 @@ func TestDefaultX11RuleRoutesToHostPort(t *testing.T) {
 	}
 }
 
+func TestDefaultSparkRuleRoutesOnlyRecognizedFingerprints(t *testing.T) {
+	rules, err := LoadTagRules(filepath.Join("..", "..", "config", "service-tags.yaml"))
+	if err != nil {
+		t.Fatalf("LoadTagRules returned error: %v", err)
+	}
+
+	for _, tt := range []struct {
+		name        string
+		fp          fingerprint.ServiceFingerprint
+		http        vuln.HTTPResult
+		want        []string
+		wantAddress string
+	}{
+		{
+			name: "nmap Apache Spark product and httpx URL",
+			fp: fingerprint.ServiceFingerprint{
+				IP: "192.0.2.10", Port: 8080, Normalized: "http", Product: "Apache Spark",
+			},
+			http:        vuln.HTTPResult{URL: "http://192.0.2.10:8080"},
+			want:        []string{"spark"},
+			wantAddress: "http://192.0.2.10:8080",
+		},
+		{
+			name: "httpx Apache Spark technology and URL",
+			fp: fingerprint.ServiceFingerprint{
+				IP: "192.0.2.10", Port: 8080, Normalized: "http",
+			},
+			http:        vuln.HTTPResult{URL: "https://192.0.2.10:8080", Tech: []string{"Apache Spark"}},
+			want:        []string{"spark"},
+			wantAddress: "https://192.0.2.10:8080",
+		},
+		{
+			name: "recognized product without URL falls back to host port",
+			fp: fingerprint.ServiceFingerprint{
+				IP: "192.0.2.12", Port: 8080, Normalized: "http", Product: "Apache Spark",
+			},
+			want:        []string{"spark"},
+			wantAddress: "192.0.2.12:8080",
+		},
+		{
+			name: "unknown non-web service on port 8080 is not Spark",
+			fp:   fingerprint.ServiceFingerprint{IP: "192.0.2.11", Port: 8080, Normalized: "tcpwrapped"},
+			want: nil,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := vuln.MatchNucleiTags(tt.fp, tt.http, rules)
+			if !reflect.DeepEqual(got.Tags, tt.want) {
+				t.Fatalf("tags = %#v, want %#v (match=%#v)", got.Tags, tt.want, got)
+			}
+			if len(tt.want) == 0 {
+				if got.Address != "" {
+					t.Fatalf("unknown service matched a rule: %#v", got)
+				}
+				return
+			}
+			if got.Address != tt.wantAddress || got.Target != "url" {
+				t.Fatalf("Spark target = %#v, want URL target %q", got, tt.wantAddress)
+			}
+			for _, excluded := range []string{"fuzz", "dos", "default-login", "brute", "bruteforce"} {
+				if !hasString(got.ExcludeTags, excluded) {
+					t.Fatalf("Spark exclusions = %#v, missing %q", got.ExcludeTags, excluded)
+				}
+			}
+		})
+	}
+}
+
 func TestDefaultWebRulesRouteByFingerprint(t *testing.T) {
 	rules, err := LoadTagRules(filepath.Join("..", "..", "config", "service-tags.yaml"))
 	if err != nil {
@@ -329,6 +397,15 @@ func TestDefaultWebRulesRouteByFingerprint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func hasString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestDefaultHighriskPortsCoverRequestedServices(t *testing.T) {

@@ -349,3 +349,63 @@ out, err := tools.RunNucleiTemplate(ctx, runner, nuclei, match.Address, rule.Tem
 ```go
 out, err := tools.RunNuclei(ctx, runner, nuclei, match.Address, match.Tags, match.ExcludeTags, args)
 ```
+
+## Scenario: Spark Web UI/API tag routing
+
+### 1. Scope / Trigger
+
+- A default scan fingerprint identifies an Apache Spark Web UI/API through an Nmap service product or httpx technology value.
+- This scenario covers only Spark's HTTP exposure; it does not infer Spark from port 8080 or cover non-Web components.
+
+### 2. Signatures
+
+- Rule evidence: `product: ["apache spark"]` or `tech: ["apache spark"]`.
+- Default Nuclei selection: `nuclei_tags: spark`.
+
+### 3. Contracts
+
+- A Spark rule must have concrete fingerprint evidence and no port-only condition.
+- The default route uses `spark` tags with the normal global `fuzz,dos` exclusions and additionally excludes `default-login`, `brute`, and `bruteforce`.
+- A usable HTTP URL is the Nuclei target; otherwise use the existing `IP:port` fallback.
+- An unknown or `tcpwrapped` service on port 8080 has no matching Spark rule and retains `skipped/no_matching_rule` semantics.
+- The external template library supplies the selected templates; the repository neither bundles Spark templates nor adds `template:` to service-tag rules.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Nmap product or httpx tech is Apache Spark | Invoke Nuclei with `-tags spark` and safe exclusions. |
+| Spark has URL | Target that URL. |
+| Spark lacks URL | Target `IP:port`. |
+| Unknown service on 8080 | Do not invoke Nuclei; persist `skipped/no_matching_rule`. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: product `Apache Spark` with an httpx URL invokes the `spark` tag route against that URL.
+- Base: a recognized Spark service without URL remains routable via `IP:port`.
+- Bad: a generic HTTP or `tcpwrapped` service on 8080 selects Spark solely from its port.
+
+### 6. Tests Required
+
+- Rule tests cover product-only and tech-only Spark evidence, URL use, `IP:port` fallback, safe exclusions, and unknown 8080 rejection.
+- An execution test creates release-shaped sidecars and calls `PrepareScan`; it asserts `-tags spark`, exact exclusions, and completed Nuclei DetectionCheck.
+- The negative execution test proves unknown 8080 does not invoke Nuclei and records `skipped/no_matching_rule`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```yaml
+match:
+  ports: [8080]
+nuclei_tags: spark
+```
+
+#### Correct
+
+```yaml
+match:
+  product: ["apache spark"]
+  tech: ["apache spark"]
+nuclei_tags: spark
+```
