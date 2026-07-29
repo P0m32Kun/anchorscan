@@ -436,6 +436,87 @@ func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 	}
 }
 
+func TestRunScanRoutesSparkWebUIWithSafeTags(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	req := fixture.request()
+	req.ConfigPath = writePackagedConfig(t, fixture)
+	req.TargetSpec = "192.0.2.10"
+	req.PortSpec = "8080"
+	req.RunID = "run-spark-webui"
+	prepared, err := PrepareScan(req)
+	if err != nil || prepared.Preflight.HasErrors() {
+		t.Fatalf("PrepareScan = %#v, %v", prepared, err)
+	}
+
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.0.2.10 -> [8080]\\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Spark"/></port></ports></host></nmaprun>`),
+		[]byte(`{"url":"http://192.0.2.10:8080","status_code":200,"title":"Spark Master at spark://","tech":["Apache Spark"]}`),
+		[]byte{},
+	}}
+	scanStore := newScanStore(t)
+	err = RunScan(context.Background(), runner, scanStore, prepared.Options)
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-tags", "spark", "-etags", "fuzz,dos,default-login,brute,bruteforce", "-target", "http://192.0.2.10:8080", "-jsonl") {
+		t.Fatalf("expected safe Spark nuclei invocation, commands=%#v", runner.commands)
+	}
+	checks, err := scanStore.ListDetectionChecks(prepared.Options.RunID)
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nuclei" {
+			if check.Status != "completed" || check.ReasonCode != "" {
+				t.Fatalf("Spark nuclei DetectionCheck = %#v, want completed", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("Spark nuclei DetectionCheck not recorded: %#v", checks)
+}
+
+func TestRunScanSkipsNucleiForUnknownServiceOnSparkPort(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.0.2.11 -> [8080]\\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="tcpwrapped"/></port></ports></host></nmaprun>`),
+	}}
+	scanStore := newScanStore(t)
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-unknown-8080",
+		Targets:        []string{"192.0.2.11"},
+		Ports:          "8080",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		TagRules: []TagRule{{
+			Name: "spark", Product: []string{"apache spark"}, Tech: []string{"apache spark"},
+			NucleiTags: []string{"spark"}, ExcludeTags: []string{"default-login", "brute", "bruteforce"}, Target: "url",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.hasArgs("/opt/nuclei") {
+		t.Fatalf("unknown service on port 8080 invoked nuclei: %#v", runner.commands)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-unknown-8080")
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nuclei" {
+			if check.Status != "skipped" || check.ReasonCode != "no_matching_rule" {
+				t.Fatalf("unknown port 8080 nuclei DetectionCheck = %#v, want skipped/no_matching_rule", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("nuclei DetectionCheck not recorded: %#v", checks)
+}
+
 func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,

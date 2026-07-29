@@ -199,6 +199,16 @@
   tech: ["joomla"]
   nuclei_tags: ["joomla"]
   target: "url"
+- name: spark
+  # Spark Web UI/API is identified by Nmap's Apache Spark product or httpx's
+  # Apache Spark technology, never by its commonly used 8080 port alone.
+  product: ["apache spark"]
+  tech: ["apache spark"]
+  nuclei_tags: ["spark"]
+  # This route only permits unauthenticated exposure checks; do not run
+  # credential dictionaries or brute-force templates against Spark.
+  exclude_tags: ["default-login", "brute", "bruteforce"]
+  target: "url"
 # 通用 HTTP 兜底：识别为 http 但未命中具体产品时，跑通用 web 模板
 - name: http-generic
   service: ["http"]
