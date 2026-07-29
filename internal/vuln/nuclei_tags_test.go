@@ -25,6 +25,9 @@ func TestMatchNucleiTagsSelectsSSHViaTags(t *testing.T) {
 	}}
 	fp := fingerprint.ServiceFingerprint{IP: "192.168.1.10", Port: 22, Normalized: "ssh"}
 	got := MatchNucleiTags(fp, HTTPResult{}, rules)
+	if got.Template != "" {
+		t.Fatalf("Template = %q, want empty (SSH routes via -tags, not an in-repo template)", got.Template)
+	}
 	if len(got.Tags) == 0 || got.Tags[0] != "ssh" {
 		t.Fatalf("Tags = %#v, want [ssh]", got.Tags)
 	}
