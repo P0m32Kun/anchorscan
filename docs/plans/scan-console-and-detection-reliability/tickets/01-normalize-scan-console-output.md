@@ -4,7 +4,7 @@
 
 **Blocked by:** 无。
 
-**Status:** in-review.
+**Status:** done.
 
 ## 行为契约
 
@@ -25,7 +25,7 @@
 - [x] 失败 Nuclei 输出不再将 ANSI、banner 或重复文本持久化为 ScanEvent；日志和原始 artifact 保持取证用途。
 - [x] ScanEvent 仍保留简洁的可行动错误及关键阶段进度。
 - [x] 未匹配 Dameng 候选探测不污染事件流，匹配事件仍可见。
-- [ ] 聚焦测试、self-check、Standards/Spec 双轴只读评审和 `make pr-check` 全部通过；PR、合并与 Trellis complete gate 证据已记录。
+- [x] 聚焦测试、self-check、Standards/Spec 双轴只读评审和 `make pr-check` 全部通过；PR、合并与 Trellis complete gate 证据已记录。
 
 ## 非目标
 
