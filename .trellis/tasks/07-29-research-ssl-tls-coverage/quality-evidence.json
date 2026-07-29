@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "approval": {
+    "recorded_at": "2026-07-29T00:00:00Z",
+    "result": "passed",
+    "summary": "用户在本会话要求继续推进现有 TLS 覆盖研究任务；范围是证据化盘点，不修改扫描规则或运行侵入性检测。"
+  },
+  "tdd": {
+    "required": false,
+    "red": {
+      "command": null,
+      "result": "not_applicable",
+      "evidence": "研究任务未修改产品行为或测试代码。"
+    },
+    "green": {
+      "command": null,
+      "result": "not_applicable"
+    }
+  },
+  "verification": [
+    {
+      "command": "go test ./internal/config ./internal/app ./internal/fingerprint/... ./internal/vuln/...",
+      "result": "passed",
+      "evidence": "2026-07-29: config, app, fingerprint, fingerprint/probes and vuln packages passed."
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed",
+      "evidence": "2026-07-29: no whitespace errors."
+    },
+    {
+      "command": "python3 ./.trellis/scripts/task.py validate 07-29-research-ssl-tls-coverage --ready",
+      "result": "passed",
+      "evidence": "Planning readiness passed before activation."
+    }
+  ],
+  "research": {
+    "artifact": ".trellis/tasks/07-29-research-ssl-tls-coverage/research/ssl-tls-coverage.md",
+    "result": "passed",
+    "summary": "Four-category evidence matrix: Web identification is partial, weak-cipher detection is template-dependent conditional coverage, and certificate/CVE coverage is not connected by default."
+  },
+  "reviews": {
+    "self_check": {
+      "agent": "codex",
+      "result": "passed",
+      "summary": "Checked local routing, configuration, tool/template provenance boundary, focused tests, and diff whitespace."
+    },
+    "standards": {
+      "agent": "reviewer",
+      "result": "passed",
+      "summary": "Final read-only review approved the conservative coverage and runtime-routing claims."
+    },
+    "spec": {
+      "agent": "reviewer",
+      "result": "passed",
+      "summary": "Final read-only review approved all four TLS research PRD acceptance criteria."
+    }
+  },
+  "delivery": {
+    "branch": "codex/research-ssl-tls-coverage",
+    "commit": null,
+    "pr": null,
+    "merged_at": null
+  }
+}
