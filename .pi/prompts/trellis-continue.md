@@ -27,10 +27,10 @@ Shows the Phase Index (Plan / Execute / Finish) with routing + skill mapping.
 - `status=planning` + no `prd.md` → **1.1** (load `trellis-brainstorm`)
 - `status=planning` + `prd.md` only → decide whether the task is lightweight or complex. Lightweight can move to **1.4** review; complex returns to **1.1** to add `design.md` + `implement.md`.
 - `status=planning` + complex artifacts complete + sub-agent jsonl not curated (only the seed `_example` row) → **1.3**
-- `status=planning` + required artifacts complete + required jsonl curated or inline mode → **1.4** (ask for start review; only run `task.py start` after user confirms)
+- `status=planning` + required artifacts complete + required jsonl curated or inline mode → **1.4** (run `task.py validate --ready` before `task.py start`)
 - `status=in_progress` + implementation not started → **2.1**
 - `status=in_progress` + implementation done, not yet checked → **2.2** (write-capable self-check)
-- `status=in_progress` + self-check passed → Standards review → Spec/AC review → full verification → PR → **3.3** (spec update) → **3.4** (commit)
+- `status=in_progress` + self-check passed → Standards review → Spec/AC review → full verification → evidence/ticket/archive ready → delivery PR
 - `status=completed` (rare; usually archived immediately) → archive flow
 
 Phase rules (full detail in `.trellis/workflow.md`):
@@ -38,6 +38,8 @@ Phase rules (full detail in `.trellis/workflow.md`):
 1. Run steps **in order** within a phase — `[required]` steps must not be skipped
 2. `[once]` steps are already done if the required output exists. `prd.md` alone can be enough only for lightweight tasks; complex tasks also need `design.md` and `implement.md`.
 3. You may go back to an earlier phase if discoveries require it
+
+`delivery.commit` 和 `delivery.pr` 是完成交付引用；`delivery.merged_at` 仅是 PR 合并后的可空观测，不阻塞 complete/archive，也不得产生纯元数据后续 PR。用户已授予持续自治时，分支、提交、push、PR、合并、归档和 journal 都直接执行；仅产品范围、安全/权限、未知并行工作，或 Trellis 上游、全局安装、npm 发布等外部持久变更需要升级。
 
 ## Step 4: Load the Specific Step
 
