@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -35,6 +36,33 @@ func TestRunDamengDefaultPassword_Safe(t *testing.T) {
 	}
 	if res.Verdict != DamengSafe {
 		t.Fatalf("expected safe, got %q", res.Verdict)
+	}
+}
+
+type panicDamengChecker struct{}
+
+func (panicDamengChecker) Check(context.Context, string, int, string, string) (bool, string, error) {
+	panic("driver index out of range")
+}
+
+func TestRunDamengDefaultPassword_RecoversCheckerPanic(t *testing.T) {
+	res, err := RunDamengDefaultPassword(context.Background(), panicDamengChecker{}, "127.0.0.1", 5236)
+	if err == nil || !strings.Contains(err.Error(), "dameng driver panic") {
+		t.Fatalf("error = %v, want recovered driver panic", err)
+	}
+	if res.Verdict != DamengUnknown || !strings.Contains(res.Output, "driver index out of range") {
+		t.Fatalf("result = %#v, want unknown result with panic detail", res)
+	}
+}
+
+func TestRunDamengDefaultPassword_ReturnsDeadlineFailure(t *testing.T) {
+	checker := &fakeDamengChecker{err: context.DeadlineExceeded}
+	res, err := RunDamengDefaultPassword(context.Background(), checker, "127.0.0.1", 5236)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error = %v, want deadline exceeded", err)
+	}
+	if res.Verdict != DamengUnknown || !strings.Contains(res.Output, "deadline exceeded") {
+		t.Fatalf("result = %#v, want unknown result with deadline detail", res)
 	}
 }
 

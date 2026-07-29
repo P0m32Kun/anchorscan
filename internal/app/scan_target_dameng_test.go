@@ -3,19 +3,30 @@ package app
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
 // fakeDamengAuthChecker implements the DamengAuthChecker interface for scan-level tests.
 type fakeDamengAuthChecker struct {
-	ok  bool
-	out string
-	err error
+	ok         bool
+	out        string
+	err        error
+	panicValue any
+	waitForCtx bool
 }
 
 func (f *fakeDamengAuthChecker) Check(ctx context.Context, host string, port int, username, password string) (bool, string, error) {
+	if f.waitForCtx {
+		<-ctx.Done()
+		return false, "", ctx.Err()
+	}
+	if f.panicValue != nil {
+		panic(f.panicValue)
+	}
 	return f.ok, f.out, f.err
 }
 
@@ -66,6 +77,98 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 	if c, ok := checkByEngine["dameng"]; !ok || c.Status != "completed" {
 		t.Fatalf("expected dameng completed, got %#v", checkByEngine["dameng"])
 	}
+}
+
+func TestRunScanRecordsDamengPanicAsCompletedWithErrors(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte("192.0.2.10 -> [5236]\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
+	}}
+	scanStore := newScanStore(t)
+
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-dameng-panic",
+		Targets:        []string{"192.0.2.10"},
+		Ports:          "5236",
+		DiscoveryMode:  DiscoveryAssumeUp,
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		DamengChecker:  &fakeDamengAuthChecker{panicValue: "driver index out of range"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	run, err := scanStore.GetScanRun("run-dameng-panic")
+	if err != nil || run.Status != "completed_with_errors" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+	findings, err := scanStore.ListFindings("run-dameng-panic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("findings = %#v, want none", findings)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-dameng-panic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range checks {
+		if check.Engine == "dameng" && check.Status == "failed" && check.ReasonCode == "command_failed" {
+			if !strings.Contains(check.Detail, "dameng driver panic") {
+				t.Fatalf("Dameng failure detail = %q, want driver panic diagnostic", check.Detail)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected failed Dameng check, got %#v", checks)
+}
+
+func TestRunScanRecordsDamengDeadlineAsCompletedWithErrors(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte("192.0.2.11 -> [5236]\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
+	}}
+	scanStore := newScanStore(t)
+
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-dameng-deadline",
+		Targets:        []string{"192.0.2.11"},
+		Ports:          "5236",
+		DiscoveryMode:  DiscoveryAssumeUp,
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		Timeouts:       ToolTimeouts{Dameng: time.Millisecond},
+		DamengChecker:  &fakeDamengAuthChecker{waitForCtx: true},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	run, err := scanStore.GetScanRun("run-dameng-deadline")
+	if err != nil || run.Status != "completed_with_errors" {
+		t.Fatalf("run = %#v, %v", run, err)
+	}
+	findings, err := scanStore.ListFindings("run-dameng-deadline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("findings = %#v, want none", findings)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-dameng-deadline")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range checks {
+		if check.Engine == "dameng" && check.Status == "failed" && check.ReasonCode == "command_failed" {
+			if !strings.Contains(check.Detail, "deadline exceeded") {
+				t.Fatalf("Dameng failure detail = %q, want deadline diagnostic", check.Detail)
+			}
+			return
+		}
+	}
+	t.Fatalf("expected failed Dameng check, got %#v", checks)
 }
 
 // TestRunScanSkipsDamengWhenToolUnconfigured verifies that a dameng-normalized

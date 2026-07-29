@@ -19,7 +19,7 @@ timeouts:
   nse: "0"
   nuclei: "0"
   rdpscan: "0"
-  dameng: "0"
+  dameng: "15s"
 
 knowledge_base:
   path: ""

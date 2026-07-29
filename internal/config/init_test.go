@@ -53,6 +53,24 @@ func TestInitProfilesMatchShippedExample(t *testing.T) {
 	}
 }
 
+func TestInitTimeoutsMatchShippedExample(t *testing.T) {
+	generatedPath := filepath.Join(t.TempDir(), "default.yaml")
+	if err := Init(generatedPath); err != nil {
+		t.Fatal(err)
+	}
+	generated, err := Load(generatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	example, err := Load(filepath.Join("..", "..", "config", "default.yaml.example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if generated.Timeouts.Dameng != "15s" || example.Timeouts.Dameng != "15s" {
+		t.Fatalf("dameng timeouts = generated %q, example %q; want 15s", generated.Timeouts.Dameng, example.Timeouts.Dameng)
+	}
+}
+
 func TestLoadAutoInitsWhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "default.yaml")
