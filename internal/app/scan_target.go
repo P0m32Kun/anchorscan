@@ -126,7 +126,6 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		// any custom port). Fire a lightweight DM handshake probe on weakly
 		// identified non-web ports before the vulnerability engines run.
 		if !fp.IsWeb && opts.Tools.Dameng != "" && shouldProbeDameng(fp) {
-			progress.Emit("info", "dameng-probe", "dameng-probe %s:%d (nmap service=%q product=%q)", fp.IP, fp.Port, fp.Service, fp.Product)
 			if enriched, ok := probes.DetectDameng(ctx, fp); ok {
 				fp = enriched
 				progress.Emit("info", "dameng-probe", "dameng-probe %s:%d matched", fp.IP, fp.Port)

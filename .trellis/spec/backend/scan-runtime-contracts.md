@@ -236,3 +236,60 @@ if errors.As(err, &panicErr) || errors.Is(err, context.DeadlineExceeded) {
     return DamengResult{Verdict: DamengUnknown, Output: err.Error()}, err
 }
 ```
+
+## Scenario: ScanEvent console summaries
+
+### 1. Scope / Trigger
+
+- `storeProgress.Emit` is the boundary between raw scan diagnostics and the persisted `store.ScanEvent` feed consumed by the Web Console.
+- External tools, especially Nuclei, can embed ANSI sequences and a complete ASCII banner inside an error string. Persisting that output makes the Console unreadable; dropping it from logs/artifacts loses diagnostic evidence.
+
+### 2. Signatures
+
+- Producer: `app.Progress.Emit(level, stage, format string, args ...any)`.
+- Adapter: `storeProgress.Emit` logs the formatted raw message and appends `store.ScanEvent{Message: ...}`.
+- Consumer: the Web Console reads `ScanEvent.Message`; artifact writers retain tool output independently.
+
+### 3. Contracts
+
+- Log callbacks receive the original formatted message. Artifact content, DetectionCheck status/reason/detail, runner arguments, and Run status are not changed by event summarization.
+- Persisted ScanEvent messages remove ANSI escapes, ASCII-only banner lines, known Nuclei version/template-load notices, and retain the final `[FTL]` reason with the preceding scan-stage context.
+- A normal single-line progress event retains its semantic content after ANSI removal.
+- An unmatched Dameng protocol probe emits no ScanEvent; a successful match emits its existing `dameng-probe ... matched` event.
+
+### 4. Validation & Error Matrix
+
+| Condition | Log / artifact | ScanEvent |
+|---|---|---|
+| Nuclei multiline error with final `[FTL]` | Preserve full raw output | Stage context plus final actionable reason, no ANSI/banner/version/template-load noise |
+| Single-line progress with ANSI | Preserve original log | Same progress text without ANSI |
+| Dameng probe misses | Probe behavior unchanged | No `dameng-probe` event |
+| Dameng probe matches | Fingerprint/enrichment unchanged | One matched event |
+
+### 5. Good/Base/Bad Cases
+
+- Good: the Console says `nuclei 192.0.2.10:443 failed: Could not run nuclei: no templates provided for scan`, while logs retain the complete Nuclei banner and diagnostics.
+- Base: `rustscan 192.0.2.10 open=[22,443]` remains recognizably the same progress event.
+- Bad: logging the summary instead of the raw text, persisting raw Nuclei banner output, or emitting a Console event for every failed Dameng candidate probe.
+
+### 6. Tests Required
+
+- App/store test: a realistic Nuclei multiline error proves raw log preservation and exact persisted event summary.
+- Unit test: ANSI is removed from ordinary one-line progress.
+- Deterministic loopback fixture: a non-Dameng reply emits no probe event; a valid Dameng response preserves the matched event and enriched fingerprint.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+p.log("%s", summarizeScanEvent(message))
+_ = p.store.AppendScanEvent(store.ScanEvent{Message: message})
+```
+
+#### Correct
+
+```go
+p.log("%s", message)
+_ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)})
+```
