@@ -314,6 +314,10 @@ def validate_task_gate(target_dir: Path, repo_root: Path, mode: str) -> int:
                 value = source.get(key)
                 if not isinstance(value, str) or not (repo_root / value).is_file():
                     errors += _gate_error(f"source_of_truth.{key} must reference an existing file")
+            ticket = source.get("ticket")
+            if mode == "ready" and isinstance(ticket, str) and (repo_root / ticket).is_file():
+                if "**Status:** ready-for-agent" not in (repo_root / ticket).read_text(encoding="utf-8"):
+                    errors += _gate_error("source ticket must be ready-for-agent")
         required_artifacts = ("prd.md", "design.md", "implement.md") if risk == "behavioral" else ("prd.md",)
         for artifact in required_artifacts:
             if not (target_dir / artifact).is_file():

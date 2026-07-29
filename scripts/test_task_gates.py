@@ -27,7 +27,9 @@ class TaskGateCLITest(unittest.TestCase):
         self.task_dir.mkdir(parents=True)
         (self.root / "docs").mkdir()
         (self.root / "docs" / "spec.md").write_text("# spec\n", encoding="utf-8")
-        (self.root / "docs" / "ticket.md").write_text("# ticket\n", encoding="utf-8")
+        (self.root / "docs" / "ticket.md").write_text(
+            "# ticket\n\n**Status:** ready-for-agent\n", encoding="utf-8"
+        )
         for name in ("prd.md", "design.md", "implement.md"):
             (self.task_dir / name).write_text("# artifact\n", encoding="utf-8")
         (self.task_dir / "task.json").write_text(
@@ -79,6 +81,16 @@ class TaskGateCLITest(unittest.TestCase):
 
         self.assertNotEqual(0, result.returncode)
         self.assertIn("branch is required", result.stdout + result.stderr)
+
+    def test_ready_rejects_source_ticket_not_ready_for_agent(self) -> None:
+        (self.root / "docs" / "ticket.md").write_text(
+            "# ticket\n\n**Status:** planning\n", encoding="utf-8"
+        )
+
+        result = self.run_task("validate", "fixture", "--ready")
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("ready-for-agent", result.stdout + result.stderr)
 
     def test_forced_start_requires_and_records_reason(self) -> None:
         result = self.run_task("start", "fixture", "--force")
