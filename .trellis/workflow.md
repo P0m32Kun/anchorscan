@@ -560,7 +560,7 @@ If issues are found → fix → re-check, until green.
 
 [/codex-inline, Kilo, Antigravity, Devin]
 
-**Independent review and delivery**: after self-check, run `code-review` from the recorded fixed point against the authoritative ticket/spec. Standards review and Spec/AC review are separate read-only outputs; neither may edit the implementation. Then run full verification, open a PR, and record all results in task evidence.
+**Independent review and delivery**: after self-check, run `code-review` from the recorded fixed point against the authoritative ticket/spec. Standards review and Spec/AC review are separate read-only outputs; neither may edit the implementation. Then run full verification, commit and open one delivery PR, record its URL in task evidence, and commit/push archive or journal records to that still-open PR before merging it. `delivery.commit` and `delivery.pr` close the local complete gate; `delivery.merged_at` is an optional remote observation. Never open a follow-up PR solely to record merge time, archive, or journal metadata.
 
 **Final pass (before Phase 3.4 commit)**: the last 2.2 of a task must run full-scope, not just on the latest implement chunk. List all affected packages with `python3 ./.trellis/scripts/get_context.py --mode packages`, then load each package's spec index Quality Check section. This catches cross-layer / multi-package issues a mid-iteration local 2.2 cannot.
 
@@ -620,31 +620,13 @@ The AI drives a batched commit of this task's code changes so `/finish-work` can
 
 4. **Draft a commit plan**. Group AI-edited files into logical commits (1 commit per coherent change unit, not 1 commit per file). Each entry: `<commit message>` + file list. List unrecognized files separately at the bottom.
 
-5. **Present the plan once, ask for one-shot confirmation**. Format:
-   ```
-   Proposed commits (in order):
-     1. <message>
-        - <file>
-        - <file>
-     2. <message>
-        - <file>
+5. **Execute routine delivery under continuous authorization**: when the user has granted continuous/autonomous authority, run `git add <files>` + `git commit -m "<msg>"` for each batch in order, then push and create/merge the delivery PR as the repository rules permit. Do not amend. Do not ask again for branch creation, commit, push, PR, merge, archive, or journal.
 
-   Unrecognized dirty files (NOT in any commit — confirm include/exclude):
-     - <file>
-     - <file>
-
-   Reply 'ok' / '行' to execute. Reply with edits, or '我自己来' / 'manual' to abort.
-   ```
-
-6. **On confirmation**: run `git add <files>` + `git commit -m "<msg>"` for each batch in order. Do not amend. Do not push.
-
-7. **On rejection** (user replies "不行" / "我自己来" / "manual" / any pushback on the plan): stop. Do not attempt a second plan. The user will commit by hand; you skip ahead to 3.5 once they confirm.
+6. **Escalate only material decisions**: stop for a product behavior/scope choice, a security or permission risk, unknown concurrent-work ownership, or an external persistent action such as Trellis upstream changes, global installation, or npm publication. A user may still explicitly choose manual delivery; then stop without creating a second plan.
 
 **Rules**:
-- No `git commit --amend` anywhere — three-stage three-commit flow (work commits → archive commit → journal commit).
-- Never push to remote in this step.
-- If the user wants different message wording but accepts the file grouping, edit the message and re-confirm once — but if they reject the grouping, exit to manual mode.
-- The batched plan is one prompt; do not prompt per commit.
+- No `git commit --amend` anywhere. Work, archive, and journal commits may be separate commits, but they must all be pushed to the same still-open delivery PR rather than becoming post-merge metadata PRs.
+- Open the delivery PR once its reviewed work commit is pushed, record that PR URL, then commit/push any completion-gated archive or journal artifacts to the same still-open PR before merging. After merge, record only local observations; do not create a metadata-only follow-up PR.
 
 #### 3.5 Archive only after the completion gate
 
@@ -663,7 +645,7 @@ shortcut.
 
 #### 3.6 Wrap-up reminder
 
-After the above, remind the user they can run `/finish-work` to wrap up (archive the task, record the session).
+After the above, archive and record the session on the still-open delivery PR when task state is available, then merge that PR; do not turn bookkeeping into a separate PR.
 
 ---
 
