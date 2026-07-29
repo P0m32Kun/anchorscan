@@ -50,7 +50,7 @@ You are already the `trellis-implement` sub-agent that the main session dispatch
 4. Implement the requested change using existing project patterns.
 5. For behavioral work, begin with TDD Red and make the smallest Green change.
 6. Run the relevant lint, typecheck, and focused tests available for the touched code.
-6. Report files changed and verification results.
+7. Report files changed and verification results.
 
 ## Forbidden Operations
 

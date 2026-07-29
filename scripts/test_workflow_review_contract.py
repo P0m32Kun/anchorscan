@@ -18,6 +18,17 @@ class WorkflowReviewContractTest(unittest.TestCase):
         self.assertIn("trellis-check is a write-capable self-check", text)
         self.assertIn("code-review", text)
 
+    def test_every_implement_dispatch_requires_tdd(self) -> None:
+        text = (ROOT / ".trellis/workflow.md").read_text(encoding="utf-8")
+        for platform_block in (
+            "Claude Code, Cursor, OpenCode, codex-sub-agent, CodeBuddy, Droid, Pi, ZCode, Snow, Oh My Pi",
+            "Gemini, Qoder, Copilot, Reasonix, Trae, Grok, Kimi Code",
+            "Kiro",
+        ):
+            start = text.index(f"[{platform_block}]")
+            end = text.index(f"[/{platform_block}]", start)
+            self.assertIn("TDD Red", text[start:end], platform_block)
+
     def test_all_agent_surfaces_preserve_role_boundaries(self) -> None:
         for relative in (
             ".codex/agents/trellis-implement.toml",

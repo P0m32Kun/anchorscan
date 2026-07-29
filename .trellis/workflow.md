@@ -498,7 +498,7 @@ The platform hook/plugin auto-handles:
 Spawn the implement sub-agent:
 
 - **Agent type**: `trellis-implement`
-- **Task description**: Implement the reviewed task artifacts, consulting materials under `{TASK_DIR}/research/`; finish by running project lint and type-check
+- **Task description**: Start with TDD Red, make the smallest Green change, then run focused tests and self-check; record commands/results in task evidence
 - **Dispatch prompt guard**: The prompt MUST start with `Active task: <task path>`, then explicitly say the spawned agent is already `trellis-implement` and must implement directly without spawning another `trellis-implement` / `trellis-check`.
 
 The pull-based sub-agent definition auto-handles the context load requirement:
@@ -512,7 +512,7 @@ The pull-based sub-agent definition auto-handles the context load requirement:
 Spawn the implement sub-agent:
 
 - **Agent type**: `trellis-implement`
-- **Task description**: Implement the reviewed task artifacts, consulting materials under `{TASK_DIR}/research/`; finish by running project lint and type-check
+- **Task description**: Start with TDD Red, make the smallest Green change, then run focused tests and self-check; record commands/results in task evidence
 - **Dispatch prompt guard**: Tell the spawned agent it is already the `trellis-implement` sub-agent and must implement directly, not spawn another `trellis-implement` / `trellis-check`.
 
 The platform prelude auto-handles the context load requirement:
