@@ -16,13 +16,17 @@ PACKAGE_ARCHIVE ?= $(DIST_DIR)/$(PACKAGE_NAME).tar.gz
 E2E_TIMEOUT ?= 55m
 RUNTIME_CONFIG := default.yaml.example nse.yaml service-tags.yaml ports-highrisk.txt ports-top1000.txt
 
-.PHONY: test doc-check docx-test docx-visual build package package-test package-smoke security-check web-smoke release-check pr-check e2e clean
+.PHONY: test harness-check doc-check docx-test docx-visual build package package-test package-smoke security-check web-smoke release-check pr-check e2e clean
 
 test:
 	go test ./...
 	node --test internal/web/static/*.test.mjs internal/web/frontend/*.test.mjs
 	python3 scripts/test_task_gates.py
 	python3 scripts/test_workflow_review_contract.py
+	node --test scripts/check_ai_workflow.test.mjs
+
+harness-check:
+	node scripts/check_ai_workflow.mjs
 
 doc-check:
 	node scripts/check_markdown_links.mjs
@@ -75,7 +79,7 @@ release-check: web-smoke
 	@test "$(GOOS)" = "$(shell go env GOOS)" && test "$(GOARCH)" = "$(shell go env GOARCH)" || { echo "release-check requires a host build" >&2; exit 1; }
 	@test "$$($(DIST_DIR)/$(BINARY) version)" = "anchorscan version $(DISPLAY_VERSION)" || { echo "release version was not injected" >&2; exit 1; }
 
-pr-check: test doc-check docx-test build package-test web-smoke
+pr-check: test harness-check doc-check docx-test build package-test web-smoke
 
 e2e:
 	go test -tags=e2e ./e2e -timeout $(E2E_TIMEOUT) -v
