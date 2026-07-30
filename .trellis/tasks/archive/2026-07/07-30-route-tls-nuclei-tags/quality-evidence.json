@@ -9,7 +9,7 @@
     "required": true,
     "red": {
       "command": "go test ./internal/fingerprint ./internal/vuln; go test ./internal/app ./internal/vuln",
-      "result": "passed",
+      "result": "failed",
       "evidence": "先后观察到 IsTLS 未定义/三类 TLS tags 未追加、DetectionCheck Detail 缺少 tags，以及独立审查指出的 unidentified TLS 与 tool_unconfigured 反例失败。"
     },
     "green": {
@@ -44,8 +44,8 @@
   },
   "delivery": {
     "branch": "codex/route-tls-nuclei-tags",
-    "commit": null,
-    "pr": null,
+    "commit": "ed9cea2b2e8e981a51447f52dac2b6e2c152df4c",
+    "pr": "https://github.com/P0m32Kun/anchorscan/pull/29",
     "merged_at": null
   }
 }
