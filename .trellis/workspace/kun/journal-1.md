@@ -218,6 +218,20 @@ Merged Web Console Shanghai time formatting; archived completed task.
 
 - 确认 Web 识别部分覆盖、弱套件检测仅为外部模板依赖的条件路径，证书/CVE 检测未接通。
 - 提出锁定外部输入、证书采集、协议套件基线和单 CVE 验证四个需重新批准的候选任务。
+## Session 10: 完成未识别服务通用增强研究
+
+**Date**: 2026-07-30
+**Task**: 完成未识别服务通用增强研究
+**Branch**: `codex/research-unknown-service-enrichment`
+
+### Summary
+
+完成证据化研究，拒绝通用 unknown/tcpwrapped fallback，并归档研究任务。
+
+### Main Changes
+
+- 新增带一手资料与本机版本证据的研究结论，保留现有 Dameng 专用例外。
+- 将通用探测准入、预算、证据与审计约束写入扫描运行时契约。
 
 ### Git Commits
 
@@ -226,11 +240,15 @@ Merged Web Console Shanghai time formatting; archived completed task.
 | `4b8194d` | (see git log) |
 | `155b856` | (see git log) |
 | `bf8176f` | (see git log) |
+| `9de20a4` | (see git log) |
+| `22dea75` | (see git log) |
+| `9317291` | (see git log) |
 
 ### Testing
 
 - [OK] go test ./internal/config ./internal/app ./internal/fingerprint/... ./internal/vuln/...
 - [OK] git diff --check；独立 Standards 与 Spec/AC 审查通过。
+- [OK] git diff --check；独立 standards 与 Spec/AC 审查通过。
 
 ### Status
 
@@ -239,3 +257,4 @@ Merged Web Console Shanghai time formatting; archived completed task.
 ### Next Steps
 
 - 收敛 07-29-triage-bug-record 的最终规划，纠正已完成子任务数量并申请后续实施批准。
+- 推进 07-29-research-ssl-tls-coverage，再回到父任务收敛最终规划。
