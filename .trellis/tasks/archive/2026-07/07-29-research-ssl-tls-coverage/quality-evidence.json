@@ -35,7 +35,7 @@
     }
   ],
   "research": {
-    "artifact": ".trellis/tasks/07-29-research-ssl-tls-coverage/research/ssl-tls-coverage.md",
+    "artifact": ".trellis/tasks/archive/2026-07/07-29-research-ssl-tls-coverage/research/ssl-tls-coverage.md",
     "result": "passed",
     "summary": "Four-category evidence matrix: Web identification is partial, weak-cipher detection is template-dependent conditional coverage, and certificate/CVE coverage is not connected by default."
   },
