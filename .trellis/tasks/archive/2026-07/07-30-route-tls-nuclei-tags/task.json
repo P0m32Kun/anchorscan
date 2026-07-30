@@ -26,7 +26,7 @@
     "fixed_point": "63a6c899d7258e1ebc9adc94c9c800bd19fe119c",
     "source_of_truth": {
       "type": "trellis-prd",
-      "path": ".trellis/tasks/07-30-route-tls-nuclei-tags/prd.md"
+      "path": ".trellis/tasks/archive/2026-07/07-30-route-tls-nuclei-tags/prd.md"
     }
   }
 }
