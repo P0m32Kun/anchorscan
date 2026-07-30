@@ -305,6 +305,7 @@ _ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)
 
 - Default rule fields: `nuclei_tags`, optional `exclude_tags`, and `target`.
 - Explicit execution: `anchorscan tool nuclei --template <path>` and `tools.RunNucleiTemplate`.
+- Real-tool lab: `e2e.writeConfig` generates a tags-only rule and an E2E-only nuclei wrapper using `ANCHORSCAN_E2E_NUCLEI_BINARY` plus `ANCHORSCAN_E2E_NUCLEI_TEMPLATE`.
 
 ### 3. Contracts
 
@@ -315,6 +316,7 @@ _ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)
 - Every routed Nuclei DetectionCheck persists the actual comma-separated tags in `Detail`; failures retain those tags followed by the failure diagnostic.
 - This tag addition does not start a TLS probe, lock an external template set, or route ordinary HTTP, empty-service, `unknown`, or `tcpwrapped` fingerprints. Those unidentified service states never receive the appended tag, even when another matched product/tech rule carries `tunnel: ssl`.
 - Explicit single-tool template execution remains supported and records its template path as tool-run provenance.
+- The real-tool lab keeps its generated `service-tags.yaml` on the production `nuclei_tags` schema. To stay hermetic without weakening scan-scope argument validation, its temporary nuclei wrapper prepends the trusted lab fixture with `-t` and then forwards the production `-target`, `-tags`, `-etags`, and `-jsonl` arguments unchanged.
 - Release packages must not include `nuclei-templates` directories.
 - Rollback removes only the matched-rule `ssl` append and the future DetectionCheck tag-detail write; no configuration, schema, or data migration is required. Historical DetectionCheck rows remain facts for their original runs.
 
@@ -323,6 +325,7 @@ _ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)
 | Condition | Required behavior |
 |---|---|
 | Default rule contains `template:` | Fail preparation before a run starts; error mentions `nuclei_tags`. |
+| E2E lab needs a custom template | Keep the rule tags-only; the temporary test wrapper injects the trusted fixture. Do not add `-t` to profile args or the production allowlist. |
 | Matching TLS default tag rule | Invoke Nuclei with original tags plus one `ssl` tag and accumulated `-etags`; persist the resulting tags in the DetectionCheck detail. |
 | TLS fingerprint without a default tag rule | Do not invoke Nuclei; retain `skipped/no_matching_rule`. |
 | Ordinary HTTP, empty-service, `unknown`, or `tcpwrapped` fingerprint | Do not add `ssl`; retain the existing routing result, including when a product/tech rule happens to match. |
@@ -333,11 +336,13 @@ _ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)
 
 - Good: an HTTPS default rule runs its original tags plus `ssl`, while retaining `fuzz,dos` and rule exclusions.
 - Base: a tags-only ordinary HTTP default rule retains its tag and exclusion behavior.
-- Bad: adding `ssl` to every HTTP rule, or creating a new Nuclei route for TLS, `unknown`, or `tcpwrapped` fingerprints without an existing rule.
+- Bad: adding `ssl` to every HTTP rule, creating a new Nuclei route for TLS, `unknown`, or `tcpwrapped` fingerprints without an existing rule, or reviving `template:` only in the release-lab fixture.
 
 ### 6. Tests Required
 
 - Loader test rejects `template:` and checks the migration error mentions `nuclei_tags`.
+- Focused E2E harness tests load the generated rule through `LoadTagRulesForConfig` and execute the configured nuclei path to assert the trusted `-t <lab fixture>` prefix plus unchanged production arguments.
+- Release/tag runs execute `make e2e` with real nuclei and require the Tomcat nuclei DetectionCheck to complete before any package build starts.
 - Scan tests check a matched TLS service appends `ssl` and persists the actual tags, while ordinary HTTP, empty-service/`unknown`/`tcpwrapped` candidates, and a TLS fingerprint with no matching rule preserve existing Nuclei behavior.
 - Tool-run test checks an explicit template produces `-t <path>`.
 - Package smoke test rejects `nuclei-templates` directories.
