@@ -478,6 +478,116 @@ func TestRunScanRoutesSparkWebUIWithSafeTags(t *testing.T) {
 	t.Fatalf("Spark nuclei DetectionCheck not recorded: %#v", checks)
 }
 
+func TestRunScanRoutesConfirmedTLSWithSSLTag(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	req := fixture.request()
+	req.ConfigPath = writePackagedConfig(t, fixture)
+	req.TargetSpec = "192.0.2.10"
+	req.PortSpec = "8443"
+	req.RunID = "run-tls-webui"
+	prepared, err := PrepareScan(req)
+	if err != nil || prepared.Preflight.HasErrors() {
+		t.Fatalf("PrepareScan = %#v, %v", prepared, err)
+	}
+
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.0.2.10 -> [8443]\\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8443"><state state="open"/><service name="https" product="Apache Spark"/></port></ports></host></nmaprun>`),
+		[]byte(`{"url":"https://192.0.2.10:8443","status_code":200,"title":"Spark Master at spark://","tech":["Apache Spark"]}`),
+		[]byte{},
+	}}
+	scanStore := newScanStore(t)
+	if err := RunScan(context.Background(), runner, scanStore, prepared.Options); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if !runner.hasArgs(prepared.Options.Tools.Nuclei, "-tags", "spark,ssl", "-etags", "fuzz,dos,default-login,brute,bruteforce", "-target", "https://192.0.2.10:8443", "-jsonl") {
+		t.Fatalf("expected confirmed TLS nuclei invocation with ssl tag, commands=%#v", runner.commands)
+	}
+	checks, err := scanStore.ListDetectionChecks(prepared.Options.RunID)
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nuclei" {
+			if check.Status != "completed" || check.Detail != "tags=spark,ssl" {
+				t.Fatalf("TLS nuclei DetectionCheck = %#v, want completed with tags", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("TLS nuclei DetectionCheck not recorded: %#v", checks)
+}
+
+func TestRunScanRecordsTagsWhenNucleiIsUnconfigured(t *testing.T) {
+	fixture := newPrepareScanFixture(t)
+	req := fixture.request()
+	req.ConfigPath = writePackagedConfig(t, fixture)
+	req.TargetSpec, req.PortSpec, req.RunID = "192.0.2.10", "8443", "run-tls-no-nuclei"
+	prepared, err := PrepareScan(req)
+	if err != nil || prepared.Preflight.HasErrors() {
+		t.Fatalf("PrepareScan = %#v, %v", prepared, err)
+	}
+	prepared.Options.Tools.Nuclei = ""
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.0.2.10 -> [8443]\\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8443"><state state="open"/><service name="https" product="Apache Spark"/></port></ports></host></nmaprun>`),
+		[]byte(`{"url":"https://192.0.2.10:8443","status_code":200,"tech":["Apache Spark"]}`),
+	}}
+	scanStore := newScanStore(t)
+	if err := RunScan(context.Background(), runner, scanStore, prepared.Options); err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	checks, err := scanStore.ListDetectionChecks(prepared.Options.RunID)
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nuclei" {
+			if check.Status != "skipped" || check.ReasonCode != "tool_unconfigured" || check.Detail != "tags=spark,ssl: nuclei is not configured" {
+				t.Fatalf("unconfigured nuclei DetectionCheck = %#v", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("nuclei DetectionCheck not recorded: %#v", checks)
+}
+
+func TestRunScanDoesNotRouteTLSWithoutMatchingRule(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		[]byte("192.0.2.12 -> [465]\\n"),
+		[]byte(`<nmaprun><host><address addr="192.0.2.12" addrtype="ipv4"/><ports><port protocol="tcp" portid="465"><state state="open"/><service name="smtp" tunnel="ssl"/></port></ports></host></nmaprun>`),
+	}}
+	scanStore := newScanStore(t)
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID: "run-tls-no-rule", Targets: []string{"192.0.2.12"}, Ports: "465",
+		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		TagRules:       []TagRule{{Service: []string{"http"}, NucleiTags: []string{"http"}, Target: "url"}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+	if runner.hasArgs("/opt/nuclei") {
+		t.Fatalf("TLS service without a matching rule invoked nuclei: %#v", runner.commands)
+	}
+	checks, err := scanStore.ListDetectionChecks("run-tls-no-rule")
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	for _, check := range checks {
+		if check.Engine == "nuclei" {
+			if check.Status != "skipped" || check.ReasonCode != "no_matching_rule" {
+				t.Fatalf("TLS no-rule DetectionCheck = %#v, want skipped/no_matching_rule", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("nuclei DetectionCheck not recorded: %#v", checks)
+}
+
 func TestRunScanSkipsNucleiForUnknownServiceOnSparkPort(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
@@ -645,8 +755,8 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 	for _, c := range checks {
 		checkByEngine[c.Engine] = c
 	}
-	if c, ok := checkByEngine["nuclei"]; !ok || c.Status != "failed" || c.ReasonCode != "command_failed" {
-		t.Fatalf("expected nuclei failed command, got %#v", c)
+	if c, ok := checkByEngine["nuclei"]; !ok || c.Status != "failed" || c.ReasonCode != "command_failed" || !strings.HasPrefix(c.Detail, "tags=demo: exit status 1") {
+		t.Fatalf("expected nuclei failed command with audited tags, got %#v", c)
 	}
 	if c, ok := checkByEngine["rdpscan"]; !ok {
 		t.Fatalf("expected rdpscan record, got %#v", c)

@@ -48,12 +48,24 @@ func MatchNucleiTags(fp fingerprint.ServiceFingerprint, http HTTPResult, rules [
 				Target:  rule.Target,
 				Address: address,
 			}
+			if fingerprint.IsTLS(fp) && isIdentifiedService(fp.Service) && !contains(result.Tags, "ssl") {
+				result.Tags = append(result.Tags, "ssl")
+			}
 			result.ExcludeTags = append([]string(nil), defaultExcludedNucleiTags...)
 			result.ExcludeTags = append(result.ExcludeTags, rule.ExcludeTags...)
 			return result
 		}
 	}
 	return MatchResult{}
+}
+
+func isIdentifiedService(service string) bool {
+	switch strings.ToLower(strings.TrimSpace(service)) {
+	case "", "unknown", "tcpwrapped":
+		return false
+	default:
+		return true
+	}
 }
 
 func contains(items []string, value string) bool {

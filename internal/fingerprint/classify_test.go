@@ -26,3 +26,26 @@ func TestClassifyMarksWebFromSSLHTTPService(t *testing.T) {
 		t.Fatalf("unexpected url: %q", got.URL)
 	}
 }
+
+func TestIsTLSUsesClassifyEvidence(t *testing.T) {
+	tests := []struct {
+		name string
+		fp   ServiceFingerprint
+		want bool
+	}{
+		{name: "ssl tunnel", fp: ServiceFingerprint{Tunnel: "SSL"}, want: true},
+		{name: "https service", fp: ServiceFingerprint{Service: "HTTPS"}, want: true},
+		{name: "ssl http service", fp: ServiceFingerprint{Service: "ssl/http"}, want: true},
+		{name: "plain http", fp: ServiceFingerprint{Service: "http"}, want: false},
+		{name: "unknown", fp: ServiceFingerprint{Service: "unknown"}, want: false},
+		{name: "tcpwrapped", fp: ServiceFingerprint{Service: "tcpwrapped"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsTLS(tt.fp); got != tt.want {
+				t.Fatalf("IsTLS(%#v) = %t, want %t", tt.fp, got, tt.want)
+			}
+		})
+	}
+}

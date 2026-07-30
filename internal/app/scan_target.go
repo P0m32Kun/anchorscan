@@ -217,7 +217,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				return TargetScan{}, err
 			}
 		case opts.Tools.Nuclei == "":
-			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "tool_unconfigured", "nuclei is not configured", time.Now(), time.Now()); err != nil {
+			if err := recordDetectionCheck(opts, fp, "nuclei", "skipped", "tool_unconfigured", "tags="+strings.Join(match.Tags, ",")+": nuclei is not configured", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
 		// NSE and nuclei DetectionCheck tails are kept separate on purpose:
@@ -226,7 +226,8 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 		default:
 			started := time.Now()
 			stageFailed := false
-			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", "", started, time.Time{}); err != nil {
+			nucleiDetail := "tags=" + strings.Join(match.Tags, ",")
+			if err := recordDetectionCheck(opts, fp, "nuclei", "running", "", nucleiDetail, started, time.Time{}); err != nil {
 				return TargetScan{}, err
 			}
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nuclei)
@@ -239,7 +240,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			operatorCanceled := isOperatorCanceled(toolCtx)
 			cancel()
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nuclei", fp.IP, strconv.Itoa(fp.Port), artifactKey)+".jsonl", out); writeErr != nil {
-				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", writeErr.Error(), started, time.Now())
+				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "artifact_failed", nucleiDetail+": "+writeErr.Error(), started, time.Now())
 				result.HadErrors = true
 				stageFailed = true
 				progress.Emit("error", "nuclei", "nuclei %s artifact failed: %v", match.Address, writeErr)
@@ -249,7 +250,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				if operatorCanceled {
 					status, reason = "canceled", "run_canceled"
 				}
-				_ = recordDetectionCheck(opts, fp, "nuclei", status, reason, err.Error(), started, time.Now())
+				_ = recordDetectionCheck(opts, fp, "nuclei", status, reason, nucleiDetail+": "+err.Error(), started, time.Now())
 				if operatorCanceled {
 					return result, context.Canceled
 				}
@@ -259,7 +260,7 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			}
 			nucleiFindings, parseErr := tools.ParseNucleiJSONL(out)
 			if err == nil && parseErr != nil {
-				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "invalid_output", parseErr.Error(), started, time.Now())
+				_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "invalid_output", nucleiDetail+": "+parseErr.Error(), started, time.Now())
 				result.HadErrors = true
 				stageFailed = true
 				progress.Emit("error", "nuclei", "nuclei %s returned invalid output: %v", match.Address, parseErr)
@@ -272,14 +273,14 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 						continue
 					}
 					if err := persistFinding(opts, finding); err != nil {
-						_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "persistence_failed", err.Error(), started, time.Now())
+						_ = recordDetectionCheck(opts, fp, "nuclei", "failed", "persistence_failed", nucleiDetail+": "+err.Error(), started, time.Now())
 						return result, err
 					}
 					allFindings = append(allFindings, finding)
 				}
 			}
 			if !stageFailed {
-				if err := recordDetectionCheck(opts, fp, "nuclei", "completed", "", "", started, time.Now()); err != nil {
+				if err := recordDetectionCheck(opts, fp, "nuclei", "completed", "", nucleiDetail, started, time.Now()); err != nil {
 					return TargetScan{}, err
 				}
 			}
