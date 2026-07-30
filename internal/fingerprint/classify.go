@@ -24,11 +24,20 @@ func Classify(fp ServiceFingerprint) ServiceFingerprint {
 		strings.Contains(product, "weblogic") {
 		out.IsWeb = true
 		scheme := "http"
-		if fp.Tunnel == "ssl" || strings.Contains(service, "https") || strings.Contains(service, "ssl/http") {
+		if IsTLS(fp) {
 			scheme = "https"
 		}
 		out.URL = (&url.URL{Scheme: scheme, Host: net.JoinHostPort(fp.IP, strconv.Itoa(fp.Port))}).String()
 	}
 
 	return out
+}
+
+// IsTLS identifies the Nmap fingerprint evidence that AnchorScan treats as TLS.
+// Keep this shared with Classify so URL construction and Nuclei routing agree.
+func IsTLS(fp ServiceFingerprint) bool {
+	service := strings.ToLower(fp.Service)
+	return strings.EqualFold(strings.TrimSpace(fp.Tunnel), "ssl") ||
+		strings.Contains(service, "https") ||
+		strings.Contains(service, "ssl/http")
 }

@@ -311,28 +311,34 @@ _ = p.store.AppendScanEvent(store.ScanEvent{Message: summarizeScanEvent(message)
 - Default rules select Nuclei templates only with `nuclei_tags`; `template:` is not a supported rule field.
 - `LoadTagRules` rejects a legacy `template:` field with an error directing the operator to migrate to `nuclei_tags`.
 - Default scan execution calls `tools.RunNuclei`, retaining global `fuzz,dos` exclusions plus rule `exclude_tags`; it never calls `RunNucleiTemplate`.
+- When an existing default rule matches, append `ssl` exactly once only if the fingerprint has Nmap TLS evidence: `tunnel: ssl`, a service name containing `https`, or a service name containing `ssl/http`. This applies equally to an already routed non-Web TLS service. A TLS fingerprint with no matching default rule remains `skipped/no_matching_rule`.
+- Every routed Nuclei DetectionCheck persists the actual comma-separated tags in `Detail`; failures retain those tags followed by the failure diagnostic.
+- This tag addition does not start a TLS probe, lock an external template set, or route ordinary HTTP, empty-service, `unknown`, or `tcpwrapped` fingerprints. Those unidentified service states never receive the appended tag, even when another matched product/tech rule carries `tunnel: ssl`.
 - Explicit single-tool template execution remains supported and records its template path as tool-run provenance.
 - Release packages must not include `nuclei-templates` directories.
+- Rollback removes only the matched-rule `ssl` append and the future DetectionCheck tag-detail write; no configuration, schema, or data migration is required. Historical DetectionCheck rows remain facts for their original runs.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Required behavior |
 |---|---|
 | Default rule contains `template:` | Fail preparation before a run starts; error mentions `nuclei_tags`. |
-| Matching default tag rule | Invoke Nuclei with `-tags` and accumulated `-etags`. |
+| Matching TLS default tag rule | Invoke Nuclei with original tags plus one `ssl` tag and accumulated `-etags`; persist the resulting tags in the DetectionCheck detail. |
+| TLS fingerprint without a default tag rule | Do not invoke Nuclei; retain `skipped/no_matching_rule`. |
+| Ordinary HTTP, empty-service, `unknown`, or `tcpwrapped` fingerprint | Do not add `ssl`; retain the existing routing result, including when a product/tech rule happens to match. |
 | Explicit single-tool template | Invoke Nuclei with `-t <path>`. |
 | Packaged archive | Contains `service-tags.yaml` but no `nuclei-templates` directory. |
 
 ### 5. Good/Base/Bad Cases
 
-- Good: an SSH default rule runs `-tags ssh -etags fuzz,dos,default-login`.
-- Base: a tags-only default rule retains its tag and exclusion behavior.
-- Bad: resolving a relative template path from `service-tags.yaml`, or silently ignoring a legacy `template:` field.
+- Good: an HTTPS default rule runs its original tags plus `ssl`, while retaining `fuzz,dos` and rule exclusions.
+- Base: a tags-only ordinary HTTP default rule retains its tag and exclusion behavior.
+- Bad: adding `ssl` to every HTTP rule, or creating a new Nuclei route for TLS, `unknown`, or `tcpwrapped` fingerprints without an existing rule.
 
 ### 6. Tests Required
 
 - Loader test rejects `template:` and checks the migration error mentions `nuclei_tags`.
-- Scan test checks a default SSH route passes tags and exclusions, not `-t`.
+- Scan tests check a matched TLS service appends `ssl` and persists the actual tags, while ordinary HTTP, empty-service/`unknown`/`tcpwrapped` candidates, and a TLS fingerprint with no matching rule preserve existing Nuclei behavior.
 - Tool-run test checks an explicit template produces `-t <path>`.
 - Package smoke test rejects `nuclei-templates` directories.
 

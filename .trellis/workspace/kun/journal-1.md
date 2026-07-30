@@ -204,6 +204,15 @@ Merged Web Console Shanghai time formatting; archived completed task.
 [OK] **Completed**
 
 
+## Session 10: Route confirmed TLS Nuclei tags
+
+**Date**: 2026-07-30
+**Task**: Route confirmed TLS Nuclei tags
+**Branch**: `codex/route-tls-nuclei-tags`
+
+### Summary
+
+Added shared TLS evidence routing, appended ssl only after existing Nuclei rule matches, persisted routed tags in DetectionCheck details, and verified the constrained path.
 ## Session 10: 完成 TLS 覆盖研究
 
 **Date**: 2026-07-30
@@ -237,6 +246,7 @@ Merged Web Console Shanghai time formatting; archived completed task.
 
 | Hash | Message |
 |------|---------|
+| `ed9cea2b2e8e981a51447f52dac2b6e2c152df4c` | (see git log) |
 | `4b8194d` | (see git log) |
 | `155b856` | (see git log) |
 | `bf8176f` | (see git log) |

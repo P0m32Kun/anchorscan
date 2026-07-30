@@ -24,7 +24,8 @@
     "07-29-remove-default-nuclei-template-rules",
     "07-29-research-ssl-tls-coverage",
     "07-29-add-spark-detection-rules",
-    "07-29-research-unknown-service-enrichment"
+    "07-29-research-unknown-service-enrichment",
+    "07-30-route-tls-nuclei-tags"
   ],
   "parent": null,
   "relatedFiles": [],
