@@ -21,10 +21,73 @@ import (
 	"testing"
 	"time"
 
+	"github.com/P0m32Kun/anchorscan/internal/config"
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
+
+func TestWriteConfigUsesSupportedTagRules(t *testing.T) {
+	configPath := writeConfig(t, repoRoot(t), t.TempDir(), toolPaths{
+		rustscan: "/opt/rustscan",
+		nmap:     "/opt/nmap",
+		httpx:    "/opt/httpx",
+		nuclei:   "/opt/nuclei",
+	})
+
+	rules, err := config.LoadTagRulesForConfig(configPath)
+	if err != nil {
+		t.Fatalf("LoadTagRulesForConfig returned error: %v", err)
+	}
+	if len(rules) != 1 || rules[0].Name != "tomcat" {
+		t.Fatalf("unexpected E2E tag rules: %#v", rules)
+	}
+	if got := rules[0].NucleiTags; len(got) != 1 || got[0] != "tomcat" {
+		t.Fatalf("Tomcat nuclei tags = %#v, want [tomcat]", got)
+	}
+}
+
+func TestWriteConfigUsesHermeticNucleiTemplate(t *testing.T) {
+	dir := t.TempDir()
+	nuclei := filepath.Join(dir, "real-nuclei")
+	if err := os.WriteFile(nuclei, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	configPath := writeConfig(t, repoRoot(t), dir, toolPaths{
+		rustscan: "/opt/rustscan",
+		nmap:     "/opt/nmap",
+		httpx:    "/opt/httpx",
+		nuclei:   nuclei,
+	})
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	out, err := exec.Command(
+		cfg.Tools.Nuclei,
+		"-target", "http://127.0.0.1:8080",
+		"-tags", "tomcat",
+		"-jsonl",
+		"-etags", "fuzz,dos",
+		"-rate-limit", "10",
+	).CombinedOutput()
+	if err != nil {
+		t.Fatalf("configured nuclei returned error: %v: %s", err, out)
+	}
+	got := strings.Split(strings.TrimSpace(string(out)), "\n")
+	want := []string{
+		"-t", filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml"),
+		"-target", "http://127.0.0.1:8080",
+		"-tags", "tomcat",
+		"-jsonl",
+		"-etags", "fuzz,dos",
+		"-rate-limit", "10",
+	}
+	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("configured nuclei args = %#v, want %#v", got, want)
+	}
+}
 
 func TestCLIEndToEndMultiIPSpecifiedPorts(t *testing.T) {
 	root := repoRoot(t)
@@ -481,25 +544,26 @@ func writeConfig(t *testing.T, root, dir string, paths toolPaths) string {
 	if err := os.WriteFile(filepath.Join(dir, "nse.yaml"), nseData, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// The lab runs hermetically (no `nuclei -update-templates`), so tag-based
-	// nuclei rules have no public templates. Route the Tomcat check through the
-	// trusted template-rule mechanism (service-tags.yaml `template` field ->
-	// RunNucleiTemplate) via the bundled lab-tomcat.yaml fixture, instead of
-	// raw "-t" profile args, which the scan-scope allowlist rejects.
-	//
 	// Match on `service: ["http"]`: the lab slow profile omits `nmap -sV`, so
 	// the Tomcat product is empty and httpx tech-detect is not guaranteed; the
 	// shipped default rules rely on their trailing `http-generic` service rule
 	// for exactly this case, which we mirror here.
-	template := filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml")
-	tagRules := fmt.Sprintf(`- name: tomcat
+	tagRules := `- name: tomcat
   service: ["http"]
   product: ["tomcat", "apache tomcat"]
   tech: ["tomcat"]
-  template: %q
+  nuclei_tags: ["tomcat"]
   target: "url"
-`, template)
+`
 	if err := os.WriteFile(filepath.Join(dir, "service-tags.yaml"), []byte(tagRules), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nucleiWrapper := filepath.Join(dir, "nuclei-e2e")
+	t.Setenv("ANCHORSCAN_E2E_NUCLEI_BINARY", paths.nuclei)
+	t.Setenv("ANCHORSCAN_E2E_NUCLEI_TEMPLATE", filepath.Join(labDir(), "fixtures", "lab-tomcat.yaml"))
+	if err := os.WriteFile(nucleiWrapper, []byte(`#!/bin/sh
+exec "$ANCHORSCAN_E2E_NUCLEI_BINARY" -t "$ANCHORSCAN_E2E_NUCLEI_TEMPLATE" "$@"
+`), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	configPath := filepath.Join(dir, "config.yaml")
@@ -519,7 +583,7 @@ profiles:
     rustscan_args: ["--ulimit", "5000"]
     nmap_args: ["-T2", "--max-retries", "2"]
     httpx_args: ["-silent"]
-`, paths.rustscan, paths.nmap, paths.httpx, paths.nuclei)
+`, paths.rustscan, paths.nmap, paths.httpx, nucleiWrapper)
 	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
