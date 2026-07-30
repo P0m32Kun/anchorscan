@@ -35,7 +35,7 @@
     }
   ],
   "research": {
-    "artifact": ".trellis/tasks/07-29-research-unknown-service-enrichment/research/unknown-service-enrichment.md",
+    "artifact": ".trellis/tasks/archive/2026-07/07-29-research-unknown-service-enrichment/research/unknown-service-enrichment.md",
     "result": "passed",
     "summary": "Rejected a generic unknown/tcpwrapped fallback; recorded existing Dameng exception, fixed-source evidence, proposed admission limits, and the four-sample fixture limitation."
   },
