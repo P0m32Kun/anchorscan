@@ -3,7 +3,7 @@
   "name": "research-ssl-tls-coverage",
   "title": "调查 SSL TLS 检测覆盖与缺口",
   "description": "核验现有 SSL/TLS 指纹、NSE 和 Nuclei 覆盖，形成证据化缺口与后续规则建议。",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": null,
@@ -11,16 +11,22 @@
   "creator": "kun",
   "assignee": "kun",
   "createdAt": "2026-07-29",
-  "completedAt": null,
-  "branch": null,
+  "completedAt": "2026-07-30",
+  "branch": "codex/research-ssl-tls-coverage",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
-  "pr_url": null,
+  "commit": "4b8194d",
+  "pr_url": "https://github.com/P0m32Kun/anchorscan/pull/28",
   "subtasks": [],
   "children": [],
   "parent": "07-29-triage-bug-record",
   "relatedFiles": [],
   "notes": "",
-  "meta": {}
+  "meta": {
+    "fixed_point": "63a6c899d7258e1ebc9adc94c9c800bd19fe119c",
+    "source_of_truth": {
+      "type": "trellis-prd",
+      "path": ".trellis/tasks/archive/2026-07/07-29-research-ssl-tls-coverage/prd.md"
+    }
+  }
 }

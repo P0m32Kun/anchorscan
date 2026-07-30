@@ -415,3 +415,66 @@ match:
   tech: ["apache spark"]
 nuclei_tags: spark
 ```
+
+## Scenario: Unknown service enrichment admission
+
+### 1. Scope / Trigger
+
+- A proposal would add active enrichment after Nmap reports an empty service, `unknown`, or `tcpwrapped`.
+- This covers the admission boundary before any **new generic or non-Dameng** protocol probe, httpx invocation, NSE script, or Nuclei tag route. It does not change the existing Dameng-specific handshake, which is an explicit current exception for weak non-Web fingerprints.
+
+### 2. Signatures
+
+- Candidate input: `fingerprint.ServiceFingerprint` after `tools.FingerprintWithOutput`.
+- Existing routing seams: `tools.EnrichWebWithOutput`, `vuln.MatchNSE`, and `vuln.MatchNucleiTags`.
+- Future concrete probes require a protocol-specific function and an explicit opt-in configuration key; no generic `ProbeUnknown` interface is permitted.
+
+### 3. Contracts
+
+- Empty service, `unknown`, and `tcpwrapped` are distinct evidence states, not protocol names and not Nuclei tags.
+- The default scan must not invoke httpx, NSE, or Nuclei merely because a port lacks a recognized service. NSE and Nuclei retain their existing `skipped/no_matching_rule` behavior; httpx has no DetectionCheck row in the current pipeline.
+- Apart from the existing Dameng-specific handshake, `tcpwrapped` is never automatically retried. A future non-Dameng protocol-specific feature needs a separate explicit authorization path.
+- A future specific probe may run only for an explicit protocol allowlist and must have a maintenance-owned protocol document, one fixed request, no authentication/write/enumeration behavior, one connection per port, no retries, 1-second connect/read deadlines, serial execution, and a default all-Run cap of 10 candidates.
+- A positive enrichment requires protocol-specific response evidence. Port number, a successful TCP connect, or one ambiguous banner must not overwrite an existing fingerprint or enable vulnerability routing.
+- Record probe provenance, budget consumption, and failure reason as new facts; do not rewrite historical fingerprint or DetectionCheck facts.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Empty service or `unknown` without a protocol-specific opt-in | No httpx/NSE/Nuclei invocation; NSE and Nuclei record `skipped/no_matching_rule` under their existing contracts. |
+| `tcpwrapped` | No new generic/non-Dameng connection attempt or vulnerability route; preserve the existing Dameng exception unchanged. |
+| Known normalized service or non-empty product | Exclude it from any future weak-identification probe. |
+| Probe budget exhausted, deadline, cancellation, or non-match | Stop without retry or enrichment; persist an auditable skipped/failed fact. |
+| Fixed response matches protocol magic and grammar | Add provenance-bearing enrichment; only then may existing fingerprint routes be reevaluated. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: an explicitly enabled, documented protocol probe consumes one request for an allowlisted `unknown` endpoint and records an evidence-bearing match.
+- Base: an `unknown` endpoint without that opt-in retains its Nmap XML artifact and no-matching-rule DetectionChecks for NSE/Nuclei; httpx remains uninvoked without a DetectionCheck row, and the existing Dameng exception remains separately governed.
+- Bad: running `httpx` or broad Nuclei network/http tags against every `unknown`, treating `tcpwrapped` as an ordinary fallback candidate, or broadening the existing Dameng selector under the guise of generic enrichment.
+
+### 6. Tests Required
+
+- Loopback fixtures cover one matching unknown endpoint, one non-matching unknown endpoint, empty service, accept-then-close `tcpwrapped`, and known HTTP/SSH/database endpoints.
+- Assert exact per-port connection/request cap, no retries, deadline/cancellation behavior, all-Run budget stop, no goroutine leak, and provenance persistence.
+- Negative execution tests prove empty, unknown, and tcpwrapped inputs neither call httpx nor select NSE/Nuclei without a separately approved protocol implementation. Existing Dameng behavior needs separate fixtures and must not be silently changed.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```go
+if fp.Normalized == "unknown" || fp.Normalized == "tcpwrapped" {
+    tools.RunNuclei(ctx, runner, nuclei, fp.IP, []string{"network", "http"}, nil, args)
+}
+```
+
+#### Correct
+
+```go
+// No generic fallback: leave httpx uninvoked without a DetectionCheck, and
+// retain NSE/Nuclei no_matching_rule until a separately approved protocol-specific
+// probe has reproducible positive evidence. This does not change the separately
+// governed Dameng-specific handshake.
+```

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
+- **Total Sessions**: 12
 - **Last Active**: 2026-07-30
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~225 | Active |
+| `journal-1.md` | ~270 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,7 +29,9 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
-| 10 | 2026-07-30 | Route confirmed TLS Nuclei tags | `ed9cea2b2e8e981a51447f52dac2b6e2c152df4c` | `codex/route-tls-nuclei-tags` |
+| 12 | 2026-07-30 | Route confirmed TLS Nuclei tags | `ed9cea2b2e8e981a51447f52dac2b6e2c152df4c` | `codex/route-tls-nuclei-tags` |
+| 11 | 2026-07-30 | 完成 TLS 覆盖研究 | `4b8194d`, `155b856`, `bf8176f` | `codex/research-ssl-tls-coverage` |
+| 10 | 2026-07-30 | 完成未识别服务通用增强研究 | `9de20a4`, `22dea75`, `9317291` | `codex/research-unknown-service-enrichment` |
 | 9 | 2026-07-29 | Fix console Shanghai time | `0e202b4` | `codex/fix-console-shanghai-time` |
 | 8 | 2026-07-29 | Complete report service filters | `3682f73`, `645b58d` | `codex/enhance-report-service-filters` |
 | 7 | 2026-07-29 | 同步已合并 Spark 任务元数据 | `6fbb167`, `5542145`, `5a2b11f`, `2de7b10`, `8a2e013` | `codex/sync-task-metadata` |
