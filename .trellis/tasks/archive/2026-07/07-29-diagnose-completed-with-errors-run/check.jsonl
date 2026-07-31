@@ -1,3 +1,0 @@
-{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Requires detection failures to remain historical facts and defines package constraints."}
-{"file":".trellis/tasks/07-29-diagnose-completed-with-errors-run/prd.md","reason":"Acceptance criteria bind the repair to supplied evidence and controlled fixture validation."}
-{"file":".trellis/tasks/07-29-diagnose-completed-with-errors-run/implement.md","reason":"Defines the runtime experiment and app-status regression checks."}

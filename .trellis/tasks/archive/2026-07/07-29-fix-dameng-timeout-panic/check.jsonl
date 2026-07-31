@@ -1,5 +1,0 @@
-{"path":".trellis/tasks/07-29-fix-dameng-timeout-panic/prd.md","kind":"acceptance","reason":"Source of observable acceptance conditions and compatibility constraints."}
-{"path":"docs/plans/dameng-default-password/tickets/02-harden-timeout-and-panic-isolation.md","kind":"ticket","reason":"Authoritative ready-to-implement acceptance checklist after planning approval."}
-{"path":"docs/testing-strategy.md","kind":"test-strategy","reason":"Specifies lowest-sufficient test seam selection and final checks."}
-{"path":"internal/tools/dameng_test.go","kind":"existing-tests","reason":"Baseline classification tests that must remain green."}
-{"path":"internal/app/scan_target_dameng_test.go","kind":"existing-tests","reason":"Baseline app orchestration and DetectionCheck tests."}

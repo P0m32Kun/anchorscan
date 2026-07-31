@@ -1,5 +1,0 @@
-{"file":".trellis/spec/backend/error-handling.md","reason":"Verify missing/empty rule resources fail closed and diagnostics do not report false health."}
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify regression coverage, package contents, focused/full suites, and absence of unrelated changes."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Verify discovery form behavior, accessibility, validation, defaulting, and rerun compatibility."}
-{"file":".trellis/spec/frontend/type-safety.md","reason":"Check Go/Vue discovery-mode field and JSON snapshot consistency."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace config resources and discovery mode end to end through preparation, execution, snapshots, and reports."}

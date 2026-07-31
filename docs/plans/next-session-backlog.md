@@ -2,7 +2,7 @@
 
 > 最后更新：2026-07-29
 >
-> 用途：记录已规划但尚未交付的工作顺序及前置条件。开始任何一项前，先检查对应 Trellis task、`origin/main` 与此清单是否一致。
+> 用途：记录已规划但尚未交付的工作顺序及前置条件。开始任何一项前，先检查 `origin/main`、相关 `docs/plans/` ticket 与此清单是否一致。
 
 ## 已确认产品交付
 
@@ -17,19 +17,17 @@
 ## 后续交付顺序
 
 1. [ ] **研究未识别服务通用指纹增强**
-   - Trellis：`07-29-research-unknown-service-enrichment`
    - 优先级：P1。
    - 安全边界：分别处理空服务名、`unknown` 和 `tcpwrapped`；不得因服务未知而泛化执行 Nuclei，也不得扩大 Dameng 探针。
    - 产物：以证据支持的后续独立任务，不直接混入规则修改。
 
 2. [ ] **调查 SSL/TLS 检测覆盖与缺口**
-   - Trellis：`07-29-research-ssl-tls-coverage`
    - 优先级：P2。
    - 产物：识别、配置、证书、漏洞检测的覆盖矩阵；每项应有代码/配置位置、工具或模板版本、可复现验证和安全限制。
 
 ## 开始下一项前的检查
 
-1. 从 `origin/main` 创建专用分支，避免携带已合并 PR 后的本地元数据提交。
-2. 阅读目标 Trellis task 的 `prd.md`、`design.md`、`implement.md`，确认 ready gate。
-3. 行为变更遵循：TDD Red -> Green -> self-check -> Standards review -> Spec/AC review -> full verification -> PR。
+1. 从 `origin/main` 创建专用分支。
+2. 若工作需要跨会话保存或拆分多个 ticket，先在 `docs/plans/` 建立唯一权威 spec/ticket。
+3. 行为变更遵循：明确验收标准 -> 聚焦实现与测试 -> full verification -> PR。
 4. 研究任务先产出可复现证据和边界，不直接引入猜测性的检测规则。

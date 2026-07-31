@@ -45,8 +45,7 @@ Real-tool E2E is separate from Playwright and is not required on every PR. Relea
 
 ```bash
 make test      # Go and JavaScript tests
-make harness-check # AI workflow contracts; no network or runtime-session state
-make pr-check  # Unit/integration checks, build/package, and Playwright Chromium smoke
+make pr-check  # Unit/integration checks, docs, build/package, and Playwright Chromium smoke
 make e2e       # Real-tool Docker laboratory
 ```
 

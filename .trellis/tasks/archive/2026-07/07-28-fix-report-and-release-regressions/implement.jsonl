@@ -1,3 +1,0 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
-{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "前端 JSON、Go handler、DOCX context/template 与发布构建均为跨层契约"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "统一 verification payload 与版本单一来源，避免重复契约"}
