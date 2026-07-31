@@ -1,3 +1,0 @@
-{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Provides the project's available backend quality-review criteria."}
-{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"Defines the release version-injection and package validation contract to verify is unchanged."}
-{"file":".trellis/tasks/07-29-fix-v2-0-2-release-build/research/root-cause.md","reason":"Supplies the original cross-platform failure evidence and expected regression checks."}

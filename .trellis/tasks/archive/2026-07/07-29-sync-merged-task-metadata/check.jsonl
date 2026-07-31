@@ -1,4 +1,0 @@
-{"file":".trellis/tasks/07-29-sync-merged-task-metadata/prd.md","reason":"Authoritative allowed-path and no-touch requirements for review."}
-{"file":".trellis/tasks/07-29-add-spark-detection-rules/quality-evidence.json","reason":"Expected Spark PR #13 implementation commit and merge evidence."}
-{"file":".trellis/tasks/07-29-remove-default-nuclei-template-rules/task.json","reason":"Must remain active and unchanged; protects the excluded task."}
-{"file":".trellis/tasks/07-29-remove-default-nuclei-template-rules/quality-evidence.json","reason":"Must retain empty delivery fields; protects the excluded task."}

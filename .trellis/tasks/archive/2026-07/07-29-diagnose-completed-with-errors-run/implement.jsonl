@@ -1,3 +1,0 @@
-{"file":".trellis/spec/backend/scan-runtime-contracts.md","reason":"DetectionCheck records are immutable historical facts; preserve status semantics."}
-{"file":".trellis/tasks/07-29-diagnose-completed-with-errors-run/prd.md","reason":"Captures supplied artifact evidence, the root-cause scope, and safe SSH credential-attempt limits."}
-{"file":".trellis/tasks/07-29-diagnose-completed-with-errors-run/design.md","reason":"Defines runtime validation and status-preservation constraints for the template repair."}
