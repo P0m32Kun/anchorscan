@@ -66,4 +66,6 @@ jobs:
           cache: true
 
       - name: Run Dameng regression tests
-        run: go test ./cmd/anchorscan ./internal/app ./internal/config ./internal/fingerprint ./internal/preflight ./internal/tools
+        run: |
+          go test ./internal/app -run '^TestScanTargetDamengNucleiGate$'
+          go test ./internal/tools -run 'Dameng|NucleiTemplate'

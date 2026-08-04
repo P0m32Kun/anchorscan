@@ -151,3 +151,35 @@ func TestScanTargetRecordsNSESkipReasons(t *testing.T) {
 		})
 	}
 }
+
+func TestScanTargetDamengNucleiGate(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		nucleiOut []byte
+		wantCalls int
+	}{
+		{name: "no template match", wantCalls: 0},
+		{name: "dameng template match on custom port", nucleiOut: []byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"10198"}`), wantCalls: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			runner := &recordingSequenceRunner{outputs: [][]byte{
+				[]byte("192.0.2.10 -> [10198]\n"),
+				[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="10198"><state state="open"/><service name="padl2sim"/></port></ports></host></nmaprun>`),
+				tc.nucleiOut,
+			}}
+			checker := &fakeDamengAuthChecker{}
+			_, err := scanTarget(context.Background(), runner, ScanOptions{
+				RunID:         "run-dameng-gate",
+				Ports:         "10198",
+				Tools:         ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Nuclei: "nuclei", NucleiTemplates: "templates", Dameng: "enabled"},
+				DamengChecker: checker,
+			}, "192.0.2.10", t.TempDir(), &recordingProgress{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if checker.calls != tc.wantCalls {
+				t.Fatalf("Dameng authentication calls = %d, want %d", checker.calls, tc.wantCalls)
+			}
+		})
+	}
+}

@@ -17,9 +17,11 @@ type fakeDamengAuthChecker struct {
 	err        error
 	panicValue any
 	waitForCtx bool
+	calls      int
 }
 
 func (f *fakeDamengAuthChecker) Check(ctx context.Context, host string, port int, username, password string) (bool, string, error) {
+	f.calls++
 	if f.waitForCtx {
 		<-ctx.Done()
 		return false, "", ctx.Err()
