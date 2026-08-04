@@ -106,6 +106,13 @@ func Run(opts Options) Result {
 	checkOptionalTool(&result, "httpx", opts.Tools.Httpx)
 	checkOptionalTool(&result, "nuclei", opts.Tools.Nuclei)
 	checkOptionalTool(&result, "rdpscan", opts.Tools.Rdpscan)
+	if strings.TrimSpace(opts.Tools.Dameng) != "" {
+		if strings.TrimSpace(opts.Tools.Nuclei) == "" {
+			result.Warnings = append(result.Warnings, Message{Field: "dameng", Message: "nuclei is required when dameng detection is enabled"})
+		} else if info, err := os.Stat(opts.Tools.DamengTemplatePath()); err != nil || info.IsDir() {
+			result.Warnings = append(result.Warnings, Message{Field: "nuclei templates", Message: "dameng template not found: " + opts.Tools.DamengTemplatePath()})
+		}
+	}
 
 	checkRuleLoad(&result, "nse rules", opts.NSERulesError, true)
 	checkRuleLoad(&result, "tag rules", opts.TagRulesError, strings.TrimSpace(opts.Tools.Nuclei) != "")

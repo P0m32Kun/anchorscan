@@ -4,7 +4,7 @@ AnchorScan 面向单机、已授权的内网扫描。首次安装、从源码构
 
 ## 发布归档与运行目录
 
-Release 归档支持 linux/amd64、darwin/arm64 和 windows/amd64。归档不包含 `rustscan`、`nmap`、`httpx` 或 `nuclei`，这些外部工具必须由操作者安装并置于 `PATH`，再运行 `anchorscan doctor` 检查。
+Release 归档支持 linux/amd64、darwin/arm64 和 windows/amd64。归档不包含 `rustscan`、`nmap`、`httpx` 或 `nuclei`，这些外部工具必须由操作者安装并置于 `PATH`，再运行 `anchorscan doctor` 检查。启用达梦默认口令检测时，还需要在 `tools.nuclei_templates` 配置 Nuclei 社区模板仓库根目录，使 `javascript/detection/dameng-detect.yaml` 可读。
 
 从归档根目录运行程序，并保留其目录结构：其中的 `config/`、`tools/docx-render/` 和 DOCX 模板是运行期 sidecar。运行 `doctor` 首次初始化时会创建 `config/default.yaml`、`data/` 和 SQLite 数据库。
 

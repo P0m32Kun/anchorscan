@@ -17,9 +17,11 @@ type fakeDamengAuthChecker struct {
 	err        error
 	panicValue any
 	waitForCtx bool
+	calls      int
 }
 
 func (f *fakeDamengAuthChecker) Check(ctx context.Context, host string, port int, username, password string) (bool, string, error) {
+	f.calls++
 	if f.waitForCtx {
 		<-ctx.Done()
 		return false, "", ctx.Err()
@@ -38,6 +40,7 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		[]byte("192.0.2.10 -> [5236]\n"),
 		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
+		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236"}`),
 	}}
 	scanStore := newScanStore(t)
 
@@ -46,7 +49,7 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		DamengChecker:  &fakeDamengAuthChecker{ok: true, out: "default password accepted"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
@@ -83,6 +86,7 @@ func TestRunScanRecordsDamengPanicAsCompletedWithErrors(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		[]byte("192.0.2.10 -> [5236]\n"),
 		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
+		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236"}`),
 	}}
 	scanStore := newScanStore(t)
 
@@ -91,7 +95,7 @@ func TestRunScanRecordsDamengPanicAsCompletedWithErrors(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		DamengChecker:  &fakeDamengAuthChecker{panicValue: "driver index out of range"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
@@ -129,6 +133,7 @@ func TestRunScanRecordsDamengDeadlineAsCompletedWithErrors(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		[]byte("192.0.2.11 -> [5236]\n"),
 		[]byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
+		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.11","port":"5236"}`),
 	}}
 	scanStore := newScanStore(t)
 
@@ -137,7 +142,7 @@ func TestRunScanRecordsDamengDeadlineAsCompletedWithErrors(t *testing.T) {
 		Targets:        []string{"192.0.2.11"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		Timeouts:       ToolTimeouts{Dameng: time.Millisecond},
 		DamengChecker:  &fakeDamengAuthChecker{waitForCtx: true},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
@@ -227,7 +232,7 @@ func TestRunScanSkipsDamengWhenNoMatchingRule(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "3306",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled"},
+		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {

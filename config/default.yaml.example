@@ -8,8 +8,9 @@ tools:
   nmap: nmap
   httpx: httpx
   nuclei: nuclei
+  nuclei_templates: ~/nuclei-templates # 社区模板仓库根目录
   rdpscan: ""              # 可选：BlueKeep (CVE-2019-0708) 检测；留空则自动跳过
-  dameng: enabled          # 内置达梦默认口令检测；留空则禁用
+  dameng: enabled          # Nuclei 确认后执行达梦默认口令检测；留空则禁用
 
 # Go duration（如 30s、5m）；0 表示不限时。档位不会覆盖这些全局设置。
 timeouts:

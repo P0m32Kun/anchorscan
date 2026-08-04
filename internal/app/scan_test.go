@@ -265,8 +265,11 @@ type recordingSequenceRunner struct {
 
 func (r *recordingSequenceRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
 	r.commands = append(r.commands, append([]string{binary}, args...))
-	out := r.outputs[r.index]
-	err := error(nil)
+	var out []byte
+	if r.index < len(r.outputs) {
+		out = r.outputs[r.index]
+	}
+	var err error
 	if len(r.errors) > r.index {
 		err = r.errors[r.index]
 	}

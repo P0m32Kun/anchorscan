@@ -43,6 +43,7 @@ func defaultConfig() Config {
 	cfg.Tools.Nmap = detectToolPath("nmap")
 	cfg.Tools.Httpx = detectToolPath("httpx")
 	cfg.Tools.Nuclei = detectToolPath("nuclei")
+	cfg.Tools.NucleiTemplates = "~/nuclei-templates"
 	cfg.Tools.Rdpscan = detectToolPath("rdpscan")
 	cfg.Tools.Dameng = "enabled"
 	return cfg

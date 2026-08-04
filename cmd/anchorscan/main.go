@@ -51,6 +51,8 @@ func run(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) error 
 	}
 
 	switch args[0] {
+	case "internal-dameng-check":
+		return runInternalDamengCheck(args[1:], stdout)
 	case "scan":
 		return runScan(args[1:], stdout, stderr, deps)
 	case "tool":
