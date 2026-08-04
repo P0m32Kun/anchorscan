@@ -52,3 +52,18 @@ jobs:
           name: web-smoke-diagnostics
           path: test-artifacts/web-smoke
           if-no-files-found: ignore
+
+  windows-dameng-regression:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run Dameng regression tests
+        run: go test ./cmd/anchorscan ./internal/app ./internal/config ./internal/fingerprint ./internal/preflight ./internal/tools

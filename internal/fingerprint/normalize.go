@@ -10,8 +10,6 @@ var aliases = map[string]string{
 	"ms-wbt-server": "rdp",
 	"mariadb":       "mysql",
 	"dameng":        "dameng",
-	"dm":            "dameng",
-	"padl2sim":      "dameng",
 }
 
 func normalizeService(service string, product string) string {

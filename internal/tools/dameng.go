@@ -3,9 +3,11 @@ package tools
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	_ "gitee.com/chunanyong/dm"
@@ -24,8 +26,8 @@ const (
 
 // DamengResult carries the classified verdict and any human-readable output.
 type DamengResult struct {
-	Verdict DamengVerdict
-	Output  string
+	Verdict DamengVerdict `json:"verdict"`
+	Output  string        `json:"output"`
 }
 
 // DamengAuthChecker abstracts the actual login attempt so tests can inject
@@ -109,6 +111,18 @@ func RunDamengDefaultPassword(ctx context.Context, checker DamengAuthChecker, ip
 		return DamengResult{Verdict: DamengVulnerable, Output: detail}, nil
 	}
 	return DamengResult{Verdict: DamengSafe, Output: "authentication rejected"}, nil
+}
+
+func RunDamengHelper(ctx context.Context, runner Runner, executable, host string, port int) (DamengResult, error) {
+	out, err := runner.Run(ctx, executable, []string{"internal-dameng-check", "--host", host, "--port", strconv.Itoa(port)})
+	if err != nil {
+		return DamengResult{Verdict: DamengUnknown, Output: string(out)}, withOutputError(err, out)
+	}
+	var result DamengResult
+	if err := json.Unmarshal(out, &result); err != nil {
+		return DamengResult{}, fmt.Errorf("parse dameng helper output: %w", err)
+	}
+	return result, nil
 }
 
 // ParseDamengResult is a small helper for callers that already have a string

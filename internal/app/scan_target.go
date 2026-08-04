@@ -2,13 +2,14 @@ package app
 
 import (
 	"context"
+	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
-	"github.com/P0m32Kun/anchorscan/internal/fingerprint/probes"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/target"
@@ -121,19 +122,36 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			}
 		}
 
-		// Dameng active protocol fingerprinting: nmap has no service probe for
-		// Dameng and usually reports padl2sim/unknown/tcpwrapped on port 5236 (or
-		// any custom port). Fire a lightweight DM handshake probe on weakly
-		// identified non-web ports before the vulnerability engines run.
-		if !fp.IsWeb && opts.Tools.Dameng != "" && shouldProbeDameng(fp) {
-			if enriched, ok := probes.DetectDameng(ctx, fp); ok {
-				fp = enriched
-				progress.Emit("info", "dameng-probe", "dameng-probe %s:%d matched", fp.IP, fp.Port)
-				if opts.PersistFingerprint != nil {
-					if err := opts.PersistFingerprint(fp); err != nil {
-						return result, err
+		// Nuclei is the sole Dameng protocol authority. Nmap labels and ports
+		// are candidates only and never authorize a credential attempt.
+		damengMatched := false
+		var damengIdentifyErr error
+		if !fp.IsWeb && opts.Tools.Dameng != "" && opts.Tools.Nuclei != "" {
+			started := time.Now()
+			progress.Emit("info", "dameng-identify", "dameng-identify %s:%d template=dameng-detect", fp.IP, fp.Port)
+			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Dameng)
+			out, err := tools.RunNucleiTemplate(toolCtx, runner, opts.Tools.Nuclei, net.JoinHostPort(fp.IP, strconv.Itoa(fp.Port)), opts.Tools.DamengTemplatePath(), nil)
+			operatorCanceled := isOperatorCanceled(toolCtx)
+			cancel()
+			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("dameng-identify", fp.IP, strconv.Itoa(fp.Port))+".jsonl", out); writeErr != nil {
+				damengIdentifyErr = writeErr
+			} else if err != nil {
+				damengIdentifyErr = err
+				if operatorCanceled {
+					return result, context.Canceled
+				}
+			} else if findings, parseErr := tools.ParseNucleiJSONL(out); parseErr != nil {
+				damengIdentifyErr = parseErr
+			} else {
+				for _, finding := range findings {
+					if finding.TemplateID == "dameng-detect" {
+						damengMatched = true
+						break
 					}
 				}
+			}
+			if damengIdentifyErr != nil {
+				progress.Emit("error", "dameng-identify", "dameng-identify %s:%d failed after %s: %v", fp.IP, fp.Port, time.Since(started).Round(time.Second), damengIdentifyErr)
 			}
 		}
 
@@ -364,17 +382,24 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			}
 		}
 
-		// Dameng default-password detector — optional fourth engine. Execution is
-		// triggered only when active protocol fingerprinting (or a future nmap
-		// probe) normalizes the service to "dameng", so custom ports are covered
-		// without a fixed port list.
+		// Default credentials are attempted only after the configured community
+		// Nuclei template produced a dameng-detect finding for this endpoint.
 		switch {
-		case fp.Normalized != "dameng":
-			if err := recordDetectionCheck(opts, fp, "dameng", "skipped", "no_matching_rule", "", time.Now(), time.Now()); err != nil {
-				return TargetScan{}, err
-			}
 		case opts.Tools.Dameng == "":
 			if err := recordDetectionCheck(opts, fp, "dameng", "skipped", "tool_unconfigured", "dameng detector is not configured", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case opts.Tools.Nuclei == "" || strings.TrimSpace(opts.Tools.NucleiTemplates) == "":
+			if err := recordDetectionCheck(opts, fp, "dameng", "skipped", "tool_unconfigured", "nuclei or nuclei_templates is not configured", time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+		case damengIdentifyErr != nil:
+			if err := recordDetectionCheck(opts, fp, "dameng", "failed", "command_failed", damengIdentifyErr.Error(), time.Now(), time.Now()); err != nil {
+				return TargetScan{}, err
+			}
+			result.HadErrors = true
+		case !damengMatched:
+			if err := recordDetectionCheck(opts, fp, "dameng", "skipped", "no_matching_rule", "dameng-detect template did not match", time.Now(), time.Now()); err != nil {
 				return TargetScan{}, err
 			}
 		default:
@@ -386,10 +411,17 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			}
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Dameng)
 			checker := opts.DamengChecker
+			var damengResult tools.DamengResult
 			if checker == nil {
-				checker = tools.DefaultDamengChecker
+				executable, executableErr := os.Executable()
+				if executableErr != nil {
+					err = executableErr
+				} else {
+					damengResult, err = tools.RunDamengHelper(toolCtx, runner, executable, fp.IP, fp.Port)
+				}
+			} else {
+				damengResult, err = tools.RunDamengDefaultPassword(toolCtx, checker, fp.IP, fp.Port)
 			}
-			damengResult, err := tools.RunDamengDefaultPassword(toolCtx, checker, fp.IP, fp.Port)
 			operatorCanceled := isOperatorCanceled(toolCtx)
 			cancel()
 			out := []byte(damengResult.Output)
@@ -447,45 +479,6 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
-}
-
-// shouldProbeDameng decides whether a fingerprint is weak enough that the
-// active Dameng protocol probe is worth running. Known database and web
-// services are skipped to avoid wasting packets.
-func shouldProbeDameng(fp fingerprint.ServiceFingerprint) bool {
-	if fp.Normalized == "dameng" {
-		return false
-	}
-	known := map[string]bool{
-		"mysql":    true,
-		"mariadb":  true,
-		"postgres": true,
-		"mssql":    true,
-		"redis":    true,
-		"mongodb":  true,
-		"oracle":   true,
-		"http":     true,
-		"https":    true,
-		"ssh":      true,
-		"smb":      true,
-		"rdp":      true,
-		"ftp":      true,
-		"smtp":     true,
-		"dns":      true,
-		"snmp":     true,
-		"telnet":   true,
-		"vnc":      true,
-	}
-	if known[fp.Normalized] {
-		return false
-	}
-	// Also skip when nmap already gave a confident product name that maps to a
-	// non-Dameng database or middleware.
-	product := strings.ToLower(fp.Product)
-	if strings.Contains(product, "dameng") || strings.Contains(product, "dm") {
-		return false
-	}
-	return true
 }
 
 func filterScopeFingerprints(scope target.Scope, fingerprints []fingerprint.ServiceFingerprint) []fingerprint.ServiceFingerprint {

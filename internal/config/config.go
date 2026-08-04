@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -21,11 +23,22 @@ type ToolPaths struct {
 	Nmap     string `yaml:"nmap"`
 	Httpx    string `yaml:"httpx"`
 	Nuclei   string `yaml:"nuclei"`
-	Rdpscan  string `yaml:"rdpscan"`
-	// Dameng is an on/off switch for the built-in Dameng default-password
-	// detector. It does not point to an external binary; any non-empty value
-	// enables the detector.
+	// NucleiTemplates is the root of the community nuclei-templates checkout.
+	NucleiTemplates string `yaml:"nuclei_templates"`
+	Rdpscan         string `yaml:"rdpscan"`
+	// Dameng enables the community-template-gated default-password detector.
+	// It does not point to an external binary; any non-empty value enables it.
 	Dameng string `yaml:"dameng"`
+}
+
+func (p ToolPaths) DamengTemplatePath() string {
+	root := strings.TrimSpace(p.NucleiTemplates)
+	if root == "~" || strings.HasPrefix(root, "~/") || strings.HasPrefix(root, `~\`) {
+		if home, err := os.UserHomeDir(); err == nil {
+			root = filepath.Join(home, strings.TrimLeft(root[1:], `/\`))
+		}
+	}
+	return filepath.Join(root, "javascript", "detection", "dameng-detect.yaml")
 }
 
 type ToolTimeouts struct {
@@ -127,6 +140,9 @@ func Load(path string) (Config, error) {
 	}
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, err
+	}
+	if cfg.Tools.NucleiTemplates == "" {
+		cfg.Tools.NucleiTemplates = "~/nuclei-templates"
 	}
 	if cfg.Scan.Ports == "" {
 		cfg.Scan.Ports = "top1000"
