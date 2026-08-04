@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { formatConsoleTime } from './console-time';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ansiToHtml } from './ansi';
 
 type ScanEvent = { id: number; time: string; level: string; stage: string; message: string };
 
+// This terminal intentionally does NOT share the run-monitor page's event-log
+// rendering: the monitor shows the processed pipeline ("[time] [level] stage:
+// message"), while this page mirrors an external terminal — the echoed command
+// (level "command") plus the complete raw tool output (level "raw") with ANSI
+// colors rendered as-is.
 const output = ref('等待启动工具…');
 const events = ref<ScanEvent[]>([]);
 const runID = ref('');
@@ -30,7 +35,8 @@ async function poll(run: string) {
     if (!eventsResult.ok || !statusResult.ok) throw new Error('poll failed');
     const newEvents = await eventsResult.json() as ScanEvent[];
     if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
-    output.value = events.value.map((event) => `[${formatConsoleTime(event.time)}] [${event.level || 'info'}] ${event.stage || 'tool'}: ${event.message}`).join('\n') || '工具已启动，等待输出…';
+    const rendered = renderTerminal(events.value);
+    output.value = rendered || '工具已启动，等待输出…';
     const status = (await statusResult.json() as { status: string }).status;
     const hasMoreEvents = newEvents.length === eventPageSize;
     if (status !== 'running' && !hasMoreEvents) {
@@ -39,6 +45,13 @@ async function poll(run: string) {
     }
     if (status === 'running') await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
+}
+
+function renderTerminal(list: ScanEvent[]): string {
+  return list
+    .filter((event) => event.level === 'command' || event.level === 'raw')
+    .map((event) => (event.level === 'command' ? `$ ${event.message}` : event.message))
+    .join('\n');
 }
 
 async function submit(event: SubmitEvent) {
@@ -70,6 +83,8 @@ async function submit(event: SubmitEvent) {
   }
 }
 
+const outputHtml = computed(() => ansiToHtml(output.value));
+
 watch(output, async () => {
   await nextTick();
   const selection = window.getSelection();
@@ -93,7 +108,7 @@ onBeforeUnmount(() => {
     <div class="panel-heading"><div><p class="eyebrow">工具输出</p><h3>工具实时输出</h3><p class="meta-line" role="status">{{ feedback }}</p></div><a v-if="runID" class="button button-secondary" :href="`/runs/${runID}`">查看本次完整结果</a></div>
     <div class="terminal-window tool-preview-window">
       <div class="terminal-header"><div class="terminal-dots"><span class="terminal-dot dot-red"></span><span class="terminal-dot dot-yellow"></span><span class="terminal-dot dot-green"></span></div><div class="terminal-title">tool output</div></div>
-      <pre ref="terminal" class="event-log tool-command-preview" @scroll="onScroll">{{ output }}</pre>
+      <pre ref="terminal" class="event-log tool-command-preview" @scroll="onScroll" v-html="outputHtml"></pre>
     </div>
   </section>
 </template>

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	_ "gitee.com/chunanyong/dm"
+	dm "gitee.com/chunanyong/dm"
 )
 
 // DamengVerdict is the outcome of a default-password check against a Dameng
@@ -26,8 +26,10 @@ const (
 
 // DamengResult carries the classified verdict and any human-readable output.
 type DamengResult struct {
-	Verdict DamengVerdict `json:"verdict"`
-	Output  string        `json:"output"`
+	Verdict  DamengVerdict `json:"verdict"`
+	Username string        `json:"username,omitempty"`
+	Password string        `json:"password,omitempty"`
+	Output   string        `json:"output"`
 }
 
 // DamengAuthChecker abstracts the actual login attempt so tests can inject
@@ -67,48 +69,48 @@ func (e *damengDriverPanicError) Error() string {
 	return fmt.Sprintf("dameng driver panic: %v", e.value)
 }
 
-func callDamengChecker(ctx context.Context, checker DamengAuthChecker, host string, port int) (ok bool, detail string, err error) {
+func callDamengChecker(ctx context.Context, checker DamengAuthChecker, host string, port int, username, password string) (ok bool, detail string, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = &damengDriverPanicError{value: recovered}
 		}
 	}()
-	return checker.Check(ctx, host, port, "SYSDBA", "SYSDBA")
+	return checker.Check(ctx, host, port, username, password)
 }
 
-// RunDamengDefaultPassword checks whether a Dameng listener still uses the
-// factory default credential SYSDBA/SYSDBA. Authentication success is treated
-// as vulnerable; authentication failure means the password has been changed;
-// network or driver errors remain unknown so they are not misclassified as a
-// finding.
+// RunDamengDefaultPassword checks the known historical SYSDBA weak passwords.
+// Authentication success is treated as vulnerable; all candidates being
+// rejected means the password has been changed; network or driver errors
+// remain unknown so they are not misclassified as a finding.
 func RunDamengDefaultPassword(ctx context.Context, checker DamengAuthChecker, ip string, port int) (DamengResult, error) {
 	if checker == nil {
 		checker = DefaultDamengChecker
 	}
 
-	ok, detail, err := callDamengChecker(ctx, checker, ip, port)
-	if err != nil {
-		var panicErr *damengDriverPanicError
-		if errors.As(err, &panicErr) || errors.Is(err, context.DeadlineExceeded) {
+	for _, credential := range []struct {
+		username string
+		password string
+	}{
+		{username: "SYSDBA", password: "SYSDBA"},
+		{username: "SYSDBA", password: "SYSDBA001"},
+	} {
+		ok, detail, err := callDamengChecker(ctx, checker, ip, port, credential.username, credential.password)
+		if err != nil {
+			var panicErr *damengDriverPanicError
+			if errors.As(err, &panicErr) || errors.Is(err, context.DeadlineExceeded) {
+				return DamengResult{Verdict: DamengUnknown, Output: err.Error()}, err
+			}
+			if IsDamengAuthError(err) {
+				continue
+			}
 			return DamengResult{Verdict: DamengUnknown, Output: err.Error()}, err
 		}
-		// Distinguish an actual authentication rejection from a connection-level
-		// problem. The DM driver returns errors containing authentication or
-		// login keywords when credentials are rejected; everything else is
-		// unknown (service not reachable, protocol mismatch, etc.).
-		msg := strings.ToLower(err.Error())
-		if strings.Contains(msg, "login") ||
-			strings.Contains(msg, "authentication") ||
-			strings.Contains(msg, "password") ||
-			strings.Contains(msg, "权限") ||
-			strings.Contains(msg, "口令") {
-			return DamengResult{Verdict: DamengSafe, Output: "authentication rejected: " + err.Error()}, nil
+		if ok {
+			if detail == "" {
+				detail = fmt.Sprintf("authentication succeeded for %s/%s", credential.username, credential.password)
+			}
+			return DamengResult{Verdict: DamengVulnerable, Username: credential.username, Password: credential.password, Output: detail}, nil
 		}
-		return DamengResult{Verdict: DamengUnknown, Output: err.Error()}, nil
-	}
-
-	if ok {
-		return DamengResult{Verdict: DamengVulnerable, Output: detail}, nil
 	}
 	return DamengResult{Verdict: DamengSafe, Output: "authentication rejected"}, nil
 }
@@ -145,10 +147,15 @@ func IsDamengAuthError(err error) bool {
 	if err == nil {
 		return false
 	}
+	var dmErr *dm.DmError
+	if errors.As(err, &dmErr) && dmErr.ErrCode == -2501 {
+		return true
+	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "login") ||
 		strings.Contains(msg, "authentication") ||
 		strings.Contains(msg, "password") ||
 		strings.Contains(msg, "权限") ||
-		strings.Contains(msg, "口令")
+		strings.Contains(msg, "口令") ||
+		strings.Contains(msg, "密码")
 }

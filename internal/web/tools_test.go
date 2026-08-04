@@ -87,6 +87,29 @@ func TestToolDetailPageRendersNmapHelpAndPresets(t *testing.T) {
 	}
 }
 
+func TestToolPagesRenderToolSpecificPlaceholders(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	if _, err := store.Open(dbPath); err != nil {
+		t.Fatalf("Open returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath, Listen: "127.0.0.1:8088"})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	for _, tool := range manualTools() {
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/tools/"+tool.Name, nil))
+		if res.Code != http.StatusOK {
+			t.Fatalf("%s: status mismatch: %d", tool.Name, res.Code)
+		}
+		want := `placeholder="` + tool.Placeholder + `"`
+		if !strings.Contains(res.Body.String(), want) {
+			t.Fatalf("%s: expected %q in body: %s", tool.Name, want, res.Body.String())
+		}
+	}
+}
+
 func TestToolPageBindsProjectZoneAndVerification(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")

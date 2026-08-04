@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/url"
 	"os"
@@ -116,12 +117,6 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				fp.URL = httpResult.URL
 			}
 		}
-		if opts.PersistFingerprint != nil {
-			if err := opts.PersistFingerprint(fp); err != nil {
-				return result, err
-			}
-		}
-
 		// Nuclei is the sole Dameng protocol authority. Nmap labels and ports
 		// are candidates only and never authorize a credential attempt.
 		damengMatched := false
@@ -146,12 +141,24 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 				for _, finding := range findings {
 					if finding.TemplateID == "dameng-detect" {
 						damengMatched = true
+						fp.Service = "dameng"
+						fp.Product = "Dameng Database"
+						fp.Normalized = "dameng"
+						if len(finding.ExtractedResults) > 0 {
+							fp.Version = strings.TrimSpace(finding.ExtractedResults[0])
+						}
 						break
 					}
 				}
 			}
 			if damengIdentifyErr != nil {
 				progress.Emit("error", "dameng-identify", "dameng-identify %s:%d failed after %s: %v", fp.IP, fp.Port, time.Since(started).Round(time.Second), damengIdentifyErr)
+			}
+		}
+
+		if opts.PersistFingerprint != nil {
+			if err := opts.PersistFingerprint(fp); err != nil {
+				return result, err
 			}
 		}
 
@@ -454,9 +461,9 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 						Source:   "dameng",
 						ID:       "dameng-default-password",
 						Severity: "high",
-						Summary:  "Dameng Database Default Password (SYSDBA/SYSDBA)",
+						Summary:  fmt.Sprintf("Dameng Database Default Password (%s/%s)", damengResult.Username, damengResult.Password),
 						Target:   fp.IP,
-						Output:   strings.TrimSpace(string(out)),
+						Output:   strings.TrimSpace(damengResult.Output),
 					}
 					if err := persistFinding(opts, finding); err != nil {
 						_ = recordDetectionCheck(opts, fp, "dameng", "failed", "persistence_failed", err.Error(), started, time.Now())

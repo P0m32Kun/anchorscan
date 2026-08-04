@@ -48,7 +48,7 @@ Project 内用于组织测试范围和报告内容的业务分区。创建 Proje
 报告对每个指纹汇总 NSE、nuclei 与 rdpscan 的实际完成情况，显示各引擎、未覆盖及失败/跳过/取消/中断数量。它是本次执行记录的可见汇总，不是漏洞覆盖率或安全保证。
 
 ### Progress（进度事件流）
-扫描进行中按 level/stage/message 报告的实时事件流，驱动 web 的 `/runs/:id/status` 与 `/runs/:id/events`。持久化为 `store.ScanEvent`。
+扫描进行中按 level/stage/message 报告的实时事件流，驱动 web 的 `/runs/:id/status` 与 `/runs/:id/events`。持久化为 `store.ScanEvent`。普通 level 的事件落库前会经 `summarizeScanEvent` 摘要化（去 ANSI、首行+末行）；level 为 `command`（回显命令）与 `raw`（原始终端输出）的事件逐字保留（含 ANSI 颜色序列），专供单工具调用页的模拟终端渲染，任务监控页对 `raw` 事件只显示占位说明而不展开原始内容。
 > 由候选 #1 深化引入：`internal/app.Progress` 接口（单方法 `Emit`）是 scanTarget 报告进度的窄接缝，store 适配器 `storeProgress` 负责落 `ScanEvent` + 调日志。
 
 ### ScanEvent（`store.ScanEvent`）

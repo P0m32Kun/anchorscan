@@ -30,11 +30,12 @@ type toolPageData struct {
 }
 
 type manualTool struct {
-	Name    string
-	Title   string
-	Summary string
-	Help    []string
-	Presets []toolPreset
+	Name        string
+	Title       string
+	Summary     string
+	Placeholder string
+	Help        []string
+	Presets     []toolPreset
 }
 
 type toolPreset struct {
@@ -271,9 +272,10 @@ func manualToolByName(name string) (manualTool, bool) {
 func manualTools() []manualTool {
 	return []manualTool{
 		{
-			Name:    "rustscan",
-			Title:   "Rustscan 单工具调用",
-			Summary: "快速发现主机开放端口，适合先摸清资产入口。",
+			Name:        "rustscan",
+			Title:       "Rustscan 单工具调用",
+			Summary:     "快速发现主机开放端口，适合先摸清资产入口。",
+			Placeholder: "例如 -a 192.168.1.10 --ports 22,80,443,3389",
 			Help: []string{
 				"参数框填写 rustscan 原生参数，例如 -a 192.168.1.10 --ports 80,443。",
 				"端口写法保持 rustscan 习惯：--top、--range 100-1000、--ports 80,443。",
@@ -287,9 +289,10 @@ func manualTools() []manualTool {
 			},
 		},
 		{
-			Name:    "nmap",
-			Title:   "Nmap 单工具调用",
-			Summary: "做主机存活验证或已知端口的服务指纹识别。",
+			Name:        "nmap",
+			Title:       "Nmap 单工具调用",
+			Summary:     "做主机存活验证或已知端口的服务指纹识别。",
+			Placeholder: "例如 -sn 192.168.1.10 或 -sV -p 22,80,443 192.168.1.10",
 			Help: []string{
 				"参数框填写 nmap 原生参数，例如 -sn 192.168.1.10。",
 				"存活检测常用 -sn；服务识别常用 -sV 加目标和端口。",
@@ -302,9 +305,10 @@ func manualTools() []manualTool {
 			},
 		},
 		{
-			Name:    "httpx",
-			Title:   "Httpx 单工具调用",
-			Summary: "识别单个 Web URL 的状态码、标题和技术栈。",
+			Name:        "httpx",
+			Title:       "Httpx 单工具调用",
+			Summary:     "识别单个 Web URL 的状态码、标题和技术栈。",
+			Placeholder: "例如 -u http://192.168.1.10:8080 -title -status-code",
 			Help: []string{
 				"参数框填写 httpx 原生参数，例如 -u http://192.168.1.10:8080。",
 				"URL 要写完整协议，适合在发现 Web 端口后单独做指纹补充。",
@@ -317,9 +321,10 @@ func manualTools() []manualTool {
 			},
 		},
 		{
-			Name:    "nuclei",
-			Title:   "Nuclei 单工具调用",
-			Summary: "对单个 URL 按 tags 或指定 template 做漏洞模板探测。",
+			Name:        "nuclei",
+			Title:       "Nuclei 单工具调用",
+			Summary:     "对单个 URL 按 tags 或指定 template 做漏洞模板探测。",
+			Placeholder: "例如 -u http://192.168.1.10:8080 -tags cve",
 			Help: []string{
 				"参数框填写 nuclei 原生参数，例如 -u http://192.168.1.10:8080 -tags cve。",
 				"按 nuclei 原生命令习惯填写 -tags、-t、-u 等参数。",

@@ -25,5 +25,9 @@ case " $* " in
     printf '%s\n' '{"template-id":"anchorscan-test","matched-at":"http://192.0.2.20:80","info":{"name":"AnchorScan test","severity":"info"}}'
     exit 0
     ;;
+  *" --ansi-demo "*)
+    printf '\033[32mANSI-OK\033[0m plain-tail\n'
+    exit 0
+    ;;
 esac
 printf '%s\n' '[80]'

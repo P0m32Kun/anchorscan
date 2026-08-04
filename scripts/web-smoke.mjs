@@ -317,10 +317,22 @@ try {
   const projectID = projectURL.split('/').pop();
   await page.goto(`${baseURL}/tools/nmap?project_id=${projectID}`, { waitUntil: 'networkidle' });
   await page.locator('[data-tool-run-feedback][data-mounted="true"]').waitFor();
-  await page.locator('textarea[name="raw_args"]').fill('-sn 192.0.2.20');
+  // 每个工具的参数示例应按工具定制，nmap 的示例必须包含 nmap 参数写法。
+  const placeholder = await page.locator('textarea[name="raw_args"]').getAttribute('placeholder');
+  assert.match(placeholder ?? '', /-sn|-sV/, 'nmap tool page should show an nmap-specific args example');
+  await page.locator('textarea[name="raw_args"]').fill('--ansi-demo');
   await page.getByRole('button', { name: '启动 nmap' }).click();
   await assert.doesNotReject(() => page.getByRole('link', { name: '查看本次完整结果' }).waitFor({ timeout: 5_000 }));
   await assert.doesNotReject(() => page.getByText(/工具运行已完成|工具运行已结束/).waitFor({ timeout: 5_000 }));
+  // 单工具终端应渲染与外部终端一致的原始输出：ANSI 颜色变为带样式的 span，
+  // 而不是事件日志式的 [time] [level] 处理格式。
+  const ansiSpan = page.locator('.tool-command-preview span', { hasText: 'ANSI-OK' });
+  await assert.doesNotReject(() => ansiSpan.waitFor({ timeout: 5_000 }));
+  assert.match((await ansiSpan.getAttribute('style')) ?? '', /color/, 'raw ANSI color should render as a styled span');
+  const terminalText = await page.locator('.tool-command-preview').innerText();
+  assert.match(terminalText, /\$ .*--ansi-demo/, 'terminal should echo the executed command');
+  assert.match(terminalText, /plain-tail/, 'terminal should keep the raw output verbatim');
+  assert.doesNotMatch(terminalText, /\[info\]|\[raw\]/, 'tool terminal must not use the processed event-log format');
 
   await seedRun(`INSERT INTO scan_runs (run_id, project_id, zone_id, target, ports, profile, status, started_at, finished_at, error, config_snapshot, artifact_dir) VALUES
     ('browser-errors', '${projectID}', 'I', '192.0.2.30', '443', 'normal', 'completed_with_errors', '2026-01-01T00:00:00Z', '2026-01-01T00:01:00Z', '', '{"zone_id":"I","target":"192.0.2.30","ports":"443","profile":"normal"}', ''),

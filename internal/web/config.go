@@ -58,6 +58,7 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 		cfg.Tools.Nmap = r.FormValue("nmap")
 		cfg.Tools.Httpx = r.FormValue("httpx")
 		cfg.Tools.Nuclei = r.FormValue("nuclei")
+		cfg.Tools.NucleiTemplates = r.FormValue("nuclei_templates")
 		cfg.Tools.Rdpscan = r.FormValue("rdpscan")
 		cfg.Timeouts.Rustscan = r.FormValue("timeout_rustscan")
 		cfg.Timeouts.Nmap = r.FormValue("timeout_nmap")

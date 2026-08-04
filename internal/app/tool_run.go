@@ -191,12 +191,17 @@ func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 	if err != nil {
 		return nil, err
 	}
-	emitTool(opts, scanStore, "info", opts.Tool, "%s", displayCommand(binary, opts.NativeArgs))
+	// The tool-page terminal renders native runs verbatim: the echoed command
+	// (level "command") and the complete raw output (level "raw", ANSI color
+	// sequences preserved) are tagged so the browser can render them like an
+	// external terminal instead of the processed event-log view used by the
+	// run monitor page.
+	emitTool(opts, scanStore, "command", opts.Tool, "%s", displayCommand(binary, opts.NativeArgs))
 	toolCtx, cancel := toolRunContext(ctx, opts)
 	out, err := runner.Run(toolCtx, binary, opts.NativeArgs)
 	output := normalizeToolOutput(string(out))
 	if strings.TrimSpace(output) != "" {
-		emitTool(opts, scanStore, "info", opts.Tool, "%s", strings.TrimRight(output, "\n"))
+		emitTool(opts, scanStore, "raw", opts.Tool, "%s", strings.TrimRight(output, "\n"))
 	}
 	if err != nil {
 		normalizedErr := normalizeToolError(toolCtx, err)

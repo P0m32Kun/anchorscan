@@ -159,7 +159,7 @@ func TestScanTargetDamengNucleiGate(t *testing.T) {
 		wantCalls int
 	}{
 		{name: "no template match", wantCalls: 0},
-		{name: "dameng template match on custom port", nucleiOut: []byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"10198"}`), wantCalls: 1},
+		{name: "dameng template match on custom port", nucleiOut: []byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"10198"}`), wantCalls: 2},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			runner := &recordingSequenceRunner{outputs: [][]byte{

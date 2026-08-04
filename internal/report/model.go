@@ -28,6 +28,7 @@ type PortReport struct {
 	Protocol    string    `json:"protocol"`
 	Service     string    `json:"service"`
 	Product     string    `json:"product"`
+	Version     string    `json:"version,omitempty"`
 	CPE         string    `json:"cpe,omitempty"`
 	Fingerprint string    `json:"fingerprint,omitempty"`
 	IsWeb       bool      `json:"is_web"`
@@ -157,6 +158,7 @@ func buildWithScanDataAndDetectionChecks(fps []fingerprint.ServiceFingerprint, f
 			Protocol:    fp.Protocol,
 			Service:     fp.Service,
 			Product:     fp.Product,
+			Version:     fp.Version,
 			CPE:         fp.CPE,
 			Fingerprint: fp.Normalized,
 			IsWeb:       fp.IsWeb,

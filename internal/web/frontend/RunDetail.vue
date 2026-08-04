@@ -37,7 +37,12 @@ let hasMoreEvents = false;
 
 const active = computed(() => status.value === 'running');
 const latestEvent = computed(() => events.value.at(-1));
-const output = computed(() => events.value.map((event) => `[${formatConsoleTime(event.time)}] [${event.level || 'info'}] ${event.stage || 'engine'}: ${event.message}`).join('\n'));
+const output = computed(() => events.value.map((event) => {
+  // Tool-terminal events belong to the single-tool page's raw terminal; here
+  // the monitor keeps its processed view and only points at the raw record.
+  if (event.level === 'raw') return `[${formatConsoleTime(event.time)}] [raw] ${event.stage || 'tool'}: 原始终端输出（完整内容与颜色见单工具调用页/扫描报告）`;
+  return `[${formatConsoleTime(event.time)}] [${event.level || 'info'}] ${event.stage || 'engine'}: ${event.message}`;
+}).join('\n'));
 const progress = computed(() => {
   const event = [...events.value].reverse().find(({ stage }) => stage.toLowerCase() === 'progress');
   const match = event?.message.match(/(\d+)\s*\/\s*(\d+)/);

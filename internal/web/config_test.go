@@ -23,7 +23,7 @@ func TestConfigPageUpdatesToolPath(t *testing.T) {
 		t.Fatalf("NewServer returned error: %v", err)
 	}
 	closeServer(t, handler)
-	form := strings.NewReader("rustscan=/new/rustscan&nmap=/new/nmap&httpx=&nuclei=&ports=8080&profile=normal")
+	form := strings.NewReader("rustscan=/new/rustscan&nmap=/new/nmap&httpx=&nuclei=&nuclei_templates=~/nuclei-templates&ports=8080&profile=normal")
 	req := httptest.NewRequest(http.MethodPost, "/config", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res := httptest.NewRecorder()
@@ -35,7 +35,7 @@ func TestConfigPageUpdatesToolPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	if cfg.Tools.Rustscan != "/new/rustscan" || cfg.Scan.Ports != "8080" {
+	if cfg.Tools.Rustscan != "/new/rustscan" || cfg.Tools.NucleiTemplates != "~/nuclei-templates" || cfg.Scan.Ports != "8080" {
 		t.Fatalf("unexpected config: %#v", cfg)
 	}
 }
@@ -73,7 +73,7 @@ func TestConfigPageUpdatesKnowledgeBasePathAndShowsRestartNotice(t *testing.T) {
 func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nuclei_templates: ~/nuclei-templates\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
@@ -87,7 +87,7 @@ func TestConfigPageRendersAdvancedEditor(t *testing.T) {
 		t.Fatalf("status mismatch: %d", res.Code)
 	}
 	body := res.Body.String()
-	if !strings.Contains(body, "name=\"raw_config\"") || !strings.Contains(body, "高级 YAML") || !strings.Contains(body, "name=\"timeout_rustscan\"") || !strings.Contains(body, "value=\"0\"") {
+	if !strings.Contains(body, "name=\"raw_config\"") || !strings.Contains(body, "高级 YAML") || !strings.Contains(body, "name=\"timeout_rustscan\"") || !strings.Contains(body, "value=\"0\"") || !strings.Contains(body, "name=\"nuclei_templates\"") || !strings.Contains(body, "value=\"~/nuclei-templates\"") {
 		t.Fatalf("expected raw editor in body: %s", body)
 	}
 }

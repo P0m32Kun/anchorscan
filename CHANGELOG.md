@@ -6,6 +6,13 @@ uses semantic version tags for local-operator releases.
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-08-04
+
+### Changed
+- 单工具调用页的模拟终端改为渲染与外部终端一致的原始输出（回显命令 + 完整 ANSI 颜色渲染），不再复用任务监控页的处理后事件日志格式；每个工具的参数示例按工具定制。
+- Dameng 默认口令检测扩展为遍历已知历史弱口令（SYSDBA/SYSDBA、SYSDBA/SYSDBA001），finding 摘要与 JSON 输出记录实际命中的账号口令；Dameng 指纹自动补充 service/product/normalized 字段并从检测结果提取版本号。
+- Web 配置页新增 Nuclei 社区模板根目录（nuclei_templates）配置项，用于定位 dameng-detect 检测模板。
+
 ## [2.0.0] - 2026-07-24
 
 v2.0.0 完成 Web 控制台的渐进式 Vue 迁移与视觉收口，同时保持现有 Go 路由、表单和单文件发布方式。
