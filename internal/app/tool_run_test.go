@@ -306,6 +306,40 @@ func TestRunToolNativeArgsDoNotLeakIntoTargetField(t *testing.T) {
 	}
 }
 
+func TestRunToolNativeArgsEmitsTerminalEvents(t *testing.T) {
+	st := newToolRunStore(t)
+	runner := toolRunnerFunc(func(_ string, _ []string) ([]byte, error) {
+		return []byte("\x1b[34mINF\x1b[0m scan done\n"), nil
+	})
+
+	err := RunTool(context.Background(), runner, st, ToolRunOptions{
+		RunID: "run-terminal", Tool: "nmap", UseNativeArgs: true, NativeArgs: []string{"-sn", "192.0.2.10"},
+		Tools: ToolPaths{Nmap: "nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := st.ListScanEvents("run-terminal", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var commandEvent, rawEvent *store.ScanEvent
+	for i := range events {
+		switch events[i].Level {
+		case "command":
+			commandEvent = &events[i]
+		case "raw":
+			rawEvent = &events[i]
+		}
+	}
+	if commandEvent == nil || !strings.Contains(commandEvent.Message, "nmap") || !strings.Contains(commandEvent.Message, "-sn") {
+		t.Fatalf("missing echoed command event: %#v", events)
+	}
+	if rawEvent == nil || rawEvent.Message != "\x1b[34mINF\x1b[0m scan done" {
+		t.Fatalf("missing verbatim raw output event: %#v", events)
+	}
+}
+
 func TestRunToolAppliesConfiguredToolTimeout(t *testing.T) {
 	for _, test := range []struct {
 		tool     string

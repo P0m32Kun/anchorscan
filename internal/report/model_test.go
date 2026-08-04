@@ -13,6 +13,16 @@ func TestBuildIncludesDiscoveryMode(t *testing.T) {
 	}
 }
 
+func TestBuildPreservesFingerprintVersion(t *testing.T) {
+	got := Build([]fingerprint.ServiceFingerprint{
+		{IP: "172.22.0.10", Port: 5236, Protocol: "tcp", Service: "dameng", Product: "Dameng Database", Version: "8.1.2.128", Normalized: "dameng"},
+	}, nil)
+	port := got.Hosts[0].Ports[0]
+	if port.Version != "8.1.2.128" {
+		t.Fatalf("Port.Version = %q, want 8.1.2.128", port.Version)
+	}
+}
+
 func TestBuildDeduplicatesFindingsByIPAndID(t *testing.T) {
 	report := Build(
 		[]fingerprint.ServiceFingerprint{

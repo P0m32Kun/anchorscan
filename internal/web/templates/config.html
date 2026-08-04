@@ -69,6 +69,11 @@
         <input name="nuclei" value="{{.Config.Tools.Nuclei}}" placeholder="例如: /usr/local/bin/nuclei">
       </label>
       <label class="full-width">
+        <span>Nuclei 社区模板根目录</span>
+        <input name="nuclei_templates" value="{{.Config.Tools.NucleiTemplates}}" placeholder="例如: ~/nuclei-templates">
+        <p class="meta-line config-field-help">用于定位 javascript/detection/dameng-detect.yaml。</p>
+      </label>
+      <label class="full-width">
         <span>rdpscan 路径（BlueKeep 可选检测）</span>
         <input name="rdpscan" value="{{.Config.Tools.Rdpscan}}" placeholder="例如: /usr/local/bin/rdpscan">
         <p class="meta-line config-field-help">留空则 BlueKeep (CVE-2019-0708) 检测自动跳过。需自行编译 rdpscan 并填入路径。</p>

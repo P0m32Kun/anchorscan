@@ -83,6 +83,17 @@ func (p storeProgress) Emit(level, stage, format string, args ...any) {
 		Time:    p.now(),
 		Level:   level,
 		Stage:   stage,
-		Message: summarizeScanEvent(message),
+		Message: scanEventMessage(level, message),
 	})
+}
+
+// scanEventMessage keeps the live feed readable for regular events, but stores
+// tool-terminal events (the echoed command and the raw tool output) verbatim —
+// ANSI colors included — so the single-tool page can render them exactly like
+// an external terminal.
+func scanEventMessage(level, message string) string {
+	if level == "command" || level == "raw" {
+		return message
+	}
+	return summarizeScanEvent(message)
 }

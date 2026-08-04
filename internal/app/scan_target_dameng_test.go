@@ -39,8 +39,8 @@ func (f *fakeDamengAuthChecker) Check(ctx context.Context, host string, port int
 func TestRunScanTriggersDamengFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		[]byte("192.0.2.10 -> [5236]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
-		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236"}`),
+		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="padl2sim"/></port></ports></host></nmaprun>`),
+		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236","extracted-results":["8.1.2.128"]}`),
 	}}
 	scanStore := newScanStore(t)
 
@@ -50,7 +50,7 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
 		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
-		DamengChecker:  &fakeDamengAuthChecker{ok: true, out: "default password accepted"},
+		DamengChecker:  &fakeDamengAuthChecker{ok: true},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {
@@ -68,6 +68,9 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 	if f.Source != "dameng" || f.ID != "dameng-default-password" || f.Severity != "high" {
 		t.Fatalf("unexpected finding: %#v", f)
 	}
+	if f.Summary != "Dameng Database Default Password (SYSDBA/SYSDBA)" || !strings.Contains(f.Output, "SYSDBA/SYSDBA") {
+		t.Fatalf("finding should expose matched credential: %#v", f)
+	}
 
 	checks, err := scanStore.ListDetectionChecks("run-dameng-vulnerable")
 	if err != nil {
@@ -79,6 +82,18 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 	}
 	if c, ok := checkByEngine["dameng"]; !ok || c.Status != "completed" {
 		t.Fatalf("expected dameng completed, got %#v", checkByEngine["dameng"])
+	}
+
+	fingerprints, err := scanStore.ListFingerprints("run-dameng-vulnerable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fingerprints) != 1 {
+		t.Fatalf("expected 1 fingerprint, got %#v", fingerprints)
+	}
+	fp := fingerprints[0]
+	if fp.Service != "dameng" || fp.Product != "Dameng Database" || fp.Normalized != "dameng" || fp.Version != "8.1.2.128" {
+		t.Fatalf("unexpected Dameng fingerprint: %#v", fp)
 	}
 }
 
