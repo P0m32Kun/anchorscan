@@ -108,9 +108,9 @@ func Run(opts Options) Result {
 	checkOptionalTool(&result, "rdpscan", opts.Tools.Rdpscan)
 	if strings.TrimSpace(opts.Tools.Dameng) != "" {
 		if strings.TrimSpace(opts.Tools.Nuclei) == "" {
-			result.Errors = append(result.Errors, Message{Field: "dameng", Message: "nuclei is required when dameng detection is enabled"})
+			result.Warnings = append(result.Warnings, Message{Field: "dameng", Message: "nuclei is required when dameng detection is enabled"})
 		} else if info, err := os.Stat(opts.Tools.DamengTemplatePath()); err != nil || info.IsDir() {
-			result.Errors = append(result.Errors, Message{Field: "nuclei templates", Message: "dameng template not found: " + opts.Tools.DamengTemplatePath()})
+			result.Warnings = append(result.Warnings, Message{Field: "nuclei templates", Message: "dameng template not found: " + opts.Tools.DamengTemplatePath()})
 		}
 	}
 
