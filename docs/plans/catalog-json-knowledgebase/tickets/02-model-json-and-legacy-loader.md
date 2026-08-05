@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — 发布 catalog v2 跨仓库协议。
 
-**Status:** draft
+**Status:** done
 
 **Execution skills:** `tdd`、`implement`、`code-review`、`ponytail`。
 
@@ -24,12 +24,12 @@
 
 ## 验收
 
-- [ ] v2 fixture 在 JSON 路径加载为 ready，legacy 字段和 command 与同源 Markdown 对等子集一致。
-- [ ] `safety`、`status`、sources、generated、cleanup 不被静默丢弃。
-- [ ] JSON 条目缺 safety 或非法 safety 不会获得可用命令。
-- [ ] Markdown 扩展知识小节不破坏固定章节解析。
-- [ ] legacy Markdown 产生 `legacy-unknown`，而非 safe。
-- [ ] 聚焦 `go test ./internal/knowledgebase/...` 通过。
+- [x] v2 fixture 在 JSON 路径加载为 ready，legacy 字段和 command 与同源 Markdown 对等子集一致。
+- [x] `safety`、`status`、sources、generated、cleanup 不被静默丢弃。
+- [x] JSON 条目缺 safety 或非法 safety 不会获得可用命令。
+- [x] Markdown 扩展知识小节不破坏固定章节解析。
+- [x] legacy Markdown 产生 `legacy-unknown`，而非 safe。
+- [x] 聚焦 `go test ./internal/knowledgebase/...` 通过。
 
 ## 非目标
 

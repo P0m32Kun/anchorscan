@@ -40,6 +40,183 @@ nuclei -t network/smb.yaml -u {{host}}:{{port}}
 启用签名。
 `
 
+func TestLoadJSONV2PreservesSafetyAndAuditFields(t *testing.T) {
+	configPath, catalogPath := writeCatalog(t, fixture(t, "catalog-v2.json"))
+	catalog := Load(configPath, filepath.Base(catalogPath))
+	entry, ok := catalog.Entry("smb-signing")
+	if catalog.Status() != StatusReady || !ok {
+		t.Fatalf("Status() = %q, entry = %#v, ok = %t", catalog.Status(), entry, ok)
+	}
+	if entry.ReviewStatus != ReviewStatusNeedsReview || entry.Safety.Mode != SafetyOptional || entry.Safety.Cleanup != "停止认证尝试" || len(entry.Sources) != 1 || entry.Generated.By != "agent:test" {
+		t.Fatalf("Entry() lost catalog v2 safety or audit data: %#v", entry)
+	}
+	if entry.Verify == nil || entry.Verify.Template != "network/smb.yaml" {
+		t.Fatalf("Entry() lost verify data: %#v", entry.Verify)
+	}
+	if entry.Commands.Nuclei != "nuclei -t network/smb.yaml -u {{host}}:{{port}}" {
+		t.Fatalf("Entry() command = %q", entry.Commands.Nuclei)
+	}
+}
+
+func TestLoadJSONRejectsTrailingDocument(t *testing.T) {
+	for _, trailing := range []string{"\n{}", "\n]", "\n}"} {
+		catalog := LoadJSON([]byte(fixture(t, "catalog-v2.json") + trailing))
+		if catalog.Status() != StatusUnavailable {
+			t.Fatalf("Status() = %q, want %q for trailing %q", catalog.Status(), StatusUnavailable, trailing)
+		}
+	}
+}
+
+func TestLoadJSONFixtureSupportsCodeAndNoVerify(t *testing.T) {
+	configPath, catalogPath := writeCatalog(t, fixture(t, "catalog-v2.json"))
+	catalog := Load(configPath, filepath.Base(catalogPath))
+	code, codeOK := catalog.Entry("nuclei-code")
+	noVerify, noVerifyOK := catalog.Entry("no-verify")
+	manual, manualOK := catalog.Entry("test-file-delete")
+	if catalog.Status() != StatusReady || !codeOK || code.Verify == nil || !code.Verify.Code || !strings.Contains(code.Commands.Nuclei, "nuclei -code") || !noVerifyOK || noVerify.Verify != nil || noVerify.Commands != (Commands{}) || !manualOK || manual.Safety.Cleanup == "" {
+		t.Fatalf("catalog v2 fixture was not preserved: status=%q code=%#v no-verify=%#v manual=%#v", catalog.Status(), code, noVerify, manual)
+	}
+}
+
+func TestLoadJSONSkipsInvalidSafetyAndClearsInvalidCommand(t *testing.T) {
+	fixtureContent := fixture(t, "catalog-v2.json")
+	invalidSafety := strings.Replace(fixtureContent, `"safety": {"mode": "optional", "effects": ["authentication-attempt"], "cleanup": "停止认证尝试"}`, `"safety": null`, 1)
+	catalog := LoadJSON([]byte(invalidSafety))
+	if catalog.Status() != StatusDegraded {
+		t.Fatalf("invalid safety status = %q, want %q", catalog.Status(), StatusDegraded)
+	}
+	if _, ok := catalog.Entry("smb-signing"); ok {
+		t.Fatal("invalid safety entry was retained")
+	}
+
+	invalidCommand := strings.Replace(fixtureContent, "nuclei -t network/smb.yaml", "nuclei --invalid network/smb.yaml", 1)
+	catalog = LoadJSON([]byte(invalidCommand))
+	entry, ok := catalog.Entry("smb-signing")
+	if catalog.Status() != StatusDegraded || !ok || entry.Commands != (Commands{}) {
+		t.Fatalf("invalid command status=%q entry=%#v ok=%t", catalog.Status(), entry, ok)
+	}
+}
+
+func TestLoadJSONRejectsSafeSafetyWithoutEffects(t *testing.T) {
+	content := strings.Replace(fixture(t, "catalog-v2.json"), `"safety": {"mode": "safe", "effects": []}`, `"safety": {"mode": "safe"}`, 1)
+	catalog := LoadJSON([]byte(content))
+	if catalog.Status() != StatusDegraded {
+		t.Fatalf("Status() = %q, want %q", catalog.Status(), StatusDegraded)
+	}
+	if _, ok := catalog.Entry("nuclei-code"); ok {
+		t.Fatal("safe entry without effects was retained")
+	}
+}
+
+func TestLoadJSONRejectsManualGatedSafetyWithoutEffects(t *testing.T) {
+	content := strings.Replace(fixture(t, "catalog-v2.json"), `"safety": {"mode": "manual-gated", "effects": ["file-read"]}`, `"safety": {"mode": "manual-gated", "effects": []}`, 1)
+	catalog := LoadJSON([]byte(content))
+	if catalog.Status() != StatusDegraded {
+		t.Fatalf("Status() = %q, want %q", catalog.Status(), StatusDegraded)
+	}
+	if _, ok := catalog.Entry("no-verify"); ok {
+		t.Fatal("manual-gated entry without effects was retained")
+	}
+}
+
+func TestLoadJSONKeepsDisplayEntryForMalformedCommandOrVerify(t *testing.T) {
+	fixtureContent := fixture(t, "catalog-v2.json")
+	for _, content := range []string{
+		strings.Replace(fixtureContent, `"command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}"`, `"command": 123`, 1),
+		strings.Replace(fixtureContent, `"verify": {"tool": "nuclei", "template": "network/smb.yaml", "target": "host:port"}`, `"verify": []`, 1),
+	} {
+		catalog := LoadJSON([]byte(content))
+		entry, ok := catalog.Entry("smb-signing")
+		if catalog.Status() != StatusDegraded || !ok || entry.Commands != (Commands{}) || entry.Verify != nil {
+			t.Fatalf("malformed command/verify status=%q entry=%#v ok=%t", catalog.Status(), entry, ok)
+		}
+	}
+}
+
+func TestLoadJSONAcceptsCanonicalNmapCommand(t *testing.T) {
+	content := fixture(t, "catalog-v2.json")
+	content = strings.Replace(content, `"verify": {"tool": "nuclei", "template": "network/smb.yaml", "target": "host:port"}`, `"verify": {"tool": "nmap", "script": "smb-signing", "flags": ["-sU"]}`, 1)
+	content = strings.Replace(content, `"command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}"`, `"command": "nmap -sU -p {{port}} --script smb-signing {{host}}"`, 1)
+	catalog := LoadJSON([]byte(content))
+	entry, ok := catalog.Entry("smb-signing")
+	if catalog.Status() != StatusReady || !ok || entry.Commands.NmapNSE == "" || entry.Verify == nil || entry.Verify.Script != "smb-signing" {
+		t.Fatalf("canonical Nmap command status=%q entry=%#v ok=%t", catalog.Status(), entry, ok)
+	}
+}
+
+func TestLoadJSONRejectsNmapCommandWithoutScript(t *testing.T) {
+	content := fixture(t, "catalog-v2.json")
+	content = strings.Replace(content, `"verify": {"tool": "nuclei", "template": "network/smb.yaml", "target": "host:port"}`, `"verify": {"tool": "nmap", "script": "smb-signing"}`, 1)
+	content = strings.Replace(content, `"command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}"`, `"command": "nmap -sU -p {{port}} {{host}}"`, 1)
+	catalog := LoadJSON([]byte(content))
+	entry, ok := catalog.Entry("smb-signing")
+	if catalog.Status() != StatusDegraded || !ok || entry.Commands != (Commands{}) {
+		t.Fatalf("invalid Nmap command status=%q entry=%#v ok=%t", catalog.Status(), entry, ok)
+	}
+}
+
+func TestLoadJSONClearsCommandThatDoesNotMatchVerify(t *testing.T) {
+	content := strings.Replace(fixture(t, "catalog-v2.json"), `"command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}"`, `"command": "nuclei -t network/other.yaml -u {{host}}:{{port}}"`, 1)
+	catalog := LoadJSON([]byte(content))
+	entry, ok := catalog.Entry("smb-signing")
+	if catalog.Status() != StatusDegraded || !ok || entry.Commands != (Commands{}) || entry.Verify != nil {
+		t.Fatalf("verify mismatch status=%q entry=%#v ok=%t", catalog.Status(), entry, ok)
+	}
+}
+
+func TestLoadLegacyFixtureAllowsExtensionsAndFailsClosed(t *testing.T) {
+	configPath, handbookPath := writeHandbook(t, fixture(t, "handbook-v1.md"))
+	catalog := Load(configPath, filepath.Base(handbookPath))
+	entry, ok := catalog.Entry("smb-signing")
+	if catalog.Status() != StatusReady || !ok || entry.ReviewStatus != ReviewStatusLegacyUnknown || entry.Safety.Mode != SafetyLegacyUnknown {
+		t.Fatalf("legacy entry status=%q entry=%#v ok=%t", catalog.Status(), entry, ok)
+	}
+}
+
+func TestCatalogV2FixtureMatchesMarkdownProjection(t *testing.T) {
+	jsonEntry, jsonOK := LoadJSON([]byte(fixture(t, "catalog-v2.json"))).Entry("smb-signing")
+	configPath, handbookPath := writeHandbook(t, fixture(t, "handbook-v2.md"))
+	markdownEntry, markdownOK := Load(configPath, filepath.Base(handbookPath)).Entry("smb-signing")
+	if !jsonOK || !markdownOK || jsonEntry.Name != markdownEntry.Name || jsonEntry.Severity != markdownEntry.Severity || jsonEntry.Description != markdownEntry.Description || jsonEntry.Remediation != markdownEntry.Remediation || jsonEntry.Commands.Nuclei != markdownEntry.Commands.Nuclei || !slicesEqual(jsonEntry.Match.NucleiIDs, markdownEntry.Match.NucleiIDs) || !slicesEqual(jsonEntry.Match.CVEs, markdownEntry.Match.CVEs) {
+		t.Fatalf("JSON and Markdown projections differ: json=%#v markdown=%#v", jsonEntry, markdownEntry)
+	}
+}
+
+func slicesEqual(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func TestLoadJSONRejectsDuplicateObjectKeys(t *testing.T) {
+	content := strings.Replace(fixture(t, "catalog-v2.json"), `"source": "handbook-v2",`, `"source": "handbook-v2", "source": "handbook-v2",`, 1)
+	if got := LoadJSON([]byte(content)).Status(); got != StatusUnavailable {
+		t.Fatalf("Status() = %q, want %q", got, StatusUnavailable)
+	}
+}
+
+func TestLoadJSONRejectsInvalidCatalogProtocol(t *testing.T) {
+	fixtureContent := fixture(t, "catalog-v2.json")
+	cases := []string{
+		"{",
+		strings.Replace(fixtureContent, `"handbook-v2"`, `"handbook-v3"`, 1),
+		strings.Replace(fixtureContent, `"entry_count": 4`, `"entry_count": 5`, 1),
+		strings.Replace(fixtureContent, `"id": "nuclei-code"`, `"id": "smb-signing"`, 1),
+		`{"version": 2, "source": "handbook-v2", "entry_count": 1, "entries": [{}]}`,
+	}
+	for _, content := range cases {
+		if got := LoadJSON([]byte(content)).Status(); got != StatusUnavailable {
+			t.Errorf("Status() = %q, want %q for %s", got, StatusUnavailable, content[:min(len(content), 30)])
+		}
+	}
+}
+
 func TestLoadParsesThreeSections(t *testing.T) {
 	configPath, handbookPath := writeHandbook(t, handbook)
 	catalog := Load(configPath, filepath.Base(handbookPath))
@@ -47,7 +224,7 @@ func TestLoadParsesThreeSections(t *testing.T) {
 		t.Fatalf("Status() = %q, diagnostics = %#v", catalog.Status(), catalog.Diagnostics())
 	}
 	entry, ok := catalog.Entry("smb-signing")
-	if !ok || entry.Description != "描述。" || entry.Remediation != "启用签名。" || entry.Commands.Nuclei == "" {
+	if !ok || entry.Description != "描述。" || entry.Remediation != "启用签名。" || entry.Commands.Nuclei == "" || entry.ReviewStatus != ReviewStatusLegacyUnknown || entry.Safety.Mode != SafetyLegacyUnknown {
 		t.Fatalf("Entry() = %#v, %t", entry, ok)
 	}
 }
@@ -140,6 +317,29 @@ func TestLoadRejectsYAMLAnchor(t *testing.T) {
 	if got := Load(configPath, filepath.Base(handbookPath)).Status(); got != StatusUnavailable {
 		t.Fatalf("Status() = %q, want %q", got, StatusUnavailable)
 	}
+}
+
+func fixture(t *testing.T, name string) string {
+	t.Helper()
+	content, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(content)
+}
+
+func writeCatalog(t *testing.T, content string) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	catalogPath := filepath.Join(dir, "catalog.json")
+	if err := os.WriteFile(configPath, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(catalogPath, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return configPath, catalogPath
 }
 
 func writeHandbook(t *testing.T, content string) (string, string) {

@@ -1,0 +1,59 @@
+{
+  "version": 2,
+  "source": "handbook-v2",
+  "entry_count": 4,
+  "entries": [
+    {
+      "id": "smb-signing",
+      "title": "SMB 签名未启用",
+      "severity": "中危",
+      "order": 10,
+      "status": "needs-review",
+      "safety": {"mode": "optional", "effects": ["authentication-attempt"], "cleanup": "停止认证尝试"},
+      "match": {"nuclei": ["smb-signing"], "nse": [], "manual-review": [], "cve": ["CVE-2024-0001"]},
+      "sections": {"漏洞描述": "描述。", "修复建议": "启用签名。"},
+      "verify": {"tool": "nuclei", "template": "network/smb.yaml", "target": "host:port"},
+      "command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}",
+      "sources": ["https://example.test/advisory"],
+      "generated": {"by": "agent:test", "at": "2026-08-04"}
+    },
+    {
+      "id": "nuclei-code",
+      "title": "Nuclei Code",
+      "severity": "高危",
+      "order": 20,
+      "status": "stable",
+      "safety": {"mode": "safe", "effects": []},
+      "match": {"nuclei": ["CVE-2026-24061"], "nse": [], "manual-review": [], "cve": ["CVE-2026-24061"]},
+      "sections": {"漏洞描述": "code 模板。", "修复建议": "升级。"},
+      "verify": {"tool": "nuclei", "template": "code/cves/2026/CVE-2026-24061.yaml", "target": "host:port", "code": true},
+      "command": "nuclei -code -t code/cves/2026/CVE-2026-24061.yaml -u {{host}}:{{port}}",
+      "sources": ["https://example.test/cve"],
+      "generated": {"by": "agent:test", "at": "2026-08-04"}
+    },
+    {
+      "id": "test-file-delete",
+      "title": "测试文件删除",
+      "severity": "低危",
+      "order": 30,
+      "status": "needs-review",
+      "safety": {"mode": "manual-gated", "effects": ["test-file-delete"], "cleanup": "确认随机测试文件已删除。"},
+      "match": {"nuclei": [], "nse": [], "manual-review": ["test-file-delete"], "cve": []},
+      "sections": {"漏洞描述": "需人工确认。", "修复建议": "限制权限。"},
+      "sources": [],
+      "generated": {"by": "agent:test", "at": "2026-08-04"}
+    },
+    {
+      "id": "no-verify",
+      "title": "无自动验证",
+      "severity": "低危",
+      "order": 40,
+      "status": "needs-review",
+      "safety": {"mode": "manual-gated", "effects": ["file-read"]},
+      "match": {"nuclei": [], "nse": [], "manual-review": ["no-verify"], "cve": []},
+      "sections": {"漏洞描述": "仅人工复核。", "修复建议": "补充验证。"},
+      "sources": [],
+      "generated": {"by": "agent:test", "at": "2026-08-04"}
+    }
+  ]
+}
