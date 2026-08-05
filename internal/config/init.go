@@ -27,8 +27,10 @@ func Init(path string) error {
 
 // defaultConfig builds the Config written by Init. Tool binaries are resolved
 // from PATH so a fresh clone works without manual path editing.
-// KnowledgeBase.Path points at the packaged catalog.json (catalog protocol
-// version 2, source handbook-v3) shipped next to the config; relative paths
+// KnowledgeBase.Path is left empty (disabled): the release archive no longer
+// ships a catalog copy (single-source design, see docs/plans/catalog-json-
+// knowledgebase/spec.md). Operators clone the knowledge-base repo and point
+// knowledge_base.path at its handbook-v3/dist/catalog.json; relative paths
 // resolve against the config file directory.
 func defaultConfig() Config {
 	cfg := Config{
@@ -42,7 +44,6 @@ func defaultConfig() Config {
 		Profiles: builtInProfiles(),
 		Timeouts: ToolTimeouts{Rustscan: "0", Nmap: "0", Httpx: "0", NSE: "0", Nuclei: "0", Rdpscan: "0", Dameng: "15s"},
 	}
-	cfg.KnowledgeBase.Path = "catalog.json"
 	cfg.Tools.Rustscan = detectToolPath("rustscan")
 	cfg.Tools.Nmap = detectToolPath("nmap")
 	cfg.Tools.Httpx = detectToolPath("httpx")

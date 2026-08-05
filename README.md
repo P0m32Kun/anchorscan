@@ -133,11 +133,21 @@ make e2e       # 使用真实扫描器运行 Docker 实验室 E2E
 
 AnchorScan 的漏洞知识库（KB）为报告 enrich、验证工作台与命令生成提供条目：扫描发现会按 nuclei/nse/CVE/名称匹配到 KB 条目，展示漏洞描述、修复建议，并按条目声明的 safety/status 档位生成验证命令。
 
-**发行自带 catalog**：发布归档包含 `config/catalog.json`（catalog 协议 **version 2**、`source: handbook-v3`，与程序版本匹配），默认配置 `knowledge_base.path: catalog.json` 即指向该包内文件，解压后开箱可用。该文件是上游 producer artifact（`handbook-v3/dist/catalog.json`）的字节级拷贝，来源与 SHA-256（`7d8ce203a503f63b8d733e6c07fa10c2f1bbb1daf4d5c0619b61e553f374224e`）记录在 `internal/knowledgebase/testdata/README.md`，运行时不访问任何外部仓库。
+**获取知识库（catalog 单源）**：发行归档**不带** catalog 副本——catalog 只在知识库仓库更新。首次使用前请自行 clone 知识库仓库（Pentest-Playbook），并在配置文件的 `knowledge_base` 下把 `path` 指向其 catalog 产物（catalog 协议 **version 2**、`source: handbook-v3`）：
 
-**协议版本**：JSON 知识库必须满足 catalog v2 顶层协议（`version: 2`、`source: "handbook-v3"`、`entry_count` 与条目数一致）。不满足协议、JSON 无效、缺失或无法读取时，`/kb` 页显示明确的 **unavailable** 诊断；**不会回退到另一份知识库**（包括包内默认副本），也不会当作安全条目处理。部分条目不合法时知识库进入 degraded 并跳过/禁用对应内容，其余条目照常可用。
+```bash
+# 1. 自行 clone 知识库仓库（Pentest-Playbook），得到 handbook-v3/dist/catalog.json
+# 2. 编辑 config/default.yaml：knowledge_base.path 指向克隆仓库的 catalog，例如
+#      knowledge_base:
+#        path: ~/Pentest-Playbook/handbook-v3/dist/catalog.json
+# 3. 重启 AnchorScan
+```
 
-**外部路径与更新**：`knowledge_base.path` 可改为任意外部 JSON（catalog v2）或旧版 Markdown 手册路径（相对路径相对配置文件目录解析）；留空则禁用知识库。更新步骤：用新的 catalog 文件覆盖该路径所指文件（或另存后修改路径），重启 AnchorScan 生效。恢复方式：还原受支持的文件，或恢复归档中的 `config/catalog.json` 与默认配置。
+默认配置 `knowledge_base.path` 为空（禁用，`/kb` 显示 disabled 与明确诊断）；协议版本、safety/status/legacy 等知识库行为仅在有可用 catalog 时启用。AnchorScan 的测试 fixture 锁定上游 producer artifact 的 SHA-256（`7d8ce203a503f63b8d733e6c07fa10c2f1bbb1daf4d5c0619b61e553f374224e`，记录在 `internal/knowledgebase/testdata/README.md`），运行时只读取操作者显式配置的路径，不访问任何其他仓库。
+
+**协议版本**：JSON 知识库必须满足 catalog v2 顶层协议（`version: 2`、`source: "handbook-v3"`、`entry_count` 与条目数一致）。不满足协议、JSON 无效、缺失或无法读取时，`/kb` 页显示明确的 **unavailable** 诊断；**不会回退到另一份知识库**，也不会当作安全条目处理。部分条目不合法时知识库进入 degraded 并跳过/禁用对应内容，其余条目照常可用。
+
+**外部路径与更新**：`knowledge_base.path` 可改为任意外部 JSON（catalog v2）或旧版 Markdown 手册路径（相对路径相对配置文件目录解析）；留空则禁用知识库。更新步骤：进入克隆的知识库仓库执行 `git pull` 拉取新 catalog，重启 AnchorScan 生效（也可另存新文件后修改路径）。恢复方式：还原受支持的文件，或重新 clone/还原知识库仓库。
 
 **safety/status/legacy 行为边界**：JSON 条目保留 `safety`（safe / optional / manual-gated）与 `status`（stable / needs-review），命令按服务端门禁放行——`stable + safe` 直通；`needs-review` 需显式 acknowledgement；`optional` / `manual-gated` 需确认 effects（与 cleanup）；缺失或非法 safety 的条目不返回命令。旧版 Markdown 手册仍可阅读与匹配（未移除兼容），但其条目标记为 **legacy-unknown**，命令按不低于 manual-gated 的强度确认，不能继承 safe 默认值。详细规则见 [docs/plans/catalog-json-knowledgebase/spec.md](./docs/plans/catalog-json-knowledgebase/spec.md)。
 

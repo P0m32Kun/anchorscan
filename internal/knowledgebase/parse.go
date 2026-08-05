@@ -26,7 +26,11 @@ type entryMeta struct {
 
 func Load(configPath, configuredPath string) *Catalog {
 	if strings.TrimSpace(configuredPath) == "" {
-		return &Catalog{status: StatusDisabled, byID: map[string]Entry{}}
+		return &Catalog{
+			status:      StatusDisabled,
+			diagnostics: []Diagnostic{{Status: StatusDisabled, Reason: "未配置 knowledge_base.path，无知识库文件可加载；发行包不再附带 catalog，请克隆知识库仓库（Pentest-Playbook）后将路径指向其 handbook-v3/dist/catalog.json 并重启"}},
+			byID:        map[string]Entry{},
+		}
 	}
 	path := configuredPath
 	if !filepath.IsAbs(path) {

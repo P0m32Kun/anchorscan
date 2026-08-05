@@ -35,7 +35,7 @@ func TestInitCreatesDefaultConfig(t *testing.T) {
 	}
 }
 
-func TestInitDefaultKnowledgeBasePointsAtPackagedCatalog(t *testing.T) {
+func TestInitDefaultKnowledgeBasePathIsEmpty(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "default.yaml")
 	if err := Init(path); err != nil {
 		t.Fatal(err)
@@ -44,8 +44,10 @@ func TestInitDefaultKnowledgeBasePointsAtPackagedCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.KnowledgeBase.Path != "catalog.json" {
-		t.Fatalf("default knowledge_base.path = %q, want %q (packaged catalog next to config)", cfg.KnowledgeBase.Path, "catalog.json")
+	// Single-source design: the release archive ships no catalog and the
+	// freshly generated config must not point at any packaged file.
+	if cfg.KnowledgeBase.Path != "" {
+		t.Fatalf("default knowledge_base.path = %q, want %q (empty = disabled)", cfg.KnowledgeBase.Path, "")
 	}
 }
 
