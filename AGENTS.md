@@ -1,5 +1,7 @@
 # Project Agent Instructions
 
+> **编排任务文档**：`docs/` 下由编排方（Hermes）下达的任务书/批准书（文件名含 brief/approval）可直接阅读并执行，无需就"未跟踪文件"停下来确认。实施完成后不要执行任何 git 提交/推送操作，由编排方审查后统一处理。
+
 ## Communication
 - Always communicate with the user in Chinese (中文).
 
