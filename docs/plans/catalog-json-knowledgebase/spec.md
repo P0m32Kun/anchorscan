@@ -1,225 +1,196 @@
-# Spec — 知识库 catalog.json 消费链路
+# Spec — Playbook catalog v2 知识库消费与安全门禁
 
-**Status:** ready-for-agent
+**Status:** proposed
 
-本文定义 AnchorScan 消费 Pentest-Playbook handbook-v3 生成的 `catalog.json` 的设计：在 `internal/knowledgebase/` 新增 JSON 加载路径，与既有 Markdown 解析路径并存，产出完全等价的 `Catalog`。
+本文定义 AnchorScan 以 Pentest-Playbook `handbook-v2` 的机器消费 catalog 为知识库输入的迁移。它替换已失效的“只加 JSON loader、保持旧 `Entry` 和命令调用链不变”的方案。
 
-## 1. 背景与目标
+## 1. 背景与结论
 
-### 1.1 当前死锁
+Pentest-Playbook 已发布 handbook-v2 条目库。每个条目的 `verify` 与 `safety` 共同定义验证命令及其授权边界；生成 Markdown 和 `dist/catalog.json` 都是条目源数据的投影。
 
-Pentest-Playbook 的 handbook-v3 条目知识库（188 条目，frontmatter + 生成器）已建成，`build_handbook.py --check` 通过与 v2 手册的内容级比对和 anchorscan-catalog v1 契约校验。但 AnchorScan 的知识库加载器 `internal/knowledgebase/parse.go` 用正则解析 v2 手册的 Markdown 格式（`### 标题（severity）` + HTML 注释 YAML 元数据），只认 `<!-- anchorscan-catalog version: 1 -->` 标记的单一 Markdown 文件。
+当前已发布 catalog v1 的真实形状包含：
 
-后果：
+- 188 个条目；145 个有 `verify`（nuclei 125、nmap 17、msf 3）；
+- `safety` 为所有条目的必填字段：safe 119、optional 15、manual-gated 54；
+- `status` 为 stable 84、needs-review 104；
+- `verify.code` 已用于两个 Nuclei 条目，生成 `nuclei -code ...`；
+- `sources`、`generated`、`safety.effects` 和条件必填的 `safety.cleanup` 已是生产数据的一部分。
 
-- v3 的 `dist/catalog.json`（机器消费版产物）无人消费；
-- v3 不敢正式替换 v2——切换后 AnchorScan 知识库加载失效；
-- AnchorScan 不敢动知识库解析——v2 是唯一输入源，正则解析牵一发动全身。
+旧 AnchorScan 模型只保存三个命令字符串，既不能携带安全门禁，也在 loader 和命令绑定路径中拒绝 `-code`。因此 JSON 迁移不得仅视为格式转换，也不能静默丢弃 v3 的安全与审计语义。
 
-### 1.2 目标
+## 2. 目标
 
-1. AnchorScan 支持直接消费 `catalog.json`，产出与 Markdown 路径**逐字段等价**的 `Catalog`。
-2. 双格式并存：`knowledge_base.path` 按文件扩展名分派，`.json` 走新加载器，其余走既有 Markdown 解析，向后兼容。
-3. 提供**平价验收测试**：同一份知识库分别经两条路径加载，断言 `Catalog` 条目集合完全一致。
-4. 为后续切换铺路：本工作完成后，操作者可将 `knowledge_base.path` 指向 `catalog.json`；Markdown 路径保留至 v2 手册退役。
+1. **安全消费**：AnchorScan 仅消费发布并校验过的 catalog v2；JSON 条目的 `safety`、`status`、`sources` 和 `generated` 被保留到知识库模型。
+2. **单一命令构造源**：Pentest-Playbook 从 `verify` 生成 canonical `command` 投影；AnchorScan 只验证、解析、绑定目标，不重写 Python `render_command`。
+3. **服务端门禁**：safe、optional、manual-gated、legacy/unknown 和 needs-review 条目在所有命令暴露路径上遵循可验证的授权规则；不能只依赖浏览器 UI。
+4. **双格式迁移**：`knowledge_base.path` 以扩展名分派 catalog JSON 与旧 Markdown。旧 Markdown 仍可阅读和匹配，但其命令不能被当作已声明安全级别。
+5. **可部署默认值**：发布归档带有与程序版本匹配的 catalog，新的默认配置开箱可用；仍允许操作者配置外部 catalog 路径。
+6. **可审计兼容性**：生产仓库与 AnchorScan fixture 的来源、协议版本和校验值可追溯；不在运行时依赖另一个工作区。
 
-### 1.3 非目标
+## 3. 非目标
 
-- 不改动 Pentest-Playbook 侧（`catalog.json` 产物已完整，无需变更）。
-- 不改动知识库 Web 视图（`/kb` 页面）、报告生成、命令执行的调用方——`Catalog`/`Entry` 公开接口不变。
-- 不实现知识库热加载；加载仍发生在 `NewServer` 启动时。
-- 不处理 v3 条目中 `漏洞描述`/`修复建议` 之外的扩展知识小节（如 `漏洞原理`）；JSON 加载器忽略它们，与 Markdown 路径行为一致（Markdown 路径的固定三章节契约本就不解析扩展小节）。
+- 不实现知识库热加载；仍在 `NewServer` 启动时加载。
+- 不让 AnchorScan 解释或执行 Playbook 条目正文中的扩展知识小节。
+- 不把 `safety` 当作权限系统；本项目没有身份/审批服务。它是服务器强制的显式操作者确认与风险呈现边界。
+- 不自动执行 optional 或 manual-gated 检测。
+- 不在本特性中移除旧 Markdown loader；移除须在确认无部署依赖后另行立项。
 
-## 2. 现状分析
+## 4. 跨仓库 catalog 协议
 
-### 2.1 AnchorScan 侧
+### 4.1 catalog v2 是实施前置条件
 
-加载入口（`internal/web/server.go:81-83`）：
+Pentest-Playbook 必须先发布 `catalog.json` **version: 2**，并同时发布/校验 `handbook-v2/schema/catalog.schema.json`。当前 v1 虽有 `safety` 和 `code`，但没有正式的 consumer 协议边界；AnchorScan 不应通过“继续接受 v1 并忽略新字段”完成迁移。
 
-```go
-catalog := knowledgebase.Load(opts.ConfigPath, "")
-if cfg, err := config.Load(opts.ConfigPath); err == nil {
-    catalog = knowledgebase.Load(opts.ConfigPath, cfg.KnowledgeBase.Path)
-}
-```
-
-`Load(configPath, configuredPath)` 解析单个 Markdown 文件；`configuredPath` 为空时返回 `StatusDisabled`。相对路径相对于配置文件目录解析。
-
-`Entry` 模型（`internal/knowledgebase/catalog.go`）：
-
-| 字段 | 类型 | 来源（Markdown 路径） |
-|---|---|---|
-| `ID` | string | `anchorscan-entry` 元数据 `id` |
-| `Name` | string | `###` 标题 |
-| `Severity` | enum | 标题中的中文标签 → `parseSeverity` |
-| `Aliases` | []string | 元数据 `aliases`（v2 手册实际全部为空） |
-| `Match` | MatchKeys | 元数据 `match.nuclei/nse/manual-review/cve` |
-| `Description` | string | `#### 漏洞描述` 节 |
-| `Commands` | Commands | `##### Nuclei/Nmap NSE/MSF` 代码块，经 `validNuclei/validNmapNSE/validMSF` 白名单校验 |
-| `Remediation` | string | `#### 修复建议` 节 |
-
-诊断语义：条目级问题（缺章节、命令非法等）→ `StatusDegraded` + `Diagnostic`，条目视情况保留；文件级问题（缺标记、无有效条目、重复 ID）→ `StatusUnavailable`；正常 → `StatusReady`。
-
-### 2.2 catalog.json 产物结构
-
-`build_handbook.py` 的 `build()` 生成：
+catalog v2 顶层必须包含：
 
 ```json
 {
-  "version": 1,
-  "source": "handbook-v3",
+  "version": 2,
+  "source": "handbook-v2",
   "entry_count": 188,
-  "entries": [ ... ]
+  "entries": []
 }
 ```
 
-每条目字段（已在真实产物上核实，188 条目）：
+consumer 必须检查：JSON 语法、`version == 2`、`source == "handbook-v2"`、`entry_count == len(entries)`、条目 ID 唯一且至少有一个可展示条目。顶层或条目新增的**不影响既有语义**字段可忽略；影响消费、命令、授权、匹配或审计含义的变化必须提升 catalog 版本，并同步 producer schema、fixture 和 consumer。
 
-| catalog.json 字段 | 说明 | 覆盖情况 |
-|---|---|---|
-| `id` | 条目 ID | 全部 |
-| `title` | 标题 | 全部 |
-| `severity` | `严重/高危/中危/低危` | 全部，四种取值 |
-| `order` | 章内排序 | 全部 |
-| `status` | 条目状态 | 全部 |
-| `tags` | 标签数组 | 全部（多为空） |
-| `chapter` / `chapter_name` | 所属章节 | 全部 |
-| `match.nuclei/nse/manual-review/cve` | 匹配键 | 全部（129 条有 nuclei 键） |
-| `verify` | 验证命令结构 | 147 条；41 条无 verify |
-| `sections` | 正文字节映射（不含 `验证命令`） | 全部 |
-| `sources` | 来源 | 全部（多为空） |
+### 4.2 条目最小消费契约
 
-**注意**：catalog.json 不投影 `aliases`。已核实 v2 手册全部条目 `aliases: []`，v3 schema 也未声明 `aliases`，当前无信息损失。若未来 v3 schema 引入非空 aliases，须同步加入 catalog 投影与本加载器。
+每个 catalog v2 条目必须投影以下字段：
 
-`verify` 三种形态（真实产物核实：nuclei 125 / nmap 19 / msf 3）：
+| 字段 | AnchorScan 语义 |
+|---|---|
+| `id`、`title`、`severity` | 现有 `Entry` 标识、显示与报告严重性 |
+| `match` | nuclei/nse/manual-review/cve 匹配键 |
+| `sections["漏洞描述"]`、`sections["修复建议"]` | 报告 enrich 与 KB 详情 |
+| `status` | `stable` 或 `needs-review`；影响命令确认和 UI 标记 |
+| `safety.mode`、`safety.effects`、可选 `safety.cleanup` | 命令风险门禁与审计提示 |
+| `sources`、`generated` | 追溯信息；至少在 KB 详情和诊断中保留 |
+| `verify` | 结构化来源，用于确认命令工具与安全语义一致 |
+| `command` | 由 producer 从 `verify` 生成的 canonical 命令字符串；无 `verify` 时两者均不存在 |
 
-```json
-{"tool": "nuclei", "template": "network/exposures/exposed-redis.yaml", "target": "host:port"}
-{"tool": "nmap", "script": "telnet-brute", "args": "userdb=...,passdb=...", "flags": ["-sV"]}
-{"tool": "msf", "module": "auxiliary/scanner/ssh/ssh_enumusers", "action": "run"}
+`command` 是**派生投影**，不是第二真相源。producer 的 `verify`/`safety` 仍是唯一编辑输入；构建器必须保证 `command` 与生成 Markdown 中的命令块逐字节一致。
+
+consumer 对每个有命令的条目必须验证：
+
+- `verify.tool` 与 `command` 的工具一致；
+- `command` 只能是 Nuclei、Nmap NSE 或 MSF 的允许形状；
+- `verify.code == true` 当且仅当 Nuclei 命令在 `nuclei` 后带单个 `-code`；
+- `safety`、`status` 与 `verify` 符合 producer schema；
+- 验证失败时保留可展示条目，但清空其命令并产生 degraded diagnostic。
+
+JSON 条目的安全字段缺失/非法不得退回为 safe。
+
+### 4.3 command 允许形状
+
+AnchorScan 只接受 producer 已构造且本地复核通过的命令：
+
+- Nuclei：`nuclei [-code] -t <template> -u {{url}}` 或 `nuclei [-code] -t <template> -u {{host}}:{{port}}`；`-code` 只允许与 `verify.code: true` 配对。
+- Nmap NSE：`nmap [-sU] -p {{port}} --script <script> [--script-args <args>] {{host}}`。
+- MSF：四行 `use <module>`、`set RHOSTS {{host}}`、`set RPORT {{port}}`、`run|check`，并复用现有模块/动作白名单。
+
+AnchorScan 不根据 JSON 中的 template、flags 或 args 重新拼接上述字符串；它只用受限 parser 读取 `command`，在运行时替换目标占位符，并再次检查没有残留占位符。
+
+## 5. AnchorScan 模型和加载设计
+
+### 5.1 领域模型
+
+`knowledgebase.Entry` 新增但不混淆 catalog 可用性状态的字段：
+
+- `ReviewStatus`：`stable` / `needs-review` / `legacy-unknown`；
+- `Safety`：`Mode`（safe / optional / manual-gated / legacy-unknown）、`Effects`、`Cleanup`；
+- `Sources` 与 `Generated`：producer 的审计数据；
+- 现有 `Commands` 保留为 canonical command 的工具分发结果。
+
+`Catalog.Status` 继续表达 loader 状态（disabled / unavailable / degraded / ready），不可与条目 `ReviewStatus` 混用。
+
+### 5.2 JSON loader
+
+在 `internal/knowledgebase/` 引入 catalog v2 JSON decoder。`Load` 负责路径解析、读文件和基于 `.json` 的分派；其余后缀继续进入 Markdown loader。新增公开 `LoadJSON` 只用于清晰的单元测试，调用方仍使用 `Load`。
+
+诊断规则：
+
+| 情形 | 结果 |
+|---|---|
+| 读文件失败、JSON 无效、顶层协议无效、重复 ID、零可展示条目 | `StatusUnavailable` |
+| 单条缺展示字段、severity/status/safety 不合法、缺固定 sections | `StatusDegraded`，跳过该条目 |
+| 单条 `verify` / `command` 不一致或命令不合法 | `StatusDegraded`，保留文本与匹配键但移除命令 |
+| 正常条目 | `StatusReady`；任一条目诊断使 catalog 为 `StatusDegraded` |
+
+### 5.3 Markdown 兼容
+
+旧 Markdown loader 继续读现有 anchorscan-catalog v1 格式，并允许在三个固定章节之间存在其他四级知识小节；只要求“漏洞描述 → 验证命令 → 修复建议”各出现一次且顺序正确。
+
+Markdown 没有 v3 `safety`、`status` 和来源声明，加载后必须标记为：
+
+```text
+ReviewStatus = legacy-unknown
+Safety.Mode = legacy-unknown
 ```
 
-### 2.3 命令构造的唯一真相源
+它的命令可以显示、匹配与报告 enrich，但任何 Web/CLI 命令暴露需走 legacy 明示确认，不能继承 safe 默认值。
 
-`build_handbook.py:render_command` 是 verify → 命令字符串的**唯一构造实现**，白名单规则内建：
+## 6. 命令绑定与安全门禁
 
-- **nuclei**：`nuclei -t <template> -u {{url}}`（`target: url`）或 `nuclei -t <template> -u {{host}}:{{port}}`（`target: host:port`）；template 须匹配 `(RBKD-templates/)?[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*\.ya?ml`。
-- **nmap**：`nmap [flags...] -p {{port}} --script <script> [--script-args <args>] {{host}}`；flags 每项匹配 `-[A-Za-z0-9]+`；script/args 禁含 ` <>&;|#`。
-- **msf**：四行 `use <module>\nset RHOSTS {{host}}\nset RPORT {{port}}\n<action>`；`run` 仅允许 `auxiliary/scanner/`，`check` 仅允许 `exploit/`；module 匹配 `(auxiliary/scanner/|exploit/)[A-Za-z0-9._/-]+`。
+### 6.1 运行时命令绑定
 
-生成的 v3 Markdown 已通过 `--check` 验证与 v2 内容一致、且通过 `validate_anchorscan_v1` 契约校验——即这些构造规则产出的命令与 AnchorScan 现有解析器接受的命令集合完全重合。
+Nuclei binder 和批量 Nuclei builder 必须接受可选 `-code`，保留其位置和参数序列；Nmap/MSF 继续使用已有严格绑定规则。批量命令必须将带 `-code` 的参数视为同一 canonical 形状的一部分。
 
-## 3. 设计
+`report`、项目工作台、单漏洞命令、批量命令和会预填 `/tools/{tool}` 的路径必须经同一门禁入口。首先以代码图/引用搜索列举 `Entry.Commands` 的全部外部输出点；新增出口必须复用该入口。
 
-### 3.1 总体方案
+### 6.2 服务器判定规则
 
-在 `internal/knowledgebase/` 新增 `catalog_json.go`：
+| 条目条件 | 返回/预填命令前的要求 |
+|---|---|
+| `stable + safe` | 正常返回 |
+| `needs-review + safe` | 显示待复核来源状态，并提交服务器校验的显式 acknowledgement |
+| `optional` | 展示 `authentication-attempt`，要求 explicit confirmation |
+| `manual-gated` | 展示所有 effects、cleanup（如有），要求 explicit confirmation |
+| `legacy-unknown` | 以不低于 manual-gated 的确认强度处理，并说明旧手册没有安全声明 |
+| safety/command 缺失或不合法 | 不返回命令；文本条目仍可浏览 |
 
-```go
-// LoadJSON 从 catalog.json 加载知识库。path 语义与 Load 相同。
-func LoadJSON(configPath, configuredPath string) *Catalog
-```
+确认字段必须由服务器根据当前 catalog 条目重新计算并校验，不接受客户端传来的 mode/effects/cleanup 作为事实。该确认是每次命令请求的显式操作者意图，不是可复用的权限凭据。
 
-`Load` 改为按扩展名分派：
+前端只负责解释风险、展示 cleanup 和提交确认。禁止通过隐藏按钮、前端条件或直接构造 query 参数绕过服务端。
 
-```go
-func Load(configPath, configuredPath string) *Catalog {
-    // ...既有的空路径/路径解析/读文件逻辑...
-    if strings.HasSuffix(strings.ToLower(path), ".json") {
-        return parseCatalogJSON(string(data))
-    }
-    return parseCatalog(string(data)) // 既有 Markdown 路径
-}
-```
+## 7. 分发、配置和迁移
 
-调用方（`server.go`）零改动；`knowledge_base.path` 指向 `catalog.json` 即启用新路径。
+发布归档应包含版本匹配的 `catalog.json`，并将默认 `knowledge_base.path` 指向该包内位置。外部绝对/相对 JSON 路径仍可配置；失效外部路径显示 unavailable diagnostic，不静默回退到另一份知识库。
 
-### 3.2 字段映射
+迁移阶段：
 
-| catalog.json | Entry | 转换规则 |
-|---|---|---|
-| `id` | `ID` | 直取；空或重复 → 见 §3.4 |
-| `title` | `Name` | 直取 |
-| `severity` | `Severity` | 复用 `parseSeverity`（中文标签→枚举）；四种以外取值 → 条目级诊断，跳过该条目 |
-| `match.nuclei` | `Match.NucleiIDs` | 直取；缺省视为空数组 |
-| `match.nse` | `Match.NSEIDs` | 同上 |
-| `match.cve` | `Match.CVEs` | 同上 |
-| `match.manual-review` | `Match.Names` | 同上 |
-| `sections["漏洞描述"]` | `Description` | 直取；缺失或为空 → 条目级诊断，跳过该条目 |
-| `sections["修复建议"]` | `Remediation` | 直取；缺失或为空 → 条目级诊断，跳过该条目 |
-| `verify` | `Commands` | 按 §3.3 构造；无 verify → 三个命令字段均为空（与 Markdown 路径无命令块的条目等价） |
-| —（catalog 无 aliases） | `Aliases` | 置空切片 |
-| `chapter/order/status/tags/sources` | — | 忽略（`Entry` 无对应字段；KB 视图未来需要时再扩展） |
-| `sections` 其他键 | — | 忽略（见 §1.3 非目标） |
+1. Playbook 发布 catalog v2 协议、schema、产物和生成器测试。
+2. AnchorScan 实现 v2 loader、legacy 映射、canonical command 验证与 `-code` 绑定。
+3. AnchorScan 在所有外部命令路径落实服务端 safety/status gate。
+4. 包含 catalog 的默认发行、配置/部署文档和验收。
+5. Playbook 决定 v2 Markdown 退役后，另行评估删除 Markdown loader。
 
-### 3.3 命令构造（Go 侧 `renderCommand`）
+## 8. 验收与测试策略
 
-Go 实现与 `build_handbook.py:render_command` 逐条对齐的构造与白名单校验。任何一条校验失败 → 条目级诊断（degraded），该条目保留但对应命令字段置空；**绝不**输出未通过白名单的命令字符串。
+测试遵循 `docs/testing-strategy.md` 的最低充分 seam：
 
-| tool | 构造 | 校验 |
-|---|---|---|
-| `nuclei` | `nuclei -t <template> -u {{url}}` 或 `... {{host}}:{{port}}` | template 正则同上；target 仅允许 `url`/`host:port` |
-| `nmap` | `nmap [flags] -p {{port}} --script <script> [--script-args <args>] {{host}}` | script/args 禁字符 ` <>&;|#`；flags 每项 `-[A-Za-z0-9]+` |
-| `msf` | 四行 use/set/set/action | module 前缀白名单 + action↔模块类型匹配，规则同上 |
-| 其他 | — | 未知 tool → 条目级诊断，无命令 |
+1. **Playbook producer contract**：schema、生成器、`--check`；真实 `-code`、optional、manual-gated、cleanup、needs-review、无 verify 条目均被覆盖，catalog command 与 Markdown 命令块一致。
+2. **knowledgebase unit**：catalog v2 顶层及每类条目诊断、`command`/`verify` 一致性、`-code`、legacy Markdown、扩展小节、分派与重复 ID。
+3. **runtime unit**：单条和批量 Nuclei `-code` 参数绑定；拒绝非法或残留占位符；既有 Nmap/MSF 行为不回归。
+4. **HTTP handler**：每种 safety/status/legacy 组合的未确认拒绝、确认成功和 invalid-command 拒绝；测试直接访问 handler，不以 UI 代替。
+5. **Playwright smoke**：一个 safe 正常流、一个 optional 或 manual-gated 确认流、一个 needs-review 流，断言风险内容、确认动作和未确认时不产生 tool link。
+6. **package/config**：归档包含 catalog，默认路径可加载，外部 JSON 路径仍可覆盖。
 
-构造产物的字符串必须与 Markdown 路径命令块逐字节一致（含 msf 的换行符位置），这是平价测试的断言基础。
+AnchorScan fixture 必须内嵌，不在测试运行时读取 Playbook 工作区；fixture 中记录 catalog protocol version、producer artifact checksum 和生成日期。同步 fixture 的变更必须同时说明 producer schema/生成器的对应变更。
 
-### 3.4 错误处理与诊断语义
+最终检查：受影响包聚焦测试、`make test`、`go vet ./...`、`make pr-check`。Playwright 仅在 UI gate ticket 后运行；真实扫描器不因本特性而自动运行。
 
-复用现有 `Status`/`Diagnostic` 模型：
+## 9. 风险与控制
 
-| 情形 | 状态 | 说明 |
-|---|---|---|
-| 文件不存在 / 读失败 | `StatusUnavailable` | 与 Markdown 路径一致 |
-| JSON 语法错误、`version != 1`、`entries` 非数组 | `StatusUnavailable` | 文件级诊断 |
-| 重复条目 ID | `StatusUnavailable` | 与 Markdown 路径一致 |
-| 条目缺 `id`/`title`/severity 非法/缺 `漏洞描述`/缺 `修复建议` | `StatusDegraded` | 条目级诊断，跳过该条目，继续解析其余 |
-| 条目 verify 校验失败 | `StatusDegraded` | 条目保留，命令字段置空 |
-| 全部条目被跳过（0 有效条目） | `StatusUnavailable` | 与 Markdown 路径"没有有效漏洞条目"一致 |
-| 正常（可有 degraded 诊断） | `StatusReady`/`StatusDegraded` | 同现有语义 |
+| 风险 | 控制 |
+|---|---|
+| producer/consumer 命令规则漂移 | v2 canonical command 投影 + 双端 schema/fixture/protocol 测试；Anchor 不重写 renderer |
+| 新安全语义被旧 consumer 静默忽略 | catalog v2 显式版本门控，JSON safety 缺失 fail closed |
+| 前端绕过门禁 | 所有命令输出点复用服务器 gate，HTTP 直接测试 |
+| legacy Markdown 被误判为 safe | 显式 `legacy-unknown`，至少 manual-gated 强度确认 |
+| needs-review 条目被误当稳定事实 | 保留状态并要求 acknowledgement；不隐藏其审计状态 |
+| 默认配置指向不存在的外部文件 | 发布包内嵌匹配 catalog，并由 package smoke 验证 |
 
-### 3.5 分发方式
+## 10. 实施状态
 
-发布归档当前不内嵌手册（`Makefile package` 只带 config/docs/docx-render），`knowledge_base.path` 由操作者自行配置——catalog.json 沿用同一模式，操作者将路径指向 Pentest-Playbook 的 `handbook-v3/dist/catalog.json`（或其副本）。本次不涉及发布打包变更；后续若决定归档内嵌知识库，另行立项。
-
-## 4. 验收标准
-
-1. **平价测试**（核心验收）：测试 fixture 使用真实 `catalog.json` 与其对应的真实 v3 生成 Markdown 手册（或从两者提取的对等子集），分别经 `parseCatalogJSON` 与 `parseCatalog` 加载，断言：
-   - 两条路径的有效条目集合完全相同（按 ID 对齐）；
-   - 每条目的 `ID/Name/Severity/Aliases/Match/Description/Remediation` 逐字段相等；
-   - 每条目的 `Commands.Nuclei/NmapNSE/Metasploit` 逐字节相等；
-   - 诊断条目的集合一致（Markdown 路径因格式问题降级的条目，JSON 路径同样降级——当前真实产物两条路径均无诊断，此断言退化为"双方均 ready"）。
-2. **契约测试**：手工构造的 catalog.json fixture 覆盖 §3.4 每种诊断情形，断言状态码与诊断内容。
-3. **分派测试**：`Load` 对 `.json` 扩展名走 JSON 路径、对 `.md` 走 Markdown 路径、对无扩展名文件走 Markdown 路径（向后兼容）。
-4. `go test ./internal/knowledgebase/ ./internal/report/ ./internal/web/` 全绿；`make pr-check` 通过。
-5. 手工验证：将运行实例的 `knowledge_base.path` 指向真实 `catalog.json`，`/kb` 页面条目列表/详情、报告页漏洞 enrich、候选命令生成与指向 v2 手册时表现一致。
-
-## 5. 分阶段迁移
-
-| 阶段 | 内容 | 完成判据 |
-|---|---|---|
-| 1（本 spec） | AnchorScan 双格式支持 + 平价测试 | §4 全部通过 |
-| 2 | 操作者默认配置指向 catalog.json；更新 `docs/` 中知识库配置说明 | 新部署默认消费 JSON |
-| 3（后续，Playbook 侧主导） | v3 正式替换 v2 成为唯一维护源；v2 手册停更 | Playbook 完成切换 |
-| 4（远期） | AnchorScan 移除 Markdown 解析路径 | 确认无操作者依赖 v2 格式后另行立项 |
-
-## 6. 风险与对策
-
-| 风险 | 等级 | 对策 |
-|---|---|---|
-| Go/Python 两处命令构造规则漂移 | 高 | 平价测试直接钉死双路径输出一致；Python 侧 render_command 变更会导致 v3 手册变化、进而打破平价测试，形成双向告警 |
-| catalog.json 被手工编辑成非法 verify | 中 | §3.3 白名单校验在 Go 侧兜底，非法命令不进入 Entry |
-| v3 schema 演进（新增 aliases、verify 新形态）未同步 | 中 | catalog.json `version` 字段门控；加载器只认 `version: 1`，schema 变更须升版本号并同步本加载器 |
-| 41 条无 verify 条目在报告中缺候选命令 | 低 | 与现状一致（v2 中这些条目同样无命令块），非回归 |
-
-## 7. 实施 ticket 拆分（建议）
-
-按 `docs/agents/issue-tracker.md` 契约，实施时创建：
-
-1. `01-json-catalog-loader` — `catalog_json.go`：JSON 解析、字段映射、renderCommand + 白名单、诊断语义；单元测试覆盖 §3.4。
-2. `02-load-dispatch` — `Load` 扩展名分派；分派测试。
-3. `03-parity-test` — 真实产物平价测试（fixture 取自 Pentest-Playbook dist，测试内嵌或构建期拷贝，不运行时依赖外部仓库）。
-4. `04-docs-and-manual-verify` — 更新知识库配置文档；按 §4.5 手工验证并记录结果。
-
-实施顺序即编号顺序；每个 ticket 独立可验证。fixed point 为 `main` 分支 `41580aa`。
+本 feature 的 tickets 位于 `docs/plans/catalog-json-knowledgebase/tickets/`。它们当前均为 `draft`；只有在本 spec 被批准、前置 producer contract 已发布且对应阻塞项完成后，才能将可实施 ticket 标记为 `ready-for-agent`。实施时在独立 worktree 记录当时的 review fixed point；本 spec 不写死提交 SHA。
