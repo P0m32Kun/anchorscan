@@ -35,6 +35,20 @@ func TestInitCreatesDefaultConfig(t *testing.T) {
 	}
 }
 
+func TestInitDefaultKnowledgeBasePointsAtPackagedCatalog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "default.yaml")
+	if err := Init(path); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.KnowledgeBase.Path != "catalog.json" {
+		t.Fatalf("default knowledge_base.path = %q, want %q (packaged catalog next to config)", cfg.KnowledgeBase.Path, "catalog.json")
+	}
+}
+
 func TestInitProfilesMatchShippedExample(t *testing.T) {
 	generatedPath := filepath.Join(t.TempDir(), "default.yaml")
 	if err := Init(generatedPath); err != nil {

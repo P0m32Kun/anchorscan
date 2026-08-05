@@ -766,6 +766,9 @@ func TestReportPageVulnerabilityAggregateExplainsDisabledCatalog(t *testing.T) {
 	if err := scanStore.SaveFinding("run-disabled", report.Finding{IP: "192.0.2.4", Port: 80, Protocol: "tcp", Source: "nuclei", ID: "unmatched", Severity: "medium"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte("knowledge_base:\n  path: \"\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	handler, err := NewServer(ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
 	if err != nil {
 		t.Fatal(err)

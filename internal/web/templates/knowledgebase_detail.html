@@ -46,6 +46,14 @@
     <h3>修复建议</h3>
     <pre>{{.Entry.Remediation}}</pre>
   </section>
+  {{if or .Entry.Sources .Entry.Generated.By}}
+  <section class="knowledgebase-detail-section">
+    <p class="eyebrow">审计追溯</p>
+    <h3>来源与生成信息</h3>
+    {{if .Entry.Sources}}<p>Sources：</p><ul>{{range .Entry.Sources}}<li><code>{{.}}</code></li>{{end}}</ul>{{end}}
+    {{if .Entry.Generated.By}}<p>Generated：{{.Entry.Generated.By}} @ {{.Entry.Generated.At}}</p>{{end}}
+  </section>
+  {{end}}
 </div>
 </section>
 {{end}}

@@ -5,8 +5,12 @@ package scripts
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,8 +19,17 @@ import (
 	"testing"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/knowledgebase"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
+	"github.com/P0m32Kun/anchorscan/internal/web"
 )
+
+// packagedCatalogSHA256 is the frozen producer artifact checksum
+// (Pentest-Playbook commit 57d739e, handbook-v3/dist/catalog.json) recorded in
+// internal/knowledgebase/testdata/README.md. The shipped config/catalog.json
+// must stay byte-identical to that artifact so the release catalog is
+// traceable to its producer checksum.
+const packagedCatalogSHA256 = "7d8ce203a503f63b8d733e6c07fa10c2f1bbb1daf4d5c0619b61e553f374224e"
 
 func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 	repoRoot := filepath.Clean(filepath.Join(testFileDir(t), ".."))
@@ -54,6 +67,7 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 
 	for _, relativePath := range []string{
 		"config/default.yaml.example",
+		"config/catalog.json",
 		"config/nse.yaml",
 		"config/service-tags.yaml",
 		"config/ports-highrisk.txt",
@@ -99,6 +113,56 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 		if value == "" {
 			t.Fatalf("packaged %s preset is empty", preset)
 		}
+	}
+
+	assertPackagedCatalog(t, filepath.Join(packageDir, "config", "catalog.json"))
+	assertDefaultConfigLoadsPackagedCatalog(t, packageDir)
+}
+
+// assertPackagedCatalog verifies the archive ships the catalog v2 artifact and
+// that it is byte-traceable to the frozen producer artifact checksum.
+func assertPackagedCatalog(t *testing.T, catalogPath string) {
+	t.Helper()
+	data, err := os.ReadFile(catalogPath)
+	if err != nil {
+		t.Fatalf("read packaged catalog: %v", err)
+	}
+	sum := sha256.Sum256(data)
+	if got := hex.EncodeToString(sum[:]); got != packagedCatalogSHA256 {
+		t.Fatalf("packaged catalog sha256 = %s, want %s (frozen producer artifact)", got, packagedCatalogSHA256)
+	}
+}
+
+// assertDefaultConfigLoadsPackagedCatalog boots a web server exactly as a
+// fresh install would (default example config, packaged catalog next to it)
+// and asserts the knowledge base reports ready with the full entry set.
+func assertDefaultConfigLoadsPackagedCatalog(t *testing.T, packageDir string) {
+	t.Helper()
+	configPath := filepath.Join(packageDir, "config", "default.yaml.example")
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("load packaged default config: %v", err)
+	}
+	if strings.TrimSpace(cfg.KnowledgeBase.Path) != "catalog.json" {
+		t.Fatalf("packaged default knowledge_base.path = %q, want %q", cfg.KnowledgeBase.Path, "catalog.json")
+	}
+	catalog := knowledgebase.Load(configPath, cfg.KnowledgeBase.Path)
+	if catalog.Status() != knowledgebase.StatusReady || len(catalog.Search("")) != 188 {
+		t.Fatalf("packaged default catalog status=%q entries=%d", catalog.Status(), len(catalog.Search("")))
+	}
+
+	handler, err := web.NewServer(web.ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(t.TempDir(), "scan.db")})
+	if err != nil {
+		t.Fatalf("boot web server with packaged defaults: %v", err)
+	}
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/kb", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("GET /kb with packaged defaults: status %d", res.Code)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "knowledgebase-status\">ready") || !strings.Contains(body, "SNMP 公共团体字符串") {
+		t.Fatalf("GET /kb with packaged defaults did not report ready catalog: %s", body)
 	}
 }
 

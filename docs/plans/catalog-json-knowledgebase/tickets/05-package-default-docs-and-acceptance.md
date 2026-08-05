@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — 在所有命令出口强制 safety 与 review 门禁。
 
-**Status:** draft
+**Status:** done
 
 **Execution skills:** `implement`、`code-review`、`ponytail`。
 

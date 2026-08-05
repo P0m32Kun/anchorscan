@@ -6,6 +6,12 @@ uses semantic version tags for local-operator releases.
 
 ## [Unreleased]
 
+### Added
+- 发行归档内置 catalog v2 知识库（协议 version 2 / source handbook-v3，字节级对应上游 producer artifact，checksum 可追溯），默认配置 `knowledge_base.path` 指向包内 `config/catalog.json`，解压后开箱可用。
+
+### Changed
+- 外部 catalog JSON / 旧版 Markdown 路径仍可配置；缺失或不兼容文件在 `/kb` 与报告页显示明确 unavailable 诊断，不回退到另一份知识库。配置页知识库路径说明与部署文档补齐协议版本、外部更新步骤与 safety/status/legacy 行为边界。
+
 ## [2.0.5] - 2026-08-04
 
 ### Changed

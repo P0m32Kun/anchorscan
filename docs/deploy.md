@@ -53,6 +53,17 @@ DOCX 是正式项目交付格式；同一 Network Zone 的多个扫描 run 会�
 
 程序启动时会执行 SQLite migration。若 migration、数据库或 sidecar 检查失败，停止升级并保留旧目录与备份，依据 `doctor` 的具体诊断处理。
 
+## 知识库（catalog）运维
+
+发行归档包含与程序版本匹配的 `config/catalog.json`（catalog 协议 version 2、`source: handbook-v3`），默认配置 `knowledge_base.path: catalog.json` 指向包内位置，解压后开箱可用。该文件是上游 producer artifact（`handbook-v3/dist/catalog.json`，commit 57d739e，SHA-256 `7d8ce203a503f63b8d733e6c07fa10c2f1bbb1daf4d5c0619b61e553f374224e`）的字节级拷贝，运行时不访问外部仓库。
+
+- **外部路径**：`knowledge_base.path` 可改为外部 JSON（catalog v2）或旧版 Markdown 手册（相对路径相对配置文件目录解析）；留空禁用知识库。
+- **外部更新**：用新的 catalog 文件覆盖该路径所指文件（或另存后修改路径）并重启 AnchorScan。
+- **诊断与恢复**：外部文件缺失、JSON 无效或协议版本不符时，`/kb` 页与报告页显示明确的 unavailable 诊断，不会回退到另一份知识库；恢复方式为修复外部文件，或重新解压归档恢复 `config/catalog.json` 与默认配置。
+- **safety/status/legacy 边界**：JSON 条目按 catalog v2 保留 safety（safe / optional / manual-gated）与 status（stable / needs-review），所有命令出口由服务端按条目门禁放行；旧版 Markdown 条目标记为 legacy-unknown，命令按不低于 manual-gated 强度确认。
+
+升级时保留并审阅旧目录的 `config/default.yaml`：若旧配置未设置 `knowledge_base.path`，升级后知识库保持禁用（不会自动改用新归档的 catalog），按上文重新配置即可。
+
 ## 运行限制与操作说明
 
 - 一份数据库同一时刻只允许一个 pipeline scan 或单工具运行；SQLite Run Lease 会阻止并发所有者。

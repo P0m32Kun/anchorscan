@@ -129,6 +129,18 @@ make e2e       # 使用真实扫描器运行 Docker 实验室 E2E
 ./dist/anchorscan tool nmap --mode alive --target 192.0.2.10
 ```
 
+## 漏洞知识库（KB）
+
+AnchorScan 的漏洞知识库（KB）为报告 enrich、验证工作台与命令生成提供条目：扫描发现会按 nuclei/nse/CVE/名称匹配到 KB 条目，展示漏洞描述、修复建议，并按条目声明的 safety/status 档位生成验证命令。
+
+**发行自带 catalog**：发布归档包含 `config/catalog.json`（catalog 协议 **version 2**、`source: handbook-v3`，与程序版本匹配），默认配置 `knowledge_base.path: catalog.json` 即指向该包内文件，解压后开箱可用。该文件是上游 producer artifact（`handbook-v3/dist/catalog.json`）的字节级拷贝，来源与 SHA-256（`7d8ce203a503f63b8d733e6c07fa10c2f1bbb1daf4d5c0619b61e553f374224e`）记录在 `internal/knowledgebase/testdata/README.md`，运行时不访问任何外部仓库。
+
+**协议版本**：JSON 知识库必须满足 catalog v2 顶层协议（`version: 2`、`source: "handbook-v3"`、`entry_count` 与条目数一致）。不满足协议、JSON 无效、缺失或无法读取时，`/kb` 页显示明确的 **unavailable** 诊断；**不会回退到另一份知识库**（包括包内默认副本），也不会当作安全条目处理。部分条目不合法时知识库进入 degraded 并跳过/禁用对应内容，其余条目照常可用。
+
+**外部路径与更新**：`knowledge_base.path` 可改为任意外部 JSON（catalog v2）或旧版 Markdown 手册路径（相对路径相对配置文件目录解析）；留空则禁用知识库。更新步骤：用新的 catalog 文件覆盖该路径所指文件（或另存后修改路径），重启 AnchorScan 生效。恢复方式：还原受支持的文件，或恢复归档中的 `config/catalog.json` 与默认配置。
+
+**safety/status/legacy 行为边界**：JSON 条目保留 `safety`（safe / optional / manual-gated）与 `status`（stable / needs-review），命令按服务端门禁放行——`stable + safe` 直通；`needs-review` 需显式 acknowledgement；`optional` / `manual-gated` 需确认 effects（与 cleanup）；缺失或非法 safety 的条目不返回命令。旧版 Markdown 手册仍可阅读与匹配（未移除兼容），但其条目标记为 **legacy-unknown**，命令按不低于 manual-gated 的强度确认，不能继承 safe 默认值。详细规则见 [docs/plans/catalog-json-knowledgebase/spec.md](./docs/plans/catalog-json-knowledgebase/spec.md)。
+
 ## Web 控制台功能
 
 - 主题切换：默认跟随系统，单按钮切换浅色/深色，显式偏好跨刷新保留

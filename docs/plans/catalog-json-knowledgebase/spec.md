@@ -1,6 +1,6 @@
 # Spec — Playbook catalog v2 知识库消费与安全门禁
 
-**Status:** proposed
+**Status:** implemented
 
 本文定义 AnchorScan 以 Pentest-Playbook `handbook-v3` 的机器消费 catalog 为知识库输入的迁移。它替换已失效的“只加 JSON loader、保持旧 `Entry` 和命令调用链不变”的方案。
 
@@ -195,4 +195,4 @@ AnchorScan fixture 必须内嵌，不在测试运行时读取 Playbook 工作区
 
 ## 10. 实施状态
 
-本 feature 的 tickets 位于 `docs/plans/catalog-json-knowledgebase/tickets/`。它们当前均为 `draft`；只有在本 spec 被批准、前置 producer contract 已发布且对应阻塞项完成后，才能将可实施 ticket 标记为 `ready-for-agent`。实施时在独立 worktree 记录当时的 review fixed point；本 spec 不写死提交 SHA。
+本 feature 的 tickets 位于 `docs/plans/catalog-json-knowledgebase/tickets/`，已全部完成（01–05 均为 `done`）：catalog v2 协议与 producer 契约（01）、v2 模型与双格式 loader（02）、canonical command 与 `-code` 绑定（03）、服务端五档门禁（04）、默认发行、文档与迁移验收（05）。发布 catalog 为冻结的 producer artifact（commit 57d739e，SHA-256 `7d8ce203…`），随发行归档提供，运行时不依赖 Pentest-Playbook 工作区。

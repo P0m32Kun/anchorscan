@@ -83,7 +83,7 @@ async function writeTestConfig(workDir) {
     (text, name) => text.replace(new RegExp(`^(\\s*${name}:).*$`, 'm'), `$1 ${quotedFixture}`),
     source,
   );
-  config = config.replace(/^(\s*knowledge_base:\s*\n\s*path:).*/m, '$1 "catalog.md"');
+  config = config.replace(/^(\s*knowledge_base:\s*\n(?:\s*#.*\n)*\s*path:).*/m, '$1 "catalog.md"');
   const catalog = `<!-- anchorscan-catalog version: 1 -->\n\n### SMB 签名未启用（严重）\n\n<!-- anchorscan-entry\nid: smb-signing\naliases: []\nmatch:\n  nuclei: [smb-signing]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\nSMB 签名未启用描述。\n\n#### 验证命令\n\n##### Nuclei\n\n\`\`\`\nnuclei -t smb-signing -u {{host}}:{{port}}\n\`\`\`\n\n##### Nmap NSE\n\n\`\`\`\nnmap -p {{port}} --script smb-security-mode {{host}}\n\`\`\`\n\n#### 修复建议\n\n启用 SMB 签名。\n`;
   const configPath = path.join(workDir, 'config.yaml');
   await fs.writeFile(configPath, config);

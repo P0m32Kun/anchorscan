@@ -312,6 +312,11 @@ func TestToolPrefillGrantIsOneTimeAndIgnoresForgedToken(t *testing.T) {
 	if strings.Contains(forged.Body.String(), command.ToolArgs) {
 		t.Fatalf("forged prefill leaked args: %s", forged.Body.String())
 	}
+	handcrafted := httptest.NewRecorder()
+	handler.ServeHTTP(handcrafted, httptest.NewRequest(http.MethodGet, "/tools/nuclei?raw_args="+url.QueryEscape(command.ToolArgs), nil))
+	if strings.Contains(handcrafted.Body.String(), command.ToolArgs) {
+		t.Fatalf("hand-crafted raw_args query must not prefill catalog commands: %s", handcrafted.Body.String())
+	}
 }
 
 func TestLegacyCommandAndKnowledgeBaseDetailFailClosed(t *testing.T) {

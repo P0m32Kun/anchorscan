@@ -91,9 +91,14 @@
         </div>
       </div>
       <label class="full-width">
-        <span>知识库手册路径</span>
-        <input name="knowledge_base_path" value="{{.Config.KnowledgeBase.Path}}" placeholder="例如: ../Pentest-Playbook/handbook/内网渗透测试手册_v2.md">
-        <p class="meta-line config-field-help">条目标题等级支持严重（critical）、高危（high）、中危（medium）、低危（low），例如“漏洞名称（严重）”；留空则禁用知识库。保存后需重启 AnchorScan 才会加载新手册。</p>
+        <span>知识库路径</span>
+        <input name="knowledge_base_path" value="{{.Config.KnowledgeBase.Path}}" placeholder="例如: catalog.json 或 /data/catalog.json">
+        <p class="meta-line config-field-help">
+          发行包默认指向包内 config/catalog.json（catalog 协议 version 2，source handbook-v3，与程序版本匹配），留空则禁用知识库。
+          也可改为外部 JSON 路径（catalog v2）或旧版 Markdown 手册路径；Markdown 条目按 legacy-unknown 处理，命令需至少 manual-gated 强度的显式确认。
+          外部更新：用新 catalog.json 覆盖该路径所指文件后重启 AnchorScan。缺失或不兼容文件会显示 unavailable 诊断，不会回退到其它副本；恢复方式为恢复受支持文件或还原包内默认文件。
+          保存后需重启 AnchorScan 才会加载。
+        </p>
       </label>
       
       <label>
