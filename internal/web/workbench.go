@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -454,6 +453,28 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
+	returnPath := strings.TrimSpace(r.FormValue("return"))
+	if returnPath == "" {
+		returnPath = "/projects/" + projectID + "/workbench"
+	}
+	if !isSafeReturnURL(returnPath) {
+		returnPath = ""
+	}
+	verificationID := strings.TrimSpace(r.FormValue("verification_id"))
+	entry, ok := s.catalog.Entry(cand.GroupKey)
+	if !ok {
+		http.Error(w, "知识库条目不存在", http.StatusUnprocessableEntity)
+		return
+	}
+	if !s.enforceCommandGate(w, r, commandGateRequest{
+		Action:      "project-candidate",
+		Tool:        tool,
+		Key:         projectID + "\x00" + key,
+		Fingerprint: strings.Join([]string{zoneID, assetParam, verificationID, returnPath}, "\x00"),
+	}, entry) {
+		return
+	}
+
 	commands, warning, err := report.BuildCandidateCommands(*cand, tool, assets, s.catalog)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
@@ -462,22 +483,19 @@ func (s *server) projectCandidateCommand(w http.ResponseWriter, r *http.Request,
 
 	resp := projectCommandResponse{Commands: commands, Warning: warning}
 	if len(commands) == 1 && commands[0].TargetFile == "" && (tool == "nuclei" || tool == "nmap") {
-		returnPath := strings.TrimSpace(r.FormValue("return"))
-		if returnPath == "" {
-			returnPath = "/projects/" + projectID + "/workbench"
+		resp.ToolLink, err = s.toolLink(tool, toolPrefill{
+			Tool:           tool,
+			RawArgs:        commands[0].ToolArgs,
+			ProjectID:      projectID,
+			ZoneID:         candZoneID,
+			VerificationID: verificationID,
+			ReturnURL:      returnPath,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
-		verificationID := strings.TrimSpace(r.FormValue("verification_id"))
-		q := url.Values{}
-		q.Set("project_id", projectID)
-		q.Set("zone_id", candZoneID)
-		if verificationID != "" {
-			q.Set("verification_id", verificationID)
-		}
-		q.Set("raw_args", commands[0].ToolArgs)
-		q.Set("return", returnPath)
-		resp.ToolLink = "/tools/" + tool + "?" + q.Encode()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(resp)
+	writeJSON(w, http.StatusOK, resp)
 }

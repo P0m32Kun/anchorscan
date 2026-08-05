@@ -104,11 +104,24 @@ type Zone = {
   SortOrder: number;
 };
 
+type CommandGate = {
+  level: string;
+  review_status: string;
+  safety_mode: string;
+  effects: string[];
+  cleanup: string;
+  message: string;
+  acknowledge_label: string;
+  challenge: string;
+};
+
 type CommandResult = {
   commands: { full_command: string; tool_args: string; target_file?: string }[];
   warning: string;
   tool_link: string;
 };
+type CommandFetchResult = CommandResult | { gate: CommandGate };
+type PendingCommand = { candidate: Candidate; tool: string; asset: string; verificationID: string };
 
 type Toast = { id: number; message: string; type: 'error' | 'success' };
 
@@ -295,15 +308,19 @@ const commandBody = ref('');
 const commandWarning = ref('');
 const commandToolLink = ref('');
 const commandLoading = ref(false);
+const commandGate = ref<CommandGate | null>(null);
+const pendingCommand = ref<PendingCommand | null>(null);
 
 function openCommandDialog() {
   commandBody.value = '';
   commandWarning.value = '';
   commandToolLink.value = '';
+  commandGate.value = null;
+  pendingCommand.value = null;
   commandDialog.value?.showModal();
 }
 
-async function fetchCommand(c: Candidate, tool: string, asset: string, verificationID: string) {
+async function fetchCommand(c: Candidate, tool: string, asset: string, verificationID: string, gateToken = ''): Promise<CommandFetchResult> {
   const key = c.GroupKey;
   const url = `/projects/${props.project_id}/candidates/${encodeURIComponent(key)}/commands`;
   const body = new URLSearchParams({ tool });
@@ -311,13 +328,36 @@ async function fetchCommand(c: Candidate, tool: string, asset: string, verificat
   if (asset && asset !== 'all') body.set('asset', asset);
   if (verificationID) body.set('verification_id', verificationID);
   body.set('return', `/projects/${props.project_id}/workbench`);
+  if (gateToken) {
+    body.set('gate_token', gateToken);
+    body.set('acknowledge', '1');
+  }
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
+  if (res.status === 428) {
+    const result = await res.json() as { gate?: CommandGate };
+    if (!result.gate?.challenge) throw new Error('命令确认挑战无效');
+    return { gate: result.gate };
+  }
   if (!res.ok) throw new Error((await res.text()).trim() || '命令不可用');
   return (await res.json()) as CommandResult;
+}
+
+async function loadCommand(request: PendingCommand, gateToken = '') {
+  const data = await fetchCommand(request.candidate, request.tool, request.asset, request.verificationID, gateToken);
+  if ('gate' in data) {
+    commandGate.value = data.gate;
+    commandWarning.value = data.gate.message;
+    return;
+  }
+  commandBody.value = (data.commands || []).map((c) => c.full_command).join('\n\n');
+  commandWarning.value = data.warning || '';
+  commandToolLink.value = data.tool_link || '';
+  if (commandGate.value) commandGate.value = { ...commandGate.value, challenge: '' };
+  pendingCommand.value = null;
 }
 
 async function runCommand(c: Candidate, tool: string, asset: string) {
@@ -325,13 +365,28 @@ async function runCommand(c: Candidate, tool: string, asset: string) {
   commandTitle.value = `生成 ${tool} 命令`;
   openCommandDialog();
   const v = verificationMap.value[verificationKey(c.ZoneID, c.GroupKey)];
+  const request = { candidate: c, tool, asset, verificationID: v?.ID || '' };
+  pendingCommand.value = request;
   try {
-    const data = await fetchCommand(c, tool, asset, v?.ID || '');
-    commandBody.value = (data.commands || []).map((c) => c.full_command).join('\n\n');
-    commandWarning.value = data.warning || '';
-    commandToolLink.value = data.tool_link || '';
+    await loadCommand(request);
   } catch (e: any) {
     commandBody.value = '';
+    commandWarning.value = e.message || String(e);
+  } finally {
+    commandLoading.value = false;
+  }
+}
+
+async function confirmCommandGate() {
+  const request = pendingCommand.value;
+  const gate = commandGate.value;
+  if (!request || !gate?.challenge || commandLoading.value) return;
+  commandLoading.value = true;
+  commandWarning.value = '正在校验一次性确认并生成命令。';
+  try {
+    await loadCommand(request, gate.challenge);
+  } catch (e: any) {
+    commandGate.value = null;
     commandWarning.value = e.message || String(e);
   } finally {
     commandLoading.value = false;
@@ -1053,14 +1108,25 @@ function onFileChange(target: 'verify' | 'negative', files: FileList | null) {
     </div>
 
     <!-- Command dialog -->
-    <dialog ref="commandDialog" class="panel" aria-labelledby="command-dialog-title" @close="commandBody = ''">
+    <dialog ref="commandDialog" class="panel" aria-labelledby="command-dialog-title" @close="commandBody = ''; commandGate = null; pendingCommand = null">
       <div class="panel-heading">
         <h3 id="command-dialog-title">{{ commandTitle }}</h3>
         <button type="button" class="button button-secondary" @click="commandDialog?.close()">关闭</button>
       </div>
       <p class="meta-line" v-if="commandLoading">正在生成，不会启动扫描。</p>
       <p class="meta-line" v-else-if="commandWarning">{{ commandWarning }}</p>
-      <pre class="command-pre">{{ commandBody || (commandLoading ? '生成中…' : '') }}</pre>
+      <div v-if="commandGate" class="panel command-gate-panel" role="alert">
+        <p><strong>{{ commandGate.level }}</strong> · review={{ commandGate.review_status }} · safety={{ commandGate.safety_mode }}</p>
+        <p>{{ commandGate.message }}</p>
+        <p v-if="commandGate.level === 'legacy-unknown'"><strong>Effects / Cleanup：</strong>旧 Markdown 未声明</p>
+        <div v-if="commandGate.effects.length">
+          <p class="eyebrow">Effects</p>
+          <ul><li v-for="effect in commandGate.effects" :key="effect"><code>{{ effect }}</code></li></ul>
+        </div>
+        <p v-if="commandGate.cleanup"><strong>Cleanup：</strong>{{ commandGate.cleanup }}</p>
+        <button v-if="commandGate.challenge" type="button" class="button button-primary" :disabled="commandLoading" @click="confirmCommandGate">{{ commandGate.acknowledge_label }}</button>
+      </div>
+      <pre v-if="commandBody" class="command-pre">{{ commandBody }}</pre>
       <div class="header-actions">
         <button type="button" class="button button-secondary" @click="copyCommandText" :disabled="!commandBody">复制完整命令</button>
         <a v-if="commandToolLink" class="button button-primary" :href="commandToolLink">带参数打开工具页</a>

@@ -131,16 +131,14 @@ func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *tes
 	closeServer(t, handler)
 
 	form := "finding_key=" + report.FindingKey(finding) + "&tool=nuclei&target=attacker.example&command=evil"
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/reports/run-command/commands", strings.NewReader(form))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(res, req)
+	res := postCommandWithGate(t, handler, "/reports/run-command/commands", form)
 	if res.Code != http.StatusOK {
 		t.Fatalf("command generation = %d: %s", res.Code, res.Body.String())
 	}
 	var got struct {
 		FullCommand string `json:"full_command"`
 		ToolArgs    string `json:"tool_args"`
+		ToolLink    string `json:"tool_link"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
 		t.Fatal(err)
@@ -164,7 +162,10 @@ func TestReportNucleiCommandGenerationUsesServerFindingWithoutRunningTool(t *tes
 		t.Fatalf("report page has no command entry: %s", page.Body.String())
 	}
 	toolPage := httptest.NewRecorder()
-	handler.ServeHTTP(toolPage, httptest.NewRequest(http.MethodGet, "/tools/nuclei?raw_args=-t+http%2Ftechnologies%2Fredis.yaml+-u+http%3A%2F%2F192.0.2.10%3A6379", nil))
+	if !strings.Contains(got.ToolLink, "gate_token=") || strings.Contains(got.ToolLink, "raw_args=") {
+		t.Fatalf("generated tool link is not token-gated: %q", got.ToolLink)
+	}
+	handler.ServeHTTP(toolPage, httptest.NewRequest(http.MethodGet, got.ToolLink, nil))
 	if !strings.Contains(toolPage.Body.String(), `>-t http/technologies/redis.yaml -u http://192.0.2.10:6379</textarea>`) {
 		t.Fatalf("tool page did not prefill generated arguments: %s", toolPage.Body.String())
 	}
@@ -212,10 +213,7 @@ func TestReportNucleiCommandGenerationRejectsMismatchedURL(t *testing.T) {
 	closeServer(t, handler)
 
 	form := "finding_key=" + report.FindingKey(finding) + "&tool=nuclei"
-	req := httptest.NewRequest(http.MethodPost, "/reports/run-url/commands", strings.NewReader(form))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, req)
+	res := postCommandWithGate(t, handler, "/reports/run-url/commands", form)
 	if res.Code != http.StatusUnprocessableEntity || !strings.Contains(res.Body.String(), "有效 URL") {
 		t.Fatalf("mismatched URL response = %d: %s", res.Code, res.Body.String())
 	}
@@ -257,10 +255,7 @@ func TestReportCommandGenerationProducesNmapAndMSFWithoutRunningTool(t *testing.
 		"msf":  {"msfconsole -q -x \"use auxiliary/scanner/smb/smb_version; set RHOSTS 192.0.2.12; set RPORT 445; run; exit\"", ""},
 	} {
 		form := "finding_key=" + report.FindingKey(finding) + "&tool=" + tool
-		req := httptest.NewRequest(http.MethodPost, "/reports/run-nmap-msf/commands", strings.NewReader(form))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		res := httptest.NewRecorder()
-		handler.ServeHTTP(res, req)
+		res := postCommandWithGate(t, handler, "/reports/run-nmap-msf/commands", form)
 		if res.Code != http.StatusOK {
 			t.Fatalf("%s command generation = %d: %s", tool, res.Code, res.Body.String())
 		}
@@ -380,10 +375,7 @@ func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *te
 		t.Fatal(err)
 	}
 	closeServer(t, handler)
-	req := httptest.NewRequest(http.MethodPost, "/reports/run-batch/commands/batch?findings_page=2", strings.NewReader("group_key="+report.VulnerabilityGroupKey("smb-signing")+"&tool=nuclei"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, req)
+	res := postCommandWithGate(t, handler, "/reports/run-batch/commands/batch?findings_page=2", "group_key="+report.VulnerabilityGroupKey("smb-signing")+"&tool=nuclei")
 	if res.Code != http.StatusOK {
 		t.Fatalf("batch command = %d: %s", res.Code, res.Body.String())
 	}
@@ -405,8 +397,7 @@ func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *te
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("target file mode = %v, %v", info.Mode(), err)
 	}
-	reused := httptest.NewRecorder()
-	handler.ServeHTTP(reused, req)
+	reused := postCommandWithGate(t, handler, "/reports/run-batch/commands/batch?findings_page=2", "group_key="+report.VulnerabilityGroupKey("smb-signing")+"&tool=nuclei")
 	var repeated struct {
 		TargetFile string `json:"target_file"`
 	}
@@ -423,8 +414,7 @@ func TestReportBatchNucleiCommandUsesAllFilteredFindingsWithoutRunningTool(t *te
 	if err := verify.Close(); err != nil {
 		t.Fatal(err)
 	}
-	changed := httptest.NewRecorder()
-	handler.ServeHTTP(changed, req)
+	changed := postCommandWithGate(t, handler, "/reports/run-batch/commands/batch?findings_page=2", "group_key="+report.VulnerabilityGroupKey("smb-signing")+"&tool=nuclei")
 	var changedResult struct {
 		TargetFile string `json:"target_file"`
 	}
@@ -471,10 +461,7 @@ func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
 	}
 	closeServer(t, handler)
 	group := report.VulnerabilityGroupKey("smb-signing")
-	nmap := httptest.NewRecorder()
-	nmapRequest := httptest.NewRequest(http.MethodPost, "/reports/run-batch-tools/commands/batch", strings.NewReader("group_key="+group+"&tool=nmap"))
-	nmapRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(nmap, nmapRequest)
+	nmap := postCommandWithGate(t, handler, "/reports/run-batch-tools/commands/batch", "group_key="+group+"&tool=nmap")
 	if nmap.Code != http.StatusOK {
 		t.Fatalf("nmap batch = %d: %s", nmap.Code, nmap.Body.String())
 	}
@@ -510,10 +497,7 @@ func TestReportBatchNmapAndMSFCommandsDoNotRunTools(t *testing.T) {
 		t.Fatalf("nmap target grouping = %#v", targetContents)
 	}
 
-	msf := httptest.NewRecorder()
-	msfRequest := httptest.NewRequest(http.MethodPost, "/reports/run-batch-tools/commands/batch", strings.NewReader("group_key="+group+"&tool=msf"))
-	msfRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	handler.ServeHTTP(msf, msfRequest)
+	msf := postCommandWithGate(t, handler, "/reports/run-batch-tools/commands/batch", "group_key="+group+"&tool=msf")
 	if msf.Code != http.StatusOK {
 		t.Fatalf("msf batch = %d: %s", msf.Code, msf.Body.String())
 	}

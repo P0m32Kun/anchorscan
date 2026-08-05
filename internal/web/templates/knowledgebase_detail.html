@@ -4,6 +4,7 @@
     <p class="eyebrow">漏洞知识库</p>
     <h2>{{.Entry.Name}}</h2>
     <span class="knowledgebase-entry-severity severity-{{.Entry.Severity}}">{{.Entry.Severity.Label}}</span>
+    <span class="status-badge">复核状态：{{.ReviewStatus}}</span>
   </div>
   <a class="button button-secondary" href="/kb">返回列表</a>
 </section>
@@ -15,11 +16,30 @@
     <h3>漏洞描述</h3>
     <pre>{{.Entry.Description}}</pre>
   </section>
+  <section class="knowledgebase-detail-section command-gate-panel">
+    <p class="eyebrow">命令门禁</p>
+    <h3>Safety 与复核状态</h3>
+    <p>Safety mode：<strong>{{.SafetyMode}}</strong></p>
+    {{if .NeedsReview}}<p class="alert alert-error">待复核（needs-review）：生成命令前必须显式 acknowledgement。</p>{{end}}
+    {{if .Legacy}}<p class="alert alert-error">旧 Markdown 未声明 safety；命令按至少 manual-gated 强度处理。</p><p>Effects / Cleanup：旧 Markdown 未声明。</p>{{end}}
+    {{if .Entry.Safety.Effects}}
+    <p>Effects：</p>
+    <ul>{{range .Entry.Safety.Effects}}<li><code>{{.}}</code></li>{{end}}</ul>
+    {{end}}
+    {{if .Entry.Safety.Cleanup}}<p>Cleanup：{{.Entry.Safety.Cleanup}}</p>{{end}}
+  </section>
   <section class="knowledgebase-detail-section">
     <p class="eyebrow">验证方式</p>
     <h3>验证命令</h3>
-    {{if .Entry.Commands.Nuclei}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.Nuclei}}</code></pre>{{end}}
-    {{if .Entry.Commands.NmapNSE}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.NmapNSE}}</code></pre>{{end}}
+    {{if .ShowCommands}}
+      {{if .Entry.Commands.Nuclei}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.Nuclei}}</code></pre>{{end}}
+      {{if .Entry.Commands.NmapNSE}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.NmapNSE}}</code></pre>{{end}}
+      {{if .Entry.Commands.Metasploit}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.Metasploit}}</code></pre>{{end}}
+    {{else if or .Entry.Commands.Nuclei .Entry.Commands.NmapNSE .Entry.Commands.Metasploit}}
+      <p class="meta-line">原始命令已由服务端门禁隐藏；请从报告或验证工作台发起命令流程并完成确认。</p>
+    {{else}}
+      <p class="meta-line">知识库未提供可用命令。</p>
+    {{end}}
   </section>
   <section class="knowledgebase-detail-section">
     <p class="eyebrow">处置建议</p>

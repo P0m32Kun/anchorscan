@@ -28,12 +28,13 @@ type ServerOptions struct {
 }
 
 type server struct {
-	opts    ServerOptions
-	store   *store.Store
-	manager *app.Manager
-	catalog *knowledgebase.Catalog
-	mux     *http.ServeMux
-	origin  *http.CrossOriginProtection
+	opts        ServerOptions
+	store       *store.Store
+	manager     *app.Manager
+	catalog     *knowledgebase.Catalog
+	mux         *http.ServeMux
+	origin      *http.CrossOriginProtection
+	commandGate *commandGateStore
 }
 
 func managedDataRoot(dbPath string) string {
@@ -82,7 +83,7 @@ func NewServer(opts ServerOptions) (http.Handler, error) {
 	if cfg, err := config.Load(opts.ConfigPath); err == nil {
 		catalog = knowledgebase.Load(opts.ConfigPath, cfg.KnowledgeBase.Path)
 	}
-	s := &server{opts: opts, store: scanStore, manager: app.NewManager(opts.Runner, scanStore), catalog: catalog, origin: http.NewCrossOriginProtection()}
+	s := &server{opts: opts, store: scanStore, manager: app.NewManager(opts.Runner, scanStore), catalog: catalog, origin: http.NewCrossOriginProtection(), commandGate: newCommandGateStore()}
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServerFS(assets))
 	mux.HandleFunc("/projects", s.projects)

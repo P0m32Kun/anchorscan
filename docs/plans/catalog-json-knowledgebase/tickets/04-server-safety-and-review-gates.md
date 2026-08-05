@@ -4,7 +4,7 @@
 
 **Blocked by:** 03 — 支持 canonical 命令与 Nuclei `-code` 绑定。
 
-**Status:** draft
+**Status:** done
 
 **Execution skills:** `tdd`、`implement`、`code-review`、`frontend-design`、`ui-ux-pro-max`、`ponytail`。
 

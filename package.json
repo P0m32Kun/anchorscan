@@ -5,7 +5,8 @@
   "scripts": {
     "build:web": "vue-tsc --noEmit && vite build",
     "typecheck:web": "vue-tsc --noEmit",
-    "test:web": "node scripts/web-smoke.mjs"
+    "test:web": "node scripts/web-smoke.mjs && node scripts/ticket-04-web-smoke.mjs",
+    "test:ticket-04": "node scripts/ticket-04-web-smoke.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",

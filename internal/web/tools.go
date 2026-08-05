@@ -77,6 +77,19 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 	selectedZoneID := strings.TrimSpace(r.URL.Query().Get("zone_id"))
 	returnURL := strings.TrimSpace(r.URL.Query().Get("return"))
 	verificationID := strings.TrimSpace(r.URL.Query().Get("verification_id"))
+	rawArgs := strings.TrimSpace(r.URL.Query().Get("raw_args"))
+	if token := strings.TrimSpace(r.URL.Query().Get("gate_token")); token != "" {
+		prefill, ok := s.toolPrefill(token, toolName)
+		if !ok {
+			rawArgs = ""
+		} else {
+			rawArgs = prefill.RawArgs
+			selectedProjectID = prefill.ProjectID
+			selectedZoneID = prefill.ZoneID
+			returnURL = prefill.ReturnURL
+			verificationID = prefill.VerificationID
+		}
+	}
 	if !isSafeReturnURL(returnURL) {
 		returnURL = ""
 	}
@@ -96,7 +109,7 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		Zones:             zones,
 		Tool:              tool,
 		HighriskPorts:     highriskPorts,
-		RawArgs:           strings.TrimSpace(r.URL.Query().Get("raw_args")),
+		RawArgs:           rawArgs,
 		SelectedProjectID: selectedProjectID,
 		SelectedZoneID:    selectedZoneID,
 		ReturnURL:         returnURL,
