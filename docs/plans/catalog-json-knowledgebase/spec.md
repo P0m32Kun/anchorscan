@@ -2,11 +2,11 @@
 
 **Status:** proposed
 
-本文定义 AnchorScan 以 Pentest-Playbook `handbook-v2` 的机器消费 catalog 为知识库输入的迁移。它替换已失效的“只加 JSON loader、保持旧 `Entry` 和命令调用链不变”的方案。
+本文定义 AnchorScan 以 Pentest-Playbook `handbook-v3` 的机器消费 catalog 为知识库输入的迁移。它替换已失效的“只加 JSON loader、保持旧 `Entry` 和命令调用链不变”的方案。
 
 ## 1. 背景与结论
 
-Pentest-Playbook 已发布 handbook-v2 条目库。每个条目的 `verify` 与 `safety` 共同定义验证命令及其授权边界；生成 Markdown 和 `dist/catalog.json` 都是条目源数据的投影。
+Pentest-Playbook 已发布 handbook-v3 条目库。每个条目的 `verify` 与 `safety` 共同定义验证命令及其授权边界；生成 Markdown 和 `dist/catalog.json` 都是条目源数据的投影。
 
 当前已发布 catalog v1 的真实形状包含：
 
@@ -39,20 +39,22 @@ Pentest-Playbook 已发布 handbook-v2 条目库。每个条目的 `verify` 与 
 
 ### 4.1 catalog v2 是实施前置条件
 
-Pentest-Playbook 必须先发布 `catalog.json` **version: 2**，并同时发布/校验 `handbook-v2/schema/catalog.schema.json`。当前 v1 虽有 `safety` 和 `code`，但没有正式的 consumer 协议边界；AnchorScan 不应通过“继续接受 v1 并忽略新字段”完成迁移。
+Pentest-Playbook 必须先发布 `catalog.json` **version: 2**，并同时发布/校验 `handbook-v3/schema/catalog.schema.json`。当前 v1 虽有 `safety` 和 `code`，但没有正式的 consumer 协议边界；AnchorScan 不应通过“继续接受 v1 并忽略新字段”完成迁移。
+
+勘误：本节先前将正式 `source` 写为 `"handbook-v2"`；应为 `"handbook-v3"`。
 
 catalog v2 顶层必须包含：
 
 ```json
 {
   "version": 2,
-  "source": "handbook-v2",
+  "source": "handbook-v3",
   "entry_count": 188,
   "entries": []
 }
 ```
 
-consumer 必须检查：JSON 语法、`version == 2`、`source == "handbook-v2"`、`entry_count == len(entries)`、条目 ID 唯一且至少有一个可展示条目。顶层或条目新增的**不影响既有语义**字段可忽略；影响消费、命令、授权、匹配或审计含义的变化必须提升 catalog 版本，并同步 producer schema、fixture 和 consumer。
+consumer 必须检查：JSON 语法、`version == 2`、`source == "handbook-v3"`、`entry_count == len(entries)`、条目 ID 唯一且至少有一个可展示条目。顶层或条目新增的**不影响既有语义**字段可忽略；影响消费、命令、授权、匹配或审计含义的变化必须提升 catalog 版本，并同步 producer schema、fixture 和 consumer。
 
 ### 4.2 条目最小消费契约
 

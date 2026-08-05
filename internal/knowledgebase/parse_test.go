@@ -78,6 +78,58 @@ func TestLoadJSONFixtureSupportsCodeAndNoVerify(t *testing.T) {
 	}
 }
 
+func TestLoadJSONRealCatalogV2AcceptsAllEntriesAndCodeCommands(t *testing.T) {
+	catalog := LoadJSON([]byte(fixture(t, "catalog-v2-real.json")))
+	entries := catalog.Search("")
+	if catalog.Status() != StatusReady || len(catalog.Diagnostics()) != 0 || len(entries) != 188 {
+		t.Fatalf("real catalog status=%q diagnostics=%#v entries=%d", catalog.Status(), catalog.Diagnostics(), len(entries))
+	}
+
+	commands := 0
+	for _, entry := range entries {
+		if entry.Commands != (Commands{}) {
+			commands++
+		}
+	}
+	if commands != 145 {
+		t.Fatalf("real catalog command count=%d, want 145", commands)
+	}
+
+	want := map[string]string{
+		"cve-2026-24061": "nuclei -code -t code/cves/2026/CVE-2026-24061.yaml -u {{host}}:{{port}}",
+		"cve-2017-7529":  "nuclei -code -t RBKD-templates/http/vulnerabilities/cve-2017-7529.yaml -u {{url}}",
+	}
+	for id, command := range want {
+		entry, ok := catalog.Entry(id)
+		if !ok || entry.Verify == nil || !entry.Verify.Code || entry.Commands.Nuclei != command {
+			t.Fatalf("real code entry %q = %#v, found=%t", id, entry, ok)
+		}
+	}
+}
+
+func TestLoadJSONRejectsInvalidNucleiCode(t *testing.T) {
+	fixtureContent := fixture(t, "catalog-v2.json")
+	codeVerify := `"verify": {"tool": "nuclei", "template": "code/cves/2026/CVE-2026-24061.yaml", "target": "host:port", "code": true}`
+	codeCommand := `"command": "nuclei -code -t code/cves/2026/CVE-2026-24061.yaml -u {{host}}:{{port}}"`
+	cases := map[string]string{
+		"repeated": strings.Replace(fixtureContent, codeCommand, `"command": "nuclei -code -code -t code/cves/2026/CVE-2026-24061.yaml -u {{host}}:{{port}}"`, 1),
+		"misplaced": strings.Replace(
+			strings.Replace(fixtureContent, codeVerify, `"verify": {"tool": "nuclei", "template": "-code", "target": "host:port"}`, 1),
+			codeCommand, `"command": "nuclei -t -code -u {{host}}:{{port}}"`, 1),
+		"verify requires code":  strings.Replace(fixtureContent, codeCommand, `"command": "nuclei -t code/cves/2026/CVE-2026-24061.yaml -u {{host}}:{{port}}"`, 1),
+		"command requires code": strings.Replace(fixtureContent, codeVerify, `"verify": {"tool": "nuclei", "template": "code/cves/2026/CVE-2026-24061.yaml", "target": "host:port"}`, 1),
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			catalog := LoadJSON([]byte(content))
+			entry, ok := catalog.Entry("nuclei-code")
+			if catalog.Status() != StatusDegraded || !ok || entry.Commands != (Commands{}) || entry.Verify != nil {
+				t.Fatalf("status=%q entry=%#v found=%t", catalog.Status(), entry, ok)
+			}
+		})
+	}
+}
+
 func TestLoadJSONSkipsInvalidSafetyAndClearsInvalidCommand(t *testing.T) {
 	fixtureContent := fixture(t, "catalog-v2.json")
 	invalidSafety := strings.Replace(fixtureContent, `"safety": {"mode": "optional", "effects": ["authentication-attempt"], "cleanup": "停止认证尝试"}`, `"safety": null`, 1)
@@ -155,6 +207,29 @@ func TestLoadJSONRejectsNmapCommandWithoutScript(t *testing.T) {
 	}
 }
 
+func TestLoadJSONRejectsNmapAndMSFCode(t *testing.T) {
+	fixtureContent := fixture(t, "catalog-v2.json")
+	verify := `"verify": {"tool": "nuclei", "template": "network/smb.yaml", "target": "host:port"}`
+	command := `"command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}"`
+	cases := map[string]string{
+		"nmap": strings.Replace(
+			strings.Replace(fixtureContent, verify, `"verify": {"tool": "nmap", "script": "smb-signing", "code": true}`, 1),
+			command, `"command": "nmap -p {{port}} --script smb-signing {{host}}"`, 1),
+		"msf": strings.Replace(
+			strings.Replace(fixtureContent, verify, `"verify": {"tool": "msf", "module": "auxiliary/scanner/ssh/ssh_version", "action": "run", "code": true}`, 1),
+			command, `"command": "use auxiliary/scanner/ssh/ssh_version\nset RHOSTS {{host}}\nset RPORT {{port}}\nrun"`, 1),
+	}
+	for name, content := range cases {
+		t.Run(name, func(t *testing.T) {
+			catalog := LoadJSON([]byte(content))
+			entry, ok := catalog.Entry("smb-signing")
+			if catalog.Status() != StatusDegraded || !ok || entry.Commands != (Commands{}) || entry.Verify != nil {
+				t.Fatalf("status=%q entry=%#v found=%t", catalog.Status(), entry, ok)
+			}
+		})
+	}
+}
+
 func TestLoadJSONClearsCommandThatDoesNotMatchVerify(t *testing.T) {
 	content := strings.Replace(fixture(t, "catalog-v2.json"), `"command": "nuclei -t network/smb.yaml -u {{host}}:{{port}}"`, `"command": "nuclei -t network/other.yaml -u {{host}}:{{port}}"`, 1)
 	catalog := LoadJSON([]byte(content))
@@ -195,7 +270,7 @@ func slicesEqual(left, right []string) bool {
 }
 
 func TestLoadJSONRejectsDuplicateObjectKeys(t *testing.T) {
-	content := strings.Replace(fixture(t, "catalog-v2.json"), `"source": "handbook-v2",`, `"source": "handbook-v2", "source": "handbook-v2",`, 1)
+	content := strings.Replace(fixture(t, "catalog-v2.json"), `"source": "handbook-v3",`, `"source": "handbook-v3", "source": "handbook-v3",`, 1)
 	if got := LoadJSON([]byte(content)).Status(); got != StatusUnavailable {
 		t.Fatalf("Status() = %q, want %q", got, StatusUnavailable)
 	}
@@ -205,10 +280,10 @@ func TestLoadJSONRejectsInvalidCatalogProtocol(t *testing.T) {
 	fixtureContent := fixture(t, "catalog-v2.json")
 	cases := []string{
 		"{",
-		strings.Replace(fixtureContent, `"handbook-v2"`, `"handbook-v3"`, 1),
+		strings.Replace(fixtureContent, `"handbook-v3"`, `"handbook-v2"`, 1),
 		strings.Replace(fixtureContent, `"entry_count": 4`, `"entry_count": 5`, 1),
 		strings.Replace(fixtureContent, `"id": "nuclei-code"`, `"id": "smb-signing"`, 1),
-		`{"version": 2, "source": "handbook-v2", "entry_count": 1, "entries": [{}]}`,
+		`{"version": 2, "source": "handbook-v3", "entry_count": 1, "entries": [{}]}`,
 	}
 	for _, content := range cases {
 		if got := LoadJSON([]byte(content)).Status(); got != StatusUnavailable {

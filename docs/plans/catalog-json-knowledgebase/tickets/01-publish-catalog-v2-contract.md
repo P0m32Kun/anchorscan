@@ -4,14 +4,14 @@
 
 **Blocked by:** None — 跨仓库前置条件。
 
-**Status:** draft
+**Status:** done
 
 **Owner repository:** `Pentest-Playbook`。本 ticket 完成前，AnchorScan 不开始 JSON consumer 实现。
 
 ## 行为契约
 
-- `handbook-v2/schema/catalog.schema.json` 定义 catalog v2 顶层和条目消费契约。
-- `dist/catalog.json` 使用 `version: 2`、`source: handbook-v2`，且 `entry_count` 与 entries 长度一致。
+- `handbook-v3/schema/catalog.schema.json` 定义 catalog v2 顶层和条目消费契约。
+- `dist/catalog.json` 使用 `version: 2`、`source: handbook-v3`，且 `entry_count` 与 entries 长度一致。
 - 有 `verify` 的条目同时有由 generator 派生的 `command`；无 `verify` 的条目两者都没有。
 - `command` 与同一条目生成 Markdown 的命令块逐字节一致。
 - `safety`、`status`、`sources`、`generated`、`verify` 和 `command` 都出现在 catalog 投影中；`safety.cleanup` 保留。
@@ -34,4 +34,4 @@
 ## 非目标
 
 - 不在此 ticket 修改 AnchorScan。
-- 不改变 handbook-v2 条目正文的知识结构。
+- 不改变 handbook-v3 条目正文的知识结构。

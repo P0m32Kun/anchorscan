@@ -63,7 +63,7 @@ func LoadJSON(source []byte) *Catalog {
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return unavailable("catalog JSON 无效")
 	}
-	if decoded.Version != 2 || decoded.Source != "handbook-v2" || decoded.EntryCount != len(decoded.Entries) {
+	if decoded.Version != 2 || decoded.Source != "handbook-v3" || decoded.EntryCount != len(decoded.Entries) {
 		return unavailable("catalog v2 顶层协议无效")
 	}
 
@@ -321,13 +321,17 @@ func validNucleiJSON(command string, verify *catalogV2Verify) bool {
 		return false
 	}
 	index := 1
-	if args[index] == "-code" {
-		if !verify.Code {
+	hasCode := args[index] == "-code"
+	if hasCode != verify.Code {
+		return false
+	}
+	if hasCode {
+		index++
+	}
+	for _, arg := range args[index:] {
+		if arg == "-code" {
 			return false
 		}
-		index++
-	} else if verify.Code {
-		return false
 	}
 	target := "{{host}}:{{port}}"
 	if verify.Target == "url" {

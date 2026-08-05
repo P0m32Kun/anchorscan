@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — 建立 catalog v2 模型与双格式 loader。
 
-**Status:** draft
+**Status:** done
 
 **Execution skills:** `tdd`、`implement`、`code-review`、`ponytail`。
 
