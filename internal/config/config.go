@@ -29,6 +29,10 @@ type ToolPaths struct {
 	// Dameng enables the community-template-gated default-password detector.
 	// It does not point to an external binary; any non-empty value enables it.
 	Dameng string `yaml:"dameng"`
+	// Fathom is the self-contained Rust recon binary (M4.1). It replaces the
+	// rustscan + nmap -sn + nmap -sV trio for the alive/port/fingerprint
+	// stages and emits one JSON object per open port (see internal/tools/fathom.go).
+	Fathom string `yaml:"fathom"`
 }
 
 func (p ToolPaths) DamengTemplatePath() string {
@@ -49,6 +53,7 @@ type ToolTimeouts struct {
 	Nuclei   string `yaml:"nuclei"`
 	Rdpscan  string `yaml:"rdpscan"`
 	Dameng   string `yaml:"dameng"`
+	Fathom   string `yaml:"fathom"`
 }
 
 type ToolDurations struct {
@@ -59,6 +64,7 @@ type ToolDurations struct {
 	Nuclei   time.Duration
 	Rdpscan  time.Duration
 	Dameng   time.Duration
+	Fathom   time.Duration
 }
 
 func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
@@ -95,11 +101,14 @@ func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
 	if out.Dameng, err = parse("dameng", timeouts.Dameng); err != nil {
 		return out, err
 	}
+	if out.Fathom, err = parse("fathom", timeouts.Fathom); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
 func (timeouts ToolTimeouts) Normalized() ToolTimeouts {
-	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan, &timeouts.Dameng} {
+	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan, &timeouts.Dameng, &timeouts.Fathom} {
 		if *value == "" {
 			*value = "0"
 		}
