@@ -19,12 +19,21 @@ type Store struct {
 }
 
 func Open(path string) (*Store, error) {
+	if path == "" {
+		// 空路径会让 modernc sqlite 把 "?_pragma=..." 当文件名，在 cwd 创建垃圾
+		// 文件（ISSUE-001）。调用方传入空 DB 路径是契约错误，fail fast。
+		return nil, errors.New("store.Open: empty database path")
+	}
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, err
 		}
 	}
-	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_txlock=immediate")
+	// file: URI 前缀确保 modernc sqlite 把 ? 解析为 query 分隔符而不是文件名的
+	// 一部分——裸路径 + "?_pragma=..." 在 ? 位于 DSN 开头时不解析 query，
+	// 把整串当路径创建垃圾文件（ISSUE-001）。
+	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_txlock=immediate"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}

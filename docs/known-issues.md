@@ -8,25 +8,6 @@
 
 ---
 
-## ISSUE-001 — sqlite DSN 拼接产生垃圾文件
-
-**现象：** `internal/store/sqlite.go` 用 `path + "?_pragma=..."` 拼接 DSN。某些场景下 modernc sqlite 把 `?_pragma=...` 当作文件名，在工作目录创建垃圾文件（如 `?_pragma=busy_timeout(5000)&_txlock=immediate`）。
-
-**复现步骤：**
-1. 运行 `make pr-check`（含 `package-test`）。
-2. 检查工作目录是否出现名为 `?_pragma=...` 的文件。
-
-**影响：** 低。不导致功能错误或数据损坏，但在测试和 CI 中产生无意义垃圾文件。
-
-**来源：** nmap-viewer 收敛 Ticket 08（加固）和 Ticket 09（最终 QA）均发现。非收敛计划引入，是既有缺陷。
-
-**建议方向：**
-- 检查 DSN 拼接逻辑，确认 modernc sqlite 的 `?_pragma=` 语法是否应改用 `?` query 参数或其他 DSN 格式。
-- 受影响文件：`internal/store/sqlite.go`（约第 27 行 DSN 拼接处）。
-- 验收：`make pr-check` 后工作目录无垃圾文件。
-
----
-
 ## ISSUE-002 — internal/app 租约竞争测试 CI 偶发失败（flaky）
 
 **现象：** `TestManagerRejectsRunHeldByAnotherManager` 在 GitHub Actions quality-gate 偶发失败（某个 attempt-N 报 `second manager error = <nil>`，期望 `scan already running: run-1`）。

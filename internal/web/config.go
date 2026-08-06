@@ -34,7 +34,7 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts, Saved: r.URL.Query().Get("saved") == "1", ToolChecks: toolDiagnostics(s.opts.ConfigPath, cfg)})
+		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts, Saved: r.URL.Query().Get("saved") == "1", ToolChecks: toolDiagnostics(s.opts.ConfigPath, s.opts.DBPath, cfg)})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -123,11 +123,13 @@ func normalizePortCSV(value string) string {
 // returns only the tool/rule results so the config page can surface clear,
 // actionable availability hints (installed path vs missing/not-configured)
 // without re-running database/report/docx diagnostics that are irrelevant
-// here.
-func toolDiagnostics(configPath string, cfg config.Config) []doctor.Check {
+// here. dbPath is still forwarded so doctor's database check never receives
+// an empty path (which would make store.Open create a junk "?_pragma=..." file
+// in the working directory — ISSUE-001).
+func toolDiagnostics(configPath, dbPath string, cfg config.Config) []doctor.Check {
 	toolNames := map[string]bool{"rustscan": true, "nmap": true, "httpx": true, "nuclei": true, "rdpscan": true, "nse rules": true, "tag rules": true}
 	var tools []doctor.Check
-	for _, check := range doctor.Run(doctor.Options{ConfigPath: configPath}) {
+	for _, check := range doctor.Run(doctor.Options{ConfigPath: configPath, DBPath: dbPath}) {
 		if toolNames[check.Name] {
 			tools = append(tools, check)
 		}

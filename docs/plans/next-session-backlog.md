@@ -1,6 +1,6 @@
 # 跨会话后续工作清单
 
-> 最后更新：2026-07-29
+> 最后更新：2026-08-06（PR #36 合并后）
 >
 > 用途：记录已规划但尚未交付的工作顺序及前置条件。开始任何一项前，先检查 `origin/main`、相关 `docs/plans/` ticket 与此清单是否一致。
 
@@ -13,15 +13,36 @@
 - 报告服务筛选已由 PR #17/#18 合并。
 - Web Console 上海时区显示已由 PR #20/#24 合并。
 - 运行版本契约已由 PR #25 验证并归档。
+- 知识库 v2 catalog 对接已由 PR #34/#35 合并（catalog v2 协议 + 五档门禁 + 单源分发；catalog 单源在 Pentest-Playbook，发行包零副本）。
+- nmap-viewer 功能收敛已由 PR #36 合并（t02–t09 + known-issues tracker + scroll-spy CI 修复）。AnchorScan 声明为唯一维护产品（nmap-viewer 退役）。
 
 ## 后续交付顺序
 
-1. [ ] **研究未识别服务通用指纹增强**
+1. [x] **修 ISSUE-001：sqlite DSN 拼接产生垃圾文件** — 已修复（PR #37）
+   - 根因：`/config` 页 `toolDiagnostics` 调 `doctor.Run` 未传 DBPath → `databaseCheck("")` → `store.Open("")` → DSN 以 `?` 开头（modernc `pos>=1` 不满足）→ 整串当文件路径，在 cwd 创建 `?_pragma=...` 垃圾库。
+   - 修复三层：`config.go` toolDiagnostics 传 DBPath（根治）；`doctor.go` databaseCheck 空路径跳过（防御）；`sqlite.go` Open("") fail-fast + `file:` URI 前缀（防线）。
+   - 回归测试：`TestOpenDoesNotCreatePragmaJunkFile`（空路径 + 相对路径均不产生垃圾文件）。
+   - 验收：`make web-smoke` 通过且工作目录无垃圾文件。
+
+2. [ ] **修 ISSUE-002：internal/app 租约竞争测试 CI 偶发失败（flaky）**
+   - 优先级：P2（CI 偶发红、rerun 可恢复）。
+   - 位置：`internal/app/run_lease.go`（reserveRunLease → ReconcileInterruptedRuns / AcquireRunLease）。
+   - 方向：先稳定复现（`-race` 或隔离 attempt），疑似两个独立 store 连接对同一 db 文件的锁时序竞态。
+   - 参考：`docs/known-issues.md` ISSUE-002。
+
+3. [ ] **fathom 集成（M4）：替代存活/端口/指纹三段 + 权限级检测**
+   - 优先级：P1。
+   - Spec（草案 v1.0）：`docs/plans/fathom-integration/spec.md`；fathom 仓库 ~/DEV/fathom（M1–M7 已完成，五段流水线 + 10 checks + 三平台 + 零依赖）。
+   - **前置：用户拍板 4 个决策点**——达梦权威（fathom 协议握手替代 nuclei dameng-identify）、TLS 缓解（候选端口集触发 httpx 增强）、CPE 降级（报告 CPE 字段为空）、IPv6 走 legacy。
+   - 分期：M4.1 runner+JSONL+归一化+Finding 映射 → M4.2 scan_target 前段切换（profile 门控）→ M4.3 fathom-dual 双跑对比 → M4.4 默认切换+文档。
+   - 验收门槛：lab 指纹平价（fathom ⊇ nmap）+ 真实 /24 双跑对比。
+
+4. [ ] **研究未识别服务通用指纹增强**
    - 优先级：P1。
    - 安全边界：分别处理空服务名、`unknown` 和 `tcpwrapped`；不得因服务未知而泛化执行 Nuclei，也不得扩大 Dameng 探针。
    - 产物：以证据支持的后续独立任务，不直接混入规则修改。
 
-2. [ ] **调查 SSL/TLS 检测覆盖与缺口**
+5. [ ] **调查 SSL/TLS 检测覆盖与缺口**
    - 优先级：P2。
    - 产物：识别、配置、证书、漏洞检测的覆盖矩阵；每项应有代码/配置位置、工具或模板版本、可复现验证和安全限制。
 
