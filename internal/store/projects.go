@@ -165,6 +165,7 @@ func (s *Store) DeleteProjectCascade(id string) error {
 		`DELETE FROM scan_events WHERE run_id IN (SELECT run_id FROM scan_runs WHERE project_id = ?)`,
 		`DELETE FROM scan_runs WHERE project_id = ?`,
 		`DELETE FROM project_zones WHERE project_id = ?`,
+		`DELETE FROM project_target_sets WHERE project_id = ?`,
 		`DELETE FROM projects WHERE id = ?`,
 	} {
 		if _, err := tx.Exec(stmt, id); err != nil {

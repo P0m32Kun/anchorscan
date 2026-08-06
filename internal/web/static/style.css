@@ -3423,3 +3423,25 @@ dialog.report-detail-dialog::backdrop {
 .pivot-matrix-table th, .pivot-matrix-table td { padding: var(--space-2) var(--space-3); text-align: center; }
 .pivot-matrix-table th[scope="row"] { text-align: left; white-space: nowrap; }
 .pivot-matrix-table .matrix-filled { font-weight: 700; color: var(--primary); background: var(--bg-accent); }
+
+/* --- Nmap Viewer consolidation ticket 07: project Target Set --- */
+#target-set { margin-bottom: var(--space-5); }
+.target-set-result { margin-bottom: var(--space-3); }
+.target-set-rejected { margin: var(--space-2) 0 0; padding-left: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
+.target-set-targets { margin-bottom: var(--space-3); }
+.target-set-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.target-set-list li {
+  padding: var(--space-1) var(--space-3);
+  background: var(--bg-accent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+.target-set-form textarea { font-family: var(--mono); font-size: 0.85rem; }

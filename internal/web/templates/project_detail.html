@@ -125,6 +125,45 @@
   </form>
 </section>
 
+<section class="panel" id="target-set">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">目标集</p>
+      <h3>扫描目标集合</h3>
+      <p class="meta-line">新建扫描时自动预填目标；只保存规范化目标，不保存漏洞、在线状态或运行结果。导入会替换当前目标集。</p>
+    </div>
+  </div>
+  {{if .TargetSetImport}}
+  <div class="alert alert-{{if gt (len .TargetSetImport.Rejected) 0}}warning{{else}}success{{end}} target-set-result" role="status">
+    <strong>导入完成：</strong>接受 {{.TargetSetImport.Accepted}} 条，重复 {{.TargetSetImport.Duplicates}} 条，拒绝 {{len .TargetSetImport.Rejected}} 条。
+    {{if .TargetSetImport.Rejected}}
+    <ul class="target-set-rejected">
+      {{range .TargetSetImport.Rejected}}<li><code>{{.Original}}</code> — {{.Reason}}</li>{{end}}
+    </ul>
+    {{end}}
+  </div>
+  {{end}}
+  {{if .TargetSet}}
+  <div class="target-set-targets">
+    <p class="eyebrow">当前目标（{{len .TargetSet.TargetList}}）</p>
+    <ul class="target-set-list">
+      {{range .TargetSet.TargetList}}<li class="mono-value">{{.}}</li>{{end}}
+    </ul>
+  </div>
+  {{else}}
+  <p class="muted">尚未导入目标集。导入后新建扫描会自动预填目标。</p>
+  {{end}}
+  <form class="form-grid target-set-form" method="post" action="/projects/{{.Project.ID}}/target-set">
+    <label class="full-width">
+      <span>导入目标（每行或逗号分隔一个 IP / CIDR，仅接受规范 IPv4、IPv6 与网段）</span>
+      <textarea name="targets" rows="5" placeholder="192.0.2.10&#10;198.51.100.0/24&#10;2001:db8::1"></textarea>
+    </label>
+    <div class="form-actions full-width">
+      <button class="button button-primary" type="submit">导入并替换目标集</button>
+    </div>
+  </form>
+</section>
+
 {{$zoneNames := .ZoneNames}}
 {{$runs := .Runs}}
 <section class="panel project-runs-panel" id="runs">

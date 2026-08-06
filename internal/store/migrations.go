@@ -382,6 +382,20 @@ CREATE TABLE IF NOT EXISTS run_provenance (
   manifest TEXT NOT NULL DEFAULT ''
 );`,
 	},
+	{
+		version: 14,
+		name:    "create_project_target_sets",
+		sql: `
+CREATE TABLE IF NOT EXISTS project_target_sets (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL DEFAULT '',
+  targets TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_project_target_sets_project ON project_target_sets(project_id);`,
+	},
 }
 
 func hasTable(tx *sql.Tx, table string) bool {
