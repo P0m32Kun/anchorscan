@@ -226,4 +226,18 @@
   </p>
   {{end}}
 </section>
+
+<section class="panel danger-zone-panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">危险操作</p>
+      <h3>删除项目</h3>
+    </div>
+  </div>
+  <p class="meta-line">删除项目将同时移除其分区、扫描记录、验证与报告数据，此操作不可撤销。删除前请先确认报告已导出。</p>
+  <form class="project-detail-delete-form" method="post" action="/projects/{{.Project.ID}}" data-confirm-form data-confirm-title="删除项目" data-confirm-message="确定要永久删除该项目吗？此操作不可撤销。">
+    <input type="hidden" name="_method" value="delete">
+    <button class="button button-danger" type="submit">删除该项目</button>
+  </form>
+</section>
 {{end}}

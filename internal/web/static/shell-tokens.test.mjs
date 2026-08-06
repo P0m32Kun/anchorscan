@@ -42,7 +42,7 @@ assert.match(ruleBlock('.page-header {'), /gap:\s*var\(--space-/, '.page-header 
 assert.match(ruleBlock('.panel {'), /padding:\s*var\(--space-/, '.panel padding must use space tokens');
 assert.match(ruleBlock('.data-table th,'), /padding:\s*var\(--space-/, 'table cells must use space tokens');
 assert.match(ruleBlock('input,\nselect,\ntextarea {\n  width: 100%;'), /min-height:\s*var\(--control-height\)/, 'inputs must use the control height token');
-assert.match(ruleBlock('.button,\nbutton[type="submit"] {\n  appearance: none;'), /min-height:\s*var\(--control-height\)/, 'buttons must use the control height token');
+assert.match(ruleBlock('.button,\nbutton[type="submit"]:not(.button, .link-button) {\n  appearance: none;'), /min-height:\s*var\(--control-height\)/, 'buttons must use the control height token');
 assert.match(ruleBlock('.status-badge {'), /padding:\s*var\(--space-/, 'badges must use space tokens');
 
 // Responsive shell: sidebar becomes a local horizontal strip, page never scrolls sideways.

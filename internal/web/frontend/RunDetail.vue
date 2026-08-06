@@ -159,6 +159,7 @@ onBeforeUnmount(() => window.clearInterval(timer));
     </div>
     <div class="header-actions">
       <span :class="['status-badge', `status-${status}`, 'run-status-badge']">{{ status }}</span>
+      <a v-if="project_id && !is_tool_run" class="button button-secondary" :href="`/projects/${project_id}`">返回项目</a>
       <button v-if="active" class="button button-danger" type="button" :disabled="canceling" @click="cancelRun">{{ canceling ? '正在中止…' : '中止扫描' }}</button>
       <template v-else>
         <a v-if="is_tool_run && return_url" class="button button-secondary" :href="return_url">返回工作台</a>
