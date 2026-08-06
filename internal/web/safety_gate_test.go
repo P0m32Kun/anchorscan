@@ -146,8 +146,10 @@ func setupCommandGateCatalog(t *testing.T) (http.Handler, map[string]report.Find
 		gateCatalogEntry("manual-entry", "stable", "manual-gated", []string{"file-read", "test-file-create"}, "删除测试文件", "network/manual.yaml"),
 		gateCatalogEntry("invalid-command", "stable", "safe", []string{}, "", "network/expected.yaml"),
 		gateCatalogEntry("invalid-safety", "stable", "safe", []string{"authentication-attempt"}, "", "network/invalid-safety.yaml"),
+		gateCatalogEntry("no-command-entry", "stable", "safe", []string{}, "", "network/no-command.yaml"),
 	}
 	entries[4]["command"] = "nuclei -t network/other.yaml -u {{host}}:{{port}}"
+	entries[6]["command"] = ""
 	catalog, err := json.Marshal(map[string]any{"version": 2, "source": "handbook-v3", "entry_count": len(entries), "entries": entries})
 	if err != nil {
 		t.Fatal(err)
@@ -343,23 +345,23 @@ func TestLegacyCommandAndKnowledgeBaseDetailFailClosed(t *testing.T) {
 	}
 	detail := httptest.NewRecorder()
 	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/kb/redis-default-login", nil))
-	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "旧 Markdown 未声明 safety") || !strings.Contains(detail.Body.String(), "legacy-unknown") || strings.Contains(detail.Body.String(), "nuclei -t redis-default-logins") {
-		t.Fatalf("legacy KB detail status=%d legacy-message=%t legacy-status=%t command-leaked=%t", detail.Code, strings.Contains(detail.Body.String(), "旧 Markdown 未声明 safety"), strings.Contains(detail.Body.String(), "legacy-unknown"), strings.Contains(detail.Body.String(), "nuclei -t redis-default-logins"))
+	if detail.Code != http.StatusOK || !strings.Contains(detail.Body.String(), "旧 Markdown 未声明 safety") || !strings.Contains(detail.Body.String(), "legacy-unknown") || !strings.Contains(detail.Body.String(), "nuclei -t redis-default-logins") {
+		t.Fatalf("legacy KB detail status=%d legacy-message=%t legacy-status=%t command-shown=%t", detail.Code, strings.Contains(detail.Body.String(), "旧 Markdown 未声明 safety"), strings.Contains(detail.Body.String(), "legacy-unknown"), strings.Contains(detail.Body.String(), "nuclei -t redis-default-logins"))
 	}
 	_ = projectID
 }
 
-func TestKnowledgeBaseDetailKeepsNeedsReviewVisibleAndHidesGatedCommands(t *testing.T) {
+func TestKnowledgeBaseDetailShowsCommandsForAllEntries(t *testing.T) {
 	handler, _ := setupCommandGateCatalog(t)
 	for _, tc := range []struct {
-		id        string
-		want      []string
-		forbidden string
+		id   string
+		want []string
 	}{
 		{id: "safe-entry", want: []string{"stable", "safe", "nuclei -t network/safe.yaml"}},
-		{id: "review-entry", want: []string{"needs-review", "待复核", "acknowledgement"}, forbidden: "nuclei -t network/review.yaml"},
-		{id: "optional-entry", want: []string{"optional", "authentication-attempt", "停止认证尝试"}, forbidden: "nuclei -t network/optional.yaml"},
-		{id: "manual-entry", want: []string{"manual-gated", "file-read", "test-file-create", "删除测试文件"}, forbidden: "nuclei -t network/manual.yaml"},
+		{id: "review-entry", want: []string{"needs-review", "待复核", "acknowledgement", "nuclei -t network/review.yaml"}},
+		{id: "optional-entry", want: []string{"optional", "authentication-attempt", "停止认证尝试", "nuclei -t network/optional.yaml"}},
+		{id: "manual-entry", want: []string{"manual-gated", "file-read", "test-file-create", "删除测试文件", "nuclei -t network/manual.yaml"}},
+		{id: "no-command-entry", want: []string{"stable", "知识库未提供可用命令"}},
 	} {
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/kb/"+tc.id, nil))
@@ -370,9 +372,6 @@ func TestKnowledgeBaseDetailKeepsNeedsReviewVisibleAndHidesGatedCommands(t *test
 			if !strings.Contains(res.Body.String(), want) {
 				t.Fatalf("%s missing %q: %s", tc.id, want, res.Body.String())
 			}
-		}
-		if tc.forbidden != "" && strings.Contains(res.Body.String(), tc.forbidden) {
-			t.Fatalf("%s leaked command: %s", tc.id, res.Body.String())
 		}
 	}
 }

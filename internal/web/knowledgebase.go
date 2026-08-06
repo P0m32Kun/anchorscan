@@ -21,7 +21,6 @@ type knowledgeBaseDetailData struct {
 	SafetyMode   string
 	NeedsReview  bool
 	Legacy       bool
-	ShowCommands bool
 }
 
 func (s *server) knowledgeBaseDetail(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +40,5 @@ func (s *server) knowledgeBaseDetail(w http.ResponseWriter, r *http.Request) {
 		SafetyMode:   string(entry.Safety.Mode),
 		NeedsReview:  entry.ReviewStatus == knowledgebase.ReviewStatusNeedsReview,
 		Legacy:       entry.Safety.Mode == knowledgebase.SafetyLegacyUnknown,
-		ShowCommands: entry.ReviewStatus == knowledgebase.ReviewStatusStable && entry.Safety.Mode == knowledgebase.SafetySafe,
 	})
 }
