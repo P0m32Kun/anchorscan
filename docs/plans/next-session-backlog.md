@@ -18,12 +18,11 @@
 
 ## 后续交付顺序
 
-1. [ ] **修 ISSUE-001：sqlite DSN 拼接产生垃圾文件**
-   - 优先级：P1（每次 `make pr-check` 都产生垃圾文件）。
-   - 位置：`internal/store/sqlite.go` 约第 27 行，`path + "?_pragma=..."` DSN 拼接。
-   - 方向：确认 modernc sqlite 的 `?_pragma=` 是否应改用 `?` query 参数或其他 DSN 格式。
-   - 验收：`make pr-check` 后工作目录无 `?_pragma=...` 垃圾文件。
-   - 参考：`docs/known-issues.md` ISSUE-001。
+1. [x] **修 ISSUE-001：sqlite DSN 拼接产生垃圾文件** — 已修复（PR #37）
+   - 根因：`/config` 页 `toolDiagnostics` 调 `doctor.Run` 未传 DBPath → `databaseCheck("")` → `store.Open("")` → DSN 以 `?` 开头（modernc `pos>=1` 不满足）→ 整串当文件路径，在 cwd 创建 `?_pragma=...` 垃圾库。
+   - 修复三层：`config.go` toolDiagnostics 传 DBPath（根治）；`doctor.go` databaseCheck 空路径跳过（防御）；`sqlite.go` Open("") fail-fast + `file:` URI 前缀（防线）。
+   - 回归测试：`TestOpenDoesNotCreatePragmaJunkFile`（空路径 + 相对路径均不产生垃圾文件）。
+   - 验收：`make web-smoke` 通过且工作目录无垃圾文件。
 
 2. [ ] **修 ISSUE-002：internal/app 租约竞争测试 CI 偶发失败（flaky）**
    - 优先级：P2（CI 偶发红、rerun 可恢复）。

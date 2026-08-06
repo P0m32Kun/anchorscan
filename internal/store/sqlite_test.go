@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,53 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
 )
+
+func TestOpenDoesNotCreatePragmaJunkFile(t *testing.T) {
+	// ISSUE-001 回归：modernc sqlite 只在 ? 位于 DSN 第 1 位之后时才解析 query。
+	// 空 path 会使 DSN 以 ? 开头，整串被当文件路径，在 cwd 创建
+	// "?_pragma=busy_timeout(5000)&_txlock=immediate" 垃圾文件。
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+
+	if _, err := Open(""); err == nil {
+		t.Fatal("Open of an empty path must fail, not create a junk database file")
+	}
+	assertNoPragmaJunk(t, dir)
+
+	// 正常的相对路径（含子目录）也必须只创建目标文件。
+	if err := os.Mkdir("web", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store, err := Open("web/scan.db")
+	if err != nil {
+		t.Fatalf("Open relative path with directory: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	assertNoPragmaJunk(t, filepath.Join(dir, "web"))
+	assertNoPragmaJunk(t, dir)
+}
+
+func assertNoPragmaJunk(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "_pragma") {
+			t.Fatalf("DSN 拼接产生垃圾文件: %q", entry.Name())
+		}
+	}
+}
 
 func TestOpenConfiguresSQLiteForConcurrentScanWrites(t *testing.T) {
 	store, err := Open(filepath.Join(t.TempDir(), "scan.db"))

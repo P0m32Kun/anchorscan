@@ -234,6 +234,11 @@ func writableDirCheck(name string, path string) Check {
 }
 
 func databaseCheck(path string) Check {
+	if strings.TrimSpace(path) == "" {
+		// 空路径直接 Open 会让 store.Open 在 cwd 创建 "?_pragma=..." 垃圾文件
+		// （ISSUE-001）；无 DB 路径时数据库检查无意义，跳过。
+		return okCheck("database", "not configured (no DB path provided)")
+	}
 	scanStore, err := store.Open(path)
 	if err != nil {
 		return failCheck("database", err.Error())
