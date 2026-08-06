@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -466,5 +467,59 @@ func TestUpdateVerificationConfirmedAutoIncludedWithEvidenceSucceeds(t *testing.
 	}
 	if !v.Included {
 		t.Fatalf("expected confirmed with evidence to be auto-included, got Included=%v", v.Included)
+	}
+}
+
+func TestEvidenceReorderEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "scan.db")
+	handler, projectID, verificationID, _ := setupProjectWithVerification(t, ServerOptions{ConfigPath: filepath.Join(dir, "config.yaml"), DBPath: dbPath})
+
+	base := "/projects/" + projectID + "/verifications/" + verificationID + "/evidence"
+	ids := make([]string, 0, 3)
+	for i := 0; i < 3; i++ {
+		res := uploadEvidence(t, handler, base, generateTestPNG(t), "shot "+strconv.Itoa(i))
+		if res.Code != http.StatusCreated {
+			t.Fatalf("upload %d failed: %d %s", i, res.Code, res.Body.String())
+		}
+		var ev store.VerificationEvidence
+		if err := json.Unmarshal(res.Body.Bytes(), &ev); err != nil {
+			t.Fatalf("unmarshal failed: %v", err)
+		}
+		ids = append(ids, ev.ID)
+	}
+
+	// Reorder to the reverse of upload order.
+	reversed := []string{ids[2], ids[1], ids[0]}
+	body, _ := json.Marshal(map[string]any{"ids": reversed})
+	req := httptest.NewRequest(http.MethodPost, base+"/reorder", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent && res.Code != http.StatusOK {
+		t.Fatalf("expected 2xx for reorder, got %d: %s", res.Code, res.Body.String())
+	}
+
+	// List must now reflect the new order.
+	listRes := httptest.NewRecorder()
+	handler.ServeHTTP(listRes, httptest.NewRequest(http.MethodGet, base, nil))
+	if listRes.Code != http.StatusOK {
+		t.Fatalf("list failed: %d", listRes.Code)
+	}
+	var evidence []store.VerificationEvidence
+	if err := json.Unmarshal(listRes.Body.Bytes(), &evidence); err != nil {
+		t.Fatalf("unmarshal list failed: %v", err)
+	}
+	got := make([]string, 0, len(evidence))
+	for _, e := range evidence {
+		got = append(got, e.ID)
+	}
+	if len(got) != 3 {
+		t.Fatalf("expected 3 evidence items, got %d", len(got))
+	}
+	for i := range reversed {
+		if got[i] != reversed[i] {
+			t.Fatalf("evidence order mismatch at %d: got %v want %v", i, got, reversed)
+		}
 	}
 }

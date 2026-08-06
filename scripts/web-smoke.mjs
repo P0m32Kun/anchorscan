@@ -529,7 +529,7 @@ try {
   await assert.doesNotReject(() => retryButton.waitFor({ state: 'hidden' }));
   await page.unroute(`**/projects/${projectID}/verifications/browser-evidence/evidence`);
   const evidenceDeleteButtons = dialog.locator('.evidence-item').getByRole('button', { name: '删除' });
-  const evidenceDeleteCount = await evidenceDeleteButtons.count();
+  const evidenceItemCount = await dialog.locator('.evidence-item').count();
   const evidenceDeleteButton = evidenceDeleteButtons.first();
   await evidenceDeleteButton.click();
   const evidenceConfirmDialog = page.getByRole('dialog', { name: '删除截图' });
@@ -541,7 +541,7 @@ try {
   await assert.doesNotReject(() => evidenceConfirmDialog.waitFor());
   await evidenceConfirmDialog.getByRole('button', { name: '删除' }).click();
   await assert.doesNotReject(() => page.getByText('截图已删除').waitFor());
-  await page.waitForFunction((expected) => document.querySelectorAll('dialog.verify-dialog .evidence-item button').length === expected, evidenceDeleteCount - 1);
+  await page.waitForFunction((expected) => document.querySelectorAll('dialog.verify-dialog .evidence-item').length === expected, evidenceItemCount - 1);
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => dialog.waitFor({ state: 'hidden' }));
   assert.equal(await verifyButton.evaluate((button) => document.activeElement === button), true, 'closing the verification dialog should restore focus to its trigger');
