@@ -1,5 +1,7 @@
 # AnchorScan
 
+> **AnchorScan 是唯一受维护的产品。** 此前的 nmap-viewer 前端项目已停用：其阅读、筛选、验证与目标管理能力已收敛进 AnchorScan（见 `docs/plans/nmap-viewer-feature-consolidation/`），旧源码仅作为不进入 main 的脱敏 source-only 快照保留，不再接收功能或修复。
+
 `anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。
 
 核心思路是「**指纹驱动、精准分类、服务多引擎**」：`rustscan` 做端口发现 → `nmap -sV` 做服务指纹识别 → 按服务指纹和适用规则独立调度 `nuclei`、NSE、`httpx` 等引擎 → 结果统一落入 SQLite → 导出 JSON / HTML / DOCX 报告。RDP 服务可额外启用可选 `rdpscan` 检测 BlueKeep（CVE-2019-0708）。
