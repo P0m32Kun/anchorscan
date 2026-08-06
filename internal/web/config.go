@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
+	"github.com/P0m32Kun/anchorscan/internal/doctor"
 	"github.com/P0m32Kun/anchorscan/internal/ports"
 )
 
@@ -16,6 +17,7 @@ type configPageData struct {
 	Error         string
 	HighriskPorts string
 	Saved         bool
+	ToolChecks    []doctor.Check
 }
 
 func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +34,7 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		highriskPorts, _ := ports.LoadPresetForConfig("highrisk", s.opts.ConfigPath)
-		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts, Saved: r.URL.Query().Get("saved") == "1"})
+		render(w, "templates/config.html", configPageData{Config: cfg, RawConfig: string(raw), HighriskPorts: highriskPorts, Saved: r.URL.Query().Get("saved") == "1", ToolChecks: toolDiagnostics(s.opts.ConfigPath, cfg)})
 	case http.MethodPost:
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -115,4 +117,20 @@ func normalizePortCSV(value string) string {
 		}
 	}
 	return strings.Join(out, ",")
+}
+
+// toolDiagnostics runs the external-tool subset of the doctor checks and
+// returns only the tool/rule results so the config page can surface clear,
+// actionable availability hints (installed path vs missing/not-configured)
+// without re-running database/report/docx diagnostics that are irrelevant
+// here.
+func toolDiagnostics(configPath string, cfg config.Config) []doctor.Check {
+	toolNames := map[string]bool{"rustscan": true, "nmap": true, "httpx": true, "nuclei": true, "rdpscan": true, "nse rules": true, "tag rules": true}
+	var tools []doctor.Check
+	for _, check := range doctor.Run(doctor.Options{ConfigPath: configPath}) {
+		if toolNames[check.Name] {
+			tools = append(tools, check)
+		}
+	}
+	return tools
 }

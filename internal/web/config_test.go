@@ -200,3 +200,36 @@ func TestConfigPageRawEditorRejectsInvalidYAML(t *testing.T) {
 		t.Fatalf("config should remain unchanged: %s", data)
 	}
 }
+
+func TestConfigPageShowsToolDiagnosticsForMissingTools(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	// All tool paths empty: the diagnostics must surface clear missing/not-configured hints.
+	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: ''\n  nmap: ''\n  httpx: ''\n  nuclei: ''\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatalf("NewServer returned error: %v", err)
+	}
+	closeServer(t, handler)
+
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/config", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", res.Code)
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "config-tool-diagnostics") {
+		t.Fatalf("config page must render the tool diagnostics section")
+	}
+	if !strings.Contains(body, "config-tool-check status-fail") {
+		t.Fatalf("missing required tools must produce a fail-status diagnostic: %s", body)
+	}
+	// Each external tool must appear by name so the hint is actionable.
+	for _, tool := range []string{"rustscan", "nmap"} {
+		if !strings.Contains(body, tool) {
+			t.Fatalf("config page diagnostics must mention required tool %q", tool)
+		}
+	}
+}

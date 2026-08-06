@@ -3445,3 +3445,21 @@ dialog.report-detail-dialog::backdrop {
   font-size: 0.85rem;
 }
 .target-set-form textarea { font-family: var(--mono); font-size: 0.85rem; }
+
+/* --- Nmap Viewer consolidation ticket 08: config tool diagnostics --- */
+.config-tool-diagnostics { margin-top: var(--space-4); }
+.config-tool-checks { list-style: none; margin: var(--space-2) 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.config-tool-check {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  font-size: 0.85rem;
+}
+.config-tool-check-name { font-weight: 700; min-width: 7rem; }
+.config-tool-check-msg { color: var(--muted); flex: 1; min-width: 12rem; }
+.config-tool-check.status-ok { border-color: var(--success-border); background: var(--success-soft); }
+.config-tool-check.status-ok .config-tool-check-name { color: var(--success); }
+.config-tool-check.status-warning { border-color: var(--warning); background: var(--warning-soft); }
+.config-tool-check.status-warning .config-tool-check-name { color: var(--warning); }
+.config-tool-check.status-fail { border-color: var(--danger-border); background: var(--danger-soft); }
+.config-tool-check.status-fail .config-tool-check-name { color: var(--danger); }
