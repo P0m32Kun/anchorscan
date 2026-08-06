@@ -107,6 +107,43 @@ func TestLoadAutoInitsWhenMissing(t *testing.T) {
 	}
 }
 
+// TestInitFathomConfig asserts the M4.1 fathom additions are present in both
+// the generated default config and the shipped example, and that the fathom
+// timeout parses as a duration. The fathom tool path is PATH-detected at init
+// time (it may be empty when fathom is not installed), so the test only pins
+// the timeout field and structural presence, not the resolved path.
+func TestInitFathomConfig(t *testing.T) {
+	generatedPath := filepath.Join(t.TempDir(), "default.yaml")
+	if err := Init(generatedPath); err != nil {
+		t.Fatal(err)
+	}
+	generated, err := Load(generatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	example, err := Load(filepath.Join("..", "..", "config", "default.yaml.example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// fathom timeout must be present and identical between generated and
+	// example (single source of truth; see defaultConfig() in init.go).
+	if generated.Timeouts.Fathom != example.Timeouts.Fathom {
+		t.Fatalf("fathom timeout mismatch: generated %q vs example %q", generated.Timeouts.Fathom, example.Timeouts.Fathom)
+	}
+	if generated.Timeouts.Fathom == "" {
+		t.Fatal("generated fathom timeout is empty; defaultConfig must set it")
+	}
+	// The timeout must parse. Fathom defaults to "0" (no standalone timeout,
+	// same policy as rustscan/nmap), which Durations() maps to a zero duration.
+	durs, err := generated.Timeouts.Durations()
+	if err != nil {
+		t.Fatalf("Durations() failed: %v", err)
+	}
+	if durs.Fathom != 0 {
+		t.Fatalf("default fathom duration = %v, want 0 (no standalone timeout)", durs.Fathom)
+	}
+}
+
 func TestLoadDoesNotOverwriteExisting(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "default.yaml")
