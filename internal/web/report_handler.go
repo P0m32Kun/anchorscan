@@ -261,13 +261,33 @@ func (s *server) reportCommand(w http.ResponseWriter, r *http.Request, runID str
 		http.Error(w, "finding unavailable or ambiguous", http.StatusBadRequest)
 		return
 	}
+	match := s.catalog.Match(report.ObservationFromFinding(matches[0]))
+	if match.Status != knowledgebase.MatchMatched {
+		http.Error(w, "漏洞知识库匹配不唯一或不可用", http.StatusUnprocessableEntity)
+		return
+	}
+	if !s.enforceCommandGate(w, r, commandGateRequest{
+		Action:      "report-single",
+		Tool:        tool,
+		Key:         runID + "\x00" + key,
+		Fingerprint: r.URL.RawQuery,
+	}, match.Entry) {
+		return
+	}
 	command, err := s.buildCommand(tool, matches[0])
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(command)
+	toolLink := ""
+	if tool != "msf" {
+		toolLink, err = s.toolLink(tool, toolPrefill{Tool: tool, RawArgs: command.ToolArgs})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"full_command": command.FullCommand, "tool_args": command.ToolArgs, "tool_link": toolLink})
 }
 
 func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runID string) {
@@ -303,6 +323,19 @@ func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runI
 		Catalog:      s.catalog,
 	})
 	filtered := reading.FilteredFindings
+	entry, err := s.batchCommandEntry(filtered, strings.TrimSpace(r.FormValue("group_key")))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	if !s.enforceCommandGate(w, r, commandGateRequest{
+		Action:      "report-batch",
+		Tool:        tool,
+		Key:         runID + "\x00" + strings.TrimSpace(r.FormValue("group_key")),
+		Fingerprint: r.URL.RawQuery,
+	}, entry) {
+		return
+	}
 	if tool == "msf" {
 		s.reportBatchMSFCommand(w, filtered, strings.TrimSpace(r.FormValue("group_key")))
 		return
@@ -339,8 +372,15 @@ func (s *server) reportBatchCommand(w http.ResponseWriter, r *http.Request, runI
 	args := append([]string(nil), batch.Args...)
 	args[len(args)-2], args[len(args)-1] = "-l", targetFile
 	toolArgs := displayCommandArgs(args[1:])
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"full_command": displayCommandArgs(args), "tool_args": toolArgs, "target_file": targetFile})
+	toolLink := ""
+	if len(batch.Args) >= 2 {
+		toolLink, err = s.toolLink("nuclei", toolPrefill{Tool: "nuclei", RawArgs: toolArgs})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"full_command": displayCommandArgs(args), "tool_args": toolArgs, "target_file": targetFile, "tool_link": toolLink})
 }
 
 func (s *server) reportBatchMSFCommand(w http.ResponseWriter, findings []report.Finding, groupKey string) {
@@ -386,8 +426,16 @@ func (s *server) reportBatchNmapCommand(w http.ResponseWriter, runID string, fin
 		args = append(args, "-iL", path)
 		result = append(result, map[string]string{"full_command": displayCommandArgs(args), "tool_args": displayCommandArgs(args[1:]), "target_file": path})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"commands": result, "warning": "Nmap 按实际端口分组，避免主机与端口组合扩大范围"})
+	response := map[string]any{"commands": result, "warning": "Nmap 按实际端口分组，避免主机与端口组合扩大范围"}
+	if len(result) == 1 {
+		toolLink, err := s.toolLink("nmap", toolPrefill{Tool: "nmap", RawArgs: result[0]["tool_args"]})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response["tool_link"] = toolLink
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func writeBatchTargetFile(path string, contents []byte) error {
@@ -418,6 +466,24 @@ func displayCommandArgs(args []string) string {
 		parts[i] = arg
 	}
 	return strings.Join(parts, " ")
+}
+
+func (s *server) batchCommandEntry(findings []report.Finding, groupKey string) (knowledgebase.Entry, error) {
+	var entry knowledgebase.Entry
+	for _, finding := range findings {
+		match := s.catalog.Match(report.ObservationFromFinding(finding))
+		if match.Status != knowledgebase.MatchMatched || report.VulnerabilityGroupKey(match.Entry.ID) != groupKey {
+			continue
+		}
+		if entry.ID != "" && entry.ID != match.Entry.ID {
+			return knowledgebase.Entry{}, fmt.Errorf("批量命令知识库匹配不唯一")
+		}
+		entry = match.Entry
+	}
+	if entry.ID == "" {
+		return knowledgebase.Entry{}, fmt.Errorf("漏洞筛选无效或没有匹配资产")
+	}
+	return entry, nil
 }
 
 func (s *server) buildCommand(tool string, finding report.Finding) (report.DetectionCommand, error) {

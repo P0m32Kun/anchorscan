@@ -37,6 +37,107 @@ func TestKnowledgeBaseListAndDetail(t *testing.T) {
 	}
 }
 
+func TestKnowledgeBaseLoadsExternalJSONCatalog(t *testing.T) {
+	dir := t.TempDir()
+	catalogSource, err := os.ReadFile(filepath.Clean("../knowledgebase/testdata/catalog-v2.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogPath := filepath.Join(dir, "external-catalog.json")
+	if err := os.WriteFile(catalogPath, catalogSource, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: "+catalogPath+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/kb", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "knowledgebase-status\">ready") || !strings.Contains(body, "SMB 签名未启用") || !strings.Contains(body, "/kb/nuclei-code") {
+		t.Fatalf("external JSON catalog not loaded: %d %s", res.Code, body)
+	}
+	detail := httptest.NewRecorder()
+	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/kb/smb-signing", nil))
+	detailBody := detail.Body.String()
+	for _, want := range []string{"agent:test", "来源与生成信息"} {
+		if !strings.Contains(detailBody, want) {
+			t.Fatalf("knowledge base detail does not surface audit sources: missing %q in %s", want, detailBody)
+		}
+	}
+}
+
+func TestKnowledgeBaseLegacyMarkdownLoadsAsLegacyUnknown(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	handbookPath, err := filepath.Abs(filepath.Clean("../knowledgebase/testdata/handbook-v2.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: "+handbookPath+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/kb/smb-signing", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "legacy-unknown") || !strings.Contains(body, "旧 Markdown 未声明 safety") {
+		t.Fatalf("legacy Markdown did not fail closed as legacy-unknown: %d %s", res.Code, body)
+	}
+}
+
+func TestKnowledgeBaseMissingPathShowsUnavailableDiagnostic(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	missing := filepath.Join(dir, "does-not-exist.md")
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: "+missing+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/kb", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "knowledgebase-status\">unavailable") || !strings.Contains(body, "no such file") || strings.Contains(body, "knowledgebase-entry") {
+		t.Fatalf("missing knowledge base must show unavailable diagnostic without entries: %d %s", res.Code, body)
+	}
+}
+
+func TestKnowledgeBaseIncompatibleFileShowsUnavailableDiagnostic(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(bad, []byte("not a catalog"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("knowledge_base:\n  path: "+bad+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewServer(ServerOptions{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	closeServer(t, handler)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/kb", nil))
+	body := res.Body.String()
+	if res.Code != http.StatusOK || !strings.Contains(body, "knowledgebase-status\">unavailable") || !strings.Contains(body, "catalog JSON 无效") || strings.Contains(body, "knowledgebase-entry") {
+		t.Fatalf("incompatible knowledge base must show unavailable diagnostic without entries: %d %s", res.Code, body)
+	}
+}
+
 func TestKnowledgeBaseDetailWrapsLongTextAndNavHasIcon(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

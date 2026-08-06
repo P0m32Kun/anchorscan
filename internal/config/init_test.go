@@ -35,6 +35,22 @@ func TestInitCreatesDefaultConfig(t *testing.T) {
 	}
 }
 
+func TestInitDefaultKnowledgeBasePathIsEmpty(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "default.yaml")
+	if err := Init(path); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Single-source design: the release archive ships no catalog and the
+	// freshly generated config must not point at any packaged file.
+	if cfg.KnowledgeBase.Path != "" {
+		t.Fatalf("default knowledge_base.path = %q, want %q (empty = disabled)", cfg.KnowledgeBase.Path, "")
+	}
+}
+
 func TestInitProfilesMatchShippedExample(t *testing.T) {
 	generatedPath := filepath.Join(t.TempDir(), "default.yaml")
 	if err := Init(generatedPath); err != nil {

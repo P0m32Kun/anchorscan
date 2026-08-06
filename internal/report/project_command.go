@@ -17,8 +17,8 @@ type CandidateCommand struct {
 }
 
 // BuildCandidateCommands generates commands for the selected candidate assets.
-// It returns one command per entry in the result slice; for Nuclei and Nmap
-// batch commands this may be a single command covering multiple assets.
+// It returns one command per entry in the result slice; Nmap batch commands
+// may be a single command covering multiple assets.
 func BuildCandidateCommands(cand ProjectVulnerabilityCandidate, tool string, assets []ProjectAsset, catalog *knowledgebase.Catalog) ([]CandidateCommand, string, error) {
 	if cand.IsPending {
 		return nil, "", fmt.Errorf("知识库未匹配，无可用命令")
@@ -38,7 +38,7 @@ func BuildCandidateCommands(cand ProjectVulnerabilityCandidate, tool string, ass
 
 	switch tool {
 	case "nuclei":
-		return buildCandidateNuclei(findings, entry, catalog)
+		return buildCandidateNuclei(findings, catalog)
 	case "nmap":
 		return buildCandidateNmap(findings, entry, catalog)
 	case "msf":
@@ -48,19 +48,16 @@ func BuildCandidateCommands(cand ProjectVulnerabilityCandidate, tool string, ass
 	}
 }
 
-func buildCandidateNuclei(findings []Finding, entry knowledgebase.Entry, catalog *knowledgebase.Catalog) ([]CandidateCommand, string, error) {
-	if len(findings) == 1 {
-		cmd, err := BuildNucleiCommand(findings[0], catalog)
+func buildCandidateNuclei(findings []Finding, catalog *knowledgebase.Catalog) ([]CandidateCommand, string, error) {
+	commands := make([]CandidateCommand, 0, len(findings))
+	for _, finding := range findings {
+		cmd, err := BuildNucleiCommand(finding, catalog)
 		if err != nil {
 			return nil, "", err
 		}
-		return []CandidateCommand{{FullCommand: cmd.FullCommand, ToolArgs: cmd.ToolArgs}}, "", nil
+		commands = append(commands, CandidateCommand{FullCommand: cmd.FullCommand, ToolArgs: cmd.ToolArgs})
 	}
-	batch, err := BuildBatchNucleiCommand(findings, catalog, VulnerabilityGroupKey(entry.ID))
-	if err != nil {
-		return nil, "", err
-	}
-	return []CandidateCommand{{FullCommand: displayArgs(batch.Args), ToolArgs: displayArgs(batch.Args[1:]), TargetFile: batch.Args[len(batch.Args)-1]}}, "", nil
+	return commands, "", nil
 }
 
 func buildCandidateNmap(findings []Finding, entry knowledgebase.Entry, catalog *knowledgebase.Catalog) ([]CandidateCommand, string, error) {

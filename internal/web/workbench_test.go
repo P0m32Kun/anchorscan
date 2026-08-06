@@ -211,10 +211,7 @@ func TestWorkbenchCandidateCommandGeneratesToolLink(t *testing.T) {
 	handler, projectID, _, _ := setupWorkbenchProject(t)
 
 	endpoint := "/projects/" + projectID + "/candidates/redis-default-login/commands"
-	req := httptest.NewRequest(http.MethodPost, endpoint, strings.NewReader("tool=nuclei"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, req)
+	res := postCommandWithGate(t, handler, endpoint, "tool=nuclei")
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
 	}
@@ -234,11 +231,13 @@ func TestWorkbenchCandidateCommandGeneratesToolLink(t *testing.T) {
 		t.Fatalf("expected tool_link, got empty: %#v", payload)
 	}
 	toolLink := payload["tool_link"].(string)
-	if !strings.Contains(toolLink, "project_id=") || !strings.Contains(toolLink, "zone_id=") {
-		t.Fatalf("tool link must carry project context: %s", toolLink)
+	if !strings.Contains(toolLink, "gate_token=") || strings.Contains(toolLink, "raw_args=") || strings.Contains(toolLink, "project_id=") {
+		t.Fatalf("tool link must carry only the one-time prefill token: %s", toolLink)
 	}
-	if !strings.Contains(toolLink, "raw_args=") || !strings.Contains(toolLink, "return=") {
-		t.Fatalf("tool link must carry raw_args and return: %s", toolLink)
+	toolPage := httptest.NewRecorder()
+	handler.ServeHTTP(toolPage, httptest.NewRequest(http.MethodGet, toolLink, nil))
+	if !strings.Contains(toolPage.Body.String(), projectID) || !strings.Contains(toolPage.Body.String(), "-t redis-default-logins -u") {
+		t.Fatalf("token prefill did not restore project context and args: %s", toolPage.Body.String())
 	}
 }
 

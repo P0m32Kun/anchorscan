@@ -9,6 +9,9 @@ func TestCatalogSearchReturnsIndependentEntries(t *testing.T) {
 		Severity: SeverityMedium,
 		Aliases:  []string{"SMB 签名未启用"},
 		Match:    MatchKeys{CVEs: []string{"CVE-2024-0001"}},
+		Safety:   Safety{Mode: SafetyManualGated, Effects: []string{"file-read"}},
+		Sources:  []string{"https://example.test/source"},
+		Verify:   &Verify{Tool: "nmap", Flags: []string{"-sU"}},
 	}})
 
 	entries := catalog.Search("sign")
@@ -16,9 +19,12 @@ func TestCatalogSearchReturnsIndependentEntries(t *testing.T) {
 		t.Fatalf("Search() returned %d entries, want 1", len(entries))
 	}
 	entries[0].Aliases[0] = "changed"
+	entries[0].Safety.Effects[0] = "changed"
+	entries[0].Sources[0] = "changed"
+	entries[0].Verify.Flags[0] = "changed"
 
 	entry, ok := catalog.Entry("smb-signing")
-	if !ok || entry.Aliases[0] != "SMB 签名未启用" {
+	if !ok || entry.Aliases[0] != "SMB 签名未启用" || entry.Safety.Effects[0] != "file-read" || entry.Sources[0] != "https://example.test/source" || entry.Verify.Flags[0] != "-sU" {
 		t.Fatalf("Catalog leaked mutable entry: %#v", entry)
 	}
 }

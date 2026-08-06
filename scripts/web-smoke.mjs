@@ -83,7 +83,7 @@ async function writeTestConfig(workDir) {
     (text, name) => text.replace(new RegExp(`^(\\s*${name}:).*$`, 'm'), `$1 ${quotedFixture}`),
     source,
   );
-  config = config.replace(/^(\s*knowledge_base:\s*\n\s*path:).*/m, '$1 "catalog.md"');
+  config = config.replace(/^(\s*knowledge_base:\s*\n(?:\s*#.*\n)*\s*path:).*/m, '$1 "catalog.md"');
   const catalog = `<!-- anchorscan-catalog version: 1 -->\n\n### SMB 签名未启用（严重）\n\n<!-- anchorscan-entry\nid: smb-signing\naliases: []\nmatch:\n  nuclei: [smb-signing]\n  nse: []\n  manual-review: []\n  cve: []\n-->\n\n#### 漏洞描述\n\nSMB 签名未启用描述。\n\n#### 验证命令\n\n##### Nuclei\n\n\`\`\`\nnuclei -t smb-signing -u {{host}}:{{port}}\n\`\`\`\n\n##### Nmap NSE\n\n\`\`\`\nnmap -p {{port}} --script smb-security-mode {{host}}\n\`\`\`\n\n#### 修复建议\n\n启用 SMB 签名。\n`;
   const configPath = path.join(workDir, 'config.yaml');
   await fs.writeFile(configPath, config);
@@ -479,6 +479,9 @@ try {
   await page.getByRole('button', { name: '生成 Nuclei 命令' }).click();
   const reportCommandDialog = page.getByRole('dialog', { name: '生成 Nuclei 命令' });
   await assert.doesNotReject(() => reportCommandDialog.waitFor());
+  // Legacy Markdown entries fail closed: the safety gate must render before any command.
+  await assert.doesNotReject(() => reportCommandDialog.locator('.command-gate-panel').waitFor());
+  await assert.doesNotReject(() => reportCommandDialog.getByRole('button', { name: /已知悉旧 Markdown/ }).click());
   await assert.doesNotReject(() => reportCommandDialog.locator('pre.command-pre').filter({ hasText: /nuclei/i }).waitFor({ timeout: 10_000 }));
   await page.keyboard.press('Escape');
   await assert.doesNotReject(() => reportCommandDialog.waitFor({ state: 'hidden' }));
@@ -607,6 +610,10 @@ try {
   // Workbench command dialog regression: generated command text should render.
   await page.locator('details.context-actions summary').first().click();
   await page.getByRole('button', { name: 'Nuclei 命令' }).first().click();
+  // Legacy Markdown entries fail closed: acknowledge the safety gate first.
+  const gateDialog = page.locator('dialog').filter({ has: page.locator('.command-gate-panel') });
+  await assert.doesNotReject(() => gateDialog.waitFor());
+  await assert.doesNotReject(() => gateDialog.getByRole('button', { name: /已知悉旧 Markdown/ }).click());
   const commandDialog = page.locator('dialog').filter({ has: page.locator('pre.command-pre') });
   await assert.doesNotReject(() => commandDialog.waitFor());
   const commandPre = commandDialog.locator('pre.command-pre');

@@ -1,0 +1,1 @@
+PASS: safe, optional, manual-gated, and needs-review command flows

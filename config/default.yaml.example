@@ -23,6 +23,15 @@ timeouts:
   dameng: "15s"
 
 knowledge_base:
+  # 知识库手册路径（catalog 单源模式）。发行归档**不再附带** catalog，
+  # 请自行克隆知识库仓库，再把 path 指向其 catalog 产物。
+  # 例如：~/Pentest-Playbook/handbook-v3/dist/catalog.json
+  # 协议要求：JSON 必须为 catalog v2（version: 2, source: handbook-v3）；
+  # 也可指向旧版 Markdown 手册（v1 格式，按 legacy-unknown 处理，命令需
+  # 至少 manual-gated 强度的显式确认，不能继承 safe 默认值）。
+  # 更新方式：在克隆仓库内 git pull 后重启 AnchorScan 即可生效。
+  # 缺失、JSON 无效或协议不符时知识库显示 unavailable 诊断，不会回退到其它副本。
+  # 留空表示禁用知识库（无文件可加载）。
   path: ""
 
 scan:

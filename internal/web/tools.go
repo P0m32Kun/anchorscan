@@ -77,6 +77,19 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 	selectedZoneID := strings.TrimSpace(r.URL.Query().Get("zone_id"))
 	returnURL := strings.TrimSpace(r.URL.Query().Get("return"))
 	verificationID := strings.TrimSpace(r.URL.Query().Get("verification_id"))
+	// Catalog 命令预填只接受服务端签发的一次性 gate_token；手工构造的
+	// raw_args query 参数一律忽略，避免伪造链接获得 catalog 命令预填。
+	rawArgs := ""
+	if token := strings.TrimSpace(r.URL.Query().Get("gate_token")); token != "" {
+		prefill, ok := s.toolPrefill(token, toolName)
+		if ok {
+			rawArgs = prefill.RawArgs
+			selectedProjectID = prefill.ProjectID
+			selectedZoneID = prefill.ZoneID
+			returnURL = prefill.ReturnURL
+			verificationID = prefill.VerificationID
+		}
+	}
 	if !isSafeReturnURL(returnURL) {
 		returnURL = ""
 	}
@@ -96,7 +109,7 @@ func (s *server) toolPage(w http.ResponseWriter, r *http.Request) {
 		Zones:             zones,
 		Tool:              tool,
 		HighriskPorts:     highriskPorts,
-		RawArgs:           strings.TrimSpace(r.URL.Query().Get("raw_args")),
+		RawArgs:           rawArgs,
 		SelectedProjectID: selectedProjectID,
 		SelectedZoneID:    selectedZoneID,
 		ReturnURL:         returnURL,

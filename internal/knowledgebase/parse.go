@@ -26,7 +26,11 @@ type entryMeta struct {
 
 func Load(configPath, configuredPath string) *Catalog {
 	if strings.TrimSpace(configuredPath) == "" {
-		return &Catalog{status: StatusDisabled, byID: map[string]Entry{}}
+		return &Catalog{
+			status:      StatusDisabled,
+			diagnostics: []Diagnostic{{Status: StatusDisabled, Reason: "未配置 knowledge_base.path，无知识库文件可加载；发行包不再附带 catalog，请克隆知识库仓库（Pentest-Playbook）后将路径指向其 handbook-v3/dist/catalog.json 并重启"}},
+			byID:        map[string]Entry{},
+		}
 	}
 	path := configuredPath
 	if !filepath.IsAbs(path) {
@@ -35,6 +39,9 @@ func Load(configPath, configuredPath string) *Catalog {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return unavailable(err.Error())
+	}
+	if strings.EqualFold(filepath.Ext(path), ".json") {
+		return LoadJSON(data)
 	}
 	return parseCatalog(string(data))
 }
@@ -122,7 +129,7 @@ func parseEntry(name, chineseSeverity string, lines []string, line int) (Entry, 
 	if !okDescription || !okCommands || !okRemediation || description == "" || remediation == "" {
 		return Entry{}, diagnostic(line, meta.ID, "缺少固定章节")
 	}
-	entry := Entry{ID: meta.ID, Name: name, Severity: parseSeverity(chineseSeverity), Aliases: meta.Aliases, Match: MatchKeys{NucleiIDs: meta.Match.Nuclei, NSEIDs: meta.Match.NSE, CVEs: meta.Match.CVE, Names: append([]string(nil), meta.Match.Manual...)}, Description: description, Remediation: remediation}
+	entry := Entry{ID: meta.ID, Name: name, Severity: parseSeverity(chineseSeverity), Aliases: meta.Aliases, Match: MatchKeys{NucleiIDs: meta.Match.Nuclei, NSEIDs: meta.Match.NSE, CVEs: meta.Match.CVE, Names: append([]string(nil), meta.Match.Manual...)}, Description: description, Remediation: remediation, ReviewStatus: ReviewStatusLegacyUnknown, Safety: Safety{Mode: SafetyLegacyUnknown}}
 	if command, ok := commandBlock(lines, "Nuclei"); ok {
 		if validNuclei(command) {
 			entry.Commands.Nuclei = command
@@ -163,14 +170,23 @@ func hasYAMLAnchor(node *yaml.Node) bool {
 }
 
 func hasRequiredSectionOrder(lines []string) bool {
-	var headings []string
+	required := []string{"漏洞描述", "验证命令", "修复建议"}
+	seen := make(map[string]int, len(required))
+	last := -1
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "#### ") {
-			headings = append(headings, strings.TrimPrefix(line, "#### "))
+		heading := strings.TrimPrefix(strings.TrimSpace(line), "#### ")
+		for index, title := range required {
+			if heading != title {
+				continue
+			}
+			if seen[title] > 0 || index <= last {
+				return false
+			}
+			seen[title]++
+			last = index
 		}
 	}
-	return len(headings) == 3 && headings[0] == "漏洞描述" && headings[1] == "验证命令" && headings[2] == "修复建议"
+	return len(seen) == len(required)
 }
 
 func section(lines []string, title string) (string, bool) {

@@ -2120,6 +2120,10 @@ textarea:focus { background: var(--panel); border-color: var(--primary); box-sha
 .details-toggle-btn { padding: 0.45rem 0.85rem; font-size: 0.8rem; border-radius: var(--radius-sm); }
 .details-toggle-btn .chevron-icon { width: 0.75rem; height: 0.75rem; margin-left: 0.25rem; transition: transform 0.2s ease; }
 .command-generate-btn { margin-top: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.8rem; }
+.command-gate-panel { margin: 1rem 0; border-color: var(--warning); background: var(--warning-soft); }
+.command-gate-panel p { margin: 0.45rem 0; }
+.command-gate-panel ul { margin: 0.45rem 0 0.75rem; padding-left: 1.25rem; }
+.command-gate-panel code { overflow-wrap: anywhere; }
 .details-expanded-content { padding: 0.85rem 1rem; }
 .evidence-empty { padding: 0.5rem 0; }
 .finding-col-severity { width: 12%; }

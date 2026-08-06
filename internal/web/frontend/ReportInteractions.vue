@@ -3,13 +3,25 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 type Panel = 'severity' | 'service' | 'source';
 type ServiceFacet = { raw_value: string; label: string; count: number };
+type CommandGate = {
+  level: string;
+  review_status: string;
+  safety_mode: string;
+  effects: string[];
+  cleanup: string;
+  message: string;
+  acknowledge_label: string;
+  challenge: string;
+};
 type CommandResponse = {
   commands?: Array<{ full_command?: string; target_file?: string; tool_args?: string } | string>;
   full_command?: string;
   tool_args?: string;
+  tool_link?: string;
   warning?: string;
 };
 type CommandItem = { full_command?: string; target_file?: string; tool_args?: string } | string;
+type PendingCommandRequest = { endpoint: string; body: string; batch: boolean; tool: string };
 
 const root = ref<HTMLElement>();
 const commandDialog = ref<HTMLDialogElement>();
@@ -33,6 +45,9 @@ const commandTitle = ref('生成检测命令');
 const commandMessage = ref('');
 const commandBody = ref('');
 const commandToolLink = ref('');
+const commandGate = ref<CommandGate | null>(null);
+const pendingCommandRequest = ref<PendingCommandRequest | null>(null);
+const commandConfirming = ref(false);
 
 const activeFilters = computed(() => {
   const filters: Array<{ key: string; value: string; label: string }> = [];
@@ -135,6 +150,34 @@ async function copyButton(button: HTMLElement, text: string | Promise<string>) {
   }, 1200);
 }
 
+async function requestCommand(request: PendingCommandRequest, gateToken = '') {
+  const body = new URLSearchParams(request.body);
+  if (gateToken) {
+    body.set('gate_token', gateToken);
+    body.set('acknowledge', '1');
+  }
+  const response = await fetch(request.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+  if (response.status === 428) {
+    const result = await response.json() as { gate?: CommandGate };
+    if (!result.gate?.challenge) throw new Error('命令确认挑战无效');
+    commandGate.value = result.gate;
+    commandMessage.value = result.gate.message;
+    return;
+  }
+  if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
+  const result = await response.json() as CommandResponse;
+  const commands: CommandItem[] = result.commands || [{ full_command: result.full_command, tool_args: result.tool_args }];
+  const commandLines = commands.map((item) => typeof item === 'string' ? item : item.full_command || '').filter(Boolean);
+  const files = commands.flatMap((item) => typeof item === 'string' || !item.target_file ? [] : [item.target_file]);
+  commandBody.value = commandLines.join('\n');
+  commandMessage.value = request.batch
+    ? `${result.warning ? `${result.warning}；` : ''}共 ${commands.length} 条命令${files.length ? `；目标文件：${files.join('、')}` : ''}；请人工确认后运行。`
+    : '请人工确认后运行；此操作未启动扫描。';
+  commandToolLink.value = result.tool_link || '';
+  if (commandGate.value) commandGate.value = { ...commandGate.value, challenge: '' };
+  pendingCommandRequest.value = null;
+}
+
 async function openCommand(button: HTMLElement, batch: boolean) {
   const tool = button.dataset[batch ? 'batchTool' : 'commandTool'] || '';
   const key = button.dataset[batch ? 'batchGroup' : 'commandKey'] || '';
@@ -143,26 +186,33 @@ async function openCommand(button: HTMLElement, batch: boolean) {
   commandMessage.value = batch ? '正在生成批量命令，不会启动扫描。' : '正在生成，不会启动扫描。';
   commandBody.value = '';
   commandToolLink.value = '';
+  commandGate.value = null;
+  const endpoint = new URL(`${reportPath()}/commands${batch ? '/batch' : ''}`, window.location.origin);
+  endpoint.search = window.location.search;
+  const body = new URLSearchParams(batch ? { group_key: key, tool } : { finding_key: key, tool });
+  const request = { endpoint: endpoint.toString(), body: body.toString(), batch, tool };
+  pendingCommandRequest.value = request;
   commandDialog.value?.showModal();
   try {
-    const endpoint = new URL(`${reportPath()}/commands${batch ? '/batch' : ''}`, window.location.origin);
-    endpoint.search = window.location.search;
-    const body = new URLSearchParams(batch ? { group_key: key, tool } : { finding_key: key, tool });
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-    if (!response.ok) throw new Error((await response.text()).trim() || '命令不可用');
-    const result = await response.json() as CommandResponse;
-    const commands: CommandItem[] = result.commands || [{ full_command: result.full_command, tool_args: result.tool_args }];
-    const commandLines = commands.map((item) => typeof item === 'string' ? item : item.full_command || '').filter(Boolean);
-    const files = commands.flatMap((item) => typeof item === 'string' || !item.target_file ? [] : [item.target_file]);
-    commandBody.value = commandLines.join('\n');
-    commandMessage.value = batch
-      ? `${result.warning ? `${result.warning}；` : ''}共 ${commands.length} 条命令${files.length ? `；目标文件：${files.join('、')}` : ''}；请人工确认后运行。`
-      : '请人工确认后运行；此操作未启动扫描。';
-    const first = commands[0];
-    const toolArgs = typeof first === 'string' ? '' : first.tool_args || result.tool_args || '';
-    if (tool !== 'msf' && commands.length === 1 && toolArgs) commandToolLink.value = `/tools/${tool}?raw_args=${encodeURIComponent(toolArgs)}`;
+    await requestCommand(request);
   } catch (error) {
     commandMessage.value = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function confirmCommand() {
+  const request = pendingCommandRequest.value;
+  const gate = commandGate.value;
+  if (!request || !gate?.challenge || commandConfirming.value) return;
+  commandConfirming.value = true;
+  commandMessage.value = '正在校验一次性确认并生成命令。';
+  try {
+    await requestCommand(request, gate.challenge);
+  } catch (error) {
+    commandGate.value = null;
+    commandMessage.value = error instanceof Error ? error.message : String(error);
+  } finally {
+    commandConfirming.value = false;
   }
 }
 
@@ -312,10 +362,21 @@ onBeforeUnmount(() => {
   </section>
 
   <Teleport to="body">
-    <dialog ref="commandDialog" class="panel" aria-labelledby="report-command-dialog-title" @close="commandBody = ''">
+    <dialog ref="commandDialog" class="panel" aria-labelledby="report-command-dialog-title" @close="commandBody = ''; commandGate = null; pendingCommandRequest = null">
       <div class="panel-heading"><h3 id="report-command-dialog-title">{{ commandTitle }}</h3><button class="button button-secondary" type="button" @click="commandDialog?.close()">关闭</button></div>
       <p class="meta-line">{{ commandMessage }}</p>
-      <pre class="command-pre">{{ commandBody }}</pre>
+      <div v-if="commandGate" class="panel command-gate-panel" role="alert">
+        <p><strong>{{ commandGate.level }}</strong> · review={{ commandGate.review_status }} · safety={{ commandGate.safety_mode }}</p>
+        <p>{{ commandGate.message }}</p>
+        <p v-if="commandGate.level === 'legacy-unknown'"><strong>Effects / Cleanup：</strong>旧 Markdown 未声明</p>
+        <div v-if="commandGate.effects.length">
+          <p class="eyebrow">Effects</p>
+          <ul><li v-for="effect in commandGate.effects" :key="effect"><code>{{ effect }}</code></li></ul>
+        </div>
+        <p v-if="commandGate.cleanup"><strong>Cleanup：</strong>{{ commandGate.cleanup }}</p>
+        <button v-if="commandGate.challenge" class="button button-primary" type="button" :disabled="commandConfirming" @click="confirmCommand">{{ commandGate.acknowledge_label }}</button>
+      </div>
+      <pre v-if="commandBody" class="command-pre">{{ commandBody }}</pre>
       <div class="header-actions"><button class="button button-secondary" type="button" :disabled="!commandBody" @click="copyCommand">复制完整命令</button><a v-if="commandToolLink" class="button button-primary" :href="commandToolLink">带参数打开工具页</a></div>
     </dialog>
   </Teleport>

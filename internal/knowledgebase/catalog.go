@@ -39,6 +39,46 @@ func (s Severity) Label() string {
 	}
 }
 
+type ReviewStatus string
+
+const (
+	ReviewStatusStable        ReviewStatus = "stable"
+	ReviewStatusNeedsReview   ReviewStatus = "needs-review"
+	ReviewStatusLegacyUnknown ReviewStatus = "legacy-unknown"
+)
+
+type SafetyMode string
+
+const (
+	SafetySafe          SafetyMode = "safe"
+	SafetyOptional      SafetyMode = "optional"
+	SafetyManualGated   SafetyMode = "manual-gated"
+	SafetyLegacyUnknown SafetyMode = "legacy-unknown"
+)
+
+type Safety struct {
+	Mode    SafetyMode
+	Effects []string
+	Cleanup string
+}
+
+type Generated struct {
+	By string
+	At string
+}
+
+type Verify struct {
+	Tool     string
+	Template string
+	Target   string
+	Code     bool
+	Script   string
+	Args     string
+	Flags    []string
+	Module   string
+	Action   string
+}
+
 type Tool string
 
 const (
@@ -70,14 +110,19 @@ type MatchKeys struct {
 }
 
 type Entry struct {
-	ID          string
-	Name        string
-	Severity    Severity
-	Aliases     []string
-	Match       MatchKeys
-	Description string
-	Commands    Commands
-	Remediation string
+	ID           string
+	Name         string
+	Severity     Severity
+	Aliases      []string
+	Match        MatchKeys
+	Description  string
+	Commands     Commands
+	Remediation  string
+	ReviewStatus ReviewStatus
+	Safety       Safety
+	Sources      []string
+	Generated    Generated
+	Verify       *Verify
 }
 
 type Observation struct {
@@ -287,6 +332,13 @@ func copyEntry(entry Entry) Entry {
 	entry.Match.NSEIDs = append([]string(nil), entry.Match.NSEIDs...)
 	entry.Match.CVEs = append([]string(nil), entry.Match.CVEs...)
 	entry.Match.Names = append([]string(nil), entry.Match.Names...)
+	entry.Safety.Effects = append([]string(nil), entry.Safety.Effects...)
+	entry.Sources = append([]string(nil), entry.Sources...)
+	if entry.Verify != nil {
+		verify := *entry.Verify
+		verify.Flags = append([]string(nil), verify.Flags...)
+		entry.Verify = &verify
+	}
 	return entry
 }
 
