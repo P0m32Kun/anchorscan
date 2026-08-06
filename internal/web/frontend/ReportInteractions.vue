@@ -48,6 +48,10 @@ const commandToolLink = ref('');
 const commandGate = ref<CommandGate | null>(null);
 const pendingCommandRequest = ref<PendingCommandRequest | null>(null);
 const commandConfirming = ref(false);
+type FindingDetail = { severity: string; source: string; id: string; target: string; summary: string; output: string };
+const detailDialog = ref<HTMLDialogElement>();
+const detailFinding = ref<FindingDetail | null>(null);
+let detailTrigger: HTMLButtonElement | undefined;
 
 const activeFilters = computed(() => {
   const filters: Array<{ key: string; value: string; label: string }> = [];
@@ -221,6 +225,28 @@ async function copyCommand() {
   await writeClipboard(commandBody.value);
 }
 
+function openFindingDetail(button: HTMLButtonElement) {
+  const ds = button.dataset;
+  detailFinding.value = {
+    severity: ds.detailSeverity || '',
+    source: ds.detailSource || '',
+    id: ds.detailId || '',
+    target: ds.detailTarget || '',
+    summary: ds.detailSummary || '',
+    output: ds.detailOutput || '',
+  };
+  detailTrigger = button;
+  button.setAttribute('aria-expanded', 'true');
+  detailDialog.value?.showModal();
+  void nextTick(() => {
+    (window as unknown as { highlightAllEvidences?: () => void }).highlightAllEvidences?.();
+  });
+}
+
+function closeFindingDetail() {
+  detailDialog.value?.close();
+}
+
 function handleDocumentClick(event: MouseEvent) {
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return;
@@ -239,11 +265,7 @@ function handleDocumentClick(event: MouseEvent) {
   }
   const details = target.closest<HTMLButtonElement>('[data-finding-details]');
   if (details) {
-    const row = document.getElementById(`finding-details-${details.dataset.findingDetails}`);
-    if (!row) return;
-    row.hidden = !row.hidden;
-    details.classList.toggle('active-toggle', !row.hidden);
-    details.setAttribute('aria-expanded', String(!row.hidden));
+    openFindingDetail(details);
     return;
   }
   const copy = target.closest<HTMLElement>('[data-copy-text],[data-copy-url],[data-copy-target-id]');
@@ -378,6 +400,29 @@ onBeforeUnmount(() => {
       </div>
       <pre v-if="commandBody" class="command-pre">{{ commandBody }}</pre>
       <div class="header-actions"><button class="button button-secondary" type="button" :disabled="!commandBody" @click="copyCommand">复制完整命令</button><a v-if="commandToolLink" class="button button-primary" :href="commandToolLink">带参数打开工具页</a></div>
+    </dialog>
+  </Teleport>
+
+  <Teleport to="body">
+    <dialog ref="detailDialog" class="report-detail-dialog" aria-labelledby="report-detail-title" @close="detailFinding = null; detailTrigger?.setAttribute('aria-expanded', 'false')">
+      <div v-if="detailFinding" class="report-detail-body">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">漏洞详情</p>
+            <h3 id="report-detail-title">{{ detailFinding.id || '证据与详情' }}</h3>
+          </div>
+          <button class="button button-secondary" type="button" @click="closeFindingDetail">关闭</button>
+        </div>
+        <dl class="report-detail-meta">
+          <div><dt>严重级别</dt><dd><span :class="['severity-badge', `sev-${detailFinding.severity}`]">{{ detailFinding.severity }}</span></dd></div>
+          <div><dt>安全探针</dt><dd>{{ detailFinding.source }}</dd></div>
+          <div><dt>受影响目标</dt><dd class="mono-value">{{ detailFinding.target }}</dd></div>
+        </dl>
+        <div><p class="eyebrow">漏洞摘要</p><p class="meta-line">{{ detailFinding.summary }}</p></div>
+        <div class="panel-heading"><h4>验证证据 / 原始输出</h4><button class="button button-secondary" type="button" data-copy-target-id="report-detail-evidence">复制证据</button></div>
+        <pre v-if="detailFinding.output" class="evidence-pre" id="report-detail-evidence">{{ detailFinding.output }}</pre>
+        <p v-else class="meta-line">暂无原始证据输出。</p>
+      </div>
     </dialog>
   </Teleport>
 </template>
