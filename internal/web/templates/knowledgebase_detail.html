@@ -31,12 +31,10 @@
   <section class="knowledgebase-detail-section">
     <p class="eyebrow">验证方式</p>
     <h3>验证命令</h3>
-    {{if .ShowCommands}}
+    {{if or .Entry.Commands.Nuclei .Entry.Commands.NmapNSE .Entry.Commands.Metasploit}}
       {{if .Entry.Commands.Nuclei}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.Nuclei}}</code></pre>{{end}}
       {{if .Entry.Commands.NmapNSE}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.NmapNSE}}</code></pre>{{end}}
       {{if .Entry.Commands.Metasploit}}<pre class="knowledgebase-command"><code>{{.Entry.Commands.Metasploit}}</code></pre>{{end}}
-    {{else if or .Entry.Commands.Nuclei .Entry.Commands.NmapNSE .Entry.Commands.Metasploit}}
-      <p class="meta-line">原始命令已由服务端门禁隐藏；请从报告或验证工作台发起命令流程并完成确认。</p>
     {{else}}
       <p class="meta-line">知识库未提供可用命令。</p>
     {{end}}
