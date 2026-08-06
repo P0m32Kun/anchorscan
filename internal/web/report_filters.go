@@ -15,6 +15,7 @@ type reportFilters struct {
 	IP                  string
 	Port                string
 	Service             string
+	Product             string
 	ExcludeUnidentified bool
 	Keyword             string
 	Severity            string
@@ -64,6 +65,9 @@ func filterFingerprints(items []fingerprint.ServiceFingerprint, filters reportFi
 		if filters.Service != "" && item.Service != filters.Service {
 			continue
 		}
+		if filters.Product != "" && item.Product != filters.Product {
+			continue
+		}
 		if filters.ExcludeUnidentified && isUnidentifiedService(item.Service) {
 			continue
 		}
@@ -88,6 +92,9 @@ func filterFindings(items []report.Finding, fps []fingerprint.ServiceFingerprint
 			continue
 		}
 		if filters.Service != "" && !findingMatchesService(item, fps, filters.Service) {
+			continue
+		}
+		if filters.Product != "" && !findingMatchesProduct(item, fps, filters.Product) {
 			continue
 		}
 		if filters.ExcludeUnidentified && findingMatchesUnidentifiedService(item, fps) {
@@ -181,6 +188,15 @@ func isUnidentifiedService(service string) bool {
 func findingMatchesService(item report.Finding, fps []fingerprint.ServiceFingerprint, service string) bool {
 	for _, fp := range fps {
 		if findingMatchesFingerprint(item, fp, fps) && fp.Service == service {
+			return true
+		}
+	}
+	return false
+}
+
+func findingMatchesProduct(item report.Finding, fps []fingerprint.ServiceFingerprint, product string) bool {
+	for _, fp := range fps {
+		if findingMatchesFingerprint(item, fp, fps) && fp.Product == product {
 			return true
 		}
 	}

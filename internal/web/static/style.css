@@ -3381,3 +3381,45 @@ dialog.report-detail-dialog::backdrop {
     flex-wrap: wrap;
   }
 }
+
+/* --- Nmap Viewer consolidation ticket 05: pivot analysis panel --- */
+.report-pivots { margin-bottom: var(--space-5); }
+.pivot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+}
+.pivot-dimension-label { margin: 0 0 var(--space-2); }
+.pivot-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.pivot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0.25rem var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-accent);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color var(--motion-fast), background-color var(--motion-fast);
+}
+.pivot-chip:hover { border-color: var(--primary); }
+.pivot-chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.pivot-chip-label { font-weight: 600; }
+.pivot-chip-count {
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-width: 1.1rem;
+  text-align: center;
+}
+.pivot-matrix-wrapper { margin-top: var(--space-5); }
+.pivot-matrix-table { font-size: 0.82rem; }
+.pivot-matrix-table th, .pivot-matrix-table td { padding: var(--space-2) var(--space-3); text-align: center; }
+.pivot-matrix-table th[scope="row"] { text-align: left; white-space: nowrap; }
+.pivot-matrix-table .matrix-filled { font-weight: 700; color: var(--primary); background: var(--bg-accent); }

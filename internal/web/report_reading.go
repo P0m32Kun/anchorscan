@@ -30,6 +30,8 @@ type runReportReading struct {
 	FilteredFindings     []report.Finding
 	FilteredChecks       []report.DetectionCheck
 	ServiceFacets        []serviceFacet
+	PivotFacets          []report.PivotFacet
+	ServiceMatrix        report.PivotMatrix
 	DetectionCoverage    *report.DetectionCoverage
 	Built                report.ScanReport
 	ViewInput            reportViewInput
@@ -54,6 +56,9 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 		detectionCoverage = built.DetectionCoverage
 	}
 
+	pivotFacets := report.BuildPivotFacets(filteredFingerprints, filteredFindings)
+	serviceMatrix := report.BuildServiceMatrix(filteredFingerprints)
+
 	viewInput := reportViewInput{
 		Run:               in.Run,
 		Fingerprints:      filteredFingerprints,
@@ -61,6 +66,8 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 		DetectionChecks:   built.DetectionChecks,
 		DetectionCoverage: detectionCoverage,
 		ServiceFacets:     serviceFacets,
+		PivotFacets:       pivotFacets,
+		ServiceMatrix:     serviceMatrix,
 		Query:             in.Query,
 		Catalog:           in.Catalog,
 		// CommandTools must be computed by the handler — it depends on
@@ -72,6 +79,8 @@ func buildRunReportReading(in runReportReadingInput) runReportReading {
 		FilteredFindings:     filteredFindings,
 		FilteredChecks:       filteredChecks,
 		ServiceFacets:        serviceFacets,
+		PivotFacets:          pivotFacets,
+		ServiceMatrix:        serviceMatrix,
 		DetectionCoverage:    detectionCoverage,
 		Built:                built,
 		ViewInput:            viewInput,

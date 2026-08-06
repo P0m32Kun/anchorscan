@@ -503,6 +503,7 @@ func reportFiltersFromValues(values url.Values) reportFilters {
 		IP:                  values.Get("ip"),
 		Port:                values.Get("port"),
 		Service:             values.Get("service"),
+		Product:             values.Get("product"),
 		ExcludeUnidentified: values.Get("exclude_unidentified") == "1",
 		Keyword:             values.Get("q"),
 		Severity:            values.Get("severity"),

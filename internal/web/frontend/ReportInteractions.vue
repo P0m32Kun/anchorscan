@@ -3,6 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 type Panel = 'severity' | 'service' | 'source';
 type ServiceFacet = { raw_value: string; label: string; count: number };
+type PivotFacet = { dimension: string; raw_value: string; label: string; count: number };
+type ServiceMatrix = { row_dimension: string; col_dimension: string; rows: string[]; cols: string[]; cells: number[][] };
 type CommandGate = {
   level: string;
   review_status: string;
@@ -36,8 +38,42 @@ const service = ref(current.searchParams.get('service') || '');
 const source = ref(current.searchParams.get('source') || '');
 const view = ref(['hosts', 'vulnerabilities'].includes(current.searchParams.get('view') || '') ? current.searchParams.get('view') || 'ports' : 'ports');
 const severities = ref([...new Set(current.searchParams.getAll('severity').flatMap((item) => item.split(',')))].filter((item) => supportedSeverities.includes(item)));
-const props = defineProps<{ serviceFacets?: ServiceFacet[] }>();
+const props = defineProps<{ serviceFacets?: ServiceFacet[]; pivotFacets?: PivotFacet[]; serviceMatrix?: ServiceMatrix | null }>();
 const serviceFacets = computed(() => props.serviceFacets || []);
+const pivotDimensions = [
+  { key: 'host', label: '主机', param: 'ip' },
+  { key: 'port', label: '端口', param: 'port' },
+  { key: 'service', label: '服务', param: 'service' },
+  { key: 'product', label: '产品', param: 'product' },
+  { key: 'vulnerability', label: '漏洞级别', param: 'severity' },
+] as const;
+const pivotByDimension = computed(() => {
+  const groups: Record<string, PivotFacet[]> = {};
+  for (const dim of pivotDimensions) groups[dim.key] = [];
+  for (const facet of props.pivotFacets || []) {
+    if (groups[facet.dimension]) groups[facet.dimension].push(facet);
+  }
+  return groups;
+});
+const hasPivots = computed(() => (props.pivotFacets || []).length > 0);
+// Go serializes nil slices as JSON null (e.g. an empty matrix on a run with no
+// fingerprints); normalize so every access is safe.
+const matrix = computed<ServiceMatrix>(() => {
+  const m = props.serviceMatrix;
+  if (!m || !m.rows || !m.cols || !m.cells) return { row_dimension: '', col_dimension: '', rows: [], cols: [], cells: [] };
+  return m;
+});
+const hasMatrix = computed(() => matrix.value.rows.length > 0);
+
+function applyPivot(dimension: string, rawValue: string) {
+  const meta = pivotDimensions.find((item) => item.key === dimension);
+  if (!meta) return;
+  const next = new URL(window.location.href);
+  next.searchParams.delete('assets_page');
+  next.searchParams.delete('findings_page');
+  next.searchParams.set(meta.param, rawValue);
+  window.location.assign(next.toString());
+}
 const selectableServiceFacets = computed(() => serviceFacets.value.filter((facet) => facet.raw_value !== ''));
 const emptyServiceFacet = computed(() => serviceFacets.value.find((facet) => facet.raw_value === ''));
 const excludeUnidentified = ref(current.searchParams.get('exclude_unidentified') === '1');
@@ -381,6 +417,47 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </form>
+  </section>
+
+  <section v-if="hasPivots" class="panel report-pivots">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">多维分析</p>
+        <h3>主机 · 端口 · 服务 · 产品 · 漏洞</h3>
+        <p class="meta-line">基于当前筛选范围的去重统计，点击任一维度值可下钻筛选。</p>
+      </div>
+    </div>
+    <div class="pivot-grid">
+      <div v-for="dim in pivotDimensions" :key="dim.key" class="pivot-dimension">
+        <p class="eyebrow pivot-dimension-label">{{ dim.label }}</p>
+        <div class="pivot-chips">
+          <button v-for="facet in pivotByDimension[dim.key]" :key="`${dim.key}-${facet.raw_value}`" class="pivot-chip" type="button" :aria-label="`按${dim.label} ${facet.label} 下钻筛选`" @click="applyPivot(dim.key, facet.raw_value)">
+            <span class="pivot-chip-label">{{ facet.label }}</span>
+            <span class="pivot-chip-count">{{ facet.count }}</span>
+          </button>
+          <p v-if="!pivotByDimension[dim.key].length" class="meta-line">无数据</p>
+        </div>
+      </div>
+    </div>
+    <div v-if="hasMatrix" class="pivot-matrix-wrapper">
+      <p class="eyebrow">主机 × 服务矩阵</p>
+      <div class="scroll-table">
+        <table class="data-table pivot-matrix-table">
+          <thead>
+            <tr>
+              <th>主机</th>
+              <th v-for="(col, ci) in matrix.cols" :key="`col-${ci}`">{{ col || '未识别' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, ri) in matrix.rows" :key="`row-${ri}`">
+              <th scope="row" class="mono-value">{{ row }}</th>
+              <td v-for="(col, ci) in matrix.cols" :key="`cell-${ri}-${ci}`" :class="{ 'matrix-filled': matrix.cells[ri][ci] > 0 }">{{ matrix.cells[ri][ci] || '' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <Teleport to="body">

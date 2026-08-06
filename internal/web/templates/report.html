@@ -84,7 +84,7 @@
 </details>
 {{end}}
 
-<div data-report-interactions data-service-facets="{{.ServiceFacetsJSON}}"></div>
+<div data-report-interactions data-service-facets="{{.ServiceFacetsJSON}}" data-pivot-facets="{{.PivotFacetsJSON}}" data-service-matrix="{{.ServiceMatrixJSON}}"></div>
 
 {{if eq .AssetView "vulnerabilities"}}
 <section class="panel report-section" id="report-deliverables">

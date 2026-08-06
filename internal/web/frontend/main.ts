@@ -68,7 +68,19 @@ function mountReportInteractions() {
   } catch {
     // The server always emits this JSON; retain an empty list if it is malformed.
   }
-  createApp(ReportInteractions, { serviceFacets }).mount(mountPoint);
+  let pivotFacets: unknown = [];
+  try {
+    pivotFacets = JSON.parse(mountPoint.dataset.pivotFacets || '[]');
+  } catch {
+    pivotFacets = [];
+  }
+  let serviceMatrix: unknown = null;
+  try {
+    serviceMatrix = JSON.parse(mountPoint.dataset.serviceMatrix || 'null');
+  } catch {
+    serviceMatrix = null;
+  }
+  createApp(ReportInteractions, { serviceFacets, pivotFacets, serviceMatrix }).mount(mountPoint);
   mountPoint.dataset.mounted = 'true';
 }
 

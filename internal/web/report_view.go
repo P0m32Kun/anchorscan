@@ -20,6 +20,8 @@ type reportViewModel struct {
 	RunMeta                    runMetaView
 	Filters                    reportFilters
 	ServiceFacetsJSON          string
+	PivotFacetsJSON            string
+	ServiceMatrixJSON          string
 	Fingerprints               any
 	Findings                   any
 	DetectionChecks            []report.DetectionCheck
@@ -52,6 +54,8 @@ type reportViewInput struct {
 	DetectionChecks   []report.DetectionCheck
 	DetectionCoverage *report.DetectionCoverage
 	ServiceFacets     []serviceFacet
+	PivotFacets       []report.PivotFacet
+	ServiceMatrix     report.PivotMatrix
 	Query             url.Values
 	Catalog           *knowledgebase.Catalog
 	CommandTools      map[string]commandToolsView
@@ -88,6 +92,8 @@ func buildReportViewModel(in reportViewInput) reportViewModel {
 		RunMeta:                    newRunMetaView(in.Run),
 		Filters:                    reportFiltersFromValues(query),
 		ServiceFacetsJSON:          marshalServiceFacets(in.ServiceFacets),
+		PivotFacetsJSON:            marshalJSON(in.PivotFacets),
+		ServiceMatrixJSON:          marshalJSON(in.ServiceMatrix),
 		Fingerprints:               assetPage.Items,
 		Findings:                   findingPage.Items,
 		DetectionChecks:            in.DetectionChecks,
@@ -114,6 +120,14 @@ func marshalServiceFacets(facets []serviceFacet) string {
 	encoded, err := json.Marshal(facets)
 	if err != nil {
 		return "[]"
+	}
+	return string(encoded)
+}
+
+func marshalJSON(value any) string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "null"
 	}
 	return string(encoded)
 }
