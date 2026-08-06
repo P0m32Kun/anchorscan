@@ -42,7 +42,7 @@ func defaultConfig() Config {
 			Profile: "normal",
 		},
 		Profiles: builtInProfiles(),
-		Timeouts: ToolTimeouts{Rustscan: "0", Nmap: "0", Httpx: "0", NSE: "0", Nuclei: "0", Rdpscan: "0", Dameng: "15s"},
+		Timeouts: ToolTimeouts{Rustscan: "0", Nmap: "0", Httpx: "0", NSE: "0", Nuclei: "0", Rdpscan: "0", Dameng: "15s", Fathom: "0"},
 	}
 	cfg.Tools.Rustscan = detectToolPath("rustscan")
 	cfg.Tools.Nmap = detectToolPath("nmap")
@@ -51,6 +51,7 @@ func defaultConfig() Config {
 	cfg.Tools.NucleiTemplates = "~/nuclei-templates"
 	cfg.Tools.Rdpscan = detectToolPath("rdpscan")
 	cfg.Tools.Dameng = "enabled"
+	cfg.Tools.Fathom = detectToolPath("fathom")
 	return cfg
 }
 
