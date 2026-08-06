@@ -12,13 +12,32 @@ type ScanEvent = { id: number; time: string; level: string; stage: string; messa
 const output = ref('等待启动工具…');
 const events = ref<ScanEvent[]>([]);
 const runID = ref('');
+const status = ref('');
 const busy = ref(false);
+const canceling = ref(false);
 const feedback = ref('');
 const followingOutput = ref(true);
 const terminal = ref<HTMLElement>();
 let form: HTMLFormElement | null = null;
 let stopped = false;
 const eventPageSize = 1000;
+
+// Keep the end-of-run wording aligned with the run monitor (RunDetail.vue) so
+// both surfaces report the same lifecycle semantics.
+const lifecycleText = computed(() => {
+  if (status.value === 'interrupted') return '工具运行已中断，可在任务控制台查看已保留的输出。';
+  return ({
+    running: '工具已启动，正在接收输出。',
+    canceled: '工具运行已取消。',
+    completed: '工具运行已完成。',
+    completed_with_errors: '工具运行已完成，但部分检查发生错误。',
+    failed: '工具运行失败，请查看输出定位原因。',
+  }[status.value] || '');
+});
+const latestStage = computed(() => {
+  const event = [...events.value].reverse().find(({ level }) => level !== 'command' && level !== 'raw');
+  return event?.stage || '';
+});
 
 function onScroll() {
   const box = terminal.value;
@@ -37,13 +56,14 @@ async function poll(run: string) {
     if (newEvents.length > 0) events.value = [...events.value, ...newEvents];
     const rendered = renderTerminal(events.value);
     output.value = rendered || '工具已启动，等待输出…';
-    const status = (await statusResult.json() as { status: string }).status;
+    const statusValue = (await statusResult.json() as { status: string }).status;
+    status.value = statusValue;
     const hasMoreEvents = newEvents.length === eventPageSize;
-    if (status !== 'running' && !hasMoreEvents) {
-      feedback.value = status === 'completed' ? '工具运行已完成。' : `工具运行已结束：${status}。`;
+    if (statusValue !== 'running' && !hasMoreEvents) {
+      feedback.value = lifecycleText.value;
       return;
     }
-    if (status === 'running') await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    if (statusValue === 'running') await new Promise((resolve) => window.setTimeout(resolve, 1000));
   }
 }
 
@@ -83,6 +103,21 @@ async function submit(event: SubmitEvent) {
   }
 }
 
+async function cancelRun() {
+  if (!runID.value || canceling.value) return;
+  canceling.value = true;
+  feedback.value = '正在请求中止工具…';
+  try {
+    const response = await fetch(`/runs/${encodeURIComponent(runID.value)}/cancel`, { method: 'POST' });
+    if (!response.ok) throw new Error('cancel failed');
+    feedback.value = '已请求中止，正在等待工具停止。';
+  } catch {
+    feedback.value = '中止请求未成功，请稍后重试。';
+  } finally {
+    canceling.value = false;
+  }
+}
+
 const outputHtml = computed(() => ansiToHtml(output.value));
 
 watch(output, async () => {
@@ -105,7 +140,17 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="panel tool-output-panel" :aria-busy="busy">
-    <div class="panel-heading"><div><p class="eyebrow">工具输出</p><h3>工具实时输出</h3><p class="meta-line" role="status">{{ feedback }}</p></div><a v-if="runID" class="button button-secondary" :href="`/runs/${runID}`">查看本次完整结果</a></div>
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">工具输出</p>
+        <h3>工具实时输出</h3>
+        <p class="meta-line" role="status">{{ feedback || lifecycleText }}{{ latestStage && status === 'running' ? ` · 当前阶段：${latestStage}` : '' }}</p>
+      </div>
+      <div class="header-actions">
+        <button v-if="runID && status === 'running'" class="button button-danger" type="button" :disabled="canceling" @click="cancelRun">{{ canceling ? '正在中止…' : '中止工具' }}</button>
+        <a v-if="runID" class="button button-secondary" :href="`/runs/${runID}`">查看本次完整结果</a>
+      </div>
+    </div>
     <div class="terminal-window tool-preview-window">
       <div class="terminal-header"><div class="terminal-dots"><span class="terminal-dot dot-red"></span><span class="terminal-dot dot-yellow"></span><span class="terminal-dot dot-green"></span></div><div class="terminal-title">tool output</div></div>
       <pre ref="terminal" class="event-log tool-command-preview" @scroll="onScroll" v-html="outputHtml"></pre>

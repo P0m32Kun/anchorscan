@@ -43,10 +43,11 @@ export async function postJSON<T>(url: string, payload: unknown, fallback: strin
   return await response.json() as T;
 }
 
-export async function uploadEvidence<T>(url: string, file: File, caption: string): Promise<T> {
+export async function uploadEvidence<T>(url: string, file: File, caption: string, position?: number): Promise<T> {
   const form = new FormData();
   form.append('file', file);
   form.append('caption', caption);
+  if (position !== undefined && Number.isInteger(position)) form.append('position', String(position));
   const response = await fetch(url, { method: 'POST', body: form });
   if (!response.ok) throw new Error(await errorMessage(response, '上传失败'));
   return await response.json() as T;

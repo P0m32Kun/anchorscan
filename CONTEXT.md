@@ -25,6 +25,9 @@ Project 内用于组织测试范围和报告内容的业务分区。创建 Proje
 一次 Run 的规范化 include/exclude IP 前缀集合。由 `target.ParseScope` 使用 `net/netip` 构建，最大估算地址数为 4096，且不为计数展开 CIDR。Scope 是授权边界：Nmap 使用其 include/exclude 参数，Nmap 回传地址也必须通过 Scope 过滤，后续 rustscan、httpx 与检测阶段只接收允许地址。它的稳定快照保存进 `ScanOptions.ConfigSnapshot`。
 
 
+### TargetSet（目标集）
+Project 的**规范化扫描目标摄入清单**（每 Project 至多一个）。它是 Scan Create 的预填来源，只保存规范化 IPv4/IPv6/CIDR 目标；不保存漏洞、在线状态、指纹或 Run 结果，不演化为 CMDB。导入语义由 `internal/target.ParseTargetSet` 固定：按逗号/换行分割，复用 `target.Parse` 与 `netip` 校验（拒绝 URL、以 `-` 开头的命令片段、空值与非法地址），规范化后稳定去重并报告接受/重复/拒绝数量及原因。持久化载体为 `store.TargetSet`（`project_target_sets` 表，`project_id` 唯一），随 Project 删除级联清理。
+
 ### TargetScan（单目标扫描结果）
 对**一个** Target 执行流水线（rustscan→nmap→httpx→NSE/nuclei）产出的结果束：`Fingerprints` + `Findings` + `OpenPorts`（见 `internal/app.TargetScan`）。
 > 由候选 #1 深化引入：原为位置式 4 元组穿过接缝，现已正名为具名类型。`scanTarget` 是产出它的纯流水线，持久化由 fan-out 承担。

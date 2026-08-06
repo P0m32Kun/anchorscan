@@ -112,39 +112,21 @@ func TestPackageArchiveIncludesRuntimeResources(t *testing.T) {
 		}
 	}
 
-	assertNoPackagedCatalog(t, archivePath, packageDir)
+	assertArchiveIsClean(t, archivePath, packageDir)
 	assertDefaultConfigDisablesKnowledgeBase(t, packageDir)
 }
 
-// assertNoPackagedCatalog verifies the archive does not contain a catalog
-// copy, neither in the tar member listing nor in the extracted tree.
-func assertNoPackagedCatalog(t *testing.T, archivePath, packageDir string) {
+// assertArchiveIsClean verifies the release archive contains neither a
+// knowledge-base catalog copy nor any forbidden runtime/state/customer
+// artifact. It scans the tar member listing (see package_clean.go for the
+// shared forbidden patterns) so entries that never extract are still caught.
+func assertArchiveIsClean(t *testing.T, archivePath, packageDir string) {
 	t.Helper()
 	if _, err := os.Stat(filepath.Join(packageDir, "config", "catalog.json")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("package must not ship config/catalog.json (single-source design): %v", err)
 	}
-	archive, err := os.Open(archivePath)
-	if err != nil {
-		t.Fatalf("open archive for member listing: %v", err)
-	}
-	defer archive.Close()
-	gzipReader, err := gzip.NewReader(archive)
-	if err != nil {
-		t.Fatalf("open gzip stream: %v", err)
-	}
-	defer gzipReader.Close()
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		header, err := tarReader.Next()
-		if errors.Is(err, io.EOF) {
-			return
-		}
-		if err != nil {
-			t.Fatalf("read tar entry: %v", err)
-		}
-		if strings.HasSuffix(filepath.ToSlash(header.Name), "config/catalog.json") {
-			t.Fatalf("archive must not contain catalog copy, found member %q", header.Name)
-		}
+	for _, hit := range findForbiddenMembers(archiveMembers(t, archivePath)) {
+		t.Fatalf("archive must not contain forbidden member matching %q: found %q", hit.pattern, hit.member)
 	}
 }
 

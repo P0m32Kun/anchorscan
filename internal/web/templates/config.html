@@ -125,6 +125,20 @@
         </button>
       </div>
     </form>
+    {{if .ToolChecks}}
+    <div class="config-tool-diagnostics">
+      <p class="eyebrow">工具可用性诊断</p>
+      <ul class="config-tool-checks">
+        {{range .ToolChecks}}
+        <li class="config-tool-check status-{{.Status}}">
+          <span class="config-tool-check-name mono-value">{{.Name}}</span>
+          <span class="config-tool-check-msg">{{.Message}}</span>
+        </li>
+        {{end}}
+      </ul>
+      <p class="meta-line">状态为 ok 表示工具已配置且可执行；warning/fail 请在上方修正路径或安装对应工具（参考 <code>anchorscan doctor</code>）。</p>
+    </div>
+    {{end}}
   </article>
 
   <article class="panel config-panel" id="config-yaml">

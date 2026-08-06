@@ -69,6 +69,17 @@ func (s *server) projectVerifications(w http.ResponseWriter, r *http.Request, pr
 		return
 	}
 
+	// /projects/{id}/verifications/{vid}/evidence/reorder
+	if len(segments) == 5 && segments[3] == "evidence" && segments[4] == "reorder" {
+		switch r.Method {
+		case http.MethodPost:
+			s.reorderEvidence(w, r, projectID, verificationID)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
 	// /projects/{id}/verifications/{vid}/evidence/{eid}
 	if len(segments) == 5 && segments[3] == "evidence" {
 		evidenceID := segments[4]
@@ -364,6 +375,34 @@ func (s *server) serveEvidence(w http.ResponseWriter, r *http.Request, projectID
 	w.Header().Set("Content-Type", evidence.MediaType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filepath.Base(absPath)))
 	_, _ = io.Copy(w, f)
+}
+
+type evidenceReorderRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// reorderEvidence persists the display order of a verification's evidence via
+// the store's batch reorder, keeping report ordering in sync with the UI.
+func (s *server) reorderEvidence(w http.ResponseWriter, r *http.Request, projectID, verificationID string) {
+	v, err := s.store.GetVerification(verificationID)
+	if err != nil || v.Verification.ProjectID != projectID {
+		http.NotFound(w, r)
+		return
+	}
+	var req evidenceReorderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(req.IDs) == 0 {
+		http.Error(w, "ids is required", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.ReorderEvidence(verificationID, req.IDs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *server) updateEvidence(w http.ResponseWriter, r *http.Request, projectID, verificationID, evidenceID string) {

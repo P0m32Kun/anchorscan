@@ -3,6 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 type Panel = 'severity' | 'service' | 'source';
 type ServiceFacet = { raw_value: string; label: string; count: number };
+type PivotFacet = { dimension: string; raw_value: string; label: string; count: number };
+type ServiceMatrix = { row_dimension: string; col_dimension: string; rows: string[]; cols: string[]; cells: number[][] };
 type CommandGate = {
   level: string;
   review_status: string;
@@ -36,8 +38,42 @@ const service = ref(current.searchParams.get('service') || '');
 const source = ref(current.searchParams.get('source') || '');
 const view = ref(['hosts', 'vulnerabilities'].includes(current.searchParams.get('view') || '') ? current.searchParams.get('view') || 'ports' : 'ports');
 const severities = ref([...new Set(current.searchParams.getAll('severity').flatMap((item) => item.split(',')))].filter((item) => supportedSeverities.includes(item)));
-const props = defineProps<{ serviceFacets?: ServiceFacet[] }>();
+const props = defineProps<{ serviceFacets?: ServiceFacet[]; pivotFacets?: PivotFacet[]; serviceMatrix?: ServiceMatrix | null }>();
 const serviceFacets = computed(() => props.serviceFacets || []);
+const pivotDimensions = [
+  { key: 'host', label: '主机', param: 'ip' },
+  { key: 'port', label: '端口', param: 'port' },
+  { key: 'service', label: '服务', param: 'service' },
+  { key: 'product', label: '产品', param: 'product' },
+  { key: 'vulnerability', label: '漏洞级别', param: 'severity' },
+] as const;
+const pivotByDimension = computed(() => {
+  const groups: Record<string, PivotFacet[]> = {};
+  for (const dim of pivotDimensions) groups[dim.key] = [];
+  for (const facet of props.pivotFacets || []) {
+    if (groups[facet.dimension]) groups[facet.dimension].push(facet);
+  }
+  return groups;
+});
+const hasPivots = computed(() => (props.pivotFacets || []).length > 0);
+// Go serializes nil slices as JSON null (e.g. an empty matrix on a run with no
+// fingerprints); normalize so every access is safe.
+const matrix = computed<ServiceMatrix>(() => {
+  const m = props.serviceMatrix;
+  if (!m || !m.rows || !m.cols || !m.cells) return { row_dimension: '', col_dimension: '', rows: [], cols: [], cells: [] };
+  return m;
+});
+const hasMatrix = computed(() => matrix.value.rows.length > 0);
+
+function applyPivot(dimension: string, rawValue: string) {
+  const meta = pivotDimensions.find((item) => item.key === dimension);
+  if (!meta) return;
+  const next = new URL(window.location.href);
+  next.searchParams.delete('assets_page');
+  next.searchParams.delete('findings_page');
+  next.searchParams.set(meta.param, rawValue);
+  window.location.assign(next.toString());
+}
 const selectableServiceFacets = computed(() => serviceFacets.value.filter((facet) => facet.raw_value !== ''));
 const emptyServiceFacet = computed(() => serviceFacets.value.find((facet) => facet.raw_value === ''));
 const excludeUnidentified = ref(current.searchParams.get('exclude_unidentified') === '1');
@@ -48,6 +84,10 @@ const commandToolLink = ref('');
 const commandGate = ref<CommandGate | null>(null);
 const pendingCommandRequest = ref<PendingCommandRequest | null>(null);
 const commandConfirming = ref(false);
+type FindingDetail = { severity: string; source: string; id: string; target: string; summary: string; output: string };
+const detailDialog = ref<HTMLDialogElement>();
+const detailFinding = ref<FindingDetail | null>(null);
+let detailTrigger: HTMLButtonElement | undefined;
 
 const activeFilters = computed(() => {
   const filters: Array<{ key: string; value: string; label: string }> = [];
@@ -221,6 +261,28 @@ async function copyCommand() {
   await writeClipboard(commandBody.value);
 }
 
+function openFindingDetail(button: HTMLButtonElement) {
+  const ds = button.dataset;
+  detailFinding.value = {
+    severity: ds.detailSeverity || '',
+    source: ds.detailSource || '',
+    id: ds.detailId || '',
+    target: ds.detailTarget || '',
+    summary: ds.detailSummary || '',
+    output: ds.detailOutput || '',
+  };
+  detailTrigger = button;
+  button.setAttribute('aria-expanded', 'true');
+  detailDialog.value?.showModal();
+  void nextTick(() => {
+    (window as unknown as { highlightAllEvidences?: () => void }).highlightAllEvidences?.();
+  });
+}
+
+function closeFindingDetail() {
+  detailDialog.value?.close();
+}
+
 function handleDocumentClick(event: MouseEvent) {
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return;
@@ -239,11 +301,7 @@ function handleDocumentClick(event: MouseEvent) {
   }
   const details = target.closest<HTMLButtonElement>('[data-finding-details]');
   if (details) {
-    const row = document.getElementById(`finding-details-${details.dataset.findingDetails}`);
-    if (!row) return;
-    row.hidden = !row.hidden;
-    details.classList.toggle('active-toggle', !row.hidden);
-    details.setAttribute('aria-expanded', String(!row.hidden));
+    openFindingDetail(details);
     return;
   }
   const copy = target.closest<HTMLElement>('[data-copy-text],[data-copy-url],[data-copy-target-id]');
@@ -361,6 +419,47 @@ onBeforeUnmount(() => {
     </form>
   </section>
 
+  <section v-if="hasPivots" class="panel report-pivots">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">多维分析</p>
+        <h3>主机 · 端口 · 服务 · 产品 · 漏洞</h3>
+        <p class="meta-line">基于当前筛选范围的去重统计，点击任一维度值可下钻筛选。</p>
+      </div>
+    </div>
+    <div class="pivot-grid">
+      <div v-for="dim in pivotDimensions" :key="dim.key" class="pivot-dimension">
+        <p class="eyebrow pivot-dimension-label">{{ dim.label }}</p>
+        <div class="pivot-chips">
+          <button v-for="facet in pivotByDimension[dim.key]" :key="`${dim.key}-${facet.raw_value}`" class="pivot-chip" type="button" :aria-label="`按${dim.label} ${facet.label} 下钻筛选`" @click="applyPivot(dim.key, facet.raw_value)">
+            <span class="pivot-chip-label">{{ facet.label }}</span>
+            <span class="pivot-chip-count">{{ facet.count }}</span>
+          </button>
+          <p v-if="!pivotByDimension[dim.key].length" class="meta-line">无数据</p>
+        </div>
+      </div>
+    </div>
+    <div v-if="hasMatrix" class="pivot-matrix-wrapper">
+      <p class="eyebrow">主机 × 服务矩阵</p>
+      <div class="scroll-table">
+        <table class="data-table pivot-matrix-table">
+          <thead>
+            <tr>
+              <th>主机</th>
+              <th v-for="(col, ci) in matrix.cols" :key="`col-${ci}`">{{ col || '未识别' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, ri) in matrix.rows" :key="`row-${ri}`">
+              <th scope="row" class="mono-value">{{ row }}</th>
+              <td v-for="(col, ci) in matrix.cols" :key="`cell-${ri}-${ci}`" :class="{ 'matrix-filled': matrix.cells[ri][ci] > 0 }">{{ matrix.cells[ri][ci] || '' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <Teleport to="body">
     <dialog ref="commandDialog" class="panel" aria-labelledby="report-command-dialog-title" @close="commandBody = ''; commandGate = null; pendingCommandRequest = null">
       <div class="panel-heading"><h3 id="report-command-dialog-title">{{ commandTitle }}</h3><button class="button button-secondary" type="button" @click="commandDialog?.close()">关闭</button></div>
@@ -378,6 +477,29 @@ onBeforeUnmount(() => {
       </div>
       <pre v-if="commandBody" class="command-pre">{{ commandBody }}</pre>
       <div class="header-actions"><button class="button button-secondary" type="button" :disabled="!commandBody" @click="copyCommand">复制完整命令</button><a v-if="commandToolLink" class="button button-primary" :href="commandToolLink">带参数打开工具页</a></div>
+    </dialog>
+  </Teleport>
+
+  <Teleport to="body">
+    <dialog ref="detailDialog" class="report-detail-dialog" aria-labelledby="report-detail-title" @close="detailFinding = null; detailTrigger?.setAttribute('aria-expanded', 'false')">
+      <div v-if="detailFinding" class="report-detail-body">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">漏洞详情</p>
+            <h3 id="report-detail-title">{{ detailFinding.id || '证据与详情' }}</h3>
+          </div>
+          <button class="button button-secondary" type="button" @click="closeFindingDetail">关闭</button>
+        </div>
+        <dl class="report-detail-meta">
+          <div><dt>严重级别</dt><dd><span :class="['severity-badge', `sev-${detailFinding.severity}`]">{{ detailFinding.severity }}</span></dd></div>
+          <div><dt>安全探针</dt><dd>{{ detailFinding.source }}</dd></div>
+          <div><dt>受影响目标</dt><dd class="mono-value">{{ detailFinding.target }}</dd></div>
+        </dl>
+        <div><p class="eyebrow">漏洞摘要</p><p class="meta-line">{{ detailFinding.summary }}</p></div>
+        <div class="panel-heading"><h4>验证证据 / 原始输出</h4><button class="button button-secondary" type="button" data-copy-target-id="report-detail-evidence">复制证据</button></div>
+        <pre v-if="detailFinding.output" class="evidence-pre" id="report-detail-evidence">{{ detailFinding.output }}</pre>
+        <p v-else class="meta-line">暂无原始证据输出。</p>
+      </div>
     </dialog>
   </Teleport>
 </template>

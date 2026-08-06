@@ -129,6 +129,12 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+		} else if form.Target == "" {
+			// Prefill the target field from the project's Target Set when
+			// starting a fresh scan (not a rerun).
+			if ts := s.loadTargetSet(id); ts != nil {
+				form.Target = ts.Targets
+			}
 		}
 		s.renderProjectScanForm(w, project, zones, preflight.Result{}, form)
 	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "edit":
@@ -144,6 +150,8 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 		})
 	case r.Method == http.MethodPost && len(segments) >= 2 && segments[1] == "zones":
 		s.projectZones(w, r, id, segments)
+	case r.Method == http.MethodPost && len(segments) == 2 && segments[1] == "target-set":
+		s.projectTargetSet(w, r, id)
 	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "workbench":
 		s.projectWorkbench(w, r, id)
 	case r.Method == http.MethodGet && len(segments) == 2 && segments[1] == "report.html":
@@ -175,11 +183,13 @@ func (s *server) projectDetail(w http.ResponseWriter, r *http.Request) {
 			zoneNames[z.ZoneID] = z.Name
 		}
 		render(w, "templates/project_detail.html", map[string]any{
-			"Title":     project.Name,
-			"Project":   project,
-			"Zones":     zones,
-			"ZoneNames": zoneNames,
-			"Runs":      runs,
+			"Title":            project.Name,
+			"Project":          project,
+			"Zones":            zones,
+			"ZoneNames":        zoneNames,
+			"Runs":             runs,
+			"TargetSet":        s.loadTargetSet(id),
+			"TargetSetImport":  targetSetImportFromQuery(r.URL.Query()),
 		})
 	case r.Method == http.MethodPost:
 		if err := parseProjectRequest(r); err != nil {

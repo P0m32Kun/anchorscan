@@ -98,13 +98,14 @@ onMounted(() => {
       </ul>
     </div>
     <p v-if="isRerun" class="alert alert-warning">这是一次重新运行。请检查并提交下方参数后，系统才会创建一个新的扫描任务。</p>
+    <p class="meta-line scan-create-required-note">带 * 为必填项；可选信息与高级配置默认折叠。提交前会先进行授权范围与预检校验。</p>
 
     <form class="form-grid" method="post" action="/scan" @submit="handleSubmit">
       <input type="hidden" name="project_id" :value="projectId">
 
       <label>
         <span>网络分区 (Zone) <span class="required">*</span></span>
-        <select v-model="form.zone_id" name="zone_id" required :aria-describedby="fieldError('zone_id') ? 'error-zone_id' : undefined">
+        <select v-model="form.zone_id" name="zone_id" required :aria-invalid="fieldError('zone_id') ? 'true' : undefined" :aria-describedby="fieldError('zone_id') ? 'error-zone_id' : undefined">
           <option value="">请选择 Zone</option>
           <option v-for="zone in zones" :key="zone.id" :value="zone.id">{{ zone.name }} ({{ zone.id }})</option>
         </select>
@@ -113,7 +114,7 @@ onMounted(() => {
 
       <label>
         <span>扫描档位 <span class="required">*</span></span>
-        <select v-model="form.profile" name="profile" required :aria-describedby="fieldError('profile') ? 'error-profile' : undefined">
+        <select v-model="form.profile" name="profile" required :aria-invalid="fieldError('profile') ? 'true' : undefined" :aria-describedby="fieldError('profile') ? 'error-profile' : undefined">
           <option value="slow">slow (轻载/低速率)</option>
           <option value="normal">normal (均衡/默认值)</option>
           <option value="fast">fast (极速/多路并发)</option>
@@ -123,7 +124,7 @@ onMounted(() => {
 
       <label>
         <span>主机发现模式</span>
-        <select v-model="form.discovery_mode" name="discovery_mode" :aria-describedby="fieldError('discovery_mode') ? 'error-discovery_mode' : undefined">
+        <select v-model="form.discovery_mode" name="discovery_mode" :aria-invalid="fieldError('discovery_mode') ? 'true' : undefined" :aria-describedby="fieldError('discovery_mode') ? 'error-discovery_mode' : undefined">
           <option value="auto">auto (默认：先探测存活主机)</option>
           <option value="assume-up">assume-up (跳过存活探测，直接扫描所有目标)</option>
         </select>
@@ -132,13 +133,13 @@ onMounted(() => {
 
       <label class="full-width">
         <span>目标资产 <span class="required">*</span></span>
-        <textarea v-model="form.target" name="target" rows="4" required placeholder="支持 IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔" :aria-describedby="fieldError('target') ? 'error-target' : undefined" />
+        <textarea v-model="form.target" name="target" rows="4" required placeholder="支持 IP、CIDR(网段)或自定义范围，多目标用英文逗号或换行分隔" :aria-invalid="fieldError('target') ? 'true' : undefined" :aria-describedby="fieldError('target') ? 'error-target' : undefined" />
         <p v-if="fieldError('target')" id="error-target" class="field-error">{{ fieldError('target') }}</p>
       </label>
 
       <label class="full-width">
         <span>端口范围 <span class="required">*</span></span>
-        <textarea v-model="form.ports" name="ports" rows="3" required placeholder="支持: top1000、100-1000 或 80,443,8080" :aria-describedby="fieldError('ports') ? 'error-ports' : undefined" />
+        <textarea v-model="form.ports" name="ports" rows="3" required placeholder="支持: top1000、100-1000 或 80,443,8080" :aria-invalid="fieldError('ports') ? 'true' : undefined" :aria-describedby="fieldError('ports') ? 'error-ports' : undefined" />
         <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
         <button class="link-button" type="button" @click="insertHighriskPorts">＋ 插入高危端口列表</button>
         <p v-if="fieldError('ports')" id="error-ports" class="field-error">{{ fieldError('ports') }}</p>
@@ -146,13 +147,13 @@ onMounted(() => {
 
       <label>
         <span>测试设备接入点 <span class="required">*</span></span>
-        <input v-model="form.access_point" name="access_point" required placeholder="XX 屏柜/xxx 交换机" :aria-describedby="fieldError('access_point') ? 'error-access_point' : undefined">
+        <input v-model="form.access_point" name="access_point" required placeholder="XX 屏柜/xxx 交换机" :aria-invalid="fieldError('access_point') ? 'true' : undefined" :aria-describedby="fieldError('access_point') ? 'error-access_point' : undefined">
         <p v-if="fieldError('access_point')" id="error-access_point" class="field-error">{{ fieldError('access_point') }}</p>
       </label>
 
       <label>
         <span>测试设备 IP <span class="required">*</span></span>
-        <input v-model="form.tester_ip" name="tester_ip" required placeholder="例如：10.0.0.5" :aria-describedby="fieldError('tester_ip') ? 'error-tester_ip' : undefined">
+        <input v-model="form.tester_ip" name="tester_ip" required placeholder="例如：10.0.0.5" :aria-invalid="fieldError('tester_ip') ? 'true' : undefined" :aria-describedby="fieldError('tester_ip') ? 'error-tester_ip' : undefined">
         <p v-if="fieldError('tester_ip')" id="error-tester_ip" class="field-error">{{ fieldError('tester_ip') }}</p>
       </label>
 
