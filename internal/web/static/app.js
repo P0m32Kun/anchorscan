@@ -12,41 +12,79 @@ function setActiveNavigation(path, items = document.querySelectorAll('.nav-item'
 
 // Scroll-spy: highlight the anchor link matching the section in view.
 // Used by the settings anchor nav and the report floating outline.
+//
+// 激活判定完全基于 rect 几何，分两段（不再使用 IntersectionObserver 的可见集合
+// 顺序，避免 1px 脆弱性）：
+//   1) 优先：完整位于视口内的 section 中，选最靠上的（top 最小）。这覆盖页面
+//      顶部（大纲首项默认 active——刚打开页面看到的就是顶部区块）以及目标
+//      section 被完整滚入视口的情形（scrollIntoView({block:'center'}) 之后，
+//      若目标比视口矮则必然唯一完整在视口内，从而被选中）。
+//   2) 兜底：所有相交 section 都跨越视口边界（典型：长表格/大面板）时，高亮
+//      "垂直中心最接近视口中心"的 section（用户正在看的区块）；距离并列
+//      （容差 1px）时优先更具体（高度更小）的，以纯几何方式覆盖
+//      #config-timeouts 嵌套在 #config-engine 内的场景，不依赖 DOM 顺序或 contains。
+//
+// 旧实现用 IntersectionObserver 的可见集合顺序 + 固定观察带（rootMargin
+// '-20% 0px -60% 0px'，仅覆盖视口 20%–40%），与 scrollIntoView(center) 把目标
+// 滚到视口 50% 处不匹配；观察带的二值相交判定 + visiblePairs[0] 使结果对 1px
+// 布局差异极度敏感（CI quality-gate 失败）。改用上述几何判定彻底消除该脆弱性。
 function initScrollSpy(nav) {
   const links = Array.from(nav.querySelectorAll('a[href^="#"]'));
-  if (links.length === 0 || !('IntersectionObserver' in window)) return;
+  if (links.length === 0) return;
   const pairs = links
     .map(link => ({ link, section: document.getElementById(link.hash.slice(1)) }))
     .filter(pair => pair.section);
   if (pairs.length === 0) return;
-  const visible = new Set();
+
   const activate = () => {
-    let current = pairs[0];
-    const visiblePairs = pairs.filter(p => visible.has(p.section.id));
-    if (visiblePairs.length > 0) {
-      current = visiblePairs[0];
-      for (let i = 1; i < visiblePairs.length; i++) {
-        const candidate = visiblePairs[i];
-        if (current.section.contains(candidate.section)) {
-          current = candidate;
-        }
-      }
-    } else {
-      for (const pair of pairs) {
-        if (pair.section.getBoundingClientRect().top < window.innerHeight * 0.5) current = pair;
+    const viewportHeight = window.innerHeight;
+    const viewportCenter = viewportHeight / 2;
+    // 1) 完整位于视口内的 section：选最靠上的（top 最小）。
+    let best = null;
+    let bestTop = Infinity;
+    for (const pair of pairs) {
+      const rect = pair.section.getBoundingClientRect();
+      if (rect.top >= 0 && rect.bottom <= viewportHeight && rect.top < bestTop) {
+        best = pair;
+        bestTop = rect.top;
       }
     }
-    pairs.forEach(pair => pair.link.classList.toggle('active', pair === current));
+    // 2) 兜底：所有相交 section 都跨越视口边界，选中心最接近视口中心的
+    //    （并列时取更矮/更具体者）。
+    if (!best) {
+      let bestDist = Infinity;
+      let bestHeight = Infinity;
+      for (const pair of pairs) {
+        const rect = pair.section.getBoundingClientRect();
+        const center = (rect.top + rect.bottom) / 2;
+        const dist = Math.abs(center - viewportCenter);
+        const height = rect.height || 1;
+        const clearlyCloser = dist < bestDist - 1;
+        const tied = Math.abs(dist - bestDist) <= 1;
+        const moreSpecific = tied && height < bestHeight;
+        if (!best || clearlyCloser || moreSpecific) {
+          best = pair;
+          bestDist = dist;
+          bestHeight = height;
+        }
+      }
+    }
+    pairs.forEach(pair => pair.link.classList.toggle('active', pair === best));
   };
-  const observer = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) visible.add(entry.target.id);
-      else visible.delete(entry.target.id);
+
+  let scheduled = false;
+  const update = () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      activate();
     });
-    activate();
-  }, { rootMargin: '-20% 0px -60% 0px' });
-  pairs.forEach(pair => observer.observe(pair.section));
+  };
+
   activate();
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update, { passive: true });
 }
 
 // Zone Tabs: filter project run tables by zone. Toggle buttons (aria-pressed),
