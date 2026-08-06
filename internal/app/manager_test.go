@@ -17,7 +17,7 @@ func TestManagerAllowsOnlyOneActiveScan(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 	defer scanStore.Close()
-	manager := NewManager(sleepRunner{}, scanStore)
+	manager := NewManager(waitForCancelRunner{}, scanStore)
 	opts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json")}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -36,7 +36,7 @@ func TestManagerAllowsOnlyOneActiveToolRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open returned error: %v", err)
 	}
-	manager := NewManager(sleepRunner{}, scanStore)
+	manager := NewManager(waitForCancelRunner{}, scanStore)
 	opts := ToolRunOptions{
 		RunID: "tool-1", Tool: "rustscan", Target: "127.0.0.1", Ports: "22",
 		Tools: ToolPaths{Rustscan: "/opt/rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
@@ -71,8 +71,8 @@ func testManagerRejectsRunHeldByAnotherManager(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer secondStore.Close()
-	first := NewManager(sleepRunner{}, firstStore)
-	second := NewManager(sleepRunner{}, secondStore)
+	first := NewManager(waitForCancelRunner{}, firstStore)
+	second := NewManager(waitForCancelRunner{}, secondStore)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	firstOpts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "first.json")}
@@ -94,7 +94,7 @@ func TestManagerStartRecordsScanRunBeforeReturning(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 	defer scanStore.Close()
-	manager := NewManager(sleepRunner{}, scanStore)
+	manager := NewManager(waitForCancelRunner{}, scanStore)
 	opts := ScanOptions{
 		RunID:          "run-early",
 		ProfileName:    "normal",
@@ -135,7 +135,7 @@ func TestManagerStartToolRecordsRunBeforeReturning(t *testing.T) {
 		t.Fatalf("Open returned error: %v", err)
 	}
 	defer scanStore.Close()
-	manager := NewManager(sleepRunner{}, scanStore)
+	manager := NewManager(waitForCancelRunner{}, scanStore)
 	opts := ToolRunOptions{
 		RunID: "tool-early", Tool: "rustscan", Target: "127.0.0.1", Ports: "22",
 		Tools: ToolPaths{Rustscan: "/opt/rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
@@ -156,18 +156,20 @@ func TestManagerStartToolRecordsRunBeforeReturning(t *testing.T) {
 	waitForInactive(t, manager)
 }
 
-type sleepRunner struct{}
+// waitForCancelRunner simulates a tool process that runs until its context is
+// canceled. It must NOT finish on its own: RunScan releases the run lease when
+// the scan completes, so a self-completing runner makes "a second manager is
+// rejected while the first scan holds the lease" assertions timing-dependent
+// (ISSUE-002: a >60ms scheduling stall between two Manager.Start calls let the
+// first scan finish and release the lease before the second Start ran).
+type waitForCancelRunner struct{}
 
-func (sleepRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case <-time.After(50 * time.Millisecond):
-		return []byte("127.0.0.1 -> []\n"), nil
-	}
+func (waitForCancelRunner) Run(ctx context.Context, _ string, _ []string) ([]byte, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
 }
 
-var _ tools.Runner = sleepRunner{}
+var _ tools.Runner = waitForCancelRunner{}
 
 func waitForInactive(t *testing.T, manager *Manager) {
 	t.Helper()
