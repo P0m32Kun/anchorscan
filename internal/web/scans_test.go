@@ -177,7 +177,6 @@ func TestScanCreateExpandsTop1000PresetForFathom(t *testing.T) {
 	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
-		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		webFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 	}}
 	handler, err := NewServer(ServerOptions{
@@ -227,7 +226,6 @@ func TestScanCreatePassesPortRangeToFathom(t *testing.T) {
 	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
-		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		webFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 	}}
 	handler, err := NewServer(ServerOptions{
@@ -398,7 +396,6 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	saveProjectWithZones(t, scanStore, store.Project{ID: "p1", Name: "Local Lab", CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)})
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
-		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		append(webFathomJSONL("127.0.0.1", 80, "http", "nginx"), webFathomJSONL("127.0.0.1", 8080, "http", "Apache Tomcat")...),
 	}}
 	handler, err := NewServer(ServerOptions{

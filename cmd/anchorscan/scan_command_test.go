@@ -160,7 +160,6 @@ func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
-		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		cmdFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 	}}
 	now := time.Unix(10, 0)
@@ -209,7 +208,6 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	runner := &fakeRunner{
 		outputs: [][]byte{
-			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 			cmdFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 		},
 	}
@@ -282,7 +280,6 @@ profiles:
 	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
-		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 		cmdFathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat"),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 		[]byte{},
@@ -326,7 +323,6 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
-			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
 			cmdFathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat"),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 		},

@@ -32,7 +32,7 @@ The project is a local-operator baseline; release builds derive their displayed 
 Implemented capabilities:
 
 - CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
-- fixed scan pipeline: nmap -sn alive sweep -> fathom (port/fingerprint/high-risk detection in one call) -> fingerprint-driven httpx / NSE / nuclei; nmap is retained as the NSE engine (and the alive-sweep engine until fathom's discover stage lands), rustscan is out of the pipeline
+- fixed scan pipeline: fathom (alive probing is internal to `fathom scan` — ICMP + TCP fallback — plus port/fingerprint/high-risk detection in one call) -> fingerprint-driven httpx / NSE / nuclei; nmap is retained as the NSE engine and as the alive-sweep engine for IPv6 only (fathom is IPv4-only, M4.4), rustscan is out of the pipeline
 - single-tool runs (standalone tool page, independent of the scan pipeline) for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
 - port selection follows rustscan-style expressions consumed by fathom: `top1000` -> common-1000 preset, numeric ranges like `100-1000`, and comma-separated numeric ports; `highrisk` is maintained as an insertable CSV preset
 - scan profiles: `slow`, `normal`, `fast`
@@ -50,7 +50,7 @@ Implemented capabilities:
 - system/light/dark themes, keyboard-visible focus, shared confirmation dialogs, and 1280/1440 browser smoke coverage
 - projects organized by Network Zone; each project scan selects one zone and supplies its own targets, ports, exclusions, and profile
 - verification workbench for confirmed, not-observed, and inconclusive conclusions with ordered screenshot evidence
-- live run event logs (nmap alive sweep and fathom stage progress), and persisted interruption recovery facts
+- live run event logs (fathom alive/port stage progress; nmap -sn only for IPv6), and persisted interruption recovery facts
 - report filtering, detection coverage, finding evidence expansion, host/vulnerability aggregation, and copy/export for `IP`, `IP:PORT`, and `URL` lists
 - local vulnerability knowledge-base guidance plus optional `rdpscan` BlueKeep / CVE-2019-0708 detection
 

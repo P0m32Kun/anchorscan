@@ -33,7 +33,7 @@ Project 的**规范化扫描目标摄入清单**（每 Project 至多一个）�
 > 由候选 #1 深化引入：原为位置式 4 元组穿过接缝，现已正名为具名类型。`scanTarget` 是产出它的纯流水线，持久化由 fan-out 承担。
 
 ### Fathom（侦察引擎）
-自研 Rust 单二进制（仓库独立于 anchorscan，不在本仓库内），M4.1 集成后成为 scan_target 内**唯一**端口/指纹引擎（spec v2.0：无 legacy 回退）。一次 `fathom scan --json <ip> -p <ports>` 调用完成 port→fingerprint→高危检测，逐开放端口输出一行 JSON（`internal/tools/fathom.go` 的 `fathomRecord`，checks 数组的 verdict 为 `vulnerable | safe | unknown`），JSONL 落 artifactDir。未配置时 preflight 直接报错，不启动扫描。服务名经 `internal/fingerprint/normalize.go` 别名表与 nmap 对齐（如 mssql→ms-sql）；不产 CPE（报告 CPE 降级为空）；当前仅支持 IPv4。集成中 fathom 的 discover 段未启用（`--discover` 不传），流水线外层存活扫描仍由 nmap `-sn` 承担，直到 fathom discover 段落地。
+自研 Rust 单二进制（仓库独立于 anchorscan，不在本仓库内），M4.1 集成后成为 scan_target 内**唯一**端口/指纹引擎（spec v2.0：无 legacy 回退）。一次 `fathom scan --json <ip> -p <ports>` 调用完成 alive→port→fingerprint→高危检测，逐开放端口输出一行 JSON（`internal/tools/fathom.go` 的 `fathomRecord`，checks 数组的 verdict 为 `vulnerable | safe | unknown`），JSONL 落 artifactDir。未配置时 preflight 直接报错，不启动扫描。服务名经 `internal/fingerprint/normalize.go` 别名表与 nmap 对齐（如 mssql→ms-sql）；不产 CPE（报告 CPE 降级为空）；当前仅支持 IPv4——**存活探测由 fathom scan 内置**（`alive::find` → ICMP Datagram/Raw 分级 + TCP 回退 80/443/445/22，`~/DEV/fathom src/alive.rs`），scan 只输出存活且有开放端口的主机，因此 IPv4 流水线不再有外层 nmap -sn（M4.4）；IPv6 保留 nmap -sn。
 
 ### Fingerprint（服务指纹，`fingerprint.ServiceFingerprint`）
 在一个 Target 的某端口上发现的服务：IP/端口/协议、service、product、version、是否 web、URL 等。由 fathom 产出（此前为 nmap 服务识别），httpx 可对其进行 web 增强。

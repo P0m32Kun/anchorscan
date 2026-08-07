@@ -54,7 +54,6 @@ func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
 func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	runner := &sequenceRunner{
 		outputs: [][]byte{
-			aliveNmapXML,
 			fathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat", "9.0.65"),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 			[]byte("{\"template-id\":\"tomcat-default-login\",\"matcher-name\":\"basic-auth\",\"extractor-results\":[\"admin:admin\"],\"curl-command\":\"curl -u admin:admin http://192.168.1.10:8080/manager/html\",\"info\":{\"name\":\"Tomcat Default Login\",\"severity\":\"high\"},\"matched-at\":\"http://192.168.1.10:8080\"}\n"),
@@ -177,10 +176,15 @@ func TestRunScanWritesAuditArtifacts(t *testing.T) {
 		names = append(names, entry.Name())
 	}
 	joinedNames := strings.Join(names, "\n")
-	for _, want := range []string{"nmap-alive", "fathom-127.0.0.1", "httpx-127.0.0.1-80"} {
+	for _, want := range []string{"fathom-127.0.0.1", "httpx-127.0.0.1-80"} {
 		if !strings.Contains(joinedNames, want) {
 			t.Fatalf("missing artifact %q in files:\n%s", want, joinedNames)
 		}
+	}
+	// M4.4: IPv4 alive probing is internal to fathom scan, so no nmap-alive
+	// artifact is produced for an IPv4 scope anymore.
+	if strings.Contains(joinedNames, "nmap-alive") {
+		t.Fatalf("unexpected nmap-alive artifact (IPv4 alive probing moved into fathom):\n%s", joinedNames)
 	}
 
 	run, err := scanStore.GetScanRun("run-artifacts")
@@ -250,13 +254,14 @@ type killedAfterCancelRunner struct {
 func (r *killedAfterCancelRunner) Run(ctx context.Context, binary string, _ []string) ([]byte, error) {
 	r.calls++
 	switch {
-	case binary == "/opt/nmap":
-		// alive sweep runs first: cancel there, then observe the killed tool.
+	case binary == "/opt/fathom":
+		// fathom is the first tool call since M4.4 (no outer nmap -sn for
+		// IPv4): cancel there, then observe the killed tool.
 		r.cancel()
 		<-ctx.Done()
 		return nil, fmt.Errorf("signal: killed")
-	case binary == "/opt/fathom":
-		return nil, fmt.Errorf("fathom should not run after alive-sweep cancellation")
+	case binary == "/opt/nmap":
+		return nil, fmt.Errorf("nmap should not run before fathom (IPv4 alive sweep removed)")
 	default:
 		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
@@ -478,33 +483,24 @@ func (r *blockingRunner) Run(_ context.Context, binary string, _ []string) ([]by
 
 type postAliveConcurrencyRunner struct {
 	mu          sync.Mutex
-	targets     []string
 	wantActive  int
 	release     chan struct{}
 	released    bool
-	aliveCalls  int
 	fathomCalls int
 	active      int
 	maxActive   int
 }
 
-func newPostAliveConcurrencyRunner(targets []string, wantActive int) *postAliveConcurrencyRunner {
+func newPostAliveConcurrencyRunner(wantActive int) *postAliveConcurrencyRunner {
 	return &postAliveConcurrencyRunner{
-		targets:    targets,
 		wantActive: wantActive,
 		release:    make(chan struct{}),
 	}
 }
 
 func (r *postAliveConcurrencyRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
-	if binary == "/opt/nmap" && len(args) > 0 && args[0] == "-sn" {
-		r.mu.Lock()
-		r.aliveCalls++
-		r.mu.Unlock()
-		return []byte(aliveSweepXML(r.targets...)), nil
-	}
 	if binary != "/opt/fathom" {
-		return nil, fmt.Errorf("unexpected command %s %v", binary, args)
+		return nil, fmt.Errorf("unexpected command %s %v (no nmap alive sweep in IPv4 auto mode)", binary, args)
 	}
 
 	r.mu.Lock()
@@ -604,8 +600,10 @@ func (r *downHostRunner) Run(_ context.Context, binary string, _ []string) ([]by
 	case "/opt/nmap":
 		return []byte(`<nmaprun><host><status state="down"/></host></nmaprun>`), nil
 	case "/opt/fathom":
+		// Down host (or alive host with all probed ports closed): `fathom scan`
+		// emits nothing — alive filtering is internal to fathom (M4.4).
 		r.fathomCalls++
-		return nil, fmt.Errorf("fathom should not run for down host")
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
@@ -619,10 +617,8 @@ func (r *aliveSweepRunner) Run(_ context.Context, binary string, args []string) 
 	r.commands = append(r.commands, append([]string{binary}, args...))
 	switch {
 	case binary == "/opt/nmap":
-		return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1" addrtype="ipv4"/></host><host><status state="up"/><address addr="172.22.0.2" addrtype="ipv4"/></host></nmaprun>`), nil
-	case binary == "/opt/fathom" && len(args) >= 3 && args[2] == "172.22.0.1":
-		return nil, nil
-	case binary == "/opt/fathom" && len(args) >= 3 && args[2] == "172.22.0.2":
+		return nil, fmt.Errorf("auto IPv4 scan must not call nmap (fathom owns alive probing): %v", args)
+	case binary == "/opt/fathom":
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected command %s %v", binary, args)

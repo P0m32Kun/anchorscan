@@ -33,7 +33,6 @@ func rdpscanFinding(findings []report.Finding) (report.Finding, bool) {
 
 func TestRunScanTriggersRdpscanForRDP(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		rdpFathomJSONL,
 		[]byte("192.168.1.10:3389 - VULNERABLE\n"),
 	}}
@@ -76,7 +75,6 @@ func TestRunScanTriggersRdpscanForRDP(t *testing.T) {
 
 func TestRunScanRdpscanSafeDoesNotCreateFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		rdpFathomJSONL,
 		[]byte("192.168.1.10:3389 - SAFE - target appears patched\n"),
 	}}
@@ -111,7 +109,6 @@ func TestRunScanRdpscanSafeDoesNotCreateFinding(t *testing.T) {
 
 func TestRunScanRdpscanUnknownDoesNotCreateFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		rdpFathomJSONL,
 		[]byte("192.168.1.10:3389 - UNKNOWN - NLA required\n"),
 	}}
@@ -146,7 +143,6 @@ func TestRunScanRdpscanUnknownDoesNotCreateFinding(t *testing.T) {
 
 func TestRunScanSkipsRdpscanWhenUnconfigured(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		rdpFathomJSONL,
 	}}
 	scanStore := newScanStore(t)
@@ -176,7 +172,6 @@ func TestRunScanSkipsRdpscanWhenUnconfigured(t *testing.T) {
 
 func TestRunScanSkipsRdpscanForNonRDP(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 	}}
 	scanStore := newScanStore(t)

@@ -30,8 +30,10 @@ type ToolPaths struct {
 	// It does not point to an external binary; any non-empty value enables it.
 	Dameng string `yaml:"dameng"`
 	// Fathom is the self-contained Rust recon binary (M4.1). It replaces the
-	// rustscan + nmap -sn + nmap -sV trio for the alive/port/fingerprint
-	// stages and emits one JSON object per open port (see internal/tools/fathom.go).
+	// rustscan + nmap -sV port/fingerprint stages, and since M4.4 also owns
+	// IPv4 alive probing (ICMP + TCP fallback inside `fathom scan`; nmap -sn
+	// survives for IPv6 only). It emits one JSON object per open port (see
+	// internal/tools/fathom.go).
 	Fathom string `yaml:"fathom"`
 }
 

@@ -65,7 +65,6 @@ func TestRunScanDiscardsOutOfScopeNucleiFinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"ip\":\"192.168.1.20\",\"port\":\"22\",\"matched-at\":\"192.168.1.20:22\"}\n"),
 	}}
@@ -94,7 +93,6 @@ func TestRunScanDiscardsOutOfScopeNucleiFinding(t *testing.T) {
 // is never called — the runner output sequence reflects that ordering.
 func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 		[]byte(`<nmaprun><host><ports><port><script id="ssh2-enum-algos" output="kex_algorithms:..."/></port></ports></host></nmaprun>`),
 		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
@@ -155,7 +153,6 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 // both engines when configured.
 func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.168.1.10", 6379, "redis", "Redis", ""),
 		[]byte(`<nmaprun><host><ports><port><script id="redis-info" output="redis_version:7.0.0"/></port></ports></host></nmaprun>`),
 		[]byte("{\"template-id\":\"redis-info\",\"info\":{\"name\":\"Redis Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:6379\"}\n"),
@@ -189,12 +186,11 @@ func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 func TestRunScanContinuesAfterNSEFailure(t *testing.T) {
 	runner := &recordingSequenceRunner{
 		outputs: [][]byte{
-			aliveNmapXML,
 			fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 			[]byte(`<nmaprun/>`),
 			[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
 		},
-		errors: []error{nil, nil, errors.New("nse unavailable"), nil},
+		errors: []error{nil, errors.New("nse unavailable"), nil},
 	}
 	scanStore := newScanStore(t)
 	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
@@ -346,7 +342,6 @@ func TestRunScanSkipsBackStageWhenFathomFindsNoOpenPorts(t *testing.T) {
 
 func TestRunScanAddsManualReviewForRDP(t *testing.T) {
 	runner := &sequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.10", 3389, "ms-wbt-server", "Microsoft Terminal Services", ""),
 	}}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
@@ -374,7 +369,6 @@ func TestRunScanAddsManualReviewForRDP(t *testing.T) {
 
 func TestRunScanLogsFathomFrontStage(t *testing.T) {
 	runner := &sequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		append(fathomJSONL("192.168.1.10", 6379, "redis", "Redis", ""), fathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat", "")...),
 	}}
 
@@ -430,7 +424,6 @@ func TestRunScanRoutesSparkWebUIWithSafeTags(t *testing.T) {
 	}
 
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.10", 8080, "http", "Apache Spark", ""),
 		[]byte(`{"url":"http://192.0.2.10:8080","status_code":200,"title":"Spark Master at spark://","tech":["Apache Spark"]}`),
 		[]byte{},
@@ -471,7 +464,6 @@ func TestRunScanRoutesConfirmedTLSWithSSLTag(t *testing.T) {
 	}
 
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.10", 8443, "https", "Apache Spark", ""),
 		[]byte(`{"url":"https://192.0.2.10:8443","status_code":200,"title":"Spark Master at spark://","tech":["Apache Spark"]}`),
 		[]byte{},
@@ -509,7 +501,6 @@ func TestRunScanRecordsTagsWhenNucleiIsUnconfigured(t *testing.T) {
 	}
 	prepared.Options.Tools.Nuclei = ""
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.10", 8443, "https", "Apache Spark", ""),
 		[]byte(`{"url":"https://192.0.2.10:8443","status_code":200,"tech":["Apache Spark"]}`),
 	}}
@@ -534,7 +525,6 @@ func TestRunScanRecordsTagsWhenNucleiIsUnconfigured(t *testing.T) {
 
 func TestRunScanDoesNotRouteTLSWithoutMatchingRule(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.12", 465, "smtp", "", ""),
 	}}
 	scanStore := newScanStore(t)
@@ -567,7 +557,6 @@ func TestRunScanDoesNotRouteTLSWithoutMatchingRule(t *testing.T) {
 
 func TestRunScanSkipsNucleiForUnknownServiceOnSparkPort(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.11", 8080, "unknown", "", ""),
 	}}
 	scanStore := newScanStore(t)
@@ -605,7 +594,6 @@ func TestRunScanSkipsNucleiForUnknownServiceOnSparkPort(t *testing.T) {
 
 func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		append(fathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat", ""), fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", "")...),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 		[]byte(`<nmaprun><host><ports><port><script id="ssh2-enum-algos" output="kex_algorithms:..."/></port></ports></host></nmaprun>`),
@@ -756,7 +744,6 @@ func (rejectAllChecker) Check(_ context.Context, _ string, _ int, _, _ string) (
 // the default-password check.
 func TestRunScanSkipsNucleiDamengIdentifyWhenFathomIdentifiedDameng(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.10", 5236, "dameng", "Dameng Database", ""),
 	}}
 	scanStore := newScanStore(t)
@@ -801,7 +788,6 @@ func TestRunScanSkipsNucleiDamengIdentifyWhenFathomIdentifiedDameng(t *testing.T
 // upgrades the fingerprint to web with a URL.
 func TestRunScanTLSWebEnhancementTriggersHttpx(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.10", 8443, "unknown", "", ""),
 		[]byte(`{"url":"https://192.0.2.10:8443","status-code":200,"title":"hidden TLS service","tech":["nginx"]}`),
 		[]byte{},

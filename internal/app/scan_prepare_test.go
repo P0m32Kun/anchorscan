@@ -103,7 +103,6 @@ func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 		t.Fatalf("PrepareScan = %#v, %v", prepared, err)
 	}
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		aliveNmapXML,
 		fathomJSONL("192.0.2.1", 22, "ssh", "OpenSSH", ""),
 		[]byte(`<nmaprun/>`),
 		[]byte{},
@@ -132,23 +131,23 @@ func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 
 func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		port        string
-		service     string
-		product     string
-		outputs     [][]byte
-		tags        string
-		target      string
+		name    string
+		port    string
+		service string
+		product string
+		outputs [][]byte
+		tags    string
+		target  string
 	}{
 		{
 			name: "tomcat nuclei URL", port: "8080", service: "http", product: "Apache Tomcat",
 			outputs: [][]byte{[]byte(`{"url":"http://192.0.2.1:8080","tech":["tomcat"]}`), []byte{}},
-			tags: "tomcat,apache-tomcat", target: "http://192.0.2.1:8080",
+			tags:    "tomcat,apache-tomcat", target: "http://192.0.2.1:8080",
 		},
 		{
 			name: "x11 nuclei hostport", port: "6000", service: "x11",
 			outputs: [][]byte{[]byte{}},
-			tags: "x11", target: "192.0.2.1:6000",
+			tags:    "x11", target: "192.0.2.1:6000",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -160,7 +159,7 @@ func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
 			if err != nil || prepared.Preflight.HasErrors() {
 				t.Fatalf("PrepareScan = %#v, %v", prepared, err)
 			}
-			outputs := [][]byte{aliveNmapXML, fathomJSONL("192.0.2.1", testPort(t, test.port), test.service, test.product, "")}
+			outputs := [][]byte{fathomJSONL("192.0.2.1", testPort(t, test.port), test.service, test.product, "")}
 			runner := &recordingSequenceRunner{outputs: append(outputs, test.outputs...)}
 			scanStore := newScanStore(t)
 			if err := RunScan(context.Background(), runner, scanStore, prepared.Options); err != nil {

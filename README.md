@@ -4,7 +4,7 @@
 
 `anchorscan` 是一款面向已授权内网环境的便携式自动化扫描工具。
 
-核心思路是「**指纹驱动、精准分类、服务多引擎**」：`fathom`（自研 Rust 引擎，必配）在 scan_target 内一次完成端口发现、服务指纹与高危检测 → 按服务指纹和适用规则独立调度 `nuclei`、NSE、`httpx` 等引擎 → 结果统一落入 SQLite → 导出 JSON / HTML / DOCX 报告。RDP 服务可额外启用可选 `rdpscan` 检测 BlueKeep（CVE-2019-0708）。`rustscan` 与 `nmap -sV` 已退出扫描流水线（由 fathom 替代）；nmap 仅作 NSE 引擎（外层存活扫描仍由 `nmap -sn` 承担），rustscan 仅用于工具页单工具执行。
+核心思路是「**指纹驱动、精准分类、服务多引擎**」：`fathom`（自研 Rust 引擎，必配）在 scan_target 内一次完成存活探测、端口发现、服务指纹与高危检测 → 按服务指纹和适用规则独立调度 `nuclei`、NSE、`httpx` 等引擎 → 结果统一落入 SQLite → 导出 JSON / HTML / DOCX 报告。RDP 服务可额外启用可选 `rdpscan` 检测 BlueKeep（CVE-2019-0708）。`rustscan` 与 `nmap -sV` 已退出扫描流水线（由 fathom 替代）；存活探测由 fathom scan 内置（ICMP + TCP 回退），nmap 仅作 NSE 引擎与 IPv6 存活扫描（fathom 仅 IPv4），rustscan 仅用于工具页单工具执行。
 
 默认流水线保留非 SSH 服务的弱口令/默认凭据检测；SSH 通过 `-tags ssh -exclude-tags default-login` 调用私有 RBKD-templates 的 `ssh-mini-brute` 模板（最多 2 用户 × 2 密码，4 次尝试）。RBKD-templates 与官方 nuclei-templates 合并部署在同一目录、一起生效；本项目不内置任何 nuclei 模板，仅用 `-tags` 选择服务。使用 `--args` 或 Web 单工具「原生参数」会绕过默认安全限制，调用记录会审计保存但不会进入客户报告。
 
@@ -49,7 +49,7 @@ go build -o dist/anchorscan.exe ./cmd/anchorscan
 
 #### 1. 前置依赖
 
-确保本机已安装 `fathom`（必配：scan_target 内唯一端口/指纹引擎，未配置则无法扫描）、`nmap`（NSE 引擎 + 外层存活扫描）、`httpx`、`nuclei`，并在系统 `PATH` 中可找到。`rustscan` 仅单工具执行模式需要。配置文件无需手动创建——首次运行会自动生成 `config/default.yaml`，工具路径从 PATH 自动检测。
+确保本机已安装 `fathom`（必配：存活探测 + scan_target 内唯一端口/指纹引擎，未配置则无法扫描）、`nmap`（NSE 引擎 + IPv6 存活扫描）、`httpx`、`nuclei`，并在系统 `PATH` 中可找到。`rustscan` 仅单工具执行模式需要。配置文件无需手动创建——首次运行会自动生成 `config/default.yaml`，工具路径从 PATH 自动检测。
 
 如需手动调整（例如工具不在 PATH、想固定路径），编辑自动生成的 `config/default.yaml` 即可，参考 [config/default.yaml.example](./config/default.yaml.example)。
 

@@ -7,11 +7,12 @@ uses semantic version tags for local-operator releases.
 ## [Unreleased]
 
 ### Added
-- Fathom 集成（M4.1+M4.2）：自研 Rust 引擎 fathom 成为 scan_target 内唯一端口/指纹引擎，一次调用完成 port→fingerprint→高危检测，替代 rustscan 端口发现 + nmap -sV 指纹；扫描流水线变为 nmap -sn 存活扫描 → fathom → httpx → NSE/nuclei。服务名经归一化别名表与 nmap 对齐；fathom 检出 dameng 时跳过 nuclei dameng-identify 直接进入默认口令检查。
+- Fathom 集成（M4.1+M4.2）：自研 Rust 引擎 fathom 成为 scan_target 内唯一端口/指纹引擎，一次调用完成 port→fingerprint→高危检测，替代 rustscan 端口发现 + nmap -sV 指纹。服务名经归一化别名表与 nmap 对齐；fathom 检出 dameng 时跳过 nuclei dameng-identify 直接进入默认口令检查。
+- Fathom 集成（M4.4）：存活探测切换——移除 IPv4 流水线外层 nmap `-sn`，存活探测由 fathom scan 内置（`alive::find` → ICMP Datagram/Raw 分级 + TCP 回退 80/443/445/22）；auto 模式下 scope 内全部 IPv4 地址直接进入 scanTarget，fathom 只输出存活且有开放端口的主机（alive 判定结合端口扫描：报告 `alive_ips` 由有指纹的主机推导）。IPv6（fathom 仅 IPv4）保留 nmap `-sn`；`assume-up` 保持 anchorscan 侧不预处理语义（全部地址进入扫描，fathom 调用参数不变）。
 - 知识库改为 catalog 单源模式：发行归档不再附带 catalog 副本，默认配置 `knowledge_base.path` 为空（知识库禁用，`/kb` 显示 disabled 与明确诊断）；README、部署文档与配置页指引自行 clone 知识库仓库（Pentest-Playbook）并把路径指向其 `handbook-v3/dist/catalog.json`。
 
 ### Changed
-- fathom 成为必配工具：未配置时 preflight 直接报错（不回退 legacy）；`doctor` 与 Web 配置页将 fathom 缺失标红，rustscan 标注为「仅单工具执行模式，扫描流水线不再调用」，nmap 仅作 NSE 引擎。
+- fathom 成为必配工具：未配置时 preflight 直接报错（不回退 legacy）；`doctor` 与 Web 配置页将 fathom 缺失标红，rustscan 标注为「仅单工具执行模式，扫描流水线不再调用」。nmap 角色收窄为 NSE 引擎 + IPv6 存活扫描（M4.4 起 IPv4 存活探测由 fathom 承担，nmap 缺失仅当 scope 含 IPv6 时阻断扫描）。
 - 外部 catalog JSON / 旧版 Markdown 路径仍可配置；缺失或不兼容文件在 `/kb` 与报告页显示明确 unavailable 诊断，不回退到另一份知识库。知识库更新方式改为在克隆仓库内 `git pull` 后重启。配置页知识库路径说明与部署文档保留协议版本、外部更新步骤与 safety/status/legacy 行为边界说明。
 
 ## [2.0.5] - 2026-08-04
