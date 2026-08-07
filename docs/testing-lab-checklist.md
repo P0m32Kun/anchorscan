@@ -6,8 +6,8 @@ Use this checklist to verify the fixed pipeline, SQLite persistence, and JSON/HT
 
 Verify these paths only:
 
-- rustscan port discovery
-- nmap fingerprinting
+- fathom port/fingerprint discovery
+- nmap outer alive sweep
 - web routing to httpx + nuclei
 - non-web routing to NSE + nuclei
 - SQLite persistence
@@ -172,10 +172,9 @@ At minimum:
 
 - `[scan] run`
 - `[scan] target`
-- `[scan] rustscan`
-- `[scan] nmap ... (service detection may be slow)`
-- `[scan] nmap ... still running elapsed=...` for long `nmap -sV` runs
-- `[scan] nmap ... services=... elapsed=...`
+- `[scan] fathom`
+- `[scan] nmap alive sweep targets=...` for the outer alive sweep
+- `[scan] fathom ... services=...` for fingerprint results
 - `[scan] httpx` for web targets
 - `[scan] nse` when NSE rules match
 - `[scan] nuclei` when nuclei tags match
@@ -429,7 +428,7 @@ The lab pass is good enough when:
 | `make package` | Creates `dist/<package>/` and `dist/<package>.tar.gz` |
 | `make e2e` | Runs CLI/Web smoke against the local lab with real binaries |
 | Packaged doctor | Reports config, tool, database, and reports checks |
-| CLI scan preflight | Prints target count, ports, profile, and workers before rustscan |
+| CLI scan preflight | Prints target count, ports, profile, and workers before fathom |
 | Web scan preflight | Blocks missing required tools before scan starts |
 | Existing DB open | Migrates old schema and preserves rows |
 

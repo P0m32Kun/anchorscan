@@ -40,6 +40,10 @@ type ToolRunOptions struct {
 	Logf            func(format string, args ...any)
 }
 
+// RunTool executes a single-tool run (rustscan / nmap / httpx / nuclei with
+// native args). This is the standalone tool page feature — independent of the
+// scan pipeline, which uses fathom exclusively for alive/port/fingerprint
+// since M4.2.
 func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) (runErr error) {
 	if opts.RunID == "" {
 		return errors.New("tool run requires run id")

@@ -89,6 +89,50 @@ func TestRunChecksDatabaseCanOpen(t *testing.T) {
 	}
 }
 
+func TestFathomMissingFails(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	// fathom is the sole alive/port/fingerprint engine (spec v2.0); doctor
+	// must surface a missing path as a fail even though the blocking logic
+	// lives in preflight.
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+
+	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
+	if !containsCheck(checks, "fathom", false) {
+		t.Fatalf("missing fathom must fail doctor: %#v", checks)
+	}
+}
+
+func TestRustscanMissingIsOptionalWithPipelineNote(t *testing.T) {
+	dir := t.TempDir()
+	toolPath := writeExecutable(t, dir, "tool")
+	configPath := filepath.Join(dir, "config.yaml")
+	// rustscan left the scan pipeline in M4.2; a missing path must warn (with
+	// the pipeline note) instead of failing doctor.
+	writeFile(t, configPath, "tools:\n  rustscan: \"\"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  fathom: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+
+	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
+	if HasFailures(checks) {
+		t.Fatalf("missing rustscan must not fail doctor: %#v", checks)
+	}
+	var found bool
+	for _, c := range checks {
+		if c.Name == "rustscan" {
+			found = true
+			if c.Status != StatusWarning {
+				t.Fatalf("expected rustscan warning, got %s: %#v", c.Status, checks)
+			}
+			if !strings.Contains(c.Message, "not used in scan pipeline") {
+				t.Fatalf("expected pipeline note in rustscan message, got %q", c.Message)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("rustscan check not found: %#v", checks)
+	}
+}
+
 func containsCheck(checks []Check, name string, ok bool) bool {
 	status := StatusFail
 	if ok {
@@ -152,7 +196,7 @@ func TestRdpscanMissingReportsOptionalHint(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  fathom: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
 	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
 

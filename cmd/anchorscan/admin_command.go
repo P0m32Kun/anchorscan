@@ -129,6 +129,7 @@ func runTools(args []string, stdout io.Writer) error {
 	}
 
 	for name, path := range map[string]string{
+		"fathom":   cfg.Tools.Fathom,
 		"rustscan": cfg.Tools.Rustscan,
 		"nmap":     cfg.Tools.Nmap,
 		"httpx":    cfg.Tools.Httpx,

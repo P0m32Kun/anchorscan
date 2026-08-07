@@ -14,7 +14,7 @@ Check:
 
 - target service is actually listening
 - `--ports` matches the service port
-- rustscan path in `config/default.yaml` is correct
+- fathom path in `config/default.yaml` is correct
 - local firewall / VM network is not blocking the path
 
 Quick check:
@@ -25,30 +25,22 @@ ss -lntp
 
 If you are testing the Docker lab from macOS, confirm you are scanning the real container IP and that `docker-mac-net-connect` is installed. Without it, a container can be healthy but still unreachable from the host by its bridge IP.
 
-## 2. rustscan works, nmap finds nothing useful
+## 2. fathom finds the port, fingerprint is weak
 
 Check:
 
 - target accepts normal TCP connection but gives little banner data
 - service exists but product detection is weak
-- nmap path is correct
-- full local scans may include non-standard app ports where `nmap -sV` is slow
+- fathom path is correct
+- full local scans may include non-standard app ports where fingerprinting is slow
 
 Quick check:
 
 ```bash
-<nmap-path> -sV --version-intensity 7 -p <PORT> <TARGET_IP> -oX -
+<fathom-path> scan --json <TARGET_IP> -p <PORT>
 ```
 
-If XML shows a service but no product, that is a fingerprint-quality issue, not an app crash.
-
-If the terminal shows:
-
-```text
-[scan] nmap <target> still running elapsed=...
-```
-
-the scan is not stuck; `nmap -sV --version-intensity 7` is still probing service fingerprints. For lab checks, narrow `--ports` to the services under test.
+If JSON shows a service but no product, that is a fingerprint-quality issue, not an app crash. The single-tool nmap service mode (`anchorscan tool nmap --mode service`) can still be used as a second opinion.
 
 ## 3. Web target did not run httpx
 
@@ -234,8 +226,8 @@ docker compose -f "$SHARED_LAB_DIR/docker-compose.yml" up -d --build
 
 When a lab case fails, answer these in order:
 
-1. Did rustscan find the port?
-2. Did nmap produce a usable fingerprint?
+1. Did fathom find the port?
+2. Did fathom produce a usable fingerprint?
 3. Was the service classified correctly?
 4. Did the right secondary tool run?
 5. Did findings land in SQLite?
