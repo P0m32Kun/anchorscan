@@ -106,8 +106,9 @@ func Run(opts Options) Result {
 	// engine); it survives only as an optional manual tool-page invocation, so a
 	// missing binary warns instead of blocking a scan.
 	checkOptionalTool(&result, "rustscan", opts.Tools.Rustscan)
-	// nmap stays required: it is the NSE engine (and the alive-sweep engine
-	// until fathom's discover stage lands).
+	// nmap stays required: it is the NSE engine and the IPv6 alive-sweep engine
+	// (fathom is IPv4-only; IPv4 alive probing is internal to fathom scan since
+	// M4.4).
 	checkRequiredTool(&result, "nmap", opts.Tools.Nmap)
 	checkOptionalTool(&result, "httpx", opts.Tools.Httpx)
 	checkOptionalTool(&result, "nuclei", opts.Tools.Nuclei)

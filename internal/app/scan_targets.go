@@ -19,6 +19,7 @@ type targetResult struct {
 
 func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, artifactDir string, progress Progress) ([]TargetScan, []string, bool, error) {
 	var aliveIPs []string
+	var ipv6Alive []string // nmap -sn confirmed IPv6 hosts (fathom is IPv4-only)
 	scope := opts.Scope
 	if scope.IsZero() {
 		var err error
@@ -28,22 +29,43 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 		}
 	}
 	opts.Scope = scope
-	if opts.Tools.Nmap == "" && scope.RequiresNmapDiscovery() {
-		return nil, nil, false, errors.New("nmap is required for CIDR or excluded scan targets")
+	// fathom is IPv4-only (spec decision 5), so the nmap -sn sweep survives for
+	// IPv6 scope parts only. nmap stays a hard requirement whenever the scope
+	// contains IPv6; IPv4 CIDR/exclude scopes no longer need it for discovery
+	// (fathom scan expands and probes them internally).
+	if opts.Tools.Nmap == "" {
+		for _, discoveryScope := range scope.DiscoveryScopes() {
+			if discoveryScope.IsIPv6() {
+				return nil, nil, false, errors.New("nmap is required for IPv6 scan targets")
+			}
+		}
 	}
 	targets := scope.NmapTargets()
 
-	if opts.Tools.Nmap != "" && len(targets) > 0 && opts.DiscoveryMode != DiscoveryAssumeUp {
-		discovered := make([]string, 0)
+	if opts.DiscoveryMode == DiscoveryAssumeUp && len(targets) > 0 {
+		// assume-up semantics stay anchorscan-side: every scope address enters
+		// scanTarget unprocessed. fathom still probes alive internally (ICMP +
+		// TCP fallback); the mode only skips anchorscan-side preprocessing and
+		// does not change the fathom invocation (no --no-icmp, no weaken).
+		targets = scope.Addresses()
+		aliveIPs = append([]string(nil), targets...)
+		progress.Emit("info", "target", "assume-up: skip alive discovery, treat %d host(s) as up", len(targets))
+	} else {
+		// auto: IPv4 addresses go straight to scanTarget. `fathom scan` probes
+		// alive internally (alive::find → ICMP Datagram/Raw + TCP fallback on
+		// 80/443/445/22) and only emits hosts with open ports, so alive
+		// filtering is built into the port scan itself — no separate sweep.
+		// IPv6 keeps the nmap -sn sweep (fathom is IPv4-only).
+		discovered := make([]string, 0, int(scope.EstimatedAddresses()))
 		for _, discoveryScope := range scope.DiscoveryScopes() {
+			if !discoveryScope.IsIPv6() {
+				discovered = append(discovered, discoveryScope.Addresses()...)
+				continue
+			}
 			progress.Emit("info", "nmap", "nmap alive sweep targets=%v", discoveryScope.NmapTargets())
 			toolCtx, cancel := toolContext(ctx, opts.Timeouts.Nmap)
 			aliveTargets, out, err := tools.DiscoverAliveInScopeWithOutput(toolCtx, runner, opts.Tools.Nmap, discoveryScope, nil)
-			artifactName := "nmap-alive-ipv4.xml"
-			if discoveryScope.IsIPv6() {
-				artifactName = "nmap-alive-ipv6.xml"
-			}
-			if _, writeErr := writeArtifact(artifactDir, artifactName, out); writeErr != nil {
+			if _, writeErr := writeArtifact(artifactDir, "nmap-alive-ipv6.xml", out); writeErr != nil {
 				cancel()
 				return nil, nil, false, writeErr
 			}
@@ -53,18 +75,14 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 				return nil, nil, false, normalized
 			}
 			cancel()
+			ipv6Alive = append(ipv6Alive, aliveTargets...)
 			discovered = append(discovered, aliveTargets...)
 		}
-		targets = scope.Filter(discovered)
-		aliveIPs = append([]string(nil), targets...)
-		progress.Emit("info", "nmap", "nmap alive hosts=%v", targets)
+		targets = discovered
+		progress.Emit("info", "target", "scan targets=%d (fathom alive probing is internal; nmap -sn kept for IPv6)", len(targets))
 		if len(targets) == 0 {
 			progress.Emit("info", "target", "no live hosts discovered; skip port scan")
 		}
-	} else if opts.DiscoveryMode == DiscoveryAssumeUp && len(targets) > 0 {
-		targets = scope.Addresses()
-		aliveIPs = append([]string(nil), targets...)
-		progress.Emit("info", "target", "assume-up: skip alive discovery, treat %d host(s) as up", len(targets))
 	}
 
 	totalTargets := len(targets)
@@ -158,5 +176,43 @@ func scanTargets(ctx context.Context, runner tools.Runner, opts ScanOptions, art
 		}
 	}
 
+	if opts.DiscoveryMode != DiscoveryAssumeUp {
+		// aliveIPs used to record the nmap -sn sweep result. With fathom doing
+		// the IPv4 alive probing, the alive set is derived from scan results:
+		// hosts fathom emitted fingerprints for (= alive with open ports, the
+		// only hosts `fathom scan` ever outputs). IPv6 hosts were confirmed by
+		// the retained nmap -sn sweep and count as alive even without
+		// fingerprints.
+		aliveIPs = aliveHostsFromResults(scans, ipv6Alive)
+		if len(aliveIPs) == 0 {
+			progress.Emit("info", "target", "no live hosts discovered")
+		} else {
+			progress.Emit("info", "target", "alive hosts=%d", len(aliveIPs))
+		}
+	}
+
 	return scans, aliveIPs, partialErrors, nil
+}
+
+// aliveHostsFromResults derives the alive set after the per-target fan-out:
+// hosts with fathom fingerprints (= alive with at least one open port, since
+// `fathom scan` only outputs hosts whose port scan found open ports) plus the
+// IPv6 hosts the nmap -sn sweep confirmed alive.
+func aliveHostsFromResults(scans []TargetScan, ipv6Alive []string) []string {
+	alive := make([]string, 0, len(scans)+len(ipv6Alive))
+	seen := make(map[string]bool, len(scans)+len(ipv6Alive))
+	for _, scan := range scans {
+		if len(scan.Fingerprints) == 0 || seen[scan.Target] {
+			continue
+		}
+		seen[scan.Target] = true
+		alive = append(alive, scan.Target)
+	}
+	for _, ip := range ipv6Alive {
+		if !seen[ip] {
+			seen[ip] = true
+			alive = append(alive, ip)
+		}
+	}
+	return alive
 }

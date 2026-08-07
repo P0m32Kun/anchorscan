@@ -6,13 +6,13 @@ Use this checklist to verify the fixed pipeline, SQLite persistence, and JSON/HT
 
 Verify these paths only:
 
-- fathom port/fingerprint discovery
-- nmap outer alive sweep
+- fathom alive/port/fingerprint discovery (alive probing is internal to `fathom scan`)
+- nmap alive sweep for IPv6 only (fathom is IPv4-only)
 - web routing to httpx + nuclei
 - non-web routing to NSE + nuclei
 - SQLite persistence
 - JSON / HTML report generation
-- terminal progress logs, including nmap heartbeat during slow service detection
+- terminal progress logs (fathom per-target stage progress, auto-mode target expansion, alive-host summary)
 - Web report filtering, host aggregation, copy/export actions
 
 ## Automated E2E Baseline
@@ -173,7 +173,8 @@ At minimum:
 - `[scan] run`
 - `[scan] target`
 - `[scan] fathom`
-- `[scan] nmap alive sweep targets=...` for the outer alive sweep
+- `[scan] scan targets=... (fathom alive probing is internal; nmap -sn kept for IPv6)` for the auto-mode target expansion (IPv4: no outer nmap -sn)
+- `[scan] alive hosts=...` derived from fathom output (hosts with open ports)
 - `[scan] fathom ... services=...` for fingerprint results
 - `[scan] httpx` for web targets
 - `[scan] nse` when NSE rules match

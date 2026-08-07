@@ -28,7 +28,7 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	artifactRoot := fs.String("artifacts", filepath.Join("data", "artifacts"), "path to scan artifact directory root")
 	portsSpec := fs.String("ports", "", "ports preset or csv")
 	profileFlag := fs.String("profile", "", "scan profile: slow, normal, or fast")
-	discoveryFlag := fs.String("discovery", "auto", "host discovery mode: auto (alive sweep) or assume-up")
+	discoveryFlag := fs.String("discovery", "auto", "host discovery mode: auto (fathom-internal alive probing; nmap -sn for IPv6) or assume-up")
 	hostWorkersFlag := fs.Int("host-workers", 0, "host-level worker count override")
 	rustscanArgsFlag := fs.String("rustscan-args", "", "extra rustscan args")
 	nmapArgsFlag := fs.String("nmap-args", "", "extra nmap args")
