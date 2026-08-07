@@ -11,7 +11,7 @@ tools:
   nuclei_templates: ~/nuclei-templates # 社区模板仓库根目录
   rdpscan: ""              # 可选：BlueKeep (CVE-2019-0708) 检测；留空则自动跳过
   dameng: enabled          # Nuclei 确认后执行达梦默认口令检测；留空则禁用
-  fathom: fathom           # 可选(M4.1)：自研 Rust 侦察引擎，一次调用完成存活/端口/指纹；留空则走 rustscan+nmap 旧路径
+  fathom: fathom           # 必填：自研 Rust 侦察引擎，一次调用完成存活/端口/指纹/高危检测；未配置则无法扫描
 
 # Go duration（如 30s、5m）；0 表示不限时。档位不会覆盖这些全局设置。
 timeouts:
