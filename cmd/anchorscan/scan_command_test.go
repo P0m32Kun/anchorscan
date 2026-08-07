@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,13 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 	"github.com/P0m32Kun/anchorscan/internal/tools"
 )
+
+// cmdFathomJSONL renders one `fathom scan --json` line for CLI-layer tests
+// (mirror of the app-layer fathomJSONL helper).
+func cmdFathomJSONL(ip string, port int, service, product string) []byte {
+	line := fmt.Sprintf(`{"host":"%s","port":%d,"service":"%s","product":"%s","version":""}`, ip, port, service, product)
+	return []byte(line + "\n")
+}
 
 func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	var stdout bytes.Buffer
@@ -86,7 +94,7 @@ func TestExecuteScanRejectsInvalidDiscoveryMode(t *testing.T) {
 func TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+filepath.Join(dir, "missing-fathom")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 
 	storeOpened := false
 	runnerCalled := false
@@ -110,7 +118,7 @@ func TestExecuteScanDoesNotOpenStoreWhenSharedPreflightFails(t *testing.T) {
 	if err == nil || err.Error() != "preflight failed" {
 		t.Fatalf("error = %v, want preflight failed", err)
 	}
-	if !strings.Contains(stderr.String(), "[scan] preflight error rustscan:") {
+	if !strings.Contains(stderr.String(), "[scan] preflight error fathom:") {
 		t.Fatalf("stderr = %q, want preflight diagnostic", stderr.String())
 	}
 	if storeOpened || runnerCalled {
@@ -147,13 +155,13 @@ func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	artifactRoot := filepath.Join(dir, "custom-artifacts")
 	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
-	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	fathomPath := writeExecutable(t, dir, "fathom")
+	writeFile(t, configPath, "tools:\n  fathom: "+fathomPath+"\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-		[]byte("127.0.0.1 -> [80]\n"),
-		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+		cmdFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 	}}
 	now := time.Unix(10, 0)
 
@@ -194,7 +202,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeScanRuleFiles(t, dir)
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
@@ -202,9 +210,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	runner := &fakeRunner{
 		outputs: [][]byte{
 			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-			[]byte("Open 80\nOpen 443\n"),
-			[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
-			[]byte(`{"url":"http://127.0.0.1","status-code":200,"title":"nginx","tech":["nginx"]}`),
+			cmdFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 		},
 	}
 	err := run([]string{
@@ -225,7 +231,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 func TestExecuteScanStopsOnPreflightError(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+filepath.Join(dir, "missing-fathom")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	var stdout, stderr bytes.Buffer
@@ -239,7 +245,7 @@ func TestExecuteScanStopsOnPreflightError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected preflight error")
 	}
-	if !strings.Contains(stderr.String(), "[scan] preflight error rustscan:") {
+	if !strings.Contains(stderr.String(), "[scan] preflight error fathom:") {
 		t.Fatalf("expected preflight error output, got %q", stderr.String())
 	}
 }
@@ -251,6 +257,7 @@ func TestExecuteScanPassesProfileAndToolArgs(t *testing.T) {
 	dbPath := filepath.Join(dir, "scan.db")
 	jsonPath := filepath.Join(dir, "report.json")
 	writeFile(t, configPath, `tools:
+  fathom: `+toolPath+`
   rustscan: `+toolPath+`
   nmap: `+toolPath+`
   httpx: `+toolPath+`
@@ -276,9 +283,9 @@ profiles:
 
 	runner := &recordingRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-		[]byte("Open 8080\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+		cmdFathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat"),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
+		[]byte{},
 	}}
 
 	err := run([]string{
@@ -295,14 +302,14 @@ profiles:
 		t.Fatalf("run returned error: %v", err)
 	}
 
-	if !runner.hasArgs(toolPath, "--batch-size", "100") {
-		t.Fatalf("expected slow profile rustscan args in %#v", runner.commands)
+	if !runner.hasArgs(toolPath, "scan", "--json", "192.168.1.10", "-p", "8080") {
+		t.Fatalf("expected fathom fixed argv, commands=%#v", runner.commands)
 	}
 	if !runner.hasArgs(toolPath, "-rate-limit", "20") {
 		t.Fatalf("expected slow profile httpx args in %#v", runner.commands)
 	}
-	if !runner.hasArgs(toolPath, "-T2", "--max-retries", "5") {
-		t.Fatalf("expected nmap override args in %#v", runner.commands)
+	if !runner.hasArgs(toolPath, "-rate-limit", "10") {
+		t.Fatalf("expected slow profile nuclei args in %#v", runner.commands)
 	}
 }
 
@@ -314,14 +321,13 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 	jsonPath := filepath.Join(dir, "report.json")
 	htmlPath := filepath.Join(dir, "report.html")
 
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\nscan:\n  ports: 8080\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\nscan:\n  ports: 8080\n")
 	writeScanRuleFiles(t, dir)
 
 	runner := &fakeRunner{
 		outputs: [][]byte{
 			[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-			[]byte("Open 8080\n"),
-			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
+			cmdFathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat"),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 		},
 	}
@@ -353,8 +359,7 @@ func TestExecuteScanWritesJSONAndHTML(t *testing.T) {
 	for _, line := range []string{
 		"[scan] run",
 		"[scan] target 192.168.1.10",
-		"[scan] rustscan",
-		"[scan] nmap",
+		"[scan] fathom",
 		"[scan] httpx",
 		"[scan] report json",
 		"[scan] report html",

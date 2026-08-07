@@ -2,6 +2,7 @@ package web
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,13 @@ func saveProjectWithZones(t *testing.T, s *store.Store, project store.Project) {
 	if err := s.CreateDefaultProjectZones(project.ID); err != nil {
 		t.Fatalf("CreateDefaultProjectZones returned error: %v", err)
 	}
+}
+
+// webFathomJSONL renders one `fathom scan --json` line for web-layer tests
+// (mirror of the app-layer fathomJSONL helper).
+func webFathomJSONL(ip string, port int, service, product string) []byte {
+	line := fmt.Sprintf(`{"host":"%s","port":%d,"service":"%s","product":"%s","version":""}`, ip, port, service, product)
+	return []byte(line + "\n")
 }
 
 func writeWebScanRules(t *testing.T, dir string) {
@@ -114,7 +122,7 @@ func TestScanCreateErrorsReturnsEmptyArray(t *testing.T) {
 func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+filepath.Join(dir, "missing-fathom")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
@@ -144,17 +152,22 @@ func TestScanCreateRendersPreflightErrors(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), `data-scan-create-props=`) || !strings.Contains(rec.Body.String(), "rustscan") {
+	if !strings.Contains(rec.Body.String(), `data-scan-create-props=`) || !strings.Contains(rec.Body.String(), "fathom") {
 		t.Fatalf("expected preflight errors in scan-create props, got %q", rec.Body.String())
 	}
 }
 
-func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
+// TestScanCreateExpandsTop1000PresetForFathom pins the M4.2 port flow: the
+// "top1000" preset is expanded to its CSV form during PrepareScan (fathom -p
+// accepts explicit lists/ranges only), so the runner sees a CSV -p argument
+// instead of the preset name.
+func TestScanCreateExpandsTop1000PresetForFathom(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	rustscanPath := writeExecutable(t, dir, "rustscan")
+	fathomPath := writeExecutable(t, dir, "fathom")
 	nmapPath := writeExecutable(t, dir, "nmap")
-	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+fathomPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443\n")
 	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
@@ -165,8 +178,7 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-		[]byte("127.0.0.1 -> [80]\n"),
-		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+		webFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 	}}
 	handler, err := NewServer(ServerOptions{
 		ConfigPath: configPath,
@@ -190,22 +202,22 @@ func TestScanCreatePassesTop1000ToRustscanTop(t *testing.T) {
 		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
 	}
 	for range 200 {
-		if runner.hasArgs(rustscanPath, "--top") {
+		if runner.hasArgs(fathomPath, "scan", "--json", "127.0.0.1", "-p", "80,443") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	if !runner.hasArgs(rustscanPath, "--top") {
-		t.Fatalf("expected top1000 passed to rustscan --top, got %#v", runner.Commands())
-	}
+	t.Fatalf("expected top1000 expanded to CSV for fathom -p, got %#v", runner.Commands())
 }
 
-func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
+// TestScanCreatePassesPortRangeToFathom verifies an explicit port range flows
+// through PrepareScan to the fathom -p argument unchanged.
+func TestScanCreatePassesPortRangeToFathom(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	rustscanPath := writeExecutable(t, dir, "rustscan")
+	fathomPath := writeExecutable(t, dir, "fathom")
 	nmapPath := writeExecutable(t, dir, "nmap")
-	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+fathomPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
@@ -216,8 +228,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-		[]byte("127.0.0.1 -> [80]\n"),
-		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`),
+		webFathomJSONL("127.0.0.1", 80, "http", "nginx"),
 	}}
 	handler, err := NewServer(ServerOptions{
 		ConfigPath: configPath,
@@ -241,13 +252,10 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 		t.Fatalf("expected redirect, got %d body=%s", rec.Code, rec.Body.String())
 	}
 	for range 200 {
-		if runner.hasArgs(rustscanPath, "--range", "100-1000") {
+		if runner.hasArgs(fathomPath, "scan", "--json", "127.0.0.1", "-p", "100-1000") {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
-	}
-	if !runner.hasArgs(rustscanPath, "--range", "100-1000") {
-		t.Fatalf("expected port range passed to rustscan, got %#v", runner.Commands())
 	}
 	for range 200 {
 		runs, err := scanStore.ListScanRuns(10)
@@ -259,7 +267,7 @@ func TestScanCreatePassesPortRangeToRustscanRange(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("scan did not finish before temporary directory cleanup")
+	t.Fatalf("expected port range passed to fathom, got %#v", runner.Commands())
 }
 
 func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
@@ -334,9 +342,9 @@ func TestScanCreateDoesNotStartManagerWhenPreparationReturnsOrdinaryError(t *tes
 func TestScanCreateKeepsConflictAndRedirectResponses(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	rustscanPath := writeExecutable(t, dir, "rustscan")
+	fathomPath := writeExecutable(t, dir, "fathom")
 	nmapPath := writeExecutable(t, dir, "nmap")
-	writeFile(t, configPath, "tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+fathomPath+"\n  nmap: "+nmapPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeWebScanRules(t, dir)
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
@@ -375,10 +383,10 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
-	rustscanPath := writeExecutable(t, dir, "rustscan")
+	fathomPath := writeExecutable(t, dir, "fathom")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,8080\n")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  fathom: "+fathomPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  slow:\n    host_workers: 1\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	writeWebScanRules(t, dir)
@@ -391,8 +399,7 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 
 	runner := &serverSequenceRunner{outputs: [][]byte{
 		[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`),
-		[]byte("127.0.0.1 -> [80,8080]\n"),
-		[]byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+		append(webFathomJSONL("127.0.0.1", 80, "http", "nginx"), webFathomJSONL("127.0.0.1", 8080, "http", "Apache Tomcat")...),
 	}}
 	handler, err := NewServer(ServerOptions{
 		ConfigPath: configPath,
@@ -453,8 +460,8 @@ func TestScanCreateUsesExplicitParametersAndSavesRunFields(t *testing.T) {
 	if run.ArtifactDir != wantArtifactDir {
 		t.Fatalf("unexpected artifact dir: got %q want %q", run.ArtifactDir, wantArtifactDir)
 	}
-	if !runner.hasArgs(rustscanPath, "-a", "127.0.0.1", "--ports", "80,8080") {
-		t.Fatalf("unexpected rustscan args: %#v", runner.Commands())
+	if !runner.hasArgs(fathomPath, "scan", "--json", "127.0.0.1", "-p", "80,8080") {
+		t.Fatalf("unexpected fathom args: %#v", runner.Commands())
 	}
 }
 

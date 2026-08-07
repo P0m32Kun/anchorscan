@@ -38,8 +38,7 @@ func (f *fakeDamengAuthChecker) Check(ctx context.Context, host string, port int
 // finding for the default password.
 func TestRunScanTriggersDamengFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte("192.0.2.10 -> [5236]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="padl2sim"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 5236, "padl2sim", "", ""),
 		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236","extracted-results":["8.1.2.128"]}`),
 	}}
 	scanStore := newScanStore(t)
@@ -49,7 +48,7 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		DamengChecker:  &fakeDamengAuthChecker{ok: true},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
@@ -99,9 +98,7 @@ func TestRunScanTriggersDamengFinding(t *testing.T) {
 
 func TestRunScanRecordsDamengPanicAsCompletedWithErrors(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte("192.0.2.10 -> [5236]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
-		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236"}`),
+		fathomJSONL("192.0.2.10", 5236, "dameng", "Dameng DB", ""),
 	}}
 	scanStore := newScanStore(t)
 
@@ -110,7 +107,7 @@ func TestRunScanRecordsDamengPanicAsCompletedWithErrors(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		DamengChecker:  &fakeDamengAuthChecker{panicValue: "driver index out of range"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
@@ -146,9 +143,7 @@ func TestRunScanRecordsDamengPanicAsCompletedWithErrors(t *testing.T) {
 
 func TestRunScanRecordsDamengDeadlineAsCompletedWithErrors(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte("192.0.2.11 -> [5236]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng" product="Dameng DB"/></port></ports></host></nmaprun>`),
-		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.11","port":"5236"}`),
+		fathomJSONL("192.0.2.11", 5236, "dameng", "Dameng DB", ""),
 	}}
 	scanStore := newScanStore(t)
 
@@ -157,7 +152,7 @@ func TestRunScanRecordsDamengDeadlineAsCompletedWithErrors(t *testing.T) {
 		Targets:        []string{"192.0.2.11"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		Timeouts:       ToolTimeouts{Dameng: time.Millisecond},
 		DamengChecker:  &fakeDamengAuthChecker{waitForCtx: true},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
@@ -195,8 +190,7 @@ func TestRunScanRecordsDamengDeadlineAsCompletedWithErrors(t *testing.T) {
 // fingerprint still records a detection check when the detector is disabled.
 func TestRunScanSkipsDamengWhenToolUnconfigured(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte("192.0.2.10 -> [5236]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="5236"><state state="open"/><service name="dameng"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 5236, "dameng", "Dameng DB", ""),
 	}}
 	scanStore := newScanStore(t)
 
@@ -205,7 +199,7 @@ func TestRunScanSkipsDamengWhenToolUnconfigured(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "5236",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: ""},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Dameng: ""},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {
@@ -237,8 +231,7 @@ func TestRunScanSkipsDamengWhenToolUnconfigured(t *testing.T) {
 // record a skipped dameng detection check with reason no_matching_rule.
 func TestRunScanSkipsDamengWhenNoMatchingRule(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte("192.0.2.10 -> [3306]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="3306"><state state="open"/><service name="mysql" product="MySQL"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 3306, "mysql", "MySQL", ""),
 	}}
 	scanStore := newScanStore(t)
 
@@ -247,7 +240,7 @@ func TestRunScanSkipsDamengWhenNoMatchingRule(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "3306",
 		DiscoveryMode:  DiscoveryAssumeUp,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Dameng: "enabled", Nuclei: "nuclei", NucleiTemplates: "templates"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {

@@ -101,7 +101,13 @@ func Run(opts Options) Result {
 		result.Warnings = append(result.Warnings, Message{Field: "profile", Message: "fast profile with many targets may increase load"})
 	}
 
-	checkRequiredTool(&result, "rustscan", opts.Tools.Rustscan)
+	checkRequiredFathom(&result, opts.Tools.Fathom)
+	// rustscan left the scan pipeline in M4.2 (fathom is the sole port/fingerprint
+	// engine); it survives only as an optional manual tool-page invocation, so a
+	// missing binary warns instead of blocking a scan.
+	checkOptionalTool(&result, "rustscan", opts.Tools.Rustscan)
+	// nmap stays required: it is the NSE engine (and the alive-sweep engine
+	// until fathom's discover stage lands).
 	checkRequiredTool(&result, "nmap", opts.Tools.Nmap)
 	checkOptionalTool(&result, "httpx", opts.Tools.Httpx)
 	checkOptionalTool(&result, "nuclei", opts.Tools.Nuclei)
@@ -141,6 +147,20 @@ func checkRuleLoad(result *Result, name string, err error, required bool) {
 func checkRequiredTool(result *Result, name string, path string) {
 	if err := executablePath(path); err != nil {
 		result.Errors = append(result.Errors, Message{Field: name, Message: err.Error()})
+	}
+}
+
+// checkRequiredFathom reports a blocking error when fathom is missing: it is
+// the sole alive/port/fingerprint engine (spec v2.0 — no legacy fallback), so
+// an unconfigured path must stop the scan before it starts. The empty-path
+// message is spelled out per the M4.2 brief.
+func checkRequiredFathom(result *Result, path string) {
+	if strings.TrimSpace(path) == "" {
+		result.Errors = append(result.Errors, Message{Field: "fathom", Message: "fathom is required but not configured. Set tools.fathom in config."})
+		return
+	}
+	if err := executablePath(path); err != nil {
+		result.Errors = append(result.Errors, Message{Field: "fathom", Message: err.Error()})
 	}
 }
 
