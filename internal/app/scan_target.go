@@ -137,7 +137,13 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			// so the nuclei dameng-identify round trip is skipped and the
 			// default-password check runs straight away.
 			damengMatched = true
-		case !fp.IsWeb && opts.Tools.Dameng != "" && opts.Tools.Nuclei != "":
+		case !fp.IsWeb && opts.Tools.Dameng != "" && opts.Tools.Nuclei != "" && isDamengCandidate(fp):
+			// Only ports fathom could not identify (service "unknown") are
+			// probed with nuclei dameng-detect: a non-standard Dameng port
+			// (not 5236) escapes fathom's rule table, and the nuclei template
+			// is the fallback authority. Ports fathom already fingerprinted by
+			// protocol handshake (redis/mysql/ssh/...) cannot be Dameng and
+			// skip the round trip.
 			started := time.Now()
 			progress.Emit("info", "dameng-identify", "dameng-identify %s:%d template=dameng-detect", fp.IP, fp.Port)
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Dameng)
@@ -560,6 +566,15 @@ func scanPortBounds(part string) (int, int, error) {
 		return 0, 0, err
 	}
 	return port, port, nil
+}
+
+// isDamengCandidate reports whether a fingerprint warrants a nuclei
+// dameng-detect round trip: only ports fathom left unidentified ("unknown").
+// A protocol-handshake-identified service (redis/mysql/ssh/...) cannot be
+// Dameng, and a fathom "dameng" fingerprint already bypasses this branch.
+func isDamengCandidate(fp fingerprint.ServiceFingerprint) bool {
+	return strings.EqualFold(strings.TrimSpace(fp.Normalized), "unknown") ||
+		strings.TrimSpace(fp.Normalized) == ""
 }
 
 func parseScanPort(value string) (int, error) {

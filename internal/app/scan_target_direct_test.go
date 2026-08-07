@@ -150,6 +150,34 @@ func TestScanTargetRecordsNSESkipReasons(t *testing.T) {
 	}
 }
 
+func TestScanTargetSkipsNucleiDamengIdentifyForIdentifiedService(t *testing.T) {
+	// Regression: a port fathom identified by protocol handshake (redis here)
+	// cannot be Dameng, so the nuclei dameng-detect round trip must not run.
+	// Previously every non-web port (including redis/mysql/ssh) triggered
+	// dameng-identify, wasting a nuclei invocation per identified service.
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		fathomJSONL("192.0.2.10", 6379, "redis", "Redis", "7.4.9"),
+	}}
+	checker := &fakeDamengAuthChecker{}
+	_, err := scanTarget(context.Background(), runner, ScanOptions{
+		RunID:         "run-redis-no-dameng",
+		Ports:         "6379",
+		Tools:         ToolPaths{Fathom: "fathom", Nmap: "nmap", Nuclei: "nuclei", NucleiTemplates: "templates", Dameng: "enabled"},
+		DamengChecker: checker,
+	}, "192.0.2.10", t.TempDir(), &recordingProgress{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checker.calls != 0 {
+		t.Fatalf("Dameng authentication calls = %d, want 0 (redis is not a Dameng candidate)", checker.calls)
+	}
+	for _, cmd := range runner.commands {
+		if len(cmd) > 0 && cmd[0] == "nuclei" {
+			t.Fatalf("nuclei dameng-identify invoked for identified redis service: %#v", cmd)
+		}
+	}
+}
+
 func TestScanTargetDamengNucleiGate(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -161,7 +189,7 @@ func TestScanTargetDamengNucleiGate(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			runner := &recordingSequenceRunner{outputs: [][]byte{
-				fathomJSONL("192.0.2.10", 10198, "padl2sim", "", ""),
+				fathomJSONL("192.0.2.10", 10198, "unknown", "", ""),
 				tc.nucleiOut,
 			}}
 			checker := &fakeDamengAuthChecker{}

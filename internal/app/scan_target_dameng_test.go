@@ -38,7 +38,7 @@ func (f *fakeDamengAuthChecker) Check(ctx context.Context, host string, port int
 // finding for the default password.
 func TestRunScanTriggersDamengFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		fathomJSONL("192.0.2.10", 5236, "padl2sim", "", ""),
+		fathomJSONL("192.0.2.10", 5236, "unknown", "", ""),
 		[]byte(`{"template-id":"dameng-detect","ip":"192.0.2.10","port":"5236","extracted-results":["8.1.2.128"]}`),
 	}}
 	scanStore := newScanStore(t)
