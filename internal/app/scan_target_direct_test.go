@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/P0m32Kun/anchorscan/internal/store"
@@ -18,6 +19,30 @@ type recordingProgress struct {
 
 func (r *recordingProgress) Emit(level, stage, format string, args ...any) {
 	r.events = append(r.events, fmt.Sprintf("%s/%s %s", level, stage, fmt.Sprintf(format, args...)))
+}
+
+// TestScanTargetEmitsFathomFindingEvent locks the live-terminal hit line for
+// fathom findings: a vulnerable check must surface as an info/fathom progress
+// event carrying an uppercase hit marker (REDIS-UNAUTH) plus the original
+// check id, so the frontend's per-line green hit coloring can pick it up.
+func TestScanTargetEmitsFathomFindingEvent(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		[]byte(`{"host":"127.0.0.1","port":6379,"service":"redis","product":"Redis","version":"7.4.9","checks":[{"id":"redis-unauth","verdict":"vulnerable","proof":"redis_version:7.4.9"}]}` + "\n"),
+	}}
+	progress := &recordingProgress{}
+	if _, err := scanTarget(context.Background(), runner, ScanOptions{
+		RunID: "run-fathom-finding",
+		Ports: "6379",
+		Tools: ToolPaths{Fathom: "/opt/fathom"},
+	}, "127.0.0.1", t.TempDir(), progress); err != nil {
+		t.Fatalf("scanTarget returned error: %v", err)
+	}
+	for _, event := range progress.events {
+		if strings.Contains(event, "REDIS-UNAUTH") && strings.Contains(event, "fathom redis-unauth") {
+			return
+		}
+	}
+	t.Fatalf("expected a fathom finding progress event, got %#v", progress.events)
 }
 
 // TestScanTargetReturnsFingerprintsAndOpenPorts drives scanTarget directly with a
@@ -95,11 +120,11 @@ func TestScanTargetSkipsFingerprintWhenNoOpenPorts(t *testing.T) {
 
 func TestScanTargetRecordsNSESkipReasons(t *testing.T) {
 	tests := []struct {
-		name       string
+		name        string
 		fingerprint []byte
-		tools      ToolPaths
-		rules      map[string][]string
-		wantReason string
+		tools       ToolPaths
+		rules       map[string][]string
+		wantReason  string
 	}{
 		{
 			name:        "web service skips matching nse rule",

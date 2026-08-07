@@ -30,6 +30,9 @@
   --info: #0ea5e9;
   --info-soft: rgba(14, 165, 233, 0.06);
 
+  /* 事件日志指纹识别青色：在浅色/深色 --code-bg 上均可读（浅色 3.3:1、深色 4.75:1） */
+  --log-fingerprint: #0891b2;
+
   /* Severity Colors (Clean, thin borders, no high-intensity glow) */
   --sev-critical: #f43f5e;
   --sev-critical-soft: rgba(244, 63, 94, 0.06);
@@ -1296,6 +1299,12 @@ input[type="file"]::file-selector-button:hover {
 .log-warn { color: #f59e0b; }
 .log-error { color: #ef4444; }
 .log-system { color: #a855f7; }
+
+/* 任务控制台事件日志分级着色（RunDetail.vue 按行应用 class） */
+.event-line-error { color: var(--danger); }
+.event-line-warning { color: var(--warning); }
+.event-line-hit { color: var(--success); }
+.event-line-fingerprint { color: var(--log-fingerprint); }
 
 /* Vulnerability Findings Details Row */
 .details-row td {
