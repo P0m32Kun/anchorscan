@@ -112,7 +112,7 @@ func toolVersion(path string) (string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		out, err := exec.CommandContext(ctx, path, flag).CombinedOutput()
 		cancel()
-		line := firstLine(string(out))
+		line := versionLine(string(out))
 		if err == nil && line != "" {
 			return line, nil
 		}
@@ -126,6 +126,53 @@ func toolVersion(path string) (string, error) {
 		lastErr = errors.New("version unavailable")
 	}
 	return "", lastErr
+}
+
+// versionLine extracts the meaningful version line from a tool's --version
+// output. Tools like httpx/nuclei print an ASCII banner or ANSI-colored
+// "[INF] ..." log lines before the actual version, so the first line is not
+// always useful. It prefers the first line that mentions a version, then
+// strips ANSI escape codes and a "[INF]" log prefix; falls back to the first
+// non-empty line otherwise.
+func versionLine(output string) string {
+	lines := strings.Split(output, "\n")
+	for _, raw := range lines {
+		line := stripANSI(strings.TrimSpace(raw))
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "version") && (strings.Contains(lower, ":")) {
+			// Strip a log-level prefix: "[INF] " (bracketed) or "INF "
+			// (bare, after ANSI codes were removed from an unbracketed log line).
+			line = strings.TrimPrefix(line, "[INF] ")
+			line = strings.TrimPrefix(line, "INF ")
+			return trimMessage(line)
+		}
+	}
+	return firstLine(output)
+}
+
+// stripANSI removes ANSI escape sequences (color codes) from a line, e.g.
+// "\x1b[34mINF\x1b[0m" → "INF".
+func stripANSI(value string) string {
+	var b strings.Builder
+	for i := 0; i < len(value); {
+		if value[i] == 0x1b && i+1 < len(value) && value[i+1] == '[' {
+			j := i + 2
+			for j < len(value) && !(value[j] >= 'A' && value[j] <= 'Z') && !(value[j] >= 'a' && value[j] <= 'z') {
+				j++
+			}
+			if j < len(value) {
+				j++ // consume the final letter
+			}
+			i = j
+			continue
+		}
+		b.WriteByte(value[i])
+		i++
+	}
+	return b.String()
 }
 
 func firstLine(value string) string {
