@@ -53,6 +53,11 @@ func RunNucleiTemplate(ctx context.Context, runner Runner, binaryPath string, ta
 
 func ParseNucleiJSONL(input []byte) ([]NucleiFinding, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(input)))
+	// Some templates extract large payloads into a single JSONL line (e.g.
+	// mysql-show-variables emits every SHOW VARIABLES row as one extracted
+	// result — observed 87KB for MariaDB 11.8). The default 64KB scanner
+	// limit would reject these with "token too long"; raise it to 4MB.
+	scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
 	var findings []NucleiFinding
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
