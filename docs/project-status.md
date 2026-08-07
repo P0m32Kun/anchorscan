@@ -1,6 +1,6 @@
 # AnchorScan Project Status
 
-Last reviewed: 2026-07-24
+Last reviewed: 2026-08-07
 
 This document records the current development baseline so later work can start from a shared understanding of what exists, what is intentionally out of scope, and what should be verified before changes.
 
@@ -32,9 +32,9 @@ The project is a local-operator baseline; release builds derive their displayed 
 Implemented capabilities:
 
 - CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
-- fixed scan pipeline: rustscan -> nmap fingerprinting -> fingerprint-driven httpx / NSE / nuclei
-- single-tool runs for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
-- port selection mirrors rustscan usage: `top1000` -> `--top`, numeric ranges like `100-1000` -> `--range`, and comma-separated numeric ports -> `--ports`; `highrisk` is maintained as an insertable CSV preset
+- fixed scan pipeline: nmap -sn alive sweep -> fathom (port/fingerprint/high-risk detection in one call) -> fingerprint-driven httpx / NSE / nuclei; nmap is retained as the NSE engine (and the alive-sweep engine until fathom's discover stage lands), rustscan is out of the pipeline
+- single-tool runs (standalone tool page, independent of the scan pipeline) for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
+- port selection follows rustscan-style expressions consumed by fathom: `top1000` -> common-1000 preset, numeric ranges like `100-1000`, and comma-separated numeric ports; `highrisk` is maintained as an insertable CSV preset
 - scan profiles: `slow`, `normal`, `fast`
 - per-tool extra args through configuration
 - shared scan preflight for CLI and Web Console
@@ -50,7 +50,7 @@ Implemented capabilities:
 - system/light/dark themes, keyboard-visible focus, shared confirmation dialogs, and 1280/1440 browser smoke coverage
 - projects organized by Network Zone; each project scan selects one zone and supplies its own targets, ports, exclusions, and profile
 - verification workbench for confirmed, not-observed, and inconclusive conclusions with ordered screenshot evidence
-- live run event logs, nmap heartbeat messages during slow `-sV` runs, and persisted interruption recovery facts
+- live run event logs (nmap alive sweep and fathom stage progress), and persisted interruption recovery facts
 - report filtering, detection coverage, finding evidence expansion, host/vulnerability aggregation, and copy/export for `IP`, `IP:PORT`, and `URL` lists
 - local vulnerability knowledge-base guidance plus optional `rdpscan` BlueKeep / CVE-2019-0708 detection
 
@@ -66,7 +66,7 @@ Implemented capabilities:
 | `config/nse.yaml` | nmap NSE script mapping for services with applicable scripts |
 | `internal/fingerprint/normalize.go` | service normalization aliases |
 
-Third-party tools are configured by path. AnchorScan does not package `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
+Third-party tools are configured by path. AnchorScan does not package `fathom`, `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
 
 ## Runtime Artifacts
 
@@ -82,7 +82,7 @@ These are generated locally and should not be treated as source:
 - Web Console is designed for local single-user use.
 - One active pipeline scan or single-tool run is allowed per database; persisted Run Leases prevent competing processes from owning work concurrently.
 - Web static resources are embedded in the Go binary. Rebuild the binary after frontend changes before judging browser behavior.
-- `nmap -sV --version-intensity 7` can be slow on `1-65535` full-range scans. This is expected; use narrow ports for lab checks.
+- `nmap -sV --version-intensity 7` can be slow on `1-65535` full-range scans. This is expected; use narrow ports for lab checks. (fathom replaced `-sV` fingerprinting in the scan pipeline; the note applies to the single-tool nmap service mode only.)
 - nuclei 与 NSE 根据服务指纹和各自规则独立调度：`config/service-tags.yaml` 映射 nuclei tags，`config/nse.yaml` 只为有适用 NSE 的服务映射脚本。服务可能运行两个引擎、其中一个，或在无规则时被跳过；Detection Coverage 记录实际执行事实。
 - Manual nuclei runs can target explicit tags or one template path from the CLI/Web single-tool flow.
 - BlueKeep / CVE-2019-0708 can be checked by the optional `rdpscan` engine. Missing configuration does not block scans; `SAFE` and `UNKNOWN` do not become confirmed vulnerabilities.

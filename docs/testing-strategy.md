@@ -12,7 +12,7 @@ Test each behavior at the lowest layer that can reproduce the actual risk throug
 | HTTP status, response body, and stable error-code mapping | Go `httptest` handler test |
 | SQLite persistence, transactions, migrations, and cleanup | Store or integration test |
 | Browser navigation, forms, focus, dialogs, rendering, clipboard, and downloads | Playwright browser smoke |
-| Real rustscan, nmap, httpx, and nuclei collaboration | Build-tagged Docker laboratory E2E |
+| Real fathom, nmap, httpx, and nuclei collaboration | Build-tagged Docker laboratory E2E |
 | Release archive contents and DOCX sidecar wiring | Packaging or focused integration test |
 
 ## Browser Coverage

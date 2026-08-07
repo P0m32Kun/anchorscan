@@ -5,7 +5,7 @@
 
 ## 项目一句话
 
-**anchorscan** —— 对一组网络目标（主机/IP）编排安全工具（rustscan / nmap / httpx / nuclei 等），产出服务指纹、漏洞发现与可读报告的扫描器。
+**anchorscan** —— 对一组网络目标（主机/IP）编排安全工具（fathom / nmap / httpx / nuclei 等），产出服务指纹、漏洞发现与可读报告的扫描器。
 
 ## 核心名词
 
@@ -22,21 +22,24 @@ Project 内用于组织测试范围和报告内容的业务分区。创建 Proje
 被扫描的**单个**主机/IP。一次 Run 扫描一组 Targets（`ScanOptions.Targets`）。Target 只能是规范 IPv4、IPv6 或 CIDR；hostname、范围表达式和以 `-` 开头的扫描器参数不是合法 Target。
 
 ### Scan Scope（授权扫描范围，简称 Scope）
-一次 Run 的规范化 include/exclude IP 前缀集合。由 `target.ParseScope` 使用 `net/netip` 构建，最大估算地址数为 4096，且不为计数展开 CIDR。Scope 是授权边界：Nmap 使用其 include/exclude 参数，Nmap 回传地址也必须通过 Scope 过滤，后续 rustscan、httpx 与检测阶段只接收允许地址。它的稳定快照保存进 `ScanOptions.ConfigSnapshot`。
+一次 Run 的规范化 include/exclude IP 前缀集合。由 `target.ParseScope` 使用 `net/netip` 构建，最大估算地址数为 4096，且不为计数展开 CIDR。Scope 是授权边界：Nmap 使用其 include/exclude 参数，Nmap 回传地址也必须通过 Scope 过滤，后续 fathom、httpx 与检测阶段只接收允许地址。它的稳定快照保存进 `ScanOptions.ConfigSnapshot`。
 
 
 ### TargetSet（目标集）
 Project 的**规范化扫描目标摄入清单**（每 Project 至多一个）。它是 Scan Create 的预填来源，只保存规范化 IPv4/IPv6/CIDR 目标；不保存漏洞、在线状态、指纹或 Run 结果，不演化为 CMDB。导入语义由 `internal/target.ParseTargetSet` 固定：按逗号/换行分割，复用 `target.Parse` 与 `netip` 校验（拒绝 URL、以 `-` 开头的命令片段、空值与非法地址），规范化后稳定去重并报告接受/重复/拒绝数量及原因。持久化载体为 `store.TargetSet`（`project_target_sets` 表，`project_id` 唯一），随 Project 删除级联清理。
 
 ### TargetScan（单目标扫描结果）
-对**一个** Target 执行流水线（rustscan→nmap→httpx→NSE/nuclei）产出的结果束：`Fingerprints` + `Findings` + `OpenPorts`（见 `internal/app.TargetScan`）。
+对**一个** Target 执行流水线（fathom→httpx→NSE/nuclei）产出的结果束：`Fingerprints` + `Findings` + `OpenPorts`（见 `internal/app.TargetScan`）。
 > 由候选 #1 深化引入：原为位置式 4 元组穿过接缝，现已正名为具名类型。`scanTarget` 是产出它的纯流水线，持久化由 fan-out 承担。
 
+### Fathom（侦察引擎）
+自研 Rust 单二进制（仓库独立于 anchorscan，不在本仓库内），M4.1 集成后成为 scan_target 内**唯一**端口/指纹引擎（spec v2.0：无 legacy 回退）。一次 `fathom scan --json <ip> -p <ports>` 调用完成 port→fingerprint→高危检测，逐开放端口输出一行 JSON（`internal/tools/fathom.go` 的 `fathomRecord`，checks 数组的 verdict 为 `vulnerable | safe | unknown`），JSONL 落 artifactDir。未配置时 preflight 直接报错，不启动扫描。服务名经 `internal/fingerprint/normalize.go` 别名表与 nmap 对齐（如 mssql→ms-sql）；不产 CPE（报告 CPE 降级为空）；当前仅支持 IPv4。集成中 fathom 的 discover 段未启用（`--discover` 不传），流水线外层存活扫描仍由 nmap `-sn` 承担，直到 fathom discover 段落地。
+
 ### Fingerprint（服务指纹，`fingerprint.ServiceFingerprint`）
-在一个 Target 的某端口上发现的服务：IP/端口/协议、service、product、version、是否 web、URL 等。由 nmap 服务识别产出，httpx 可对其进行 web 增强。
+在一个 Target 的某端口上发现的服务：IP/端口/协议、service、product、version、是否 web、URL 等。由 fathom 产出（此前为 nmap 服务识别），httpx 可对其进行 web 增强。
 
 ### Finding（漏洞发现，`report.Finding`）
-绑定到某指纹（IP:Port）的一条漏洞或值得关注项。来源（`Source`）：`manual-review`（人工复核建议）、`nse`（nmap NSE 脚本）、`nuclei`（nuclei 模板）、`rdpscan`（rdpscan BlueKeep 检测）。带 severity。
+绑定到某指纹（IP:Port）的一条漏洞或值得关注项。来源（`Source`）：`manual-review`（人工复核建议）、`fathom`（fathom 高危检测）、`nse`（nmap NSE 脚本）、`nuclei`（nuclei 模板）、`rdpscan`（rdpscan BlueKeep 检测）。带 severity。
 
 ### Verification（验证记录）
 对一个漏洞或验证项在一组资产上的人工确认结论，状态为 `confirmed`（已确认存在）、`not_observed`（本次验证未发现）或 `inconclusive`（无法判定）。Finding 可以发起 Verification，但没有 Finding 的负向验证也可以独立建立 Verification。对外报告中的通用漏洞说明（description）、本次验证过程/结果（detail）和内部备注是三个不同概念，不得相互代用。
@@ -61,7 +64,7 @@ Progress 的持久化形态：`{RunID, Time, Level, Stage, Message}`。web 进�
 一个正在执行的 Run 对其执行所有权和存活状态的持久化声明。CLI、Web 和单工具运行共用 Run Lease，以避免同一数据库上出现多个活动任务；执行进程定期续租。只有租约过期的 `running` Run 才能被判定为 `interrupted`。Run Lease 不提供任务队列、抢占或断点恢复。
 
 ### Artifact（制品）
-工具原始输出（rustscan ports、nmap-service XML、httpx JSONL、NSE XML、nuclei JSONL）落盘到本次 Run 的 `artifactDir`。命名由 `safeArtifactName` 规范化。报告与取证用。
+工具原始输出（fathom JSONL、NSE XML、httpx JSONL、nuclei JSONL）落盘到本次 Run 的 `artifactDir`。命名由 `safeArtifactName` 规范化。报告与取证用。
 
 ### Run Report（扫描运行报告）
 对一次 Run 的 Fingerprints + Findings + ScanData（活跃 IP、开放端口）的技术汇总产物：
