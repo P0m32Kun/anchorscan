@@ -4,7 +4,7 @@ AnchorScan 面向单机、已授权的内网扫描。首次安装、从源码构
 
 ## 发布归档与运行目录
 
-Release 归档支持 linux/amd64、darwin/arm64 和 windows/amd64。归档不包含 `fathom`（必配：scan_target 内唯一端口/指纹引擎）、`rustscan`、`nmap`、`httpx` 或 `nuclei`，这些外部工具必须由操作者安装并置于 `PATH`，再运行 `anchorscan doctor` 检查。启用达梦默认口令检测时，还需要在 `tools.nuclei_templates` 配置 Nuclei 社区模板仓库根目录，使 `javascript/detection/dameng-detect.yaml` 可读。
+Release 归档支持 linux/amd64、darwin/arm64 和 windows/amd64。归档不包含 `fathom`（必配：scan_target 内唯一端口/指纹引擎）、`nmap`、`httpx` 或 `nuclei`，这些外部工具必须由操作者安装并置于 `PATH`，再运行 `anchorscan doctor` 检查。启用达梦默认口令检测时，还需要在 `tools.nuclei_templates` 配置 Nuclei 社区模板仓库根目录，使 `javascript/detection/dameng-detect.yaml` 可读。
 
 从归档根目录运行程序，并保留其目录结构：其中的 `config/`、`tools/docx-render/` 和 DOCX 模板是运行期 sidecar。运行 `doctor` 首次初始化时会创建 `config/default.yaml`、`data/` 和 SQLite 数据库。
 
@@ -67,7 +67,7 @@ catalog 为**单源模式**：发行归档不包含 catalog，catalog 只在知�
 ## 运行限制与操作说明
 
 - 一份数据库同一时刻只允许一个 pipeline scan 或单工具运行；SQLite Run Lease 会阻止并发所有者。
-- 默认主机发现模式为 `auto`：IPv4 的存活探测由 fathom scan 内置（ICMP + TCP 回退），不再有外层 nmap -sn；IPv6（fathom 仅 IPv4）保留 nmap `-sn`。已确认在线的授权资产可显式使用 `--discovery assume-up`——anchorscan 侧不做任何存活预处理，scope 内全部地址直接进入扫描（fathom 内部探测照常），fathom 调用参数不变。该选择会进入配置快照和报告，且不会自动启用 UDP 扫描。
+- 默认主机发现模式为 `auto`：存活探测由 fathom scan 内置（ICMP + TCP 回退），不再有外层 nmap -sn。fathom 仅支持 IPv4：**IPv6 target 直接报错**（`fathom does not support IPv6 targets`），不提供 nmap -sn 兜底（M4.5）。已确认在线的授权资产可显式使用 `--discovery assume-up`——anchorscan 侧不做任何存活预处理，scope 内全部地址直接进入扫描（fathom 内部探测照常），fathom 调用参数不变。该选择会进入配置快照和报告，且不会自动启用 UDP 扫描。
 - Linux/macOS 取消会终止扫描器进程组；Windows 只保证直接启动的进程终止。
 - `completed_with_errors` 表示主扫描已有结果但可选检查失败；Detection Coverage 是本次执行事实，不是漏洞覆盖率或安全保证。
 - 工具超时默认关闭；配置 `30s`、`5m` 等显式时长后，超时会记录为 `failed` 或 `completed_with_errors`。

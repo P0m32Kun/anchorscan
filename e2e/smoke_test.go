@@ -29,10 +29,9 @@ import (
 
 func TestWriteConfigUsesSupportedTagRules(t *testing.T) {
 	configPath := writeConfig(t, repoRoot(t), t.TempDir(), toolPaths{
-		rustscan: "/opt/rustscan",
-		nmap:     "/opt/nmap",
-		httpx:    "/opt/httpx",
-		nuclei:   "/opt/nuclei",
+		nmap:   "/opt/nmap",
+		httpx:  "/opt/httpx",
+		nuclei: "/opt/nuclei",
 	})
 
 	rules, err := config.LoadTagRulesForConfig(configPath)
@@ -54,10 +53,9 @@ func TestWriteConfigUsesHermeticNucleiTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	configPath := writeConfig(t, repoRoot(t), dir, toolPaths{
-		rustscan: "/opt/rustscan",
-		nmap:     "/opt/nmap",
-		httpx:    "/opt/httpx",
-		nuclei:   nuclei,
+		nmap:   "/opt/nmap",
+		httpx:  "/opt/httpx",
+		nuclei: nuclei,
 	})
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -497,19 +495,17 @@ func containerIP(t *testing.T, root string, name string) string {
 }
 
 type toolPaths struct {
-	rustscan string
-	nmap     string
-	httpx    string
-	nuclei   string
+	nmap   string
+	httpx  string
+	nuclei string
 }
 
 func resolveToolPaths(t *testing.T) toolPaths {
 	t.Helper()
 	return toolPaths{
-		rustscan: mustFindTool(t, "ANCHORSCAN_RUSTSCAN", "rustscan", true),
-		nmap:     mustFindTool(t, "ANCHORSCAN_NMAP", "nmap", true),
-		httpx:    mustFindTool(t, "ANCHORSCAN_HTTPX", "httpx", true),
-		nuclei:   mustFindTool(t, "ANCHORSCAN_NUCLEI", "nuclei", true),
+		nmap:   mustFindTool(t, "ANCHORSCAN_NMAP", "nmap", true),
+		httpx:  mustFindTool(t, "ANCHORSCAN_HTTPX", "httpx", true),
+		nuclei: mustFindTool(t, "ANCHORSCAN_NUCLEI", "nuclei", true),
 	}
 }
 
@@ -568,7 +564,6 @@ exec "$ANCHORSCAN_E2E_NUCLEI_BINARY" -t "$ANCHORSCAN_E2E_NUCLEI_TEMPLATE" "$@"
 	}
 	configPath := filepath.Join(dir, "config.yaml")
 	content := fmt.Sprintf(`tools:
-  rustscan: %q
   nmap: %q
   httpx: %q
   nuclei: %q
@@ -580,10 +575,9 @@ scan:
 profiles:
   slow:
     host_workers: 1
-    rustscan_args: ["--ulimit", "5000"]
     nmap_args: ["-T2", "--max-retries", "2"]
     httpx_args: ["-silent"]
-`, paths.rustscan, paths.nmap, paths.httpx, nucleiWrapper)
+`, paths.nmap, paths.httpx, nucleiWrapper)
 	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}

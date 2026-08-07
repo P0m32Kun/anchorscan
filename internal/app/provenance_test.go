@@ -25,7 +25,7 @@ func TestBuildRunProvenanceRecordsVersionAndScope(t *testing.T) {
 		Version:        "v2.0.0-test",
 		ConfigSnapshot: `{"includes":["192.0.2.0/24"]}`,
 		Scope:          `{"includes":["192.0.2.0/24"]}`,
-		Tools:          config.ToolPaths{Rustscan: "/bin/rustscan", Nmap: "/bin/nmap"},
+		Tools:          config.ToolPaths{Nmap: "/bin/nmap"},
 	}, time.Unix(1, 0), time.Unix(2, 0), nil)
 	if p.Version != "v2.0.0-test" {
 		t.Fatalf("version = %q, want v2.0.0-test", p.Version)
@@ -36,7 +36,7 @@ func TestBuildRunProvenanceRecordsVersionAndScope(t *testing.T) {
 	if !p.StartedAt.Equal(time.Unix(1, 0)) || !p.FinishedAt.Equal(time.Unix(2, 0)) {
 		t.Fatalf("time boundaries wrong")
 	}
-	if p.ToolVersions["rustscan"] != "/bin/rustscan" {
+	if p.ToolVersions["nmap"] != "/bin/nmap" {
 		t.Fatalf("tool versions = %v", p.ToolVersions)
 	}
 }

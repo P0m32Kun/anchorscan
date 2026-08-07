@@ -210,22 +210,6 @@ func (s Scope) Excludes() []string { return prefixStrings(s.excludes) }
 
 func (s Scope) EstimatedAddresses() uint64 { return s.estimated }
 
-// RequiresNmapDiscovery reports whether the scope contains CIDR prefixes or
-// exclusions. Since M4.4 this no longer gates scan_targets: IPv4 CIDR/exclude
-// scopes are expanded and probed by fathom (its alive/port stages handle
-// per-address targets), and the nmap -sn sweep is required only for IPv6
-// scope parts (fathom is IPv4-only), which scan_targets checks via IsIPv6.
-// The method is kept for the nmap tool integration (DiscoverAliveInScopeWithOutput)
-// and for callers that still reason about nmap's own target syntax.
-func (s Scope) RequiresNmapDiscovery() bool {
-	for _, prefix := range s.includes {
-		if prefix.Bits() != prefix.Addr().BitLen() {
-			return true
-		}
-	}
-	return len(s.excludes) > 0
-}
-
 func (s Scope) IsIPv6() bool {
 	return len(s.includes) > 0 && !s.includes[0].Addr().Is4()
 }

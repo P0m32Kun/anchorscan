@@ -16,7 +16,7 @@ func TestExecuteToolHelpShowsTools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
-	for _, want := range []string{"anchorscan tool", "rustscan", "nmap", "httpx", "nuclei"} {
+	for _, want := range []string{"anchorscan tool", "nmap", "httpx", "nuclei"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("expected %q in %q", want, stdout.String())
 		}
@@ -26,7 +26,7 @@ func TestExecuteToolHelpShowsTools(t *testing.T) {
 func TestExecuteToolNucleiRejectsMissingTagsAndTemplate(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\n  httpx: httpx\n  nuclei: nuclei\n")
+	writeFile(t, configPath, "tools:\n  nmap: nmap\n  httpx: httpx\n  nuclei: nuclei\n")
 
 	err := run([]string{
 		"tool", "nuclei",
@@ -45,7 +45,7 @@ func TestExecuteToolNmapAliveWritesRunOutput(t *testing.T) {
 	configPath := filepath.Join(dir, "config.yaml")
 	dbPath := filepath.Join(dir, "scan.db")
 	jsonPath := filepath.Join(dir, "report.json")
-	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\n  httpx: httpx\n  nuclei: nuclei\n")
+	writeFile(t, configPath, "tools:\n  nmap: nmap\n  httpx: httpx\n  nuclei: nuclei\n")
 	runner := &recordingRunner{outputs: [][]byte{[]byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)}}
 
 	var stdout bytes.Buffer

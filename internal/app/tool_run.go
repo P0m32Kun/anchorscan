@@ -40,9 +40,9 @@ type ToolRunOptions struct {
 	Logf            func(format string, args ...any)
 }
 
-// RunTool executes a single-tool run (rustscan / nmap / httpx / nuclei with
-// native args). This is the standalone tool page feature — independent of the
-// scan pipeline, which uses fathom exclusively for alive/port/fingerprint
+// RunTool executes a single-tool run (nmap / httpx / nuclei with native
+// args). This is the standalone tool page feature — independent of the scan
+// pipeline, which uses fathom exclusively for alive/port/fingerprint
 // since M4.2.
 func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) (runErr error) {
 	if opts.RunID == "" {
@@ -103,8 +103,6 @@ func RunTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, o
 		var fingerprints []fingerprint.ServiceFingerprint
 		var findings []report.Finding
 		switch opts.Tool {
-		case "rustscan":
-			fingerprints, runErr = runRustscanTool(ctx, runner, scanStore, opts)
 		case "nmap":
 			fingerprints, findings, runErr = runNmapTool(ctx, runner, scanStore, opts)
 		case "httpx":
@@ -187,7 +185,7 @@ func saveToolRun(scanStore *store.Store, opts ToolRunOptions, startedAt time.Tim
 }
 
 func hasExtraArgs(args ToolExtraArgs) bool {
-	return len(args.Rustscan) > 0 || len(args.Nmap) > 0 || len(args.Httpx) > 0 || len(args.Nuclei) > 0
+	return len(args.Nmap) > 0 || len(args.Httpx) > 0 || len(args.Nuclei) > 0
 }
 
 func runNativeTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]report.Finding, error) {
@@ -264,8 +262,6 @@ func displayCommand(binary string, args []string) string {
 
 func nativeToolBinary(opts ToolRunOptions) (string, error) {
 	switch opts.Tool {
-	case "rustscan":
-		return opts.Tools.Rustscan, nil
 	case "nmap":
 		return opts.Tools.Nmap, nil
 	case "httpx":
@@ -275,31 +271,6 @@ func nativeToolBinary(opts ToolRunOptions) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown tool: %s", opts.Tool)
 	}
-}
-
-func runRustscanTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]fingerprint.ServiceFingerprint, error) {
-	if strings.TrimSpace(opts.Target) == "" || strings.TrimSpace(opts.Ports) == "" {
-		return nil, errors.New("rustscan requires target and ports")
-	}
-	emitTool(opts, scanStore, "info", "rustscan", "rustscan %s ports=%s", opts.Target, opts.Ports)
-	toolCtx, cancel := toolRunContext(ctx, opts)
-	ports, err := tools.DiscoverPorts(toolCtx, runner, opts.Tools.Rustscan, opts.Target, opts.Ports, opts.ExtraArgs.Rustscan)
-	if err != nil {
-		normalizedErr := normalizeToolError(toolCtx, err)
-		cancel()
-		return nil, normalizedErr
-	}
-	cancel()
-
-	out := make([]fingerprint.ServiceFingerprint, 0, len(ports))
-	for _, port := range ports {
-		fp := fingerprint.ServiceFingerprint{IP: opts.Target, Port: port, Protocol: "tcp"}
-		if err := scanStore.SaveFingerprint(opts.RunID, fp); err != nil {
-			return nil, err
-		}
-		out = append(out, fp)
-	}
-	return out, nil
 }
 
 func runNmapTool(ctx context.Context, runner tools.Runner, scanStore *store.Store, opts ToolRunOptions) ([]fingerprint.ServiceFingerprint, []report.Finding, error) {
@@ -427,8 +398,6 @@ func runNucleiTool(ctx context.Context, runner tools.Runner, scanStore *store.St
 
 func toolRunContext(ctx context.Context, opts ToolRunOptions) (context.Context, context.CancelFunc) {
 	switch opts.Tool {
-	case "rustscan":
-		return toolContext(ctx, opts.Timeouts.Rustscan)
 	case "nmap":
 		return toolContext(ctx, opts.Timeouts.Nmap)
 	case "httpx":

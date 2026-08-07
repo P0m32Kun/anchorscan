@@ -32,10 +32,10 @@ func TestRunLeaseRejectsSecondEntryWithoutCreatingRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		done <- RunTool(ctx, runner, firstStore, ToolRunOptions{RunID: "tool-1", Tool: "rustscan", Target: "192.0.2.1", Ports: "80", Tools: ToolPaths{Rustscan: "fixture"}, JSONReportPath: filepath.Join(t.TempDir(), "first.json")})
+		done <- RunTool(ctx, runner, firstStore, ToolRunOptions{RunID: "tool-1", Tool: "nmap", Target: "192.0.2.1", Ports: "80", Tools: ToolPaths{Nmap: "fixture"}, JSONReportPath: filepath.Join(t.TempDir(), "first.json")})
 	}()
 	<-started
-	err = RunTool(context.Background(), runner, secondStore, ToolRunOptions{RunID: "tool-2", Tool: "rustscan", Target: "192.0.2.2", Ports: "80", Tools: ToolPaths{Rustscan: "fixture"}, JSONReportPath: filepath.Join(t.TempDir(), "second.json")})
+	err = RunTool(context.Background(), runner, secondStore, ToolRunOptions{RunID: "tool-2", Tool: "nmap", Target: "192.0.2.2", Ports: "80", Tools: ToolPaths{Nmap: "fixture"}, JSONReportPath: filepath.Join(t.TempDir(), "second.json")})
 	if err == nil || err.Error() != "scan already running: tool-1" {
 		t.Fatalf("second entry error = %v", err)
 	}

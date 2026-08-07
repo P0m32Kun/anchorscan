@@ -34,13 +34,12 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 	for _, want := range []string{
 		"Usage: anchorscan scan",
 		"--target",
-		"IPv6",
 		"CIDR",
+		"IPv6",
 		"--ports",
 		"top1000",
 		"--profile",
 		"--host-workers",
-		"--rustscan-args",
 		"--nmap-args",
 		"--httpx-args",
 		"--nuclei-args",
@@ -57,9 +56,9 @@ func TestExecuteScanHelpShowsFlags(t *testing.T) {
 func TestLogPreflightReportsEffectiveToolTimeouts(t *testing.T) {
 	var stderr bytes.Buffer
 	logPreflight(&stderr, preflight.Result{Summary: preflight.Summary{Timeouts: config.ToolTimeouts{
-		Rustscan: "0", Nmap: "30s", Httpx: "150ms", NSE: "5m", Nuclei: "1m", Rdpscan: "0",
+		Nmap: "30s", Httpx: "150ms", NSE: "5m", Nuclei: "1m", Rdpscan: "0",
 	}}})
-	if got := stderr.String(); !strings.Contains(got, "rustscan=0 nmap=30s httpx=150ms nse=5m nuclei=1m rdpscan=0 (0=unlimited)") {
+	if got := stderr.String(); !strings.Contains(got, "nmap=30s httpx=150ms nse=5m nuclei=1m rdpscan=0 (0=unlimited)") {
 		t.Fatalf("preflight log missing timeouts: %q", got)
 	}
 }
@@ -67,7 +66,7 @@ func TestLogPreflightReportsEffectiveToolTimeouts(t *testing.T) {
 func TestExecuteScanReturnsPortErrorBeforeProfileError(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: nmap\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 
 	err := run([]string{
 		"scan",
@@ -84,7 +83,7 @@ func TestExecuteScanReturnsPortErrorBeforeProfileError(t *testing.T) {
 func TestExecuteScanRejectsInvalidDiscoveryMode(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: rustscan\n  nmap: nmap\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: nmap\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	err := run([]string{"scan", "--config", configPath, "--target", "192.0.2.1", "--discovery", "invalid"}, &bytes.Buffer{}, &bytes.Buffer{}, cliDeps{})
 	if err == nil || !strings.Contains(err.Error(), "invalid discovery mode") {
 		t.Fatalf("error = %v, want discovery mode error", err)
@@ -153,10 +152,9 @@ func TestExecuteScanStoresArtifactDirUnderSelectedRoot(t *testing.T) {
 	dbPath := filepath.Join(dir, "scan.db")
 	jsonPath := filepath.Join(dir, "report.json")
 	artifactRoot := filepath.Join(dir, "custom-artifacts")
-	rustscanPath := writeExecutable(t, dir, "rustscan")
 	nmapPath := writeExecutable(t, dir, "nmap")
 	fathomPath := writeExecutable(t, dir, "fathom")
-	writeFile(t, configPath, "tools:\n  fathom: "+fathomPath+"\n  rustscan: "+rustscanPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+fathomPath+"\n  nmap: "+nmapPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeScanRuleFiles(t, dir)
 
 	runner := &recordingRunner{outputs: [][]byte{
@@ -201,7 +199,7 @@ func TestExecuteScanPrintsPreflightSummary(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeScanRuleFiles(t, dir)
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
@@ -256,7 +254,6 @@ func TestExecuteScanPassesProfileAndToolArgs(t *testing.T) {
 	jsonPath := filepath.Join(dir, "report.json")
 	writeFile(t, configPath, `tools:
   fathom: `+toolPath+`
-  rustscan: `+toolPath+`
   nmap: `+toolPath+`
   httpx: `+toolPath+`
   nuclei: `+toolPath+`
@@ -266,13 +263,11 @@ scan:
 profiles:
   normal:
     host_workers: 3
-    rustscan_args: ["--batch-size", "500"]
     nmap_args: ["-T3"]
     httpx_args: ["-rate-limit", "100"]
     nuclei_args: ["-rate-limit", "50"]
   slow:
     host_workers: 1
-    rustscan_args: ["--batch-size", "100"]
     nmap_args: ["-T2"]
     httpx_args: ["-rate-limit", "20"]
     nuclei_args: ["-rate-limit", "10"]

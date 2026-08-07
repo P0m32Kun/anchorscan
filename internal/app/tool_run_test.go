@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -80,32 +79,6 @@ func newToolRunStore(t *testing.T) *store.Store {
 		t.Fatal(err)
 	}
 	return st
-}
-
-func TestRunToolRustscanSavesOpenPorts(t *testing.T) {
-	st := newToolRunStore(t)
-	jsonPath := filepath.Join(t.TempDir(), "report.json")
-	runner := toolRunnerFunc(func(_ string, _ []string) ([]byte, error) {
-		return []byte("[80,443]"), nil
-	})
-
-	err := RunTool(context.Background(), runner, st, ToolRunOptions{
-		RunID: "run-rustscan", Tool: "rustscan", Target: "192.0.2.10", Ports: "80,443", Tools: ToolPaths{Rustscan: "rustscan"}, JSONReportPath: jsonPath,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fps, err := st.ListFingerprints("run-rustscan")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(fps) != 2 || fps[0].Port != 80 || fps[1].Port != 443 {
-		t.Fatalf("fingerprints = %#v", fps)
-	}
-	if _, err := os.Stat(jsonPath); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func TestRunToolNmapServiceSavesFingerprints(t *testing.T) {
@@ -345,7 +318,6 @@ func TestRunToolAppliesConfiguredToolTimeout(t *testing.T) {
 		tool     string
 		timeouts ToolTimeouts
 	}{
-		{tool: "rustscan", timeouts: ToolTimeouts{Rustscan: time.Millisecond}},
 		{tool: "nmap", timeouts: ToolTimeouts{Nmap: time.Millisecond}},
 		{tool: "httpx", timeouts: ToolTimeouts{Httpx: time.Millisecond}},
 		{tool: "nuclei", timeouts: ToolTimeouts{Nuclei: time.Millisecond}},
@@ -361,7 +333,7 @@ func TestRunToolAppliesConfiguredToolTimeout(t *testing.T) {
 			})
 			err := RunTool(context.Background(), runner, st, ToolRunOptions{
 				RunID: "run-timeout-" + test.tool, Tool: test.tool, UseNativeArgs: true, NativeArgs: []string{"--version"},
-				Tools:    ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+				Tools:    ToolPaths{Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
 				Timeouts: test.timeouts, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 			})
 			if !errors.Is(err, context.DeadlineExceeded) {
@@ -380,8 +352,8 @@ func TestRunToolZeroTimeoutReusesContext(t *testing.T) {
 		return []byte("ok"), nil
 	})
 	if err := RunTool(context.Background(), runner, st, ToolRunOptions{
-		RunID: "run-unlimited", Tool: "rustscan", UseNativeArgs: true, NativeArgs: []string{"--version"},
-		Tools: ToolPaths{Rustscan: "rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		RunID: "run-unlimited", Tool: "nmap", UseNativeArgs: true, NativeArgs: []string{"--version"},
+		Tools: ToolPaths{Nmap: "nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatal(err)
 	}

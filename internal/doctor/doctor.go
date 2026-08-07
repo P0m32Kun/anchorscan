@@ -49,7 +49,6 @@ func Run(opts Options) []Check {
 		// (spec v2.0): a missing path is a blocking deployment defect, surfaced
 		// here as a fail (the actual scan-time block lives in preflight).
 		toolCheck("fathom", cfg.Tools.Fathom, false),
-		rustscanCheck(cfg.Tools.Rustscan),
 		toolCheck("nmap", cfg.Tools.Nmap, false),
 		toolCheck("httpx", cfg.Tools.Httpx, true),
 		toolCheck("nuclei", cfg.Tools.Nuclei, true),
@@ -82,21 +81,6 @@ func HasFailures(checks []Check) bool {
 		}
 	}
 	return false
-}
-
-// rustscanCheck reports rustscan as optional with a pipeline note: rustscan
-// left the scan pipeline in M4.2 (fathom replaced its port discovery), and it
-// now only serves the single-tool manual invocation page.
-func rustscanCheck(path string) Check {
-	const note = "; not used in scan pipeline (single-tool mode only)"
-	if strings.TrimSpace(path) == "" {
-		return warningCheck("rustscan", "not configured (optional)"+note)
-	}
-	check := toolCheck("rustscan", path, true)
-	if check.Status != StatusFail {
-		check.Message += note
-	}
-	return check
 }
 
 func toolCheck(name, path string, optional bool) Check {

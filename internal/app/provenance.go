@@ -185,11 +185,10 @@ func HashFile(path string) (string, error) {
 
 func toolVersions(tools config.ToolPaths, provider func(name, path string) string) map[string]string {
 	m := map[string]string{
-		"rustscan": tools.Rustscan,
-		"nmap":     tools.Nmap,
-		"httpx":    tools.Httpx,
-		"nuclei":   tools.Nuclei,
-		"rdpscan":  tools.Rdpscan,
+		"nmap":    tools.Nmap,
+		"httpx":   tools.Httpx,
+		"nuclei":  tools.Nuclei,
+		"rdpscan": tools.Rdpscan,
 	}
 	if provider == nil {
 		provider = func(name, path string) string {

@@ -355,7 +355,7 @@ func executionFields(opts ScanOptions) any {
 	}{opts.Targets, opts.Ports, opts.Tools, opts.ProfileName, opts.HostWorkers, opts.ExtraArgs, opts.NSERules, opts.TagRules}
 }
 
-type prepareScanFixture struct{ dir, configPath, dbPath, jsonPath, artifactPath, rustscan, httpx, configYAML string }
+type prepareScanFixture struct{ dir, configPath, dbPath, jsonPath, artifactPath, httpx, configYAML string }
 
 func newPrepareScanFixture(t *testing.T) prepareScanFixture {
 	t.Helper()
@@ -367,12 +367,12 @@ func newPrepareScanFixture(t *testing.T) prepareScanFixture {
 		}
 		return path
 	}
-	fixture := prepareScanFixture{dir: dir, rustscan: tool("rustscan"), httpx: tool("httpx")}
+	fixture := prepareScanFixture{dir: dir, httpx: tool("httpx")}
 	nmap, nuclei := tool("nmap"), tool("nuclei")
 	fathom := tool("fathom")
 	fixture.configPath = filepath.Join(dir, "anchorscan.yaml")
 	fixture.dbPath, fixture.jsonPath, fixture.artifactPath = filepath.Join(dir, "scan.db"), filepath.Join(dir, "out", "report.json"), filepath.Join(dir, "artifacts")
-	fixture.configYAML = "tools:\n  fathom: " + fathom + "\n  rustscan: " + fixture.rustscan + "\n  nmap: " + nmap + "\n  httpx: " + fixture.httpx + "\n  nuclei: " + nuclei + "\nscan:\n  ports: 80,443,8080\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 3\n    nmap_args: [-T3]\n  slow:\n    host_workers: 1\n    nmap_args: [-T2]\n"
+	fixture.configYAML = "tools:\n  fathom: " + fathom + "\n  nmap: " + nmap + "\n  httpx: " + fixture.httpx + "\n  nuclei: " + nuclei + "\nscan:\n  ports: 80,443,8080\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 3\n    nmap_args: [-T3]\n  slow:\n    host_workers: 1\n    nmap_args: [-T2]\n"
 	if err := os.WriteFile(fixture.configPath, []byte(fixture.configYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -31,7 +31,6 @@ type scanForm struct {
 	AccessPoint    string          `json:"access_point"`
 	TesterIP       string          `json:"tester_ip"`
 	Notes          string          `json:"notes"`
-	RustscanArgs   string          `json:"rustscan_args"`
 	NmapArgs       string          `json:"nmap_args"`
 	HttpxArgs      string          `json:"httpx_args"`
 	NucleiArgs     string          `json:"nuclei_args"`
@@ -170,11 +169,10 @@ func (s *server) scanCreate(w http.ResponseWriter, r *http.Request) {
 		ExcludePorts:   form.ExcludePorts,
 		DiscoveryMode:  form.DiscoveryMode,
 		Overrides: config.Overrides{
-			ProfileName:  form.Profile,
-			RustscanArgs: form.RustscanArgs,
-			NmapArgs:     form.NmapArgs,
-			HttpxArgs:    form.HttpxArgs,
-			NucleiArgs:   form.NucleiArgs,
+			ProfileName: form.Profile,
+			NmapArgs:    form.NmapArgs,
+			HttpxArgs:   form.HttpxArgs,
+			NucleiArgs:  form.NucleiArgs,
 		},
 		DBPath:         s.opts.DBPath,
 		JSONReportPath: jsonPath,
@@ -240,7 +238,6 @@ func scanFormFromRequest(r *http.Request) scanForm {
 		AccessPoint:    strings.TrimSpace(r.FormValue("access_point")),
 		TesterIP:       strings.TrimSpace(r.FormValue("tester_ip")),
 		Notes:          strings.TrimSpace(r.FormValue("notes")),
-		RustscanArgs:   r.FormValue("rustscan_args"),
 		NmapArgs:       r.FormValue("nmap_args"),
 		HttpxArgs:      r.FormValue("httpx_args"),
 		NucleiArgs:     r.FormValue("nuclei_args"),

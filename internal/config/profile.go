@@ -6,12 +6,11 @@ import (
 )
 
 type Overrides struct {
-	ProfileName  string
-	HostWorkers  int
-	RustscanArgs string
-	NmapArgs     string
-	HttpxArgs    string
-	NucleiArgs   string
+	ProfileName string
+	HostWorkers int
+	NmapArgs    string
+	HttpxArgs   string
+	NucleiArgs  string
 }
 
 type EffectiveScan struct {
@@ -51,12 +50,6 @@ func ResolveScan(cfg Config, overrides Overrides) (EffectiveScan, error) {
 	}
 
 	var err error
-	if overrides.RustscanArgs != "" {
-		out.Rustscan, err = SplitArgs(overrides.RustscanArgs)
-		if err != nil {
-			return EffectiveScan{}, err
-		}
-	}
 	if overrides.NmapArgs != "" {
 		out.Nmap, err = SplitArgs(overrides.NmapArgs)
 		if err != nil {
@@ -83,7 +76,6 @@ func ValidateScopeSafeToolArgs(args ToolArgs) error {
 		name string
 		args []string
 	}{
-		{"rustscan", args.Rustscan},
 		{"nmap", args.Nmap},
 		{"httpx", args.Httpx},
 		{"nuclei", args.Nuclei},
@@ -97,9 +89,6 @@ func ValidateScopeSafeToolArgs(args ToolArgs) error {
 
 func validateScopeSafeArgs(tool string, args []string) error {
 	allowed := map[string]map[string]bool{
-		"rustscan": {
-			"--batch-size": true, "--timeout": true, "--tries": true, "--ulimit": true,
-		},
 		"nmap": {
 			"-T0": false, "-T1": false, "-T2": false, "-T3": false, "-T4": false, "-T5": false,
 			"-sV": false, "--version-light": false,
@@ -145,28 +134,25 @@ func builtInProfiles() map[string]Profile {
 		"slow": {
 			HostWorkers: 1,
 			ToolArgs: ToolArgs{
-				Rustscan: []string{"--batch-size", "500", "--timeout", "3000", "--tries", "2", "--ulimit", "5000"},
-				Nmap:     []string{"-T2", "--max-retries", "3", "--scan-delay", "100ms"},
-				Httpx:    []string{"-rate-limit", "20", "-threads", "5"},
-				Nuclei:   []string{"-rate-limit", "10", "-c", "5", "-retries", "2"},
+				Nmap:   []string{"-T2", "--max-retries", "3", "--scan-delay", "100ms"},
+				Httpx:  []string{"-rate-limit", "20", "-threads", "5"},
+				Nuclei: []string{"-rate-limit", "10", "-c", "5", "-retries", "2"},
 			},
 		},
 		"normal": {
 			HostWorkers: 3,
 			ToolArgs: ToolArgs{
-				Rustscan: []string{"--batch-size", "1000", "--tries", "2", "--ulimit", "5000"},
-				Nmap:     []string{"-T3", "--max-retries", "2"},
-				Httpx:    []string{"-rate-limit", "100", "-threads", "20"},
-				Nuclei:   []string{"-rate-limit", "50", "-c", "20"},
+				Nmap:   []string{"-T3", "--max-retries", "2"},
+				Httpx:  []string{"-rate-limit", "100", "-threads", "20"},
+				Nuclei: []string{"-rate-limit", "50", "-c", "20"},
 			},
 		},
 		"fast": {
 			HostWorkers: 8,
 			ToolArgs: ToolArgs{
-				Rustscan: []string{"--batch-size", "1500", "--tries", "2", "--ulimit", "5000"},
-				Nmap:     []string{"-T4", "--max-retries", "1"},
-				Httpx:    []string{"-rate-limit", "300", "-threads", "50"},
-				Nuclei:   []string{"-rate-limit", "150", "-c", "50"},
+				Nmap:   []string{"-T4", "--max-retries", "1"},
+				Httpx:  []string{"-rate-limit", "300", "-threads", "50"},
+				Nuclei: []string{"-rate-limit", "150", "-c", "50"},
 			},
 		},
 	}

@@ -271,7 +271,7 @@ func TestScanCreatePassesPortRangeToFathom(t *testing.T) {
 func TestScanCreateRejectsUnsupportedPortFormats(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+filepath.Join(dir, "missing-rustscan")+"\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+filepath.Join(dir, "missing-nmap")+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	dbPath := filepath.Join(dir, "scan.db")
 	scanStore, err := store.Open(dbPath)
 	if err != nil {

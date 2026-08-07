@@ -102,13 +102,9 @@ func Run(opts Options) Result {
 	}
 
 	checkRequiredFathom(&result, opts.Tools.Fathom)
-	// rustscan left the scan pipeline in M4.2 (fathom is the sole port/fingerprint
-	// engine); it survives only as an optional manual tool-page invocation, so a
-	// missing binary warns instead of blocking a scan.
-	checkOptionalTool(&result, "rustscan", opts.Tools.Rustscan)
-	// nmap stays required: it is the NSE engine and the IPv6 alive-sweep engine
-	// (fathom is IPv4-only; IPv4 alive probing is internal to fathom scan since
-	// M4.4).
+	// nmap stays required: it is the NSE engine (alive probing is internal to
+	// fathom scan since M4.4; the pipeline rejects IPv6 targets outright since
+	// M4.5, so there is no IPv6 discovery role anymore).
 	checkRequiredTool(&result, "nmap", opts.Tools.Nmap)
 	checkOptionalTool(&result, "httpx", opts.Tools.Httpx)
 	checkOptionalTool(&result, "nuclei", opts.Tools.Nuclei)

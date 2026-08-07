@@ -186,7 +186,7 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 	tagsValue := r.FormValue("tags")
 	templateValue := strings.TrimSpace(r.FormValue("template"))
 	extraArgsText := r.FormValue("extra_args")
-	if !useNativeArgs && (toolName == "rustscan" || (toolName == "nmap" && mode != "alive")) {
+	if !useNativeArgs && toolName == "nmap" && mode != "alive" {
 		if portsValue == "" {
 			portsValue = cfg.Scan.Ports
 		}
@@ -232,10 +232,9 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 		Template:       templateValue,
 		RulePaths:      rulePaths,
 		Tools: app.ToolPaths{
-			Rustscan: cfg.Tools.Rustscan,
-			Nmap:     cfg.Tools.Nmap,
-			Httpx:    cfg.Tools.Httpx,
-			Nuclei:   cfg.Tools.Nuclei,
+			Nmap:   cfg.Tools.Nmap,
+			Httpx:  cfg.Tools.Httpx,
+			Nuclei: cfg.Tools.Nuclei,
 		},
 		Timeouts:       timeouts,
 		JSONReportPath: jsonPath,
@@ -266,7 +265,7 @@ func (s *server) toolCreate(w http.ResponseWriter, r *http.Request) {
 
 func isManualTool(toolName string) bool {
 	switch toolName {
-	case "rustscan", "nmap", "httpx", "nuclei":
+	case "nmap", "httpx", "nuclei":
 		return true
 	default:
 		return false
@@ -284,23 +283,6 @@ func manualToolByName(name string) (manualTool, bool) {
 
 func manualTools() []manualTool {
 	return []manualTool{
-		{
-			Name:        "rustscan",
-			Title:       "Rustscan 单工具调用",
-			Summary:     "快速发现主机开放端口，适合先摸清资产入口。",
-			Placeholder: "例如 -a 192.168.1.10 --ports 22,80,443,3389",
-			Help: []string{
-				"参数框填写 rustscan 原生参数，例如 -a 192.168.1.10 --ports 80,443。",
-				"端口写法保持 rustscan 习惯：--top、--range 100-1000、--ports 80,443。",
-				"这里不会再包装参数；你输入什么就拼到 rustscan 后面执行。",
-				"需要调速、批量或脚本参数时，直接按 rustscan 原生命令写。",
-			},
-			Presets: []toolPreset{
-				{Label: "快速 Web", Hint: "常见 Web 端口", RawArgs: "-a 192.168.1.10 --ports 80,443,8080,8443"},
-				{Label: "常见内网", Hint: "管理与中间件端口", RawArgs: "-a 192.168.1.10 --ports 22,80,443,445,3389,6379,8080"},
-				{Label: "全端口慢扫", Hint: "覆盖完整端口", RawArgs: "-a 192.168.1.10 --range 1-65535"},
-			},
-		},
 		{
 			Name:        "nmap",
 			Title:       "Nmap 单工具调用",
@@ -354,8 +336,6 @@ func manualTools() []manualTool {
 
 func applyToolExtraArgs(opts *app.ToolRunOptions, toolName string, args []string) {
 	switch toolName {
-	case "rustscan":
-		opts.ExtraArgs.Rustscan = args
 	case "nmap":
 		opts.ExtraArgs.Nmap = args
 	case "httpx":

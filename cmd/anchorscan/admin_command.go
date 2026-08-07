@@ -129,11 +129,10 @@ func runTools(args []string, stdout io.Writer) error {
 	}
 
 	for name, path := range map[string]string{
-		"fathom":   cfg.Tools.Fathom,
-		"rustscan": cfg.Tools.Rustscan,
-		"nmap":     cfg.Tools.Nmap,
-		"httpx":    cfg.Tools.Httpx,
-		"nuclei":   cfg.Tools.Nuclei,
+		"fathom": cfg.Tools.Fathom,
+		"nmap":   cfg.Tools.Nmap,
+		"httpx":  cfg.Tools.Httpx,
+		"nuclei": cfg.Tools.Nuclei,
 	} {
 		if err := checkToolPath(path); err != nil {
 			return fmt.Errorf("%s: %w", name, err)

@@ -32,9 +32,9 @@ The project is a local-operator baseline; release builds derive their displayed 
 Implemented capabilities:
 
 - CLI commands: `scan`, `tool`, `report`, `doctor`, `tools check`, `web`, `cancel`
-- fixed scan pipeline: fathom (alive probing is internal to `fathom scan` — ICMP + TCP fallback — plus port/fingerprint/high-risk detection in one call) -> fingerprint-driven httpx / NSE / nuclei; nmap is retained as the NSE engine and as the alive-sweep engine for IPv6 only (fathom is IPv4-only, M4.4), rustscan is out of the pipeline
-- single-tool runs (standalone tool page, independent of the scan pipeline) for rustscan port discovery, nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates
-- port selection follows rustscan-style expressions consumed by fathom: `top1000` -> common-1000 preset, numeric ranges like `100-1000`, and comma-separated numeric ports; `highrisk` is maintained as an insertable CSV preset
+- fixed scan pipeline: fathom (alive probing is internal to `fathom scan` — ICMP + TCP fallback — plus port/fingerprint/high-risk detection in one call) -> fingerprint-driven httpx / NSE / nuclei; nmap is retained as the NSE engine (M4.4 removed its IPv4 alive role; M4.5 removed the IPv6 `-sn` sweep — fathom is IPv4-only and IPv6 targets are rejected outright)
+- single-tool runs (standalone tool page, independent of the scan pipeline) for nmap alive/service checks, httpx web fingerprints, and nuclei tags/templates (rustscan mode removed in M4.5)
+- port selection follows fathom-native expressions: `top1000` -> common-1000 preset, numeric ranges like `100-1000`, and comma-separated numeric ports; `highrisk` is maintained as an insertable CSV preset
 - scan profiles: `slow`, `normal`, `fast`
 - per-tool extra args through configuration
 - shared scan preflight for CLI and Web Console
@@ -66,7 +66,7 @@ Implemented capabilities:
 | `config/nse.yaml` | nmap NSE script mapping for services with applicable scripts |
 | `internal/fingerprint/normalize.go` | service normalization aliases |
 
-Third-party tools are configured by path. AnchorScan does not package `fathom`, `rustscan`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
+Third-party tools are configured by path. AnchorScan does not package `fathom`, `nmap`, `httpx`, `nuclei`, or Metasploit into the binary.
 
 ## Runtime Artifacts
 

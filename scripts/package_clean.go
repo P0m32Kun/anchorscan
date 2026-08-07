@@ -22,7 +22,7 @@ import (
 // SQLite file is still caught.
 var forbiddenArchivePatterns = []string{
 	"catalog.json",
-	"nmap", "nuclei", "rustscan", "httpx", "masscan", "naabu",
+	"nmap", "nuclei", "httpx", "masscan", "naabu",
 	".db", ".sqlite", ".sqlite3",
 	".log",
 	"reports/", "evidence/", "fingerprints/", "findings/",

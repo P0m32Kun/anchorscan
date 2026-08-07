@@ -83,9 +83,10 @@ func DiscoverAliveInScope(ctx context.Context, runner Runner, binaryPath string,
 }
 
 // DiscoverAliveInScopeWithOutput runs `nmap -sn` and returns the alive
-// addresses plus the raw XML. Since M4.4 it is the alive engine for IPv6
-// scope parts only (fathom owns IPv4 alive probing inside `fathom scan`); it
-// also backs the single-tool `nmap --mode alive` invocation (tool_run.go).
+// addresses plus the raw XML. Since M4.4 it no longer serves the scan
+// pipeline (fathom owns IPv4 alive probing inside `fathom scan`; the pipeline
+// rejects IPv6 targets outright since M4.5) — it backs the single-tool
+// `nmap --mode alive` invocation (tool_run.go).
 func DiscoverAliveInScopeWithOutput(ctx context.Context, runner Runner, binaryPath string, scope target.Scope, extraArgs []string) ([]string, []byte, error) {
 	args := []string{"-sn"}
 	if scope.IsIPv6() {

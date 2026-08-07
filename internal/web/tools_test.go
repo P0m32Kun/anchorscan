@@ -34,7 +34,7 @@ func TestToolNewPageRenders(t *testing.T) {
 		t.Fatalf("status mismatch: %d body=%s", res.Code, res.Body.String())
 	}
 	body := res.Body.String()
-	for _, want := range []string{"单独运行工具", "rustscan", "nmap", "httpx", "nuclei", "Local Lab"} {
+	for _, want := range []string{"单独运行工具", "nmap", "httpx", "nuclei", "Local Lab"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected %q in body: %s", want, body)
 		}
@@ -205,7 +205,7 @@ func TestToolCreateSavesZoneAndVerification(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	scanStore, err := store.Open(dbPath)
@@ -280,7 +280,7 @@ func TestToolCreateRunsNativeRawArgs(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	runner := &serverSequenceRunner{outputs: [][]byte{
@@ -334,7 +334,7 @@ func TestToolCreateStartsRun(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "scan.db")
 	configPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(configPath, []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(configPath, []byte("tools:\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\nscan:\n  ports: 80,443\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 	runner := &serverSequenceRunner{outputs: [][]byte{

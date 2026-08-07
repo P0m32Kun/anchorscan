@@ -455,7 +455,6 @@ Use the lab container IPs resolved above. Keep `--ports` narrow.
 
 | Tool | Command | Expected |
 | --- | --- | --- |
-| rustscan | `anchorscan tool rustscan --target <IP> --ports 8080,6379 --db data/scans.sqlite --json reports/tool-rustscan.json` | Open ports land in fingerprints table |
 | nmap alive | `anchorscan tool nmap --mode alive --target <IP> --db data/scans.sqlite --json reports/tool-nmap-alive.json` | Host-up info finding recorded |
 | nmap service | `anchorscan tool nmap --mode service --target <IP> --ports 6379 --db data/scans.sqlite --json reports/tool-nmap-service.json` | redis fingerprint saved, normalized `mysql`/`redis` as expected |
 | httpx | `anchorscan tool httpx --url http://<IP>:8080 --db data/scans.sqlite --json reports/tool-httpx.json` | Web fingerprint with title/tech saved |
@@ -492,7 +491,7 @@ where source = 'manual-review';
 ### Web Console Single Tool Page
 
 1. Open `/tools/new` (or sidebar 单工具调用).
-2. Pick a tool card (rustscan / nmap / httpx / nuclei).
+2. Pick a tool card (nmap / httpx / nuclei).
 3. Submit the per-tool form with a lab target.
 4. Confirm the run starts and shows up under runs.
 5. Open its report page; confirm the tool result is present.

@@ -40,7 +40,7 @@ func TestSaveRawWithBackupWritesValidatedConfig(t *testing.T) {
 	if err := os.WriteFile(path, []byte("scan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
-	raw := "tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\nscan:\n  ports: 8080,6379\n  profile: slow\nprofiles:\n  slow:\n    host_workers: 1\n"
+	raw := "tools:\n  nmap: /opt/nmap\nscan:\n  ports: 8080,6379\n  profile: slow\nprofiles:\n  slow:\n    host_workers: 1\n"
 
 	backup, err := SaveRawWithBackup(path, raw, time.Date(2026, 7, 8, 10, 0, 0, 0, time.UTC))
 	if err != nil {

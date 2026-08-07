@@ -17,7 +17,6 @@ func TestLoadParsesToolPathsAndDefaults(t *testing.T) {
 	path := filepath.Join(dir, "config.yaml")
 	content := []byte(`
 tools:
-  rustscan: /usr/local/bin/rustscan
   nmap: /usr/local/bin/nmap
   httpx: /usr/local/bin/httpx
   nuclei: /usr/local/bin/nuclei
@@ -33,11 +32,8 @@ scan:
 	}
 
 	var paths ToolPaths = cfg.Tools
-	if paths.Rustscan != "/usr/local/bin/rustscan" || paths.Nmap != "/usr/local/bin/nmap" {
+	if paths.Nmap != "/usr/local/bin/nmap" || paths.Httpx != "/usr/local/bin/httpx" {
 		t.Fatalf("unexpected tool paths: %#v", paths)
-	}
-	if cfg.Tools.Rustscan != "/usr/local/bin/rustscan" {
-		t.Fatalf("unexpected rustscan path: %q", cfg.Tools.Rustscan)
 	}
 	if cfg.Scan.Ports != "top1000" {
 		t.Fatalf("unexpected default ports: %q", cfg.Scan.Ports)
@@ -46,19 +42,19 @@ scan:
 
 func TestLoadValidatesToolTimeouts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: -1s\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("timeouts:\n  nmap: 0\n  httpx: -1s\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load accepted a negative timeout")
 	}
-	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: invalid\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("timeouts:\n  nmap: 0\n  httpx: invalid\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("Load accepted an invalid timeout")
 	}
-	if err := os.WriteFile(path, []byte("timeouts:\n  rustscan: 2s\n  nmap: 0\n  httpx: 0\n  nse: 150ms\n  nuclei: 1m\n  dameng: 0\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("timeouts:\n  nmap: 0\n  httpx: 0\n  nse: 150ms\n  nuclei: 1m\n  dameng: 0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -66,7 +62,7 @@ func TestLoadValidatesToolTimeouts(t *testing.T) {
 		t.Fatal(err)
 	}
 	timeouts, err := cfg.Timeouts.Durations()
-	if err != nil || timeouts.Rustscan.String() != "2s" || timeouts.NSE.String() != "150ms" || timeouts.Nmap != 0 || timeouts.Dameng != 0 {
+	if err != nil || timeouts.NSE.String() != "150ms" || timeouts.Nmap != 0 || timeouts.Dameng != 0 {
 		t.Fatalf("timeouts = %#v, %v", timeouts, err)
 	}
 }
@@ -115,7 +111,6 @@ func TestLoadParsesProfiles(t *testing.T) {
 	path := filepath.Join(dir, "config.yaml")
 	content := []byte(`
 tools:
-  rustscan: /opt/rustscan
   nmap: /opt/nmap
   httpx: /opt/httpx
   nuclei: /opt/nuclei
@@ -125,7 +120,6 @@ scan:
 profiles:
   slow:
     host_workers: 1
-    rustscan_args: ["--batch-size", "100"]
     nmap_args: ["-T2", "--max-retries", "3"]
     httpx_args: ["-rate-limit", "20"]
     nuclei_args: ["-rate-limit", "10"]
@@ -154,7 +148,7 @@ profiles:
 func TestLoadDefaultsProfileToNormal(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	content := []byte("tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\nscan:\n  ports: top1000\n")
+	content := []byte("tools:\n  nmap: /opt/nmap\nscan:\n  ports: top1000\n")
 	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}

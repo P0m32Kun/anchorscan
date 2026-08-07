@@ -18,7 +18,7 @@ func TestManagerAllowsOnlyOneActiveScan(t *testing.T) {
 	}
 	defer scanStore.Close()
 	manager := NewManager(waitForCancelRunner{}, scanStore)
-	opts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json")}
+	opts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json")}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if _, err := manager.Start(ctx, opts); err != nil {
@@ -38,8 +38,8 @@ func TestManagerAllowsOnlyOneActiveToolRun(t *testing.T) {
 	}
 	manager := NewManager(waitForCancelRunner{}, scanStore)
 	opts := ToolRunOptions{
-		RunID: "tool-1", Tool: "rustscan", Target: "127.0.0.1", Ports: "22",
-		Tools: ToolPaths{Rustscan: "/opt/rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
+		RunID: "tool-1", Tool: "nmap", Target: "127.0.0.1", Ports: "22",
+		Tools: ToolPaths{Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -75,7 +75,7 @@ func testManagerRejectsRunHeldByAnotherManager(t *testing.T) {
 	second := NewManager(waitForCancelRunner{}, secondStore)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	firstOpts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "first.json")}
+	firstOpts := ScanOptions{RunID: "run-1", ProfileName: "normal", Targets: []string{"127.0.0.1"}, Ports: "22", Tools: ToolPaths{Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "first.json")}
 	if _, err := first.Start(ctx, firstOpts); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestManagerStartRecordsScanRunBeforeReturning(t *testing.T) {
 		ProfileName:    "normal",
 		Targets:        []string{"127.0.0.1"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Nmap: "/opt/nmap"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		ArtifactRoot:   t.TempDir(),
 	}
@@ -137,8 +137,8 @@ func TestManagerStartToolRecordsRunBeforeReturning(t *testing.T) {
 	defer scanStore.Close()
 	manager := NewManager(waitForCancelRunner{}, scanStore)
 	opts := ToolRunOptions{
-		RunID: "tool-early", Tool: "rustscan", Target: "127.0.0.1", Ports: "22",
-		Tools: ToolPaths{Rustscan: "/opt/rustscan"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
+		RunID: "tool-early", Tool: "nmap", Target: "127.0.0.1", Ports: "22",
+		Tools: ToolPaths{Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "tool.json"),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
