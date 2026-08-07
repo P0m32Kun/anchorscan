@@ -162,6 +162,42 @@ func TestRunFailsWhenRuleFilesAreMissing(t *testing.T) {
 	}
 }
 
+func TestVersionLinePrefersVersionMentioningLine(t *testing.T) {
+	cases := []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{
+			name:   "httpx banner then version",
+			output: "__    __\n   / /_ /\n\n		projectdiscovery.io\n\n[INF] Current Version: v1.10.0\n",
+			want:   "Current Version: v1.10.0",
+		},
+		{
+			name:   "nuclei ansi-colored inf prefix",
+			output: "\x1b[34mINF\x1b[0m Nuclei Engine Version: v3.11.0\n\x1b[34mINF\x1b[0m Nuclei Config Directory: /x\n",
+			want:   "Nuclei Engine Version: v3.11.0",
+		},
+		{
+			name:   "nmap version on first line",
+			output: "Nmap version 7.99 ( https://nmap.org )\n",
+			want:   "Nmap version 7.99 ( https://nmap.org )",
+		},
+		{
+			name:   "fathom plain version",
+			output: "fathom 0.1.0\n",
+			want:   "fathom 0.1.0",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := versionLine(tc.output); got != tc.want {
+				t.Fatalf("versionLine(%q) = %q, want %q", tc.output, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestRdpscanMissingReportsOptionalHint(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
