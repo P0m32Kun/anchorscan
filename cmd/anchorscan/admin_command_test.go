@@ -12,12 +12,11 @@ import (
 func TestExecuteToolsCheckReportsConfiguredTools(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, filepath.Join(dir, "rustscan"), "")
 	writeFile(t, filepath.Join(dir, "nmap"), "")
 	writeFile(t, filepath.Join(dir, "httpx"), "")
 	writeFile(t, filepath.Join(dir, "nuclei"), "")
 	writeFile(t, filepath.Join(dir, "fathom"), "")
-	writeFile(t, configPath, "tools:\n  fathom: "+filepath.Join(dir, "fathom")+"\n  rustscan: "+filepath.Join(dir, "rustscan")+"\n  nmap: "+filepath.Join(dir, "nmap")+"\n  httpx: "+filepath.Join(dir, "httpx")+"\n  nuclei: "+filepath.Join(dir, "nuclei")+"\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+filepath.Join(dir, "fathom")+"\n  nmap: "+filepath.Join(dir, "nmap")+"\n  httpx: "+filepath.Join(dir, "httpx")+"\n  nuclei: "+filepath.Join(dir, "nuclei")+"\n")
 
 	var stdout bytes.Buffer
 	err := run([]string{"tools", "check", "--config", configPath}, &stdout, &bytes.Buffer{}, cliDeps{})
@@ -26,7 +25,7 @@ func TestExecuteToolsCheckReportsConfiguredTools(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, name := range []string{"fathom: ok", "rustscan: ok", "nmap: ok", "httpx: ok", "nuclei: ok"} {
+	for _, name := range []string{"fathom: ok", "nmap: ok", "httpx: ok", "nuclei: ok"} {
 		if !strings.Contains(output, name) {
 			t.Fatalf("expected %q in output %q", name, output)
 		}
@@ -38,7 +37,7 @@ func TestExecuteDoctorPrintsOptionalWarningsAndVersions(t *testing.T) {
 	toolPath := filepath.Join(dir, "tool")
 	writeFile(t, toolPath, "#!/bin/sh\necho scanner 1.2.3\n")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: \"\"\n  nuclei: \"\"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
 
 	var stdout bytes.Buffer
@@ -48,7 +47,6 @@ func TestExecuteDoctorPrintsOptionalWarningsAndVersions(t *testing.T) {
 	}
 	for _, want := range []string{
 		"fathom: ok scanner 1.2.3",
-		"rustscan: ok scanner 1.2.3; not used in scan pipeline (single-tool mode only)",
 		"nmap: ok scanner 1.2.3",
 		"httpx: warning",
 		"nuclei: warning",
@@ -67,7 +65,7 @@ func TestExecuteDoctorPrintsChecks(t *testing.T) {
 	toolPath := filepath.Join(dir, "tool")
 	writeFile(t, toolPath, "#!/bin/sh\necho scanner 1.2.3\n")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  fathom: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
 	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
 
@@ -79,7 +77,6 @@ func TestExecuteDoctorPrintsChecks(t *testing.T) {
 	for _, want := range []string{
 		"config: ok",
 		"fathom: ok",
-		"rustscan: ok",
 		"nmap: ok",
 		"ports: ok",
 		"nse rules: ok",

@@ -15,7 +15,7 @@ func TestRunScanRecordsReportWriteFailure(t *testing.T) {
 		RunID:          "run-report-failure",
 		Targets:        []string{"172.22.0.7"},
 		Ports:          "1-65535",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 	})
 	if err == nil {
@@ -49,7 +49,7 @@ func TestRunScanPersistsRunLifecycleAndEvents(t *testing.T) {
 		ProfileName:    "normal",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 		ConfigSnapshot: "profile: normal",
 	}

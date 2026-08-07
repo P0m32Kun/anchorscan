@@ -28,9 +28,8 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	artifactRoot := fs.String("artifacts", filepath.Join("data", "artifacts"), "path to scan artifact directory root")
 	portsSpec := fs.String("ports", "", "ports preset or csv")
 	profileFlag := fs.String("profile", "", "scan profile: slow, normal, or fast")
-	discoveryFlag := fs.String("discovery", "auto", "host discovery mode: auto (fathom-internal alive probing; nmap -sn for IPv6) or assume-up")
+	discoveryFlag := fs.String("discovery", "auto", "host discovery mode: auto (fathom-internal alive probing) or assume-up")
 	hostWorkersFlag := fs.Int("host-workers", 0, "host-level worker count override")
-	rustscanArgsFlag := fs.String("rustscan-args", "", "extra rustscan args")
 	nmapArgsFlag := fs.String("nmap-args", "", "extra nmap args")
 	httpxArgsFlag := fs.String("httpx-args", "", "extra httpx args")
 	nucleiArgsFlag := fs.String("nuclei-args", "", "extra nuclei args")
@@ -59,12 +58,11 @@ func runScan(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		JSONReportPath: *jsonPath,
 		ArtifactRoot:   strings.TrimSpace(*artifactRoot),
 		Overrides: config.Overrides{
-			ProfileName:  *profileFlag,
-			HostWorkers:  *hostWorkersFlag,
-			RustscanArgs: *rustscanArgsFlag,
-			NmapArgs:     *nmapArgsFlag,
-			HttpxArgs:    *httpxArgsFlag,
-			NucleiArgs:   *nucleiArgsFlag,
+			ProfileName: *profileFlag,
+			HostWorkers: *hostWorkersFlag,
+			NmapArgs:    *nmapArgsFlag,
+			HttpxArgs:   *httpxArgsFlag,
+			NucleiArgs:  *nucleiArgsFlag,
 		},
 	})
 	if err != nil {
@@ -132,7 +130,7 @@ func logScan(w io.Writer, format string, args ...any) {
 
 func logPreflight(w io.Writer, result preflight.Result) {
 	logScan(w, "preflight targets=%d ports=%s profile=%s workers=%d", result.Summary.TargetCount, result.Summary.PortSpec, result.Summary.Profile, result.Summary.Workers)
-	logScan(w, "preflight timeouts fathom=%s rustscan=%s nmap=%s httpx=%s nse=%s nuclei=%s rdpscan=%s (0=unlimited)", result.Summary.Timeouts.Fathom, result.Summary.Timeouts.Rustscan, result.Summary.Timeouts.Nmap, result.Summary.Timeouts.Httpx, result.Summary.Timeouts.NSE, result.Summary.Timeouts.Nuclei, result.Summary.Timeouts.Rdpscan)
+	logScan(w, "preflight timeouts fathom=%s nmap=%s httpx=%s nse=%s nuclei=%s rdpscan=%s (0=unlimited)", result.Summary.Timeouts.Fathom, result.Summary.Timeouts.Nmap, result.Summary.Timeouts.Httpx, result.Summary.Timeouts.NSE, result.Summary.Timeouts.Nuclei, result.Summary.Timeouts.Rdpscan)
 	for _, warning := range result.Warnings {
 		logScan(w, "preflight warning %s: %s", warning.Field, warning.Message)
 	}
@@ -146,13 +144,12 @@ func printScanHelp(w io.Writer) {
 
 Flags:
   --config <path>   Config file path
-  --target <value>  Target IP, IPv6, CIDR, or comma-separated list
-  --exclude-targets <value>  IP, IPv6, CIDR, or comma-separated exclusions
+  --target <value>  Target IPv4 IP or CIDR, or comma-separated list (IPv6 unsupported: fathom is IPv4-only)
+  --exclude-targets <value>  IPv4 IP/CIDR or comma-separated exclusions
   --ports <value>   top1000, a range like 100-1000, or CSV like 80,443
   --profile slow|normal|fast
   --discovery auto|assume-up
   --host-workers N
-  --rustscan-args "..."
   --nmap-args "..."
   --httpx-args "..."
   --nuclei-args "..."

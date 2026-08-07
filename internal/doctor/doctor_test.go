@@ -11,7 +11,7 @@ func TestRunFailsWhenEnabledRuleFilesAreMissingOrEmpty(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	t.Chdir(dir)
 
 	writeFile(t, filepath.Join(dir, "nse.yaml"), "")
@@ -26,7 +26,7 @@ func TestConfiguredInvalidRdpscanFails(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  rdpscan: /missing/rdpscan\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  rdpscan: /missing/rdpscan\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
 	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
 
@@ -40,7 +40,6 @@ func TestRunReportsMissingTool(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")
 	if err := os.WriteFile(configPath, []byte(`tools:
-  rustscan: /missing/rustscan
   nmap: /missing/nmap
 scan:
   ports: top1000
@@ -56,8 +55,8 @@ profiles:
 	if !HasFailures(checks) {
 		t.Fatalf("expected failures: %#v", checks)
 	}
-	if !containsCheck(checks, "rustscan", false) {
-		t.Fatalf("expected rustscan failure: %#v", checks)
+	if !containsCheck(checks, "nmap", false) {
+		t.Fatalf("expected nmap failure: %#v", checks)
 	}
 }
 
@@ -65,7 +64,7 @@ func TestRunReportsDatabaseMigrationFailure(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 	badDB := filepath.Join(dir, "scan.db")
 	writeFile(t, badDB, "not sqlite")
@@ -80,7 +79,7 @@ func TestRunChecksDatabaseCanOpen(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "ports-top1000.txt"), "80,443")
 
 	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: filepath.Join(dir, "reports")})
@@ -96,40 +95,11 @@ func TestFathomMissingFails(t *testing.T) {
 	// fathom is the sole alive/port/fingerprint engine (spec v2.0); doctor
 	// must surface a missing path as a fail even though the blocking logic
 	// lives in preflight.
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 
 	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
 	if !containsCheck(checks, "fathom", false) {
 		t.Fatalf("missing fathom must fail doctor: %#v", checks)
-	}
-}
-
-func TestRustscanMissingIsOptionalWithPipelineNote(t *testing.T) {
-	dir := t.TempDir()
-	toolPath := writeExecutable(t, dir, "tool")
-	configPath := filepath.Join(dir, "config.yaml")
-	// rustscan left the scan pipeline in M4.2; a missing path must warn (with
-	// the pipeline note) instead of failing doctor.
-	writeFile(t, configPath, "tools:\n  rustscan: \"\"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  fathom: "+toolPath+"\nscan:\n  ports: 22\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
-
-	checks := Run(Options{ConfigPath: configPath, DBPath: filepath.Join(dir, "scan.db"), ReportDir: dir})
-	if HasFailures(checks) {
-		t.Fatalf("missing rustscan must not fail doctor: %#v", checks)
-	}
-	var found bool
-	for _, c := range checks {
-		if c.Name == "rustscan" {
-			found = true
-			if c.Status != StatusWarning {
-				t.Fatalf("expected rustscan warning, got %s: %#v", c.Status, checks)
-			}
-			if !strings.Contains(c.Message, "not used in scan pipeline") {
-				t.Fatalf("expected pipeline note in rustscan message, got %q", c.Message)
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("rustscan check not found: %#v", checks)
 	}
 }
 
@@ -179,7 +149,7 @@ func TestRunFailsWhenRuleFilesAreMissing(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\nscan:\n  ports: 80\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	for _, fileName := range []string{"nse.yaml", "service-tags.yaml"} {
 		if err := os.Remove(filepath.Join(dir, fileName)); err != nil {
 			t.Fatal(err)
@@ -196,7 +166,7 @@ func TestRdpscanMissingReportsOptionalHint(t *testing.T) {
 	dir := t.TempDir()
 	toolPath := writeExecutable(t, dir, "tool")
 	configPath := filepath.Join(dir, "config.yaml")
-	writeFile(t, configPath, "tools:\n  rustscan: "+toolPath+"\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  fathom: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
+	writeFile(t, configPath, "tools:\n  nmap: "+toolPath+"\n  httpx: "+toolPath+"\n  nuclei: "+toolPath+"\n  fathom: "+toolPath+"\nscan:\n  ports: top1000\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 1\n")
 	writeFile(t, filepath.Join(dir, "nse.yaml"), "ssh: [ssh-hostkey]\n")
 	writeFile(t, filepath.Join(dir, "service-tags.yaml"), "- name: ssh\n  service: [ssh]\n  nuclei_tags: [ssh]\n")
 

@@ -58,11 +58,6 @@
         <p class="meta-line config-field-help">scan_target 内唯一端口/指纹引擎：一次调用完成端口发现、指纹与高危检测；未配置则无法启动扫描。</p>
       </label>
       <label class="full-width">
-        <span>Rustscan 路径（仅单工具执行模式）</span>
-        <input name="rustscan" value="{{.Config.Tools.Rustscan}}" placeholder="例如: /usr/local/bin/rustscan">
-        <p class="meta-line config-field-help">扫描流水线不再调用 rustscan（端口发现已由 fathom 替代）；仅用于工具页的单工具执行模式。</p>
-      </label>
-      <label class="full-width">
         <span>Nmap 路径</span>
         <input name="nmap" value="{{.Config.Tools.Nmap}}" placeholder="例如: /usr/local/bin/nmap">
       </label>
@@ -89,7 +84,6 @@
         <p class="meta-line config-field-help">使用 Go duration（例如 30s、5m）；填 0 表示不限时，档位不会覆盖这些全局设置。</p>
         <div class="form-grid timeout-grid">
           <label><span>Fathom</span><input name="timeout_fathom" value="{{.Config.Timeouts.Fathom}}"></label>
-          <label><span>Rustscan</span><input name="timeout_rustscan" value="{{.Config.Timeouts.Rustscan}}"></label>
           <label><span>Nmap</span><input name="timeout_nmap" value="{{.Config.Timeouts.Nmap}}"></label>
           <label><span>Httpx</span><input name="timeout_httpx" value="{{.Config.Timeouts.Httpx}}"></label>
           <label><span>NSE</span><input name="timeout_nse" value="{{.Config.Timeouts.NSE}}"></label>
@@ -112,7 +106,7 @@
       <label>
         <span>全局默认端口</span>
         <input name="ports" value="{{.Config.Scan.Ports}}" placeholder="例如: top1000、100-1000 或 80,443,8080">
-        <p class="meta-line config-field-help">端口格式沿用 rustscan 写法习惯、由 fathom 直接消费：top1000 = 常见 1000 端口；100-1000 = 端口范围；80,443,8080 = 端口列表。不支持 full/highrisk。</p>
+        <p class="meta-line config-field-help">端口格式由 fathom 直接消费：top1000 = 常见 1000 端口；100-1000 = 端口范围；80,443,8080 = 端口列表。不支持 full/highrisk。</p>
       </label>
       <label>
         <span>全局默认档位</span>

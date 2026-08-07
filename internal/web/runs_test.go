@@ -436,7 +436,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 		Ports:          "80,443",
 		Profile:        "normal",
 		Status:         "interrupted",
-		ConfigSnapshot: `{"zone_id":"I","target":"198.51.100.10","exclude_targets":"198.51.100.20","ports":"80,443","exclude_ports":"22","discovery_mode":"invalid","profile":"fast","rustscan_args":"--ulimit 5000","nmap_args":"-sV"}`,
+		ConfigSnapshot: `{"zone_id":"I","target":"198.51.100.10","exclude_targets":"198.51.100.20","ports":"80,443","exclude_ports":"22","discovery_mode":"invalid","profile":"fast","nmap_args":"-sV"}`,
 		StartedAt:      time.Unix(1, 0),
 	}); err != nil {
 		t.Fatalf("SaveScanRun returned error: %v", err)
@@ -463,7 +463,7 @@ func TestInterruptedRunShowsHistoryAndPrefilledRerunFormWithoutStarting(t *testi
 		t.Fatalf("rerun page status: %d %s", rerun.Code, rerun.Body.String())
 	}
 	body := rerun.Body.String()
-	for _, want := range []string{`data-scan-create-props=`, "isRerun", "zone_id", "198.51.100.10", "exclude_targets", "198.51.100.20", "ports", "80,443", "exclude_ports", "22", "auto", "fast", "--ulimit 5000", "-sV"} {
+	for _, want := range []string{`data-scan-create-props=`, "isRerun", "zone_id", "198.51.100.10", "exclude_targets", "198.51.100.20", "ports", "80,443", "exclude_ports", "22", "auto", "fast", "-sV"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("rerun page missing %q: %s", want, body)
 		}

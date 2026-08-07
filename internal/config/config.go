@@ -12,17 +12,15 @@ import (
 )
 
 type ToolArgs struct {
-	Rustscan []string `yaml:"rustscan_args"`
-	Nmap     []string `yaml:"nmap_args"`
-	Httpx    []string `yaml:"httpx_args"`
-	Nuclei   []string `yaml:"nuclei_args"`
+	Nmap   []string `yaml:"nmap_args"`
+	Httpx  []string `yaml:"httpx_args"`
+	Nuclei []string `yaml:"nuclei_args"`
 }
 
 type ToolPaths struct {
-	Rustscan string `yaml:"rustscan"`
-	Nmap     string `yaml:"nmap"`
-	Httpx    string `yaml:"httpx"`
-	Nuclei   string `yaml:"nuclei"`
+	Nmap   string `yaml:"nmap"`
+	Httpx  string `yaml:"httpx"`
+	Nuclei string `yaml:"nuclei"`
 	// NucleiTemplates is the root of the community nuclei-templates checkout.
 	NucleiTemplates string `yaml:"nuclei_templates"`
 	Rdpscan         string `yaml:"rdpscan"`
@@ -30,10 +28,9 @@ type ToolPaths struct {
 	// It does not point to an external binary; any non-empty value enables it.
 	Dameng string `yaml:"dameng"`
 	// Fathom is the self-contained Rust recon binary (M4.1). It replaces the
-	// rustscan + nmap -sV port/fingerprint stages, and since M4.4 also owns
-	// IPv4 alive probing (ICMP + TCP fallback inside `fathom scan`; nmap -sn
-	// survives for IPv6 only). It emits one JSON object per open port (see
-	// internal/tools/fathom.go).
+	// nmap -sV port/fingerprint stages, and since M4.4 also owns IPv4 alive
+	// probing (ICMP + TCP fallback inside `fathom scan`). It emits one JSON
+	// object per open port (see internal/tools/fathom.go).
 	Fathom string `yaml:"fathom"`
 }
 
@@ -48,25 +45,23 @@ func (p ToolPaths) DamengTemplatePath() string {
 }
 
 type ToolTimeouts struct {
-	Rustscan string `yaml:"rustscan"`
-	Nmap     string `yaml:"nmap"`
-	Httpx    string `yaml:"httpx"`
-	NSE      string `yaml:"nse"`
-	Nuclei   string `yaml:"nuclei"`
-	Rdpscan  string `yaml:"rdpscan"`
-	Dameng   string `yaml:"dameng"`
-	Fathom   string `yaml:"fathom"`
+	Nmap    string `yaml:"nmap"`
+	Httpx   string `yaml:"httpx"`
+	NSE     string `yaml:"nse"`
+	Nuclei  string `yaml:"nuclei"`
+	Rdpscan string `yaml:"rdpscan"`
+	Dameng  string `yaml:"dameng"`
+	Fathom  string `yaml:"fathom"`
 }
 
 type ToolDurations struct {
-	Rustscan time.Duration
-	Nmap     time.Duration
-	Httpx    time.Duration
-	NSE      time.Duration
-	Nuclei   time.Duration
-	Rdpscan  time.Duration
-	Dameng   time.Duration
-	Fathom   time.Duration
+	Nmap    time.Duration
+	Httpx   time.Duration
+	NSE     time.Duration
+	Nuclei  time.Duration
+	Rdpscan time.Duration
+	Dameng  time.Duration
+	Fathom  time.Duration
 }
 
 func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
@@ -82,9 +77,6 @@ func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
 	}
 	var out ToolDurations
 	var err error
-	if out.Rustscan, err = parse("rustscan", timeouts.Rustscan); err != nil {
-		return out, err
-	}
 	if out.Nmap, err = parse("nmap", timeouts.Nmap); err != nil {
 		return out, err
 	}
@@ -110,7 +102,7 @@ func (timeouts ToolTimeouts) Durations() (ToolDurations, error) {
 }
 
 func (timeouts ToolTimeouts) Normalized() ToolTimeouts {
-	for _, value := range []*string{&timeouts.Rustscan, &timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan, &timeouts.Dameng, &timeouts.Fathom} {
+	for _, value := range []*string{&timeouts.Nmap, &timeouts.Httpx, &timeouts.NSE, &timeouts.Nuclei, &timeouts.Rdpscan, &timeouts.Dameng, &timeouts.Fathom} {
 		if *value == "" {
 			*value = "0"
 		}

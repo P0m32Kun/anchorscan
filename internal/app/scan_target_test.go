@@ -318,8 +318,8 @@ func TestRunScanKeepsEarlierFindingWhenLaterStageIsCanceled(t *testing.T) {
 
 // TestRunScanSkipsBackStageWhenFathomFindsNoOpenPorts guards the empty-output
 // contract: fathom returning no fingerprint lines must short-circuit the whole
-// back stage (httpx/NSE/nuclei/rdpscan/dameng) exactly like an empty rustscan
-// port list did.
+// back stage (httpx/NSE/nuclei/rdpscan/dameng), exactly like an empty port
+// list did before.
 func TestRunScanSkipsBackStageWhenFathomFindsNoOpenPorts(t *testing.T) {
 	runner := &emptyPortRunner{}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
@@ -614,10 +614,9 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
 		JSONReportPath: reportPath,
 		ExtraArgs: ToolExtraArgs{
-			Rustscan: []string{"--batch-size", "500"},
-			Nmap:     []string{"-T3"},
-			Httpx:    []string{"-rate-limit", "100"},
-			Nuclei:   []string{"-rate-limit", "50"},
+			Nmap:   []string{"-T3"},
+			Httpx:  []string{"-rate-limit", "100"},
+			Nuclei: []string{"-rate-limit", "50"},
 		},
 		NSERules: map[string][]string{
 			"ssh": {"ssh2-enum-algos"},

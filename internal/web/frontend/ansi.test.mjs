@@ -28,7 +28,7 @@ test('renders bright colors and bold', () => {
   );
 });
 
-test('renders 24-bit truecolor from rustscan', () => {
+test('renders 24-bit truecolor output', () => {
   assert.equal(
     ansiToHtml('\x1b[38;2;0;255;0mgreen\x1b[0m'),
     '<span style="color:rgb(0,255,0)">green</span>',

@@ -134,7 +134,7 @@ func TestInitFathomConfig(t *testing.T) {
 		t.Fatal("generated fathom timeout is empty; defaultConfig must set it")
 	}
 	// The timeout must parse. Fathom defaults to "0" (no standalone timeout,
-	// same policy as rustscan/nmap), which Durations() maps to a zero duration.
+	// same policy as nmap), which Durations() maps to a zero duration.
 	durs, err := generated.Timeouts.Durations()
 	if err != nil {
 		t.Fatalf("Durations() failed: %v", err)

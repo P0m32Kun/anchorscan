@@ -79,7 +79,7 @@ async function startServer(configPath) {
 async function writeTestConfig(workDir) {
   const source = await fs.readFile(path.join(repoRoot, 'config', 'default.yaml.example'), 'utf8');
   const quotedFixture = JSON.stringify(fixture);
-  let config = ['rustscan', 'nmap', 'httpx', 'nuclei', 'fathom'].reduce(
+  let config = ['nmap', 'httpx', 'nuclei', 'fathom'].reduce(
     (text, name) => text.replace(new RegExp(`^(\\s*${name}:).*$`, 'm'), `$1 ${quotedFixture}`),
     source,
   );
@@ -648,22 +648,22 @@ try {
   await page.waitForTimeout(150);
   assert.equal(await page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'light');
 
-  assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '0');
-  await page.locator('input[name="timeout_rustscan"]').fill('30s');
-  await page.locator('input[name="timeout_rustscan"]').focus();
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'timeout_rustscan');
+  assert.equal(await page.locator('input[name="timeout_fathom"]').inputValue(), '0');
+  await page.locator('input[name="timeout_fathom"]').fill('30s');
+  await page.locator('input[name="timeout_fathom"]').focus();
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('name')), 'timeout_fathom');
   await page.locator('input[name="timeout_nmap"]').fill('0');
   await page.locator('textarea[name="raw_config"]').fill(': invalid');
   await page.getByRole('button', { name: '应用高级 YAML 配置' }).click();
   await assert.doesNotReject(() => page.getByText(/配置应用失败/).waitFor());
   await page.goto(`${baseURL}/config`);
-  assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '0');
-  await page.locator('input[name="timeout_rustscan"]').fill('30s');
+  assert.equal(await page.locator('input[name="timeout_fathom"]').inputValue(), '0');
+  await page.locator('input[name="timeout_fathom"]').fill('30s');
   await page.getByLabel('全局默认端口').fill('80,443');
   await page.getByRole('button', { name: /保存/ }).first().click();
   await page.waitForURL(/\/config\?saved=1/);
   await page.goto(`${baseURL}/config`);
-  assert.equal(await page.locator('input[name="timeout_rustscan"]').inputValue(), '30s');
+  assert.equal(await page.locator('input[name="timeout_fathom"]').inputValue(), '30s');
   assert.equal(consoleLogs.length, 0, consoleLogs.join('\n'));
 
   await context.tracing.stop();

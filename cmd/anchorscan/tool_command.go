@@ -18,7 +18,7 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 	if len(args) == 0 || isHelpRequest(args[0]) {
 		printToolHelp(stdout)
 		if len(args) == 0 {
-			return errors.New("usage: anchorscan tool <rustscan|nmap|httpx|nuclei>")
+			return errors.New("usage: anchorscan tool <nmap|httpx|nuclei>")
 		}
 		return nil
 	}
@@ -54,7 +54,7 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		return err
 	}
 	resolvedPorts := strings.TrimSpace(*portsValue)
-	if toolName == "rustscan" || (toolName == "nmap" && *modeValue != "alive") {
+	if toolName == "nmap" && *modeValue != "alive" {
 		if resolvedPorts == "" {
 			resolvedPorts = cfg.Scan.Ports
 		}
@@ -103,10 +103,9 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 		Template:  *templateValue,
 		RulePaths: rulePaths,
 		Tools: app.ToolPaths{
-			Rustscan: cfg.Tools.Rustscan,
-			Nmap:     cfg.Tools.Nmap,
-			Httpx:    cfg.Tools.Httpx,
-			Nuclei:   cfg.Tools.Nuclei,
+			Nmap:   cfg.Tools.Nmap,
+			Httpx:  cfg.Tools.Httpx,
+			Nuclei: cfg.Tools.Nuclei,
 		},
 		Timeouts:       timeouts,
 		JSONReportPath: *jsonPath,
@@ -125,8 +124,6 @@ func runTool(args []string, stdout io.Writer, stderr io.Writer, deps cliDeps) er
 
 func applyToolExtraArgs(opts *app.ToolRunOptions, toolName string, args []string) {
 	switch toolName {
-	case "rustscan":
-		opts.ExtraArgs.Rustscan = args
 	case "nmap":
 		opts.ExtraArgs.Nmap = args
 	case "httpx":
@@ -147,10 +144,9 @@ func splitCSV(value string) []string {
 }
 
 func printToolHelp(w io.Writer) {
-	_, _ = fmt.Fprintln(w, `Usage: anchorscan tool <rustscan|nmap|httpx|nuclei> [flags]
+	_, _ = fmt.Fprintln(w, `Usage: anchorscan tool <nmap|httpx|nuclei> [flags]
 
 Examples:
-  anchorscan tool rustscan --target 192.168.1.10 --ports 80,443
   anchorscan tool nmap --target 192.168.1.10 --ports 80,443
   anchorscan tool nmap --target 192.168.1.10 --mode alive
   anchorscan tool httpx --url http://192.168.1.10:8080

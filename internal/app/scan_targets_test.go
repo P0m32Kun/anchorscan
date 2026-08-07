@@ -332,120 +332,49 @@ func TestRunScanReturnsErrorWhenAllTargetsFail(t *testing.T) {
 	}
 }
 
-// ---- M4.4: fathom owns IPv4 alive probing; nmap -sn survives for IPv6 only ----
+// ---- M4.5: fathom is IPv4-only; IPv6 targets are rejected outright ----
 
-// ipv6AliveSweepXML renders an nmap -sn -6 result with one up host.
-func ipv6AliveSweepXML(target string) string {
-	return `<nmaprun><host><status state="up"/><address addr="` + target + `" addrtype="ipv6"/></host></nmaprun>`
+// TestRunScanRejectsIPv6Targets pins the M4.5 acceptance: the pipeline no
+// longer falls back to an nmap -sn sweep for IPv6 (fathom is IPv4-only), so an
+// IPv6 target fails with an explicit error.
+func TestRunScanRejectsIPv6Targets(t *testing.T) {
+	tests := []struct {
+		name    string
+		targets []string
+	}{
+		{name: "single IPv6 address", targets: []string{"2001:db8::1"}},
+		{name: "IPv6 CIDR", targets: []string{"2001:db8::/126"}},
+		{name: "mixed IPv4 and IPv6 scope", targets: []string{"192.0.2.0/30", "2001:db8::/126"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := RunScan(context.Background(), &recordingSequenceRunner{}, newScanStore(t), ScanOptions{
+				RunID: "run-ipv6", Targets: tt.targets, Ports: "22",
+				Tools: ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+			})
+			if err == nil || !strings.Contains(err.Error(), "fathom does not support IPv6 targets") {
+				t.Fatalf("expected fathom IPv6 rejection, got %v", err)
+			}
+		})
+	}
 }
 
-// TestRunScanAutoModeKeepsNmapSweepForIPv6 pins that an IPv6-only scope still
-// runs the nmap -sn sweep (fathom is IPv4-only), writes the nmap-alive-ipv6
-// artifact, and reports the nmap-confirmed hosts as alive even though fathom
-// emits no fingerprints for them.
-func TestRunScanAutoModeKeepsNmapSweepForIPv6(t *testing.T) {
-	dir := t.TempDir()
+// TestRunScanAllowsIPv4CIDRWithoutNmap pins the reverse: an IPv4 CIDR scope no
+// longer needs nmap for discovery (fathom expands and probes it internally),
+// so a missing nmap binary must not block the scan.
+func TestRunScanAllowsIPv4CIDRWithoutNmap(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte(ipv6AliveSweepXML("2001:db8::1")),
+		fathomJSONL("192.0.2.1", 22, "ssh", "OpenSSH", ""),
 	}}
 	err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
-		RunID:          "run-ipv6",
-		Targets:        []string{"2001:db8::/126"},
-		Ports:          "22",
-		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
-		ArtifactRoot:   dir,
-		JSONReportPath: filepath.Join(dir, "report.json"),
+		RunID: "run-cidr-no-nmap", Targets: []string{"192.0.2.0/30"}, Ports: "22",
+		Tools: ToolPaths{Fathom: "/opt/fathom"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
-	if !runner.hasArgs("/opt/nmap", "-sn", "-6", "2001:db8::/126", "-oX", "-") {
-		t.Fatalf("expected nmap -sn -6 sweep for IPv6, got %#v", runner.commands)
-	}
-	entries, err := os.ReadDir(filepath.Join(dir, "run-ipv6"))
-	if err != nil {
-		t.Fatalf("ReadDir returned error: %v", err)
-	}
-	var names []string
-	for _, entry := range entries {
-		names = append(names, entry.Name())
-	}
-	if !slices.Contains(names, "nmap-alive-ipv6.xml") {
-		t.Fatalf("missing nmap-alive-ipv6.xml artifact, got %v", names)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "report.json"))
-	if err != nil {
-		t.Fatalf("ReadFile returned error: %v", err)
-	}
-	var r report.ScanReport
-	if err := json.Unmarshal(data, &r); err != nil {
-		t.Fatalf("Unmarshal returned error: %v", err)
-	}
-	if !reflect.DeepEqual(r.AliveIPs, []string{"2001:db8::1"}) {
-		t.Fatalf("alive_ips = %#v, want [2001:db8::1]", r.AliveIPs)
-	}
-}
-
-// TestRunScanAutoModeMixedScopeSplitsDiscovery pins the mixed-family flow:
-// IPv4 scope parts go straight to fathom (no nmap), IPv6 scope parts keep the
-// nmap -sn sweep; the alive set combines fathom-derived hosts and
-// nmap-confirmed IPv6 hosts.
-func TestRunScanAutoModeMixedScopeSplitsDiscovery(t *testing.T) {
-	dir := t.TempDir()
-	var commands [][]string
-	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
-		joined := strings.Join(args, " ")
-		if binary == "/opt/nmap" && strings.Contains(joined, "-sn") {
-			commands = append(commands, append([]string{binary}, args...))
-			return []byte(ipv6AliveSweepXML("2001:db8::1")), nil
-		}
-		if binary == "/opt/fathom" {
-			commands = append(commands, append([]string{binary}, args...))
-			if strings.Contains(joined, "192.0.2.1") {
-				return fathomJSONL("192.0.2.1", 22, "ssh", "OpenSSH", ""), nil
-			}
-			return nil, nil
-		}
-		return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
-	})
-	err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
-		RunID:          "run-mixed",
-		Targets:        []string{"192.0.2.0/30", "2001:db8::/126"},
-		Ports:          "22",
-		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
-		ArtifactRoot:   dir,
-		JSONReportPath: filepath.Join(dir, "report.json"),
-	})
-	if err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-	var fathomCalls, nmapCalls int
-	for _, command := range commands {
-		switch command[0] {
-		case "/opt/nmap":
-			nmapCalls++
-			if !slices.Contains(command, "-6") {
-				t.Fatalf("mixed IPv4 scope part must not call nmap: %#v", command)
-			}
-		case "/opt/fathom":
-			fathomCalls++
-		}
-	}
-	if nmapCalls != 1 || fathomCalls != 5 {
-		// 4 IPv4 scope addresses + the nmap-confirmed IPv6 host (which also
-		// enters scanTarget, M4.2 behavior).
-		t.Fatalf("nmap calls = %d, fathom calls = %d, want 1 and 5; commands = %#v", nmapCalls, fathomCalls, commands)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "report.json"))
-	if err != nil {
-		t.Fatalf("ReadFile returned error: %v", err)
-	}
-	var r report.ScanReport
-	if err := json.Unmarshal(data, &r); err != nil {
-		t.Fatalf("Unmarshal returned error: %v", err)
-	}
-	if want := []string{"192.0.2.1", "2001:db8::1"}; !reflect.DeepEqual(r.AliveIPs, want) {
-		t.Fatalf("alive_ips = %#v, want %#v", r.AliveIPs, want)
+	if len(runner.commands) == 0 || runner.commands[0][0] != "/opt/fathom" {
+		t.Fatalf("expected fathom-only run, got %#v", runner.commands)
 	}
 }
 
@@ -495,36 +424,5 @@ func TestRunScanAutoModeDerivesAliveIPsFromFathomOutput(t *testing.T) {
 	}
 	if !reflect.DeepEqual(r.AliveIPs, []string{"192.0.2.1"}) {
 		t.Fatalf("alive_ips = %#v, want [192.0.2.1] (only the host fathom emitted)", r.AliveIPs)
-	}
-}
-
-// TestRunScanBlocksIPv6WithoutNmap pins that nmap remains a hard requirement
-// whenever the scope contains IPv6 (fathom is IPv4-only).
-func TestRunScanBlocksIPv6WithoutNmap(t *testing.T) {
-	err := RunScan(context.Background(), &recordingSequenceRunner{}, newScanStore(t), ScanOptions{
-		RunID: "run-ipv6-no-nmap", Targets: []string{"2001:db8::1"}, Ports: "22",
-		Tools: ToolPaths{Fathom: "/opt/fathom"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
-	})
-	if err == nil || !strings.Contains(err.Error(), "nmap is required for IPv6 scan targets") {
-		t.Fatalf("expected nmap-required error for IPv6, got %v", err)
-	}
-}
-
-// TestRunScanAllowsIPv4CIDRWithoutNmap pins the reverse: an IPv4 CIDR scope no
-// longer needs nmap for discovery (fathom expands and probes it internally),
-// so a missing nmap binary must not block the scan.
-func TestRunScanAllowsIPv4CIDRWithoutNmap(t *testing.T) {
-	runner := &recordingSequenceRunner{outputs: [][]byte{
-		fathomJSONL("192.0.2.1", 22, "ssh", "OpenSSH", ""),
-	}}
-	err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
-		RunID: "run-cidr-no-nmap", Targets: []string{"192.0.2.0/30"}, Ports: "22",
-		Tools: ToolPaths{Fathom: "/opt/fathom"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
-	})
-	if err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-	if len(runner.commands) == 0 || runner.commands[0][0] != "/opt/fathom" {
-		t.Fatalf("expected fathom-only run, got %#v", runner.commands)
 	}
 }

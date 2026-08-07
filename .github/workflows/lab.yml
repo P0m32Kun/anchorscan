@@ -216,7 +216,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y nmap
-          cargo install rustscan@2.4.1 --locked
           go install github.com/projectdiscovery/httpx/cmd/httpx@v1.7.1
           go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.4.4
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
@@ -231,7 +230,6 @@ jobs:
           {
             echo "commit=$(git rev-parse HEAD)"
             echo "date=$(date -u +%FT%TZ)"
-            rustscan --version
             nmap --version | head -1
             httpx -version
             nuclei -version

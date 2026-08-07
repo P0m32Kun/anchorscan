@@ -16,7 +16,7 @@ func TestExecuteReportWritesHTMLFromStoredRun(t *testing.T) {
 	dbPath := filepath.Join(dir, "scan.db")
 	htmlPath := filepath.Join(dir, "report.html")
 	jsonPath := filepath.Join(dir, "report.json")
-	writeFile(t, configPath, "tools:\n  rustscan: /opt/rustscan\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\n")
+	writeFile(t, configPath, "tools:\n  nmap: /opt/nmap\n  httpx: /opt/httpx\n  nuclei: /opt/nuclei\n")
 
 	scanStore, err := store.Open(dbPath)
 	if err != nil {

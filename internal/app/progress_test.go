@@ -36,8 +36,8 @@ func TestStoreProgressPreservesRawLogsAndStoresActionableSummary(t *testing.T) {
 }
 
 func TestSummarizeScanEventKeepsSingleLineProgress(t *testing.T) {
-	got := summarizeScanEvent("\x1b[32mrustscan 192.0.2.10 open=[22,443]\x1b[0m")
-	const want = "rustscan 192.0.2.10 open=[22,443]"
+	got := summarizeScanEvent("\x1b[32mfathom 192.0.2.10 open=[22,443]\x1b[0m")
+	const want = "fathom 192.0.2.10 open=[22,443]"
 	if got != want {
 		t.Fatalf("summary = %q, want %q", got, want)
 	}

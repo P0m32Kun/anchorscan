@@ -18,7 +18,6 @@ func TestFindForbiddenMembersCatchesAllCategories(t *testing.T) {
 		// forbidden:
 		"anchorscan-1.0.0-darwin-arm64/bin/nmap",
 		"anchorscan-1.0.0-darwin-arm64/vendor/nuclei-templates/foo.yaml",
-		"anchorscan-1.0.0-darwin-arm64/config/rustscan.toml",
 		"anchorscan-1.0.0-darwin-arm64/data/scan.db",
 		"anchorscan-1.0.0-darwin-arm64/var/server.log",
 		"anchorscan-1.0.0-darwin-arm64/reports/run-x.html",
@@ -37,7 +36,6 @@ func TestFindForbiddenMembersCatchesAllCategories(t *testing.T) {
 	for _, want := range []string{
 		"anchorscan-1.0.0-darwin-arm64/bin/nmap",
 		"anchorscan-1.0.0-darwin-arm64/vendor/nuclei-templates/foo.yaml",
-		"anchorscan-1.0.0-darwin-arm64/config/rustscan.toml",
 		"anchorscan-1.0.0-darwin-arm64/data/scan.db",
 		"anchorscan-1.0.0-darwin-arm64/var/server.log",
 		"anchorscan-1.0.0-darwin-arm64/reports/run-x.html",
@@ -74,7 +72,7 @@ func TestForbiddenPatternsIncludeStateAndLegacyData(t *testing.T) {
 	// The catalog pattern is covered elsewhere; this guards the broader set
 	// that the acceptance checklist calls out explicitly.
 	want := map[string]bool{
-		"nmap": true, "nuclei": true, "rustscan": true, "httpx": true,
+		"nmap": true, "nuclei": true, "httpx": true,
 		".db": true, ".sqlite": true, ".log": true,
 		"reports/": true, "evidence/": true, "fingerprints/": true,
 		"fingerprinthub": true,

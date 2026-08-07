@@ -6,6 +6,9 @@ uses semantic version tags for local-operator releases.
 
 ## [Unreleased]
 
+### Removed
+- Fathom 集成（M4.5）：彻底移除 rustscan 与 nmap IPv6 存活探测两条 legacy 路径。rustscan 从代码库完全删除（config 字段、工具页单工具模式、doctor/preflight/CLI flag、profile args 全部移除）；nmap `-sn` 不再用于扫描流水线——fathom 仅支持 IPv4，IPv6 target 直接报错（`fathom does not support IPv6 targets`）。nmap 保留为 NSE 引擎与单工具执行模式（含 `--mode alive`）。
+
 ### Added
 - Fathom 集成（M4.1+M4.2）：自研 Rust 引擎 fathom 成为 scan_target 内唯一端口/指纹引擎，一次调用完成 port→fingerprint→高危检测，替代 rustscan 端口发现 + nmap -sV 指纹。服务名经归一化别名表与 nmap 对齐；fathom 检出 dameng 时跳过 nuclei dameng-identify 直接进入默认口令检查。
 - Fathom 集成（M4.4）：存活探测切换——移除 IPv4 流水线外层 nmap `-sn`，存活探测由 fathom scan 内置（`alive::find` → ICMP Datagram/Raw 分级 + TCP 回退 80/443/445/22）；auto 模式下 scope 内全部 IPv4 地址直接进入 scanTarget，fathom 只输出存活且有开放端口的主机（alive 判定结合端口扫描：报告 `alive_ips` 由有指纹的主机推导）。IPv6（fathom 仅 IPv4）保留 nmap `-sn`；`assume-up` 保持 anchorscan 侧不预处理语义（全部地址进入扫描，fathom 调用参数不变）。

@@ -57,14 +57,12 @@ func (s *server) configPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		cfg.Tools.Fathom = r.FormValue("fathom")
-		cfg.Tools.Rustscan = r.FormValue("rustscan")
 		cfg.Tools.Nmap = r.FormValue("nmap")
 		cfg.Tools.Httpx = r.FormValue("httpx")
 		cfg.Tools.Nuclei = r.FormValue("nuclei")
 		cfg.Tools.NucleiTemplates = r.FormValue("nuclei_templates")
 		cfg.Tools.Rdpscan = r.FormValue("rdpscan")
 		cfg.Timeouts.Fathom = r.FormValue("timeout_fathom")
-		cfg.Timeouts.Rustscan = r.FormValue("timeout_rustscan")
 		cfg.Timeouts.Nmap = r.FormValue("timeout_nmap")
 		cfg.Timeouts.Httpx = r.FormValue("timeout_httpx")
 		cfg.Timeouts.NSE = r.FormValue("timeout_nse")
@@ -129,7 +127,7 @@ func normalizePortCSV(value string) string {
 // an empty path (which would make store.Open create a junk "?_pragma=..." file
 // in the working directory — ISSUE-001).
 func toolDiagnostics(configPath, dbPath string, cfg config.Config) []doctor.Check {
-	toolNames := map[string]bool{"fathom": true, "rustscan": true, "nmap": true, "httpx": true, "nuclei": true, "rdpscan": true, "nse rules": true, "tag rules": true}
+	toolNames := map[string]bool{"fathom": true, "nmap": true, "httpx": true, "nuclei": true, "rdpscan": true, "nse rules": true, "tag rules": true}
 	var tools []doctor.Check
 	for _, check := range doctor.Run(doctor.Options{ConfigPath: configPath, DBPath: dbPath}) {
 		if toolNames[check.Name] {

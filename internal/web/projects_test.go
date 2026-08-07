@@ -163,7 +163,7 @@ func TestDeleteProjectRemovesManagedFilesAndDatabaseRows(t *testing.T) {
 	if err := os.WriteFile(reportPath, []byte("{}"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
-	artifactPath := filepath.Join(dir, "artifacts", "run-1", "rustscan-127.0.0.1.txt")
+	artifactPath := filepath.Join(dir, "artifacts", "run-1", "fathom-127.0.0.1.txt")
 	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}

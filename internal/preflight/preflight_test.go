@@ -96,8 +96,7 @@ func TestRunSummarizesScanAndWarnsForFullRange(t *testing.T) {
 		Profile:   "fast",
 		Workers:   4,
 		ExtraArgs: config.ToolArgs{
-			Rustscan: []string{"--batch-size", "1000"},
-			Nmap:     []string{"-T4"},
+			Nmap: []string{"-T4"},
 		},
 		NSERuleCount: 2,
 		TagRuleCount: 3,

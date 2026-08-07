@@ -16,7 +16,6 @@ type FormValues = {
   access_point: string;
   tester_ip: string;
   notes: string;
-  rustscan_args: string;
   nmap_args: string;
   httpx_args: string;
   nuclei_args: string;
@@ -39,8 +38,8 @@ const artifactRoot = ref(props.artifactRoot);
 const submitting = ref(false);
 const optionalOpen = ref(false);
 const errorSummary = ref<HTMLElement>();
-const optionalFields = ['label', 'exclude_targets', 'exclude_ports', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
-const formFields = ['zone_id', 'target', 'exclude_targets', 'ports', 'exclude_ports', 'profile', 'discovery_mode', 'label', 'access_point', 'tester_ip', 'notes', 'rustscan_args', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
+const optionalFields = ['label', 'exclude_targets', 'exclude_ports', 'notes', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
+const formFields = ['zone_id', 'target', 'exclude_targets', 'ports', 'exclude_ports', 'profile', 'discovery_mode', 'label', 'access_point', 'tester_ip', 'notes', 'nmap_args', 'httpx_args', 'nuclei_args', 'artifact_root'];
 
 const optionalChangedCount = computed(() => {
   const values = [...optionalFields.slice(0, -1).map((field) => form.value[field as keyof FormValues]), artifactRoot.value];
@@ -140,7 +139,7 @@ onMounted(() => {
       <label class="full-width">
         <span>端口范围 <span class="required">*</span></span>
         <textarea v-model="form.ports" name="ports" rows="3" required placeholder="支持: top1000、100-1000 或 80,443,8080" :aria-invalid="fieldError('ports') ? 'true' : undefined" :aria-describedby="fieldError('ports') ? 'error-ports' : undefined" />
-        <p class="meta-line">端口格式保持 rustscan 习惯：top1000 = --top；100-1000 = --range；80,443,8080 = --ports。不支持 full/highrisk，需全端口请填 1-65535。</p>
+        <p class="meta-line">端口格式与 fathom 对齐：top1000 = 常见 1000 端口；100-1000 = 范围；80,443,8080 = 列表。不支持 full/highrisk，需全端口请填 1-65535。</p>
         <button class="link-button" type="button" @click="insertHighriskPorts">＋ 插入高危端口列表</button>
         <p v-if="fieldError('ports')" id="error-ports" class="field-error">{{ fieldError('ports') }}</p>
       </label>
@@ -175,10 +174,6 @@ onMounted(() => {
           <label class="full-width">
             <span>排除端口</span>
             <textarea v-model="form.exclude_ports" name="exclude_ports" rows="2" placeholder="例如：22,3389 或 8000-8100" />
-          </label>
-          <label>
-            <span>Rustscan 参数</span>
-            <input v-model="form.rustscan_args" name="rustscan_args" placeholder="例如: --ulimit 5000">
           </label>
           <label>
             <span>Nmap 参数</span>
