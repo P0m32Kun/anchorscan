@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/P0m32Kun/anchorscan/internal/fingerprint"
 	"github.com/P0m32Kun/anchorscan/internal/report"
@@ -67,14 +66,13 @@ func TestRunScanDiscardsOutOfScopeNucleiFinding(t *testing.T) {
 	}
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"ip\":\"192.168.1.20\",\"port\":\"22\",\"matched-at\":\"192.168.1.20:22\"}\n"),
 	}}
 	scanStore := newScanStore(t)
 	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID: "run-out-of-scope-nuclei", Scope: scope, Targets: scope.NmapTargets(), Ports: "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		TagRules:       []TagRule{{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, Target: "hostport"}},
 	})
@@ -97,8 +95,7 @@ func TestRunScanDiscardsOutOfScopeNucleiFinding(t *testing.T) {
 func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 		[]byte(`<nmaprun><host><ports><port><script id="ssh2-enum-algos" output="kex_algorithms:..."/></port></ports></host></nmaprun>`),
 		[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
 	}}
@@ -107,7 +104,7 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 		RunID:          "run-ssh-dual",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		NSERules: map[string][]string{
 			"ssh": {"ssh2-enum-algos", "ssh-hostkey"},
@@ -159,8 +156,7 @@ func TestRunScanRunsNSEAndNucleiForSSH(t *testing.T) {
 func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [6379]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.168.1.10", 6379, "redis", "Redis", ""),
 		[]byte(`<nmaprun><host><ports><port><script id="redis-info" output="redis_version:7.0.0"/></port></ports></host></nmaprun>`),
 		[]byte("{\"template-id\":\"redis-info\",\"info\":{\"name\":\"Redis Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:6379\"}\n"),
 	}}
@@ -169,7 +165,7 @@ func TestRunScanRunsNSEAndNucleiForRedis(t *testing.T) {
 		RunID:          "run-redis-dual",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "6379",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		NSERules: map[string][]string{
 			"redis": {"redis-info"},
@@ -194,19 +190,18 @@ func TestRunScanContinuesAfterNSEFailure(t *testing.T) {
 	runner := &recordingSequenceRunner{
 		outputs: [][]byte{
 			aliveNmapXML,
-			[]byte("192.168.1.10 -> [22]\n"),
-			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+			fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 			[]byte(`<nmaprun/>`),
 			[]byte("{\"template-id\":\"ssh-server-info\",\"info\":{\"name\":\"SSH Server Info\",\"severity\":\"info\"},\"matched-at\":\"192.168.1.10:22\"}\n"),
 		},
-		errors: []error{nil, nil, nil, errors.New("nse unavailable"), nil},
+		errors: []error{nil, nil, errors.New("nse unavailable"), nil},
 	}
 	scanStore := newScanStore(t)
 	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID:          "run-nse-failed",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		NSERules:       map[string][]string{"ssh": {"ssh2-enum-algos"}},
 		TagRules:       []TagRule{{Name: "ssh", Service: []string{"ssh"}, NucleiTags: []string{"ssh"}, Target: "hostport"}},
@@ -255,10 +250,8 @@ func TestRunScanContinuesAfterHTTPXFailure(t *testing.T) {
 		switch {
 		case binary == "nmap" && strings.Contains(joined, "-sn"):
 			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
-		case binary == "rustscan":
-			return []byte("127.0.0.1 -> [80]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "fathom":
+			return fathomJSONL("127.0.0.1", 80, "http", "nginx", ""), nil
 		case binary == "httpx":
 			return []byte("httpx unavailable"), errors.New("exit status 1")
 		case binary == "nuclei":
@@ -271,7 +264,7 @@ func TestRunScanContinuesAfterHTTPXFailure(t *testing.T) {
 		RunID:          "run-httpx-failed",
 		Targets:        []string{"127.0.0.1"},
 		Ports:          "80",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		TagRules:       []TagRule{{Name: "nginx", Service: []string{"http"}, Product: []string{"nginx"}, NucleiTags: []string{"demo"}, Target: "url"}},
 	})
@@ -301,10 +294,8 @@ func TestRunScanKeepsEarlierFindingWhenLaterStageIsCanceled(t *testing.T) {
 		switch {
 		case binary == "nmap" && strings.Contains(joined, "-sn"):
 			return []byte(`<nmaprun><host><status state="up"/><address addr="192.0.2.10"/></host></nmaprun>`), nil
-		case binary == "rustscan":
-			return []byte("192.0.2.10 -> [3389,6379]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port></ports></host></nmaprun>`), nil
+		case binary == "fathom":
+			return append(fathomJSONL("192.0.2.10", 3389, "ms-wbt-server", "Microsoft Terminal Services", ""), fathomJSONL("192.0.2.10", 6379, "redis", "Redis", "")...), nil
 		case binary == "nmap" && strings.Contains(joined, "--script"):
 			cancel()
 			return nil, ctx.Err()
@@ -316,7 +307,7 @@ func TestRunScanKeepsEarlierFindingWhenLaterStageIsCanceled(t *testing.T) {
 		RunID:          "run-canceled-after-finding",
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "3389,6379",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		NSERules:       map[string][]string{"redis": {"redis-info"}},
 	})
@@ -329,7 +320,11 @@ func TestRunScanKeepsEarlierFindingWhenLaterStageIsCanceled(t *testing.T) {
 	}
 }
 
-func TestRunScanSkipsNmapWhenRustscanFindsNoOpenPorts(t *testing.T) {
+// TestRunScanSkipsBackStageWhenFathomFindsNoOpenPorts guards the empty-output
+// contract: fathom returning no fingerprint lines must short-circuit the whole
+// back stage (httpx/NSE/nuclei/rdpscan/dameng) exactly like an empty rustscan
+// port list did.
+func TestRunScanSkipsBackStageWhenFathomFindsNoOpenPorts(t *testing.T) {
 	runner := &emptyPortRunner{}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
 	reportPath := filepath.Join(t.TempDir(), "report.json")
@@ -339,7 +334,7 @@ func TestRunScanSkipsNmapWhenRustscanFindsNoOpenPorts(t *testing.T) {
 	}
 
 	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID: "run-empty", Targets: []string{"172.22.0.7"}, Ports: "1-1000", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+		RunID: "run-empty", Targets: []string{"172.22.0.7"}, Ports: "1-1000", Tools: ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
 	})
 	if err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
@@ -352,8 +347,7 @@ func TestRunScanSkipsNmapWhenRustscanFindsNoOpenPorts(t *testing.T) {
 func TestRunScanAddsManualReviewForRDP(t *testing.T) {
 	runner := &sequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.10 -> [3389]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 3389, "ms-wbt-server", "Microsoft Terminal Services", ""),
 	}}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
 	reportPath := filepath.Join(t.TempDir(), "report.json")
@@ -363,7 +357,7 @@ func TestRunScanAddsManualReviewForRDP(t *testing.T) {
 	}
 
 	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID: "run-bluekeep", Targets: []string{"192.0.2.10"}, Ports: "3389", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+		RunID: "run-bluekeep", Targets: []string{"192.0.2.10"}, Ports: "3389", Tools: ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -378,23 +372,11 @@ func TestRunScanAddsManualReviewForRDP(t *testing.T) {
 	}
 }
 
-func TestRunScanLogsNmapHeartbeat(t *testing.T) {
-	oldHeartbeat := nmapHeartbeatEvery
-	nmapHeartbeatEvery = time.Millisecond
-	defer func() { nmapHeartbeatEvery = oldHeartbeat }()
-
-	runner := &sequenceRunner{
-		outputs: [][]byte{
-			aliveNmapXML,
-			[]byte("192.168.1.10 -> [6379,8080]\n"),
-			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="6379"><state state="open"/><service name="redis" product="Redis"/></port><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
-		},
-		sleeps: []time.Duration{
-			0,
-			0,
-			10 * time.Millisecond,
-		},
-	}
+func TestRunScanLogsFathomFrontStage(t *testing.T) {
+	runner := &sequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		append(fathomJSONL("192.168.1.10", 6379, "redis", "Redis", ""), fathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat", "")...),
+	}}
 
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
 	reportPath := filepath.Join(t.TempDir(), "report.json")
@@ -409,7 +391,7 @@ func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 		RunID:          "run-1",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "6379,8080",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 		Logf: func(format string, args ...any) {
 			mu.Lock()
@@ -425,9 +407,8 @@ func TestRunScanLogsNmapHeartbeat(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	wantSubstrings := []string{
-		"nmap 192.168.1.10 ports=[6379 8080] (service detection may be slow)",
-		"nmap 192.168.1.10 still running elapsed=",
-		"nmap 192.168.1.10 services=2 elapsed=",
+		"fathom 192.168.1.10 ports=6379,8080",
+		"fathom 192.168.1.10 services=2",
 	}
 	for _, want := range wantSubstrings {
 		if !containsLogSubstring(logs, want) {
@@ -450,8 +431,7 @@ func TestRunScanRoutesSparkWebUIWithSafeTags(t *testing.T) {
 
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.10 -> [8080]\\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Spark"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 8080, "http", "Apache Spark", ""),
 		[]byte(`{"url":"http://192.0.2.10:8080","status_code":200,"title":"Spark Master at spark://","tech":["Apache Spark"]}`),
 		[]byte{},
 	}}
@@ -492,8 +472,7 @@ func TestRunScanRoutesConfirmedTLSWithSSLTag(t *testing.T) {
 
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.10 -> [8443]\\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8443"><state state="open"/><service name="https" product="Apache Spark"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 8443, "https", "Apache Spark", ""),
 		[]byte(`{"url":"https://192.0.2.10:8443","status_code":200,"title":"Spark Master at spark://","tech":["Apache Spark"]}`),
 		[]byte{},
 	}}
@@ -531,8 +510,7 @@ func TestRunScanRecordsTagsWhenNucleiIsUnconfigured(t *testing.T) {
 	prepared.Options.Tools.Nuclei = ""
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.10 -> [8443]\\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8443"><state state="open"/><service name="https" product="Apache Spark"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 8443, "https", "Apache Spark", ""),
 		[]byte(`{"url":"https://192.0.2.10:8443","status_code":200,"tech":["Apache Spark"]}`),
 	}}
 	scanStore := newScanStore(t)
@@ -557,13 +535,12 @@ func TestRunScanRecordsTagsWhenNucleiIsUnconfigured(t *testing.T) {
 func TestRunScanDoesNotRouteTLSWithoutMatchingRule(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.12 -> [465]\\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.12" addrtype="ipv4"/><ports><port protocol="tcp" portid="465"><state state="open"/><service name="smtp" tunnel="ssl"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.12", 465, "smtp", "", ""),
 	}}
 	scanStore := newScanStore(t)
 	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID: "run-tls-no-rule", Targets: []string{"192.0.2.12"}, Ports: "465",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		TagRules:       []TagRule{{Service: []string{"http"}, NucleiTags: []string{"http"}, Target: "url"}},
 	})
@@ -591,15 +568,14 @@ func TestRunScanDoesNotRouteTLSWithoutMatchingRule(t *testing.T) {
 func TestRunScanSkipsNucleiForUnknownServiceOnSparkPort(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.11 -> [8080]\\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="tcpwrapped"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.11", 8080, "unknown", "", ""),
 	}}
 	scanStore := newScanStore(t)
 	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID:          "run-unknown-8080",
 		Targets:        []string{"192.0.2.11"},
 		Ports:          "8080",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 		TagRules: []TagRule{{
 			Name: "spark", Product: []string{"apache spark"}, Tech: []string{"apache spark"},
@@ -630,9 +606,9 @@ func TestRunScanSkipsNucleiForUnknownServiceOnSparkPort(t *testing.T) {
 func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [8080]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
+		append(fathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat", ""), fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", "")...),
 		[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
+		[]byte(`<nmaprun><host><ports><port><script id="ssh2-enum-algos" output="kex_algorithms:..."/></port></ports></host></nmaprun>`),
 		[]byte("{" + `"template-id":"tomcat-default-login","info":{"name":"Tomcat Default Login","severity":"high"},"matched-at":"http://192.168.1.10:8080"` + "}\n"),
 	}}
 
@@ -646,8 +622,8 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	opts := ScanOptions{
 		RunID:          "run-1",
 		Targets:        []string{"192.168.1.10"},
-		Ports:          "8080",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
+		Ports:          "8080,22",
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
 		JSONReportPath: reportPath,
 		ExtraArgs: ToolExtraArgs{
 			Rustscan: []string{"--batch-size", "500"},
@@ -656,7 +632,7 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 			Nuclei:   []string{"-rate-limit", "50"},
 		},
 		NSERules: map[string][]string{
-			"http": {"http-tomcat-manager"},
+			"ssh": {"ssh2-enum-algos"},
 		},
 		TagRules: []TagRule{{Name: "tomcat", Service: []string{"http"}, Product: []string{"tomcat"}, NucleiTags: []string{"tomcat"}, Target: "url"}},
 	}
@@ -666,7 +642,6 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 	}
 
 	for _, check := range []struct{ binary, arg string }{
-		{"/opt/rustscan", "--batch-size"},
 		{"/opt/httpx", "-rate-limit"},
 		{"/opt/nuclei", "-rate-limit"},
 	} {
@@ -674,8 +649,10 @@ func TestRunScanPassesExtraArgsToTools(t *testing.T) {
 			t.Fatalf("expected %s arg %s in %#v", check.binary, check.arg, runner.commands)
 		}
 	}
-	if !runner.hasArgs("/opt/nmap", "-sV", "--version-intensity", "7", "-T3") {
-		t.Fatalf("expected nmap fingerprint args in %#v", runner.commands)
+	// fathom takes no extra args (M4.2: fixed scan/--json/-p argv); NSE carries
+	// the configured nmap extras on top of the fixed --script invocation.
+	if !runner.hasArgs("/opt/nmap", "--script", "ssh2-enum-algos", "-T3") {
+		t.Fatalf("expected nmap NSE invocation with extra args in %#v", runner.commands)
 	}
 }
 
@@ -687,10 +664,8 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 		switch {
 		case binary == "nmap" && strings.Contains(joined, "-sn"):
 			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
-		case binary == "rustscan":
-			return []byte("127.0.0.1 -> [80]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "fathom":
+			return fathomJSONL("127.0.0.1", 80, "http", "nginx", ""), nil
 		case binary == "httpx":
 			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
 		case binary == "nuclei":
@@ -704,7 +679,7 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 		RunID:          "run-failed-nuclei",
 		Targets:        []string{"127.0.0.1"},
 		Ports:          "80",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Httpx: "httpx", Nuclei: "nuclei"},
 		ProfileName:    "normal",
 		HostWorkers:    1,
 		ArtifactRoot:   dir,
@@ -763,5 +738,101 @@ func TestRunScanWritesFailedNucleiOutputArtifact(t *testing.T) {
 	}
 	if c, ok := checkByEngine["dameng"]; !ok {
 		t.Fatalf("expected dameng record, got %#v", c)
+	}
+}
+
+// rejectAllChecker is a DamengAuthChecker stub that rejects every credential,
+// driving RunDamengDefaultPassword to the SAFE verdict.
+type rejectAllChecker struct{}
+
+func (rejectAllChecker) Check(_ context.Context, _ string, _ int, _, _ string) (bool, string, error) {
+	return false, "", nil
+}
+
+// TestRunScanSkipsNucleiDamengIdentifyWhenFathomIdentifiedDameng pins spec
+// decision 4: fathom's dameng probe is a protocol-level handshake (authority
+// equivalent to nuclei dameng-detect), so a fathom fingerprint normalized to
+// "dameng" must skip the nuclei dameng-identify round trip and go straight to
+// the default-password check.
+func TestRunScanSkipsNucleiDamengIdentifyWhenFathomIdentifiedDameng(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		fathomJSONL("192.0.2.10", 5236, "dameng", "Dameng Database", ""),
+	}}
+	scanStore := newScanStore(t)
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-dameng-fathom",
+		Targets:        []string{"192.0.2.10"},
+		Ports:          "5236",
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Nuclei: "/opt/nuclei", NucleiTemplates: "/opt/nuclei-templates", Dameng: "on"},
+		DamengChecker:  rejectAllChecker{},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	// The nuclei dameng-identify round trip must never run for a fathom-confirmed
+	// dameng fingerprint: no nuclei invocation at all (no dameng-detect template).
+	for _, cmd := range runner.commands {
+		if len(cmd) > 0 && cmd[0] == "/opt/nuclei" {
+			t.Fatalf("nuclei invoked despite fathom dameng identification: %#v", cmd)
+		}
+	}
+	// The default-password check runs straight away and reports the verdict.
+	checks, err := scanStore.ListDetectionChecks("run-dameng-fathom")
+	if err != nil {
+		t.Fatalf("ListDetectionChecks returned error: %v", err)
+	}
+	for _, check := range checks {
+		if check.Engine == "dameng" {
+			if check.Status != "completed" {
+				t.Fatalf("dameng default-password check = %#v, want completed", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("dameng default-password DetectionCheck not recorded: %#v", checks)
+}
+
+// TestRunScanTLSWebEnhancementTriggersHttpx pins spec decision 2: fathom cannot
+// complete a TLS handshake, so an "unknown" service on a TLS web candidate port
+// must still be probed by httpx (https URL), and a successful httpx response
+// upgrades the fingerprint to web with a URL.
+func TestRunScanTLSWebEnhancementTriggersHttpx(t *testing.T) {
+	runner := &recordingSequenceRunner{outputs: [][]byte{
+		aliveNmapXML,
+		fathomJSONL("192.0.2.10", 8443, "unknown", "", ""),
+		[]byte(`{"url":"https://192.0.2.10:8443","status-code":200,"title":"hidden TLS service","tech":["nginx"]}`),
+		[]byte{},
+	}}
+	scanStore := newScanStore(t)
+	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
+		RunID:          "run-tls-enhance",
+		Targets:        []string{"192.0.2.10"},
+		Ports:          "8443",
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Httpx: "/opt/httpx", Nuclei: "/opt/nuclei"},
+		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		TagRules:       []TagRule{{Name: "nginx", Product: []string{"nginx"}, Tech: []string{"nginx"}, NucleiTags: []string{"demo"}, Target: "url"}},
+	})
+	if err != nil {
+		t.Fatalf("RunScan returned error: %v", err)
+	}
+
+	// httpx must be invoked with the synthesized https URL for the TLS candidate.
+	if !runner.hasArgs("/opt/httpx", "https://192.0.2.10:8443") {
+		t.Fatalf("expected httpx TLS enhancement call, commands=%#v", runner.commands)
+	}
+	// The successful httpx response upgrades the fingerprint: stored web + URL.
+	fps, err := scanStore.ListFingerprints("run-tls-enhance")
+	if err != nil || len(fps) != 1 {
+		t.Fatalf("fingerprints = %#v, %v", fps, err)
+	}
+	if !fps[0].IsWeb || fps[0].URL != "https://192.0.2.10:8443" {
+		t.Fatalf("fingerprint not upgraded by TLS enhancement: %#v", fps[0])
+	}
+	// The upgraded URL feeds the nuclei routing (url-target rule now matches).
+	if !runner.hasArgs("/opt/nuclei", "-target", "https://192.0.2.10:8443", "-jsonl") {
+		t.Fatalf("expected nuclei call against upgraded TLS URL, commands=%#v", runner.commands)
 	}
 }

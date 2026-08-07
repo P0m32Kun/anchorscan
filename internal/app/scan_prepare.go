@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
@@ -68,6 +69,16 @@ func PrepareScan(req PrepareScanRequest) (PreparedScan, error) {
 	resolvedPorts, err := ports.ResolveForConfig(portSpec, req.ConfigPath)
 	if err != nil {
 		return PreparedScan{}, err
+	}
+	// fathom -p accepts explicit port lists/ranges only (no preset names), so
+	// the "top1000" preset is expanded to its CSV form here; exclusions still
+	// apply afterwards. Preflight keeps the user's original expression
+	// ("top1000") in Summary.PortSpec for display.
+	if resolvedPorts == "top1000" {
+		resolvedPorts, err = ports.LoadPresetForConfig("top1000", req.ConfigPath)
+		if err != nil {
+			return PreparedScan{}, fmt.Errorf("load top1000 port preset: %w", err)
+		}
 	}
 	resolvedPorts, err = ports.ExcludeForConfig(resolvedPorts, req.ExcludePorts, req.ConfigPath)
 	if err != nil {

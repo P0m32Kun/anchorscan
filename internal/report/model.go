@@ -101,7 +101,7 @@ func DetectionCheckTime(value time.Time) string {
 type ScanData struct {
 	DiscoveryMode string
 	AliveIPs      []string
-	OpenPorts     map[string][]int // IP → raw open ports from rustscan
+	OpenPorts     map[string][]int // IP → raw open ports from fathom
 }
 
 func Build(fps []fingerprint.ServiceFingerprint, findings []Finding) ScanReport {

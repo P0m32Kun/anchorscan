@@ -20,6 +20,14 @@ import (
 
 var aliveNmapXML = []byte(`<nmaprun><host><status state="up"/></host></nmaprun>`)
 
+// fathomJSONL renders a single-line `fathom scan --json` fingerprint record
+// (schema confirmed in internal/tools/fathom_test.go). scan_target consumes
+// one JSON object per open port; checks are omitted unless added by the caller.
+func fathomJSONL(ip string, port int, service, product, version string) []byte {
+	line := fmt.Sprintf(`{"host":"%s","port":%d,"service":"%s","product":"%s","version":"%s"}`, ip, port, service, product, version)
+	return []byte(line + "\n")
+}
+
 func TestScanOptionsIncludesTask2MetadataFields(t *testing.T) {
 	type fieldCheck struct {
 		name string
@@ -47,8 +55,7 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 	runner := &sequenceRunner{
 		outputs: [][]byte{
 			aliveNmapXML,
-			[]byte("192.168.1.10 -> [8080]\n"),
-			[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat" version="9.0.65"/></port></ports></host></nmaprun>`),
+			fathomJSONL("192.168.1.10", 8080, "http", "Apache Tomcat", "9.0.65"),
 			[]byte(`{"url":"http://192.168.1.10:8080","status-code":200,"title":"Apache Tomcat","tech":["tomcat"]}`),
 			[]byte("{\"template-id\":\"tomcat-default-login\",\"matcher-name\":\"basic-auth\",\"extractor-results\":[\"admin:admin\"],\"curl-command\":\"curl -u admin:admin http://192.168.1.10:8080/manager/html\",\"info\":{\"name\":\"Tomcat Default Login\",\"severity\":\"high\"},\"matched-at\":\"http://192.168.1.10:8080\"}\n"),
 		},
@@ -66,10 +73,10 @@ func TestRunScanStoresFingerprintAndWritesJSONReport(t *testing.T) {
 		Targets: []string{"192.168.1.10"},
 		Ports:   "8080",
 		Tools: ToolPaths{
-			Rustscan: "/opt/rustscan",
-			Nmap:     "/opt/nmap",
-			Httpx:    "/opt/httpx",
-			Nuclei:   "/opt/nuclei",
+			Fathom: "/opt/fathom",
+			Nmap:   "/opt/nmap",
+			Httpx:  "/opt/httpx",
+			Nuclei: "/opt/nuclei",
 		},
 		JSONReportPath: reportPath,
 		NSERules: map[string][]string{
@@ -137,10 +144,8 @@ func TestRunScanWritesAuditArtifacts(t *testing.T) {
 		switch {
 		case binary == "nmap" && strings.Contains(joined, "-sn"):
 			return []byte(`<nmaprun><host><status state="up"/><address addr="127.0.0.1"/></host></nmaprun>`), nil
-		case binary == "rustscan":
-			return []byte("127.0.0.1 -> [80]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="127.0.0.1"/><ports><port protocol="tcp" portid="80"><state state="open"/><service name="http" product="nginx"/></port></ports></host></nmaprun>`), nil
+		case binary == "fathom":
+			return fathomJSONL("127.0.0.1", 80, "http", "nginx", ""), nil
 		case binary == "httpx":
 			return []byte("{\"url\":\"http://127.0.0.1:80\",\"status-code\":200,\"title\":\"ok\",\"tech\":[\"nginx\"]}\n"), nil
 		default:
@@ -152,7 +157,7 @@ func TestRunScanWritesAuditArtifacts(t *testing.T) {
 		RunID:          "run-artifacts",
 		Targets:        []string{"127.0.0.1"},
 		Ports:          "80",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap", Httpx: "httpx"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap", Httpx: "httpx"},
 		ProfileName:    "normal",
 		HostWorkers:    1,
 		ArtifactRoot:   dir,
@@ -172,7 +177,7 @@ func TestRunScanWritesAuditArtifacts(t *testing.T) {
 		names = append(names, entry.Name())
 	}
 	joinedNames := strings.Join(names, "\n")
-	for _, want := range []string{"nmap-alive", "rustscan-127.0.0.1-ports", "nmap-service-127.0.0.1", "httpx-127.0.0.1-80"} {
+	for _, want := range []string{"nmap-alive", "fathom-127.0.0.1", "httpx-127.0.0.1-80"} {
 		if !strings.Contains(joinedNames, want) {
 			t.Fatalf("missing artifact %q in files:\n%s", want, joinedNames)
 		}
@@ -245,12 +250,13 @@ type killedAfterCancelRunner struct {
 func (r *killedAfterCancelRunner) Run(ctx context.Context, binary string, _ []string) ([]byte, error) {
 	r.calls++
 	switch {
-	case binary == "/opt/rustscan":
-		return []byte("192.168.1.10 -> [22]\n"), nil
 	case binary == "/opt/nmap":
+		// alive sweep runs first: cancel there, then observe the killed tool.
 		r.cancel()
 		<-ctx.Done()
 		return nil, fmt.Errorf("signal: killed")
+	case binary == "/opt/fathom":
+		return nil, fmt.Errorf("fathom should not run after alive-sweep cancellation")
 	default:
 		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
@@ -336,7 +342,7 @@ func TestToolContextLeavesZeroTimeoutWithoutDeadline(t *testing.T) {
 	}
 }
 
-func TestRunScanClassifiesToolDeadlineAsFailure(t *testing.T) {
+func TestRunScanClassifiesFathomDeadlineAsFailure(t *testing.T) {
 	scanStore := newScanStore(t)
 	runner := runnerFunc(func(ctx context.Context, _ string, _ []string) ([]byte, error) {
 		if _, ok := ctx.Deadline(); !ok {
@@ -347,7 +353,7 @@ func TestRunScanClassifiesToolDeadlineAsFailure(t *testing.T) {
 	})
 	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID: "run-timeout", Targets: []string{"192.0.2.10"}, Ports: "80",
-		Tools: ToolPaths{Rustscan: "rustscan"}, Timeouts: ToolTimeouts{Rustscan: time.Millisecond},
+		Tools: ToolPaths{Fathom: "fathom"}, Timeouts: ToolTimeouts{Fathom: time.Millisecond},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -366,10 +372,8 @@ func TestRunScanClassifiesOptionalToolDeadlineAsCompletedWithErrors(t *testing.T
 		switch {
 		case binary == "nmap" && strings.Contains(joined, "-sn"):
 			return []byte(aliveSweepXML("192.0.2.10")), nil
-		case binary == "rustscan":
-			return []byte("192.0.2.10 -> [22]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+		case binary == "fathom":
+			return fathomJSONL("192.0.2.10", 22, "ssh", "OpenSSH", ""), nil
 		case binary == "nmap" && strings.Contains(joined, "--script"):
 			<-ctx.Done()
 			return nil, ctx.Err()
@@ -379,7 +383,7 @@ func TestRunScanClassifiesOptionalToolDeadlineAsCompletedWithErrors(t *testing.T
 	})
 	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID: "run-optional-timeout", Targets: []string{"192.0.2.10"}, Ports: "22",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap"},
 		Timeouts:       ToolTimeouts{NSE: time.Millisecond},
 		NSERules:       map[string][]string{"ssh": {"ssh-hostkey"}},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
@@ -412,10 +416,8 @@ func TestRunScanClassifiesCanceledOptionalToolAsCanceled(t *testing.T) {
 		switch {
 		case binary == "nmap" && strings.Contains(joined, "-sn"):
 			return []byte(aliveSweepXML("192.0.2.11")), nil
-		case binary == "rustscan":
-			return []byte("192.0.2.11 -> [22]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			return []byte(`<nmaprun><host><address addr="192.0.2.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+		case binary == "fathom":
+			return fathomJSONL("192.0.2.11", 22, "ssh", "OpenSSH", ""), nil
 		case binary == "nmap" && strings.Contains(joined, "--script"):
 			cancel()
 			<-toolCtx.Done()
@@ -426,7 +428,7 @@ func TestRunScanClassifiesCanceledOptionalToolAsCanceled(t *testing.T) {
 	})
 	err := RunScan(ctx, runner, scanStore, ScanOptions{
 		RunID: "run-optional-canceled", Targets: []string{"192.0.2.11"}, Ports: "22",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap"},
 		NSERules:       map[string][]string{"ssh": {"ssh-hostkey"}},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
@@ -467,25 +469,23 @@ func (r *blockingRunner) Run(_ context.Context, binary string, _ []string) ([]by
 	r.active--
 	r.mu.Unlock()
 	switch binary {
-	case "/opt/rustscan":
-		return []byte("127.0.0.1 -> [22]\n"), nil
-	case "/opt/nmap":
-		return []byte(`<nmaprun><host><address addr="127.0.0.1" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
+	case "/opt/fathom":
+		return fathomJSONL("127.0.0.1", 22, "ssh", "OpenSSH", ""), nil
 	default:
 		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
 }
 
 type postAliveConcurrencyRunner struct {
-	mu            sync.Mutex
-	targets       []string
-	wantActive    int
-	release       chan struct{}
-	released      bool
-	aliveCalls    int
-	rustscanCalls int
-	active        int
-	maxActive     int
+	mu          sync.Mutex
+	targets     []string
+	wantActive  int
+	release     chan struct{}
+	released    bool
+	aliveCalls  int
+	fathomCalls int
+	active      int
+	maxActive   int
 }
 
 func newPostAliveConcurrencyRunner(targets []string, wantActive int) *postAliveConcurrencyRunner {
@@ -503,12 +503,12 @@ func (r *postAliveConcurrencyRunner) Run(_ context.Context, binary string, args 
 		r.mu.Unlock()
 		return []byte(aliveSweepXML(r.targets...)), nil
 	}
-	if binary != "/opt/rustscan" {
+	if binary != "/opt/fathom" {
 		return nil, fmt.Errorf("unexpected command %s %v", binary, args)
 	}
 
 	r.mu.Lock()
-	r.rustscanCalls++
+	r.fathomCalls++
 	r.active++
 	if r.active > r.maxActive {
 		r.maxActive = r.active
@@ -527,7 +527,7 @@ func (r *postAliveConcurrencyRunner) Run(_ context.Context, binary string, args 
 	r.mu.Lock()
 	r.active--
 	r.mu.Unlock()
-	return []byte("127.0.0.1 -> []\n"), nil
+	return nil, nil
 }
 
 type failFirstRunner struct {
@@ -587,24 +587,25 @@ func (r *emptyPortRunner) Run(_ context.Context, binary string, args []string) (
 		}
 		r.nmapCalls++
 		return nil, fmt.Errorf("nmap should not run without open ports")
-	case "/opt/rustscan":
-		return []byte("172.22.0.7 -> []\n"), nil
+	case "/opt/fathom":
+		// fathom found no open ports: empty output.
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
 }
 
 type downHostRunner struct {
-	rustscanCalls int
+	fathomCalls int
 }
 
 func (r *downHostRunner) Run(_ context.Context, binary string, _ []string) ([]byte, error) {
 	switch binary {
 	case "/opt/nmap":
 		return []byte(`<nmaprun><host><status state="down"/></host></nmaprun>`), nil
-	case "/opt/rustscan":
-		r.rustscanCalls++
-		return nil, fmt.Errorf("rustscan should not run for down host")
+	case "/opt/fathom":
+		r.fathomCalls++
+		return nil, fmt.Errorf("fathom should not run for down host")
 	default:
 		return nil, fmt.Errorf("unexpected binary %s", binary)
 	}
@@ -619,10 +620,10 @@ func (r *aliveSweepRunner) Run(_ context.Context, binary string, args []string) 
 	switch {
 	case binary == "/opt/nmap":
 		return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1" addrtype="ipv4"/></host><host><status state="up"/><address addr="172.22.0.2" addrtype="ipv4"/></host></nmaprun>`), nil
-	case binary == "/opt/rustscan" && len(args) >= 2 && args[1] == "172.22.0.1":
-		return []byte("172.22.0.1 -> []\n"), nil
-	case binary == "/opt/rustscan" && len(args) >= 2 && args[1] == "172.22.0.2":
-		return []byte("172.22.0.2 -> []\n"), nil
+	case binary == "/opt/fathom" && len(args) >= 3 && args[2] == "172.22.0.1":
+		return nil, nil
+	case binary == "/opt/fathom" && len(args) >= 3 && args[2] == "172.22.0.2":
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unexpected command %s %v", binary, args)
 	}
@@ -640,10 +641,9 @@ func containsEvent(events []store.ScanEvent, level string, stage string, target 
 func TestScanAssumeUpSkipsAliveDiscovery(t *testing.T) {
 	runner := &recordingSequenceRunner{
 		outputs: [][]byte{
-			[]byte("192.0.2.10 -> [22]\n"),
-			[]byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+			fathomJSONL("192.0.2.10", 22, "ssh", "OpenSSH", ""),
 		},
-		errors: []error{nil, nil},
+		errors: []error{nil},
 	}
 	dir := t.TempDir()
 	err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
@@ -651,7 +651,7 @@ func TestScanAssumeUpSkipsAliveDiscovery(t *testing.T) {
 		Targets:        []string{"192.0.2.10"},
 		Ports:          "22",
 		DiscoveryMode:  "assume-up",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap"},
 		JSONReportPath: filepath.Join(dir, "report.json"),
 	})
 	if err != nil {
@@ -660,8 +660,8 @@ func TestScanAssumeUpSkipsAliveDiscovery(t *testing.T) {
 	if runner.hasArg("nmap", "-sn") {
 		t.Fatal("assume-up should not run nmap alive discovery (-sn)")
 	}
-	if !runner.hasArg("rustscan", "192.0.2.10") {
-		t.Fatal("assume-up should still run rustscan port discovery")
+	if !runner.hasArgs("fathom", "scan", "--json", "192.0.2.10", "-p", "22") {
+		t.Fatal("assume-up should still run fathom port scan")
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "report.json"))
 	if err != nil {
@@ -676,69 +676,26 @@ func TestScanAssumeUpSkipsAliveDiscovery(t *testing.T) {
 	}
 }
 
-func TestNmapHeartbeatEmitsProgressEvents(t *testing.T) {
-	orig := nmapHeartbeatEvery
-	nmapHeartbeatEvery = 50 * time.Millisecond
-	defer func() { nmapHeartbeatEvery = orig }()
-
-	scanStore := newScanStore(t)
-	runner := runnerFunc(func(ctx context.Context, binary string, args []string) ([]byte, error) {
-		joined := strings.Join(args, " ")
-		switch {
-		case binary == "nmap" && strings.Contains(joined, "-sn"):
-			return []byte(aliveSweepXML("192.0.2.10")), nil
-		case binary == "rustscan":
-			return []byte("192.0.2.10 -> [22]\n"), nil
-		case binary == "nmap" && strings.Contains(joined, "-sV"):
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(150 * time.Millisecond):
-			}
-			return []byte(`<nmaprun><host><address addr="192.0.2.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`), nil
-		default:
-			return nil, fmt.Errorf("unexpected command %s %s", binary, joined)
-		}
-	})
-	err := RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID:          "run-heartbeat",
-		Targets:        []string{"192.0.2.10"},
-		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
-		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
-	})
-	if err != nil {
-		t.Fatalf("RunScan returned error: %v", err)
-	}
-	events, err := scanStore.ListScanEvents("run-heartbeat", 100)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !containsEvent(events, "info", "heartbeat", "nmap 192.0.2.10 still running") {
-		t.Fatalf("missing nmap heartbeat event in events: %#v", events)
-	}
-}
-
 func TestScanAssumeUpExpandsScopeWithoutExcludedHosts(t *testing.T) {
 	scope, err := target.ParseScope("192.0.2.0/30", "192.0.2.2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var rustscanTargets []string
+	var fathomTargets []string
 	runner := runnerFunc(func(_ context.Context, binary string, args []string) ([]byte, error) {
 		if binary == "nmap" {
 			return nil, fmt.Errorf("assume-up must not run nmap discovery")
 		}
-		if binary != "rustscan" {
+		if binary != "fathom" {
 			return nil, fmt.Errorf("unexpected binary %s", binary)
 		}
 		for i, arg := range args {
-			if arg == "-a" && i+1 < len(args) {
-				rustscanTargets = append(rustscanTargets, args[i+1])
-				return []byte(args[i+1] + " -> []\n"), nil
+			if arg == "--json" && i+1 < len(args) {
+				fathomTargets = append(fathomTargets, args[i+1])
+				return nil, nil
 			}
 		}
-		return nil, fmt.Errorf("rustscan target missing: %v", args)
+		return nil, fmt.Errorf("fathom target missing: %v", args)
 	})
 	err = RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
 		RunID:          "run-assume-up-exclude",
@@ -747,13 +704,13 @@ func TestScanAssumeUpExpandsScopeWithoutExcludedHosts(t *testing.T) {
 		Ports:          "22",
 		DiscoveryMode:  "assume-up",
 		HostWorkers:    1,
-		Tools:          ToolPaths{Rustscan: "rustscan", Nmap: "nmap"},
+		Tools:          ToolPaths{Fathom: "fathom", Nmap: "nmap"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
-	if got, want := rustscanTargets, []string{"192.0.2.0", "192.0.2.1", "192.0.2.3"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("rustscan targets = %#v, want %#v", got, want)
+	if got, want := fathomTargets, []string{"192.0.2.0", "192.0.2.1", "192.0.2.3"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("fathom targets = %#v, want %#v", got, want)
 	}
 }

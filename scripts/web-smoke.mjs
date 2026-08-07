@@ -79,7 +79,7 @@ async function startServer(configPath) {
 async function writeTestConfig(workDir) {
   const source = await fs.readFile(path.join(repoRoot, 'config', 'default.yaml.example'), 'utf8');
   const quotedFixture = JSON.stringify(fixture);
-  let config = ['rustscan', 'nmap', 'httpx', 'nuclei'].reduce(
+  let config = ['rustscan', 'nmap', 'httpx', 'nuclei', 'fathom'].reduce(
     (text, name) => text.replace(new RegExp(`^(\\s*${name}:).*$`, 'm'), `$1 ${quotedFixture}`),
     source,
   );

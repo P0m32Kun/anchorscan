@@ -5,11 +5,21 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/P0m32Kun/anchorscan/internal/config"
 )
+
+func testPort(t *testing.T, value string) int {
+	t.Helper()
+	port, err := strconv.Atoi(value)
+	if err != nil {
+		t.Fatalf("invalid test port %q: %v", value, err)
+	}
+	return port
+}
 
 func writePackagedConfig(t *testing.T, fixture prepareScanFixture) string {
 	t.Helper()
@@ -94,8 +104,7 @@ func TestPrepareScanLoadsPackagedRulesForSSHExecution(t *testing.T) {
 	}
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.0.2.1 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.1"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.1", 22, "ssh", "OpenSSH", ""),
 		[]byte(`<nmaprun/>`),
 		[]byte{},
 	}}
@@ -125,22 +134,21 @@ func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
 	for _, test := range []struct {
 		name        string
 		port        string
-		fingerprint []byte
+		service     string
+		product     string
 		outputs     [][]byte
 		tags        string
 		target      string
 	}{
 		{
-			name: "tomcat nuclei URL", port: "8080",
-			fingerprint: []byte(`<nmaprun><host><address addr="192.0.2.1"/><ports><port protocol="tcp" portid="8080"><state state="open"/><service name="http" product="Apache Tomcat"/></port></ports></host></nmaprun>`),
-			outputs:     [][]byte{[]byte(`{"url":"http://192.0.2.1:8080","tech":["tomcat"]}`), []byte{}},
-			tags:        "tomcat,apache-tomcat", target: "http://192.0.2.1:8080",
+			name: "tomcat nuclei URL", port: "8080", service: "http", product: "Apache Tomcat",
+			outputs: [][]byte{[]byte(`{"url":"http://192.0.2.1:8080","tech":["tomcat"]}`), []byte{}},
+			tags: "tomcat,apache-tomcat", target: "http://192.0.2.1:8080",
 		},
 		{
-			name: "x11 nuclei hostport", port: "6000",
-			fingerprint: []byte(`<nmaprun><host><address addr="192.0.2.1"/><ports><port protocol="tcp" portid="6000"><state state="open"/><service name="x11"/></port></ports></host></nmaprun>`),
-			outputs:     [][]byte{[]byte{}},
-			tags:        "x11", target: "192.0.2.1:6000",
+			name: "x11 nuclei hostport", port: "6000", service: "x11",
+			outputs: [][]byte{[]byte{}},
+			tags: "x11", target: "192.0.2.1:6000",
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -152,7 +160,7 @@ func TestPrepareScanLoadsPackagedRulesForTomcatAndX11Execution(t *testing.T) {
 			if err != nil || prepared.Preflight.HasErrors() {
 				t.Fatalf("PrepareScan = %#v, %v", prepared, err)
 			}
-			outputs := [][]byte{aliveNmapXML, []byte("192.0.2.1 -> [" + test.port + "]\n"), test.fingerprint}
+			outputs := [][]byte{aliveNmapXML, fathomJSONL("192.0.2.1", testPort(t, test.port), test.service, test.product, "")}
 			runner := &recordingSequenceRunner{outputs: append(outputs, test.outputs...)}
 			scanStore := newScanStore(t)
 			if err := RunScan(context.Background(), runner, scanStore, prepared.Options); err != nil {
@@ -235,7 +243,12 @@ func TestPrepareScanAppliesExclusionsButKeepsPreflightPortSpec(t *testing.T) {
 
 func TestPrepareScanReturnsPreflightErrorsWithoutOptions(t *testing.T) {
 	fixture := newPrepareScanFixture(t)
-	if err := os.Remove(fixture.rustscan); err != nil {
+	if err := os.Remove(fixture.configPath); err != nil {
+		t.Fatal(err)
+	}
+	// fathom is the sole scan engine (spec v2.0): without it in config the
+	// preflight must error and PrepareScan must not produce any options.
+	if err := os.WriteFile(fixture.configPath, []byte(strings.Replace(fixture.configYAML, "  fathom: ", "  fathom: \"\"\n  # ", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	prepared, err := PrepareScan(fixture.request())
@@ -357,9 +370,10 @@ func newPrepareScanFixture(t *testing.T) prepareScanFixture {
 	}
 	fixture := prepareScanFixture{dir: dir, rustscan: tool("rustscan"), httpx: tool("httpx")}
 	nmap, nuclei := tool("nmap"), tool("nuclei")
+	fathom := tool("fathom")
 	fixture.configPath = filepath.Join(dir, "anchorscan.yaml")
 	fixture.dbPath, fixture.jsonPath, fixture.artifactPath = filepath.Join(dir, "scan.db"), filepath.Join(dir, "out", "report.json"), filepath.Join(dir, "artifacts")
-	fixture.configYAML = "tools:\n  rustscan: " + fixture.rustscan + "\n  nmap: " + nmap + "\n  httpx: " + fixture.httpx + "\n  nuclei: " + nuclei + "\nscan:\n  ports: 80,443,8080\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 3\n    nmap_args: [-T3]\n  slow:\n    host_workers: 1\n    nmap_args: [-T2]\n"
+	fixture.configYAML = "tools:\n  fathom: " + fathom + "\n  rustscan: " + fixture.rustscan + "\n  nmap: " + nmap + "\n  httpx: " + fixture.httpx + "\n  nuclei: " + nuclei + "\nscan:\n  ports: 80,443,8080\n  profile: normal\nprofiles:\n  normal:\n    host_workers: 3\n    nmap_args: [-T3]\n  slow:\n    host_workers: 1\n    nmap_args: [-T2]\n"
 	if err := os.WriteFile(fixture.configPath, []byte(fixture.configYAML), 0o644); err != nil {
 		t.Fatal(err)
 	}

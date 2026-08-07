@@ -14,12 +14,11 @@ import (
 
 func TestRunScanAssumeUpSkipsAliveSweep(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
-		[]byte("192.0.2.10 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.0.2.10"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.0.2.10", 22, "ssh", "OpenSSH", ""),
 	}}
 	if err := RunScan(context.Background(), runner, newScanStore(t), ScanOptions{
 		RunID: "run-assume-up", Targets: []string{"192.0.2.10"}, Ports: "22", DiscoveryMode: DiscoveryAssumeUp,
-		Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
+		Tools: ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"}, JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
@@ -28,8 +27,8 @@ func TestRunScanAssumeUpSkipsAliveSweep(t *testing.T) {
 			t.Fatalf("assume-up must skip alive sweep: %#v", runner.commands)
 		}
 	}
-	if len(runner.commands) == 0 || runner.commands[0][0] != "/opt/rustscan" {
-		t.Fatalf("first command = %#v, want rustscan", runner.commands)
+	if len(runner.commands) == 0 || runner.commands[0][0] != "/opt/fathom" {
+		t.Fatalf("first command = %#v, want fathom", runner.commands)
 	}
 }
 
@@ -50,7 +49,7 @@ func TestRunScanClampsHostWorkers(t *testing.T) {
 				HostWorkers:    tc.hostWorkers,
 				Targets:        []string{"10.0.0.0/30"},
 				Ports:          "22",
-				Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+				Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 				JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 			})
 			if err != nil {
@@ -73,13 +72,13 @@ func TestRunScanSkipsPortScanWhenHostIsDown(t *testing.T) {
 	}
 
 	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID: "run-down", Targets: []string{"172.22.0.7"}, Ports: "1-65535", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+		RunID: "run-down", Targets: []string{"172.22.0.7"}, Ports: "1-65535", Tools: ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
 	})
 	if err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
-	if runner.rustscanCalls != 0 {
-		t.Fatalf("expected rustscan to be skipped for down host, got %d calls", runner.rustscanCalls)
+	if runner.fathomCalls != 0 {
+		t.Fatalf("expected fathom to be skipped for down host, got %d calls", runner.fathomCalls)
 	}
 }
 
@@ -93,7 +92,7 @@ func TestRunScanUsesAliveSweepResultsAsTargets(t *testing.T) {
 	}
 
 	err = RunScan(context.Background(), runner, scanStore, ScanOptions{
-		RunID: "run-cidr", Targets: []string{"172.22.0.0/30"}, Ports: "1-1000", Tools: ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
+		RunID: "run-cidr", Targets: []string{"172.22.0.0/30"}, Ports: "1-1000", Tools: ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"}, JSONReportPath: reportPath,
 	})
 	if err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
@@ -101,8 +100,8 @@ func TestRunScanUsesAliveSweepResultsAsTargets(t *testing.T) {
 
 	want := [][]string{
 		{"/opt/nmap", "-sn", "172.22.0.0/30", "-oX", "-"},
-		{"/opt/rustscan", "-a", "172.22.0.1", "--range", "1-1000", "-g", "--no-banner"},
-		{"/opt/rustscan", "-a", "172.22.0.2", "--range", "1-1000", "-g", "--no-banner"},
+		{"/opt/fathom", "scan", "--json", "172.22.0.1", "-p", "1-1000"},
+		{"/opt/fathom", "scan", "--json", "172.22.0.2", "-p", "1-1000"},
 	}
 	if !reflect.DeepEqual(runner.commands, want) {
 		t.Fatalf("commands = %#v want %#v", runner.commands, want)
@@ -117,20 +116,20 @@ func TestRunScanFastProfileDoesNotReduceAliveSweep(t *testing.T) {
 		HostWorkers:    2,
 		Targets:        []string{"172.22.0.0/30"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		ExtraArgs:      ToolExtraArgs{Nmap: []string{"-T4", "--max-retries", "1"}},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	})
 	if err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
 	}
-	if runner.rustscanCalls != 2 {
-		t.Fatalf("fast profile scanned %d alive hosts, want 2", runner.rustscanCalls)
+	if runner.fathomCalls != 2 {
+		t.Fatalf("fast profile scanned %d alive hosts, want 2", runner.fathomCalls)
 	}
 }
 
 type profileSensitiveAliveRunner struct {
-	rustscanCalls int
+	fathomCalls int
 }
 
 func (r *profileSensitiveAliveRunner) Run(_ context.Context, binary string, args []string) ([]byte, error) {
@@ -141,8 +140,8 @@ func (r *profileSensitiveAliveRunner) Run(_ context.Context, binary string, args
 		}
 		return []byte(`<nmaprun><host><status state="up"/><address addr="172.22.0.1"/></host><host><status state="up"/><address addr="172.22.0.2"/></host></nmaprun>`), nil
 	}
-	if binary == "/opt/rustscan" {
-		r.rustscanCalls++
+	if binary == "/opt/fathom" {
+		r.fathomCalls++
 		return nil, nil
 	}
 	return nil, fmt.Errorf("unexpected command: %s %s", binary, joined)
@@ -164,7 +163,7 @@ func TestRunScanMarksCanceledWhenContextCanceled(t *testing.T) {
 		HostWorkers:    1,
 		Targets:        []string{"192.168.1.10", "192.168.1.11"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 	}
 	err = RunScan(ctx, runner, scanStore, opts)
@@ -199,7 +198,7 @@ func TestRunScanMarksCanceledWhenToolIsKilledAfterCancel(t *testing.T) {
 		HostWorkers:    1,
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 	}
 	err = RunScan(ctx, runner, scanStore, opts)
@@ -244,7 +243,7 @@ func TestRunScanRespectsProfileHostWorkersAfterAliveSweep(t *testing.T) {
 				HostWorkers:    tc.workers,
 				Targets:        []string{"10.0.0.0/28"},
 				Ports:          "22",
-				Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+				Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 				JSONReportPath: reportPath,
 			}
 
@@ -257,8 +256,8 @@ func TestRunScanRespectsProfileHostWorkersAfterAliveSweep(t *testing.T) {
 			if runner.maxActive != tc.workers {
 				t.Fatalf("expected max active %d, got %d", tc.workers, runner.maxActive)
 			}
-			if runner.rustscanCalls != len(targets) {
-				t.Fatalf("expected %d rustscan calls, got %d", len(targets), runner.rustscanCalls)
+			if runner.fathomCalls != len(targets) {
+			t.Fatalf("expected %d fathom calls, got %d", len(targets), runner.fathomCalls)
 			}
 		})
 	}
@@ -266,8 +265,7 @@ func TestRunScanRespectsProfileHostWorkersAfterAliveSweep(t *testing.T) {
 
 func TestRunScanContinuesAfterTargetFailure(t *testing.T) {
 	runner := &failFirstRunner{outputs: [][]byte{
-		[]byte("192.168.1.11 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.11" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.168.1.11", 22, "ssh", "OpenSSH", ""),
 	}}
 	dbPath := filepath.Join(t.TempDir(), "scan.db")
 	reportPath := filepath.Join(t.TempDir(), "report.json")
@@ -281,7 +279,7 @@ func TestRunScanContinuesAfterTargetFailure(t *testing.T) {
 		HostWorkers:    1,
 		Targets:        []string{"192.168.1.10", "192.168.1.11"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 	}
 
@@ -321,7 +319,7 @@ func TestRunScanReturnsErrorWhenAllTargetsFail(t *testing.T) {
 		HostWorkers:    2,
 		Targets:        []string{"192.168.1.10", "192.168.1.11"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		JSONReportPath: reportPath,
 	}
 

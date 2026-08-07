@@ -9,7 +9,7 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/store"
 )
 
-var rdpNmapXML = []byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="3389"><state state="open"/><service name="ms-wbt-server" product="Microsoft Terminal Services"/></port></ports></host></nmaprun>`)
+var rdpFathomJSONL = fathomJSONL("192.168.1.10", 3389, "ms-wbt-server", "Microsoft Terminal Services", "")
 
 func rdpscanCheck(t *testing.T, checks []store.DetectionCheck) store.DetectionCheck {
 	t.Helper()
@@ -34,8 +34,7 @@ func rdpscanFinding(findings []report.Finding) (report.Finding, bool) {
 func TestRunScanTriggersRdpscanForRDP(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [3389]\n"),
-		rdpNmapXML,
+		rdpFathomJSONL,
 		[]byte("192.168.1.10:3389 - VULNERABLE\n"),
 	}}
 	scanStore := newScanStore(t)
@@ -43,7 +42,7 @@ func TestRunScanTriggersRdpscanForRDP(t *testing.T) {
 		RunID:          "run-rdp-bluekeep",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "3389",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
@@ -78,8 +77,7 @@ func TestRunScanTriggersRdpscanForRDP(t *testing.T) {
 func TestRunScanRdpscanSafeDoesNotCreateFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [3389]\n"),
-		rdpNmapXML,
+		rdpFathomJSONL,
 		[]byte("192.168.1.10:3389 - SAFE - target appears patched\n"),
 	}}
 	scanStore := newScanStore(t)
@@ -87,7 +85,7 @@ func TestRunScanRdpscanSafeDoesNotCreateFinding(t *testing.T) {
 		RunID:          "run-rdp-safe",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "3389",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
@@ -114,8 +112,7 @@ func TestRunScanRdpscanSafeDoesNotCreateFinding(t *testing.T) {
 func TestRunScanRdpscanUnknownDoesNotCreateFinding(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [3389]\n"),
-		rdpNmapXML,
+		rdpFathomJSONL,
 		[]byte("192.168.1.10:3389 - UNKNOWN - NLA required\n"),
 	}}
 	scanStore := newScanStore(t)
@@ -123,7 +120,7 @@ func TestRunScanRdpscanUnknownDoesNotCreateFinding(t *testing.T) {
 		RunID:          "run-rdp-unknown",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "3389",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
@@ -150,15 +147,14 @@ func TestRunScanRdpscanUnknownDoesNotCreateFinding(t *testing.T) {
 func TestRunScanSkipsRdpscanWhenUnconfigured(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [3389]\n"),
-		rdpNmapXML,
+		rdpFathomJSONL,
 	}}
 	scanStore := newScanStore(t)
 	if err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID:          "run-rdp-unconfigured",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "3389",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)
@@ -181,15 +177,14 @@ func TestRunScanSkipsRdpscanWhenUnconfigured(t *testing.T) {
 func TestRunScanSkipsRdpscanForNonRDP(t *testing.T) {
 	runner := &recordingSequenceRunner{outputs: [][]byte{
 		aliveNmapXML,
-		[]byte("192.168.1.10 -> [22]\n"),
-		[]byte(`<nmaprun><host><address addr="192.168.1.10" addrtype="ipv4"/><ports><port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH"/></port></ports></host></nmaprun>`),
+		fathomJSONL("192.168.1.10", 22, "ssh", "OpenSSH", ""),
 	}}
 	scanStore := newScanStore(t)
 	if err := RunScan(context.Background(), runner, scanStore, ScanOptions{
 		RunID:          "run-ssh-rdpscan",
 		Targets:        []string{"192.168.1.10"},
 		Ports:          "22",
-		Tools:          ToolPaths{Rustscan: "/opt/rustscan", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
+		Tools:          ToolPaths{Fathom: "/opt/fathom", Nmap: "/opt/nmap", Rdpscan: "/opt/rdpscan"},
 		JSONReportPath: filepath.Join(t.TempDir(), "report.json"),
 	}); err != nil {
 		t.Fatalf("RunScan returned error: %v", err)

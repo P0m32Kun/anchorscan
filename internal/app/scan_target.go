@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,8 +19,6 @@ import (
 	"github.com/P0m32Kun/anchorscan/internal/vuln"
 )
 
-var nmapHeartbeatEvery = 30 * time.Second
-
 // TargetScan is the result bundle produced by scanning a single Target: the
 // service fingerprints, derived findings, and discovered open ports. It is the
 // named shape behind what scanTarget returns (previously a positional 4-tuple).
@@ -31,7 +30,7 @@ type TargetScan struct {
 	HadErrors    bool
 }
 
-// scanTarget runs the per-target pipeline (rustscan → nmap → httpx → NSE/nuclei)
+// scanTarget runs the per-target pipeline (fathom → httpx → NSE/nuclei)
 // and returns everything it discovered as a TargetScan. It persists durable
 // facts through the option seams while retaining them for the JSON report.
 func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, target string, artifactDir string, progress Progress) (TargetScan, error) {
@@ -39,54 +38,55 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	var allFindings []report.Finding
 
 	logf(opts, "target %s", target)
-	progress.Emit("info", "rustscan", "rustscan %s ports=%s", target, opts.Ports)
-	toolCtx, cancel := toolContext(ctx, opts.Timeouts.Rustscan)
-	ports, out, err := tools.DiscoverPortsWithOutput(toolCtx, runner, opts.Tools.Rustscan, target, opts.Ports, opts.ExtraArgs.Rustscan)
+	progress.Emit("info", "fathom", "fathom %s ports=%s", target, opts.Ports)
+	ports, err := parseScanPorts(opts.Ports)
+	if err != nil {
+		return TargetScan{}, err
+	}
+	toolCtx, cancel := toolContext(ctx, opts.Timeouts.Fathom)
+	fathomResult, err := tools.RunFathomScan(toolCtx, runner, opts.Tools.Fathom, target, ports)
 	normalizedErr := normalizeToolError(toolCtx, err)
 	cancel()
-	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("rustscan", target, "ports")+".txt", out); writeErr != nil {
+	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("fathom", target)+".jsonl", fathomResult.Output); writeErr != nil {
 		return TargetScan{}, writeErr
 	}
 	if err != nil {
 		return TargetScan{}, normalizedErr
 	}
-	progress.Emit("info", "rustscan", "rustscan %s open=%v", target, ports)
-	openPorts := append([]int(nil), ports...)
-	if len(ports) == 0 {
+	// Scope filtering mirrors the pre-fathom pipeline: a zero scope (direct
+	// RunScan callers, no PrepareScan) allows everything, and target.Scope.Allows
+	// returns false for an empty include set, so the filter must stay conditional.
+	fingerprints := fathomResult.Fingerprints
+	if !opts.Scope.IsZero() {
+		fingerprints = filterScopeFingerprints(opts.Scope, fathomResult.Fingerprints)
+	}
+	openPorts := make([]int, 0, len(fathomResult.Fingerprints))
+	for _, fp := range fathomResult.Fingerprints {
+		openPorts = append(openPorts, fp.Port)
+	}
+	progress.Emit("info", "fathom", "fathom %s services=%d", target, len(fingerprints))
+	if len(fingerprints) == 0 {
 		progress.Emit("info", "target", "target %s has no open ports; skip fingerprint and vulnerability checks", target)
 		return TargetScan{Target: target, OpenPorts: openPorts}, nil
 	}
 
-	progress.Emit("info", "nmap", "nmap %s ports=%v (service detection may be slow)", target, ports)
-	started := time.Now()
-	done := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(nmapHeartbeatEvery)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				progress.Emit("info", "heartbeat", "nmap %s still running elapsed=%s", target, time.Since(started).Round(time.Second))
-			case <-done:
-				return
-			}
+	// fathom checks (verdict=vulnerable/safe/unknown) persist as high-severity
+	// findings (vulnerable only) and as DetectionCheck audit rows before the
+	// back-stage loop, mirroring the front stage's persistence position: these
+	// durable facts survive even when a later optional stage fails.
+	for _, finding := range fathomResult.Findings {
+		if err := persistFinding(opts, finding); err != nil {
+			return TargetScan{}, err
 		}
-	}()
-	toolCtx, cancel = toolContext(ctx, opts.Timeouts.Nmap)
-	fingerprints, out, err := tools.FingerprintWithOutput(toolCtx, runner, opts.Tools.Nmap, target, ports, opts.ExtraArgs.Nmap)
-	if !opts.Scope.IsZero() {
-		fingerprints = filterScopeFingerprints(opts.Scope, fingerprints)
+		allFindings = append(allFindings, finding)
 	}
-	normalizedErr = normalizeToolError(toolCtx, err)
-	cancel()
-	close(done)
-	if _, writeErr := writeArtifact(artifactDir, safeArtifactName("nmap-service", target)+".xml", out); writeErr != nil {
-		return TargetScan{}, writeErr
+	for _, check := range fathomResult.Checks {
+		now := time.Now()
+		fp := fingerprint.ServiceFingerprint{IP: check.IP, Port: check.Port, Protocol: check.Protocol}
+		if err := recordDetectionCheck(opts, fp, check.Engine, check.Status, check.ReasonCode, check.Detail, now, now); err != nil {
+			return TargetScan{}, err
+		}
 	}
-	if err != nil {
-		return TargetScan{}, normalizedErr
-	}
-	progress.Emit("info", "nmap", "nmap %s services=%d elapsed=%s", target, len(fingerprints), time.Since(started).Round(time.Second))
 
 	result := TargetScan{Target: target, OpenPorts: openPorts}
 	for _, fp := range fingerprints {
@@ -96,32 +96,48 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			}
 		}
 		httpResult := tools.HTTPResult{}
-		if fp.IsWeb && opts.Tools.Httpx != "" {
-			progress.Emit("info", "httpx", "httpx %s", fp.URL)
+		if opts.Tools.Httpx != "" && (fp.IsWeb || tools.NeedsTLSWebEnhancement(fp.Normalized, fp.Port)) {
+			probe := fp
+			if probe.URL == "" {
+				// fathom cannot complete a TLS handshake (spec decision 2): probe
+				// the TLS web candidate port with an https URL so httpx can perform
+				// the handshake and upgrade the fingerprint.
+				probe.URL = (&url.URL{Scheme: "https", Host: net.JoinHostPort(fp.IP, strconv.Itoa(fp.Port))}).String()
+			}
+			progress.Emit("info", "httpx", "httpx %s", probe.URL)
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Httpx)
-			httpResult, out, err = tools.EnrichWebWithOutput(toolCtx, runner, opts.Tools.Httpx, fp, opts.ExtraArgs.Httpx)
+			var out []byte
+			httpResult, out, err = tools.EnrichWebWithOutput(toolCtx, runner, opts.Tools.Httpx, probe, opts.ExtraArgs.Httpx)
 			operatorCanceled := isOperatorCanceled(toolCtx)
 			cancel()
 			if _, writeErr := writeArtifact(artifactDir, safeArtifactName("httpx", fp.IP, strconv.Itoa(fp.Port))+".jsonl", out); writeErr != nil {
 				result.HadErrors = true
-				progress.Emit("error", "httpx", "httpx %s artifact failed: %v", fp.URL, writeErr)
+				progress.Emit("error", "httpx", "httpx %s artifact failed: %v", probe.URL, writeErr)
 			}
 			if err != nil {
 				if operatorCanceled {
 					return result, context.Canceled
 				}
 				result.HadErrors = true
-				progress.Emit("error", "httpx", "httpx %s failed: %v", fp.URL, err)
+				progress.Emit("error", "httpx", "httpx %s failed: %v", probe.URL, err)
 			}
 			if httpResult.URL != "" && (opts.Scope.IsZero() || scopeAllowsURL(opts.Scope, httpResult.URL)) {
 				fp.URL = httpResult.URL
+				fp.IsWeb = true
 			}
 		}
-		// Nuclei is the sole Dameng protocol authority. Nmap labels and ports
-		// are candidates only and never authorize a credential attempt.
+		// Nuclei is a Dameng protocol authority alongside fathom. Nmap labels and
+		// ports are candidates only and never authorize a credential attempt.
 		damengMatched := false
 		var damengIdentifyErr error
-		if !fp.IsWeb && opts.Tools.Dameng != "" && opts.Tools.Nuclei != "" {
+		switch {
+		case fp.Normalized == "dameng":
+			// fathom identified Dameng through its protocol-level handshake
+			// (spec decision 4; authority equivalent to nuclei dameng-detect),
+			// so the nuclei dameng-identify round trip is skipped and the
+			// default-password check runs straight away.
+			damengMatched = true
+		case !fp.IsWeb && opts.Tools.Dameng != "" && opts.Tools.Nuclei != "":
 			started := time.Now()
 			progress.Emit("info", "dameng-identify", "dameng-identify %s:%d template=dameng-detect", fp.IP, fp.Port)
 			toolCtx, cancel = toolContext(ctx, opts.Timeouts.Dameng)
@@ -486,6 +502,72 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 	}
 
 	return TargetScan{Target: target, Fingerprints: allFingerprints, Findings: allFindings, OpenPorts: openPorts, HadErrors: result.HadErrors}, nil
+}
+
+// parseScanPorts expands a resolved port spec ("22,80" / "1-65535") into the
+// integer list fathom scans. PrepareScan already expands the "top1000" preset
+// (fathom -p accepts explicit lists/ranges only), so scanTarget sees only
+// CSV/range specs. The grammar mirrors internal/ports.expandPortSpec (same
+// CSV + range parsing, dedup, ascending order) because that helper is
+// unexported and this task's scope forbids touching internal/ports.
+func parseScanPorts(spec string) ([]int, error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return nil, fmt.Errorf("ports is empty")
+	}
+	if spec == "top1000" {
+		return nil, fmt.Errorf("port preset %q must be expanded before scanTarget runs", spec)
+	}
+	var out []int
+	seen := map[int]struct{}{}
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		start, end, err := scanPortBounds(part)
+		if err != nil {
+			return nil, err
+		}
+		for port := start; port <= end; port++ {
+			if _, ok := seen[port]; !ok {
+				seen[port] = struct{}{}
+				out = append(out, port)
+			}
+		}
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+func scanPortBounds(part string) (int, int, error) {
+	if idx := strings.IndexByte(part, '-'); idx >= 0 {
+		start, err := parseScanPort(part[:idx])
+		if err != nil {
+			return 0, 0, err
+		}
+		end, err := parseScanPort(part[idx+1:])
+		if err != nil {
+			return 0, 0, err
+		}
+		if end < start {
+			start, end = end, start
+		}
+		return start, end, nil
+	}
+	port, err := parseScanPort(part)
+	if err != nil {
+		return 0, 0, err
+	}
+	return port, port, nil
+}
+
+func parseScanPort(value string) (int, error) {
+	port, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("invalid port: %s", strings.TrimSpace(value))
+	}
+	return port, nil
 }
 
 func filterScopeFingerprints(scope target.Scope, fingerprints []fingerprint.ServiceFingerprint) []fingerprint.ServiceFingerprint {

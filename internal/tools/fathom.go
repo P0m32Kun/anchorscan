@@ -48,7 +48,7 @@ type FathomScanResult struct {
 // IPs/CIDRs and -l target files; batch/IPv6 handling is deferred to M4.2.
 func RunFathomScan(ctx context.Context, runner Runner, binary, ip string, ports []int) (FathomScanResult, error) {
 	var result FathomScanResult
-	args := []string{"scan", "--json", ip, "-p", joinPorts(ports)}
+	args := []string{"scan", "--json", ip, "-p", fathomPortSpec(ports)}
 
 	out, err := runner.Run(ctx, binary, args)
 	result.Output = out
@@ -64,6 +64,40 @@ func RunFathomScan(ctx context.Context, runner Runner, binary, ip string, ports 
 	result.Findings = findings
 	result.Checks = checks
 	return result, nil
+}
+
+// fathomPortSpec renders ports the way `fathom scan -p` expects: comma
+// separated, with consecutive ranges collapsed ("1-65535"). A flat full-range
+// CSV is ~382 KiB — above macOS ARG_MAX (≈256 KiB) — so collapsing ranges
+// keeps the argv small; fathom's own port parser accepts ranges
+// (~/DEV/fathom src/ports.rs parse()). Single-port and sparse lists are
+// byte-identical to the previous joinPorts output.
+func fathomPortSpec(ports []int) string {
+	if len(ports) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	start, prev := ports[0], ports[0]
+	flush := func(end int) {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(strconv.Itoa(start))
+		if end != start {
+			b.WriteByte('-')
+			b.WriteString(strconv.Itoa(end))
+		}
+	}
+	for _, port := range ports[1:] {
+		if port == prev+1 {
+			prev = port
+			continue
+		}
+		flush(prev)
+		start, prev = port, port
+	}
+	flush(prev)
+	return b.String()
 }
 
 // fathomRecord mirrors the JSON fathom emits per open port. Unknown keys (e.g.
