@@ -79,6 +79,11 @@ func scanTarget(ctx context.Context, runner tools.Runner, opts ScanOptions, targ
 			return TargetScan{}, err
 		}
 		allFindings = append(allFindings, finding)
+		// Live terminal hit line, mirroring the rdpscan/dameng VULNERABLE style
+		// (info level + uppercase hit marker) so the frontend's per-line green
+		// hit coloring catches fathom findings too. The parenthesized summary
+		// keeps the original check id for traceability.
+		progress.Emit("info", "fathom", "fathom %s:%d %s (%s)", finding.IP, finding.Port, strings.ToUpper(finding.ID), finding.Summary)
 	}
 	for _, check := range fathomResult.Checks {
 		now := time.Now()

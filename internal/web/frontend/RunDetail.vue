@@ -31,18 +31,44 @@ const metaOpen = ref(false);
 const followingOutput = ref(true);
 const eventLog = ref<HTMLElement>();
 const eventPageSize = 1000;
+// 离开底部后无滚动操作多少秒自动恢复跟随。选 45s：护网场景用户可能长时间停留
+// 在某一段日志上，30s 太容易误触发；45s 内任何滚动都会重置计时，因此计时从
+// 用户停止滚动那一刻才开始。
+const resumeFollowSeconds = 45;
+let resumeFollowTimer = 0;
 let timer = 0;
 let refreshing = false;
 let hasMoreEvents = false;
 
 const active = computed(() => status.value === 'running');
 const latestEvent = computed(() => events.value.at(-1));
-const output = computed(() => events.value.map((event) => {
-  // Tool-terminal events belong to the single-tool page's raw terminal; here
-  // the monitor keeps its processed view and only points at the raw record.
+// 单行文案：raw 事件指向单工具页原始终端（保持原样），其余按 [时间] [级别] 阶段: 消息。
+function lineText(event: ScanEvent): string {
   if (event.level === 'raw') return `[${formatConsoleTime(event.time)}] [raw] ${event.stage || 'tool'}: 原始终端输出（完整内容与颜色见单工具调用页/扫描报告）`;
   return `[${formatConsoleTime(event.time)}] [${event.level || 'info'}] ${event.stage || 'engine'}: ${event.message}`;
-}).join('\n'));
+}
+
+// 分级着色（逐行判断）：错误红 / 警告黄 / 命中漏洞绿 / 指纹识别青 / 普通保持主题色。
+// 命中漏洞：rdpscan/dameng 的 VULNERABLE 行，以及 fathom finding 命中行
+// （形如 "fathom 1.2.3.4:6379 REDIS-UNAUTH (fathom redis-unauth: ...)"，finding.ID 已大写）。
+// 指纹识别：fathom services=N、service=、fingerprint 关键字。
+function lineClass(level: string, message: string): string {
+  if (level === 'error') return 'event-line-error';
+  if (level === 'warning') return 'event-line-warning';
+  if (level === 'info') {
+    if (/vulnerable/i.test(message)) return 'event-line-hit';
+    if (/^fathom \S+:\d+ [A-Z0-9][A-Z0-9_-]* \(/i.test(message)) return 'event-line-hit';
+    if (/services=\d+|service=|fingerprint/i.test(message)) return 'event-line-fingerprint';
+  }
+  return '';
+}
+
+// 逐行渲染（每行一个 span，行尾自带换行）；output 仍为纯文本，供复制按钮使用。
+const lines = computed(() => events.value.map((event) => ({
+  text: lineText(event) + '\n',
+  className: lineClass(event.level || 'info', event.message),
+})));
+const output = computed(() => events.value.map(lineText).join('\n'));
 const progress = computed(() => {
   const event = [...events.value].reverse().find(({ stage }) => stage.toLowerCase() === 'progress');
   const match = event?.message.match(/(\d+)\s*\/\s*(\d+)/);
@@ -117,7 +143,27 @@ async function copyOutput() {
 
 function onOutputScroll() {
   const box = eventLog.value;
-  if (box) followingOutput.value = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+  if (!box) return;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+  if (atBottom) {
+    // 滚回底部：取消待恢复定时器并立即继续跟随。
+    window.clearTimeout(resumeFollowTimer);
+    resumeFollowTimer = 0;
+    followingOutput.value = true;
+    return;
+  }
+  // 离开底部：进入手动模式。滚动事件高频触发，每次滚动都重置 45s 定时器，
+  // 因此计时从用户停止滚动那一刻才开始；45s 无操作后自动恢复跟随最新输出。
+  followingOutput.value = false;
+  window.clearTimeout(resumeFollowTimer);
+  resumeFollowTimer = window.setTimeout(() => {
+    resumeFollowTimer = 0;
+    followingOutput.value = true;
+    const log = eventLog.value;
+    const selection = window.getSelection();
+    const selecting = selection?.rangeCount && log && (log.contains(selection.anchorNode) || log.contains(selection.focusNode));
+    if (log && !selecting) log.scrollTop = log.scrollHeight;
+  }, resumeFollowSeconds * 1000);
 }
 
 watch(events, async () => {
@@ -136,7 +182,10 @@ onMounted(async () => {
   if (active.value || hasMoreEvents) timer = window.setInterval(() => { void refresh().catch(() => { feedback.value = '暂时无法更新运行状态。'; }); }, 1200);
 });
 
-onBeforeUnmount(() => window.clearInterval(timer));
+onBeforeUnmount(() => {
+  window.clearInterval(timer);
+  window.clearTimeout(resumeFollowTimer);
+});
 </script>
 
 <template>
@@ -182,7 +231,7 @@ onBeforeUnmount(() => window.clearInterval(timer));
     <p class="meta-line">检测检查：已完成 {{ checks.completed || 0 }}，运行中 {{ checks.running || 0 }}，失败 {{ checks.failed || 0 }}，跳过 {{ checks.skipped || 0 }}，已取消 {{ checks.canceled || 0 }}，已中断 {{ checks.interrupted || 0 }}</p>
     <div class="terminal-window">
       <div class="terminal-header"><div class="terminal-dots"><span class="terminal-dot dot-red"></span><span class="terminal-dot dot-yellow"></span><span class="terminal-dot dot-green"></span></div><div class="terminal-title">anchorscan@engine: ~</div></div>
-      <pre ref="eventLog" class="event-log" @scroll="onOutputScroll">{{ output || '等待运行事件…' }}</pre>
+      <pre ref="eventLog" class="event-log" @scroll="onOutputScroll"><span v-for="(line, i) in lines" :key="i" :class="line.className">{{ line.text }}</span><template v-if="!lines.length">等待运行事件…</template></pre>
     </div>
   </section>
 </template>
